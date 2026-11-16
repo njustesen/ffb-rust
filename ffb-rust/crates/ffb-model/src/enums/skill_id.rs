@@ -1457,7 +1457,11 @@ impl SkillId {
             SkillId::PumpUpTheCrowd => &["grantsTeamReRollWhenCausingBlockCas", "grantsTeamReRollWhenCausingCas"],
             // Java: bb2016+bb2025/PutTheBootIn.postConstruct register only canAlwaysAssistFouls;
             //   bb2020/SneakyGit.postConstruct additionally registers canMoveAfterFoul — union of both.
-            SkillId::SneakyGit | SkillId::PutTheBootIn => &["canAlwaysAssistFouls", "canMoveAfterFoul"],
+            SkillId::SneakyGit => &["canAlwaysAssistFouls", "canMoveAfterFoul"],
+            // Put the Boot In never registers canMoveAfterFoul: sharing Sneaky Git's union let a
+            // bb2025 Lord Borak (Put the Boot In + Sneaky Git) keep moving after his foul (star
+            // tier: nurgle vs vampire bb2025 seed 2).
+            SkillId::PutTheBootIn => &["canAlwaysAssistFouls"],
             // Java: bb2020+bb2025/Defensive.postConstruct both register
             // CancelSkillProperty(assistsBlocksInTacklezones) + CancelSkillProperty(assistsFoulsInTacklezones);
             // bb2025 additionally registers CancelSkillProperty(canAlwaysAssistFouls) — union of both.

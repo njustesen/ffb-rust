@@ -96,7 +96,11 @@ impl StepEndFouling {
         //           && UtilPlayer.isNextMovePossible(game, false))
         let can_move_after_foul = player_id.as_deref()
             .and_then(|id| game.player(id))
-            .map(|p| p.has_skill_property(NamedProperties::CAN_MOVE_AFTER_FOUL))
+            // Edition-aware: bb2025 Sneaky Git registers NO properties (only bb2025 Quick Foul and
+            // bb2020 Sneaky Git carry canMoveAfterFoul); the edition-agnostic union let a bb2025
+            // Sneaky Git keep moving after the foul (star tier: Lord Borak, nurgle vs vampire
+            // bb2025 seed 2).
+            .map(|p| p.has_skill_property_in(game.rules, NamedProperties::CAN_MOVE_AFTER_FOUL))
             .unwrap_or(false)
             // bb2020 StepEndFouling adds `sneakyMove.isEnabled()` (SNEAKY_GIT_CAN_MOVE_AFTER_FOUL,
             // default false): a bb2020 Sneaky Git ends the action after fouling (star tier: Lord
@@ -236,5 +240,33 @@ mod tests {
         // should push Select sequence (update_persistence=true)
         assert_eq!(out.pushes.len(), 1);
         assert_eq!(out.pushes[0][0].step_id, StepId::InitSelecting);
+    }
+
+    /// Java bb2025 `SneakyGit` registers no properties (canMoveAfterFoul is bb2020 Sneaky Git /
+    /// bb2025 Quick Foul only), so a bb2025 Sneaky Git ends the activation after the foul.
+    #[test]
+    fn bb2025_sneaky_git_does_not_move_after_the_foul() {
+        use ffb_model::enums::PlayerState;
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+        const ACTIVE_STANDING: PlayerState = PlayerState(0x101);
+
+        let mut game = make_game();
+        assert_eq!(game.rules, ffb_model::enums::Rules::Bb2025);
+        let mut p = Player::default();
+        p.id = "p1".into();
+        p.movement = 6;
+        p.starting_skills.push(SkillWithValue::new(SkillId::SneakyGit));
+        game.team_home.players.push(p);
+        game.field_model.set_player_state("p1", ACTIVE_STANDING);
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.current_move = 0;
+
+        let mut step = StepEndFouling::new();
+        step.end_turn = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.pushes.iter().all(|seq| seq.first().map(|s| s.step_id) != Some(StepId::InitSelecting)),
+            "a bb2025 Sneaky Git must not be handed a post-foul Select");
     }
 }
