@@ -216,6 +216,17 @@ fn reorder_swarming_before_scatter(seq: &mut Vec<SequenceStep>) {
 pub fn h2_kickoff_sequence_for(rules: ffb_model::enums::Rules) -> Vec<SequenceStep> {
     let mut seq = h2_kickoff_sequence();
     if rules == ffb_model::enums::Rules::Bb2020 {
+        // Java `generator/mixed/Kickoff.java:45-46`: APOTHECARY(HOME), APOTHECARY(AWAY) after
+        // APPLY_KICKOFF_RESULT, as the opening `kickoff_tail` already has. The post-touchdown /
+        // second-half kickoff lacked them, so a Ball & Chain player stunned by an Officious Ref
+        // had its injury rolled and dropped (star tier: Kreek the Verminator, human vs norse
+        // bb2020 seed 2 -- Java KO, Rust standing).
+        if let Some(i) = seq.iter().position(|st| st.step_id == StepId::ApplyKickoffResult) {
+            seq.insert(i + 1, SequenceStep::with_params(StepId::Apothecary,
+                vec![StepParameter::ApothecaryMode(ApothecaryMode::Away)]));
+            seq.insert(i + 1, SequenceStep::with_params(StepId::Apothecary,
+                vec![StepParameter::ApothecaryMode(ApothecaryMode::Home)]));
+        }
         add_bb2020_kickoff_labels(&mut seq);
     }
     if rules == ffb_model::enums::Rules::Bb2025 {
@@ -432,6 +443,20 @@ mod tests {
             assert_eq!(modes, vec![ApothecaryMode::Home, ApothecaryMode::Away],
                 "{rules:?}: APPLY_KICKOFF_RESULT must be followed by APOTHECARY(HOME) then AWAY");
         }
+    }
+
+    #[test]
+    fn bb2020_post_touchdown_kickoff_also_applies_kickoff_event_injuries() {
+        let seq = h2_kickoff_sequence_for(ffb_model::enums::Rules::Bb2020);
+        let akr = seq.iter().position(|st| st.step_id == StepId::ApplyKickoffResult).unwrap();
+        let modes: Vec<ApothecaryMode> = seq[akr + 1..].iter()
+            .take_while(|st| st.step_id == StepId::Apothecary)
+            .filter_map(|st| st.params.iter().find_map(|p| match p {
+                StepParameter::ApothecaryMode(m) => Some(*m),
+                _ => None,
+            }))
+            .collect();
+        assert_eq!(modes, vec![ApothecaryMode::Home, ApothecaryMode::Away]);
     }
     /// Java's `generator/mixed/Kickoff.pushSequence` threads GOTO_LABEL_ON_END/ON_BLITZ onto
     /// APPLY_KICKOFF_RESULT and labels BLITZ_TURN / KICKOFF_ANIMATION / END_KICKOFF. BB2020's

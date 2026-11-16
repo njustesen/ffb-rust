@@ -272,9 +272,16 @@ impl StepFoulAppearance {
                 // is deselected). Without the has_blocked guard Rust retroactively undid a stand-up
                 // Java keeps — necromantic seed 37 step 182: FA 4 (pass), block 4 (push), Frenzy FA
                 // 1 (fail), Java h01 Standing vs Rust h01 Prone.
+                // ...and not after a failed Take Root: Java's cancelPlayerAction turns BLITZ_MOVE
+                // into BLITZ (rooted), which is NOT in Java's list, so the stood-up blitzer stays
+                // Standing (star tier: halfling Treeman blitz, necromantic vs halfling bb2020).
                 || (game.rules == ffb_model::enums::Rules::Bb2020
                     && pa.is_blitzing()
-                    && !game.acting_player.has_blocked)
+                    && !game.acting_player.has_blocked
+                    && !game.acting_player.player_id.as_deref()
+                        .and_then(|id| game.field_model.player_state(id))
+                        .map(|s| s.is_rooted())
+                        .unwrap_or(false))
             ).unwrap_or(false);
             if set_prone {
                 if let Some(pid) = game.acting_player.player_id.clone() {

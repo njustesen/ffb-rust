@@ -169,10 +169,16 @@ impl StepApothecaryMultiple {
             let mut results_to_keep = Vec::new();
             for r in self.injury_results.drain(..) {
                 let player_id = r.injury_context().defender_id.clone();
-                let regen_rolled = if let Some(ref pid) = player_id {
-                    crate::step::util_server_injury::handle_regeneration(game, rng, pid)
-                } else {
-                    false
+                // Java `regenerationHandled`: `injuryContext.isCasualty() && handleRegeneration(this,
+                // player, injuryContext.getPlayerState())` -- the CONTEXT's state; the injury has
+                // not been applied to the field yet. Rust read the field state (not a casualty
+                // yet), so a multi-block casualty never rolled Regeneration (star tier: halfling
+                // vs necromantic bb2020, Grim Ironjaw's Multiple Block).
+                let ctx_state = r.injury_context().injury;
+                let regen_rolled = match (player_id.as_ref(), ctx_state) {
+                    (Some(pid), Some(state)) => crate::step::util_server_injury::handle_regeneration_with_state(
+                        game, rng, pid, state, false).0,
+                    _ => false,
                 };
                 if !regen_rolled {
                     results_to_keep.push(r);
