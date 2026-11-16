@@ -245,8 +245,12 @@ impl StepMoveDodge {
                 .publish(StepParameter::UsingBreakTackle(self.using_break_tackle));
         }
 
-        // First failure: try re-roll
-        if !already_rerolled {
+        // First failure: try re-roll. Java: `if (!fReRollUsed && (getReRolledAction() != DODGE))`
+        // — the RETRY_DODGE re-evaluation after an accepted Diving Tackle runs in a fresh step that
+        // receives RE_ROLL_USED from the first one; when the Dodge skill re-roll was already spent
+        // Java lets the dodge fail, Rust offered the team re-roll (star tier: halfling Zara,
+        // slann_fumbbl vs halfling bb2016 seed 1).
+        if !already_rerolled && !self.re_roll_used {
             use ffb_model::model::re_rolled_action::ReRolledAction;
             self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("DODGE"));
 
@@ -617,6 +621,23 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::Continue);
         assert!(out.prompt.is_some());
+    }
+
+    /// Java bb2016: `if (!fReRollUsed && reRolledAction != DODGE)` — the Diving Tackle
+    /// re-evaluation step inherits RE_ROLL_USED=true and must not offer the team re-roll.
+    #[test]
+    fn failure_after_a_spent_reroll_offers_nothing() {
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        add_player(&mut game, "p1");
+        let mut step = StepMoveDodge::new("fail".into());
+        step.dodge_roll = 1;
+        step.re_roll_used = true;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(out.prompt.is_none(), "no second re-roll offer: {:?}", out.prompt);
+        assert_eq!(out.action, StepAction::GotoLabel);
     }
 
     #[test]
