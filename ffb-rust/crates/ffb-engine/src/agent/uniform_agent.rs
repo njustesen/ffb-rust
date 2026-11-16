@@ -409,6 +409,12 @@ impl Agent for UniformAgent {
             // BuyInducements / BuyPrayersAndInducements: actually attempt purchases (uniformly
             // sampled from every affordable subset), instead of RandomAgent's hardcoded
             // empty-purchase response.
+            // Cards: no CardDeck port, so decline (StepBuyCards panics on a purchase).
+            // Kick: ParityRunner KICK_SKILL arm declines (CLIENT_USE_SKILL false), zero RNG.
+            Some(AgentPrompt::KickSkill { .. }) =>
+                Action::UseSkill { skill_id: ffb_model::enums::SkillId::Kick, use_skill: false },
+            Some(AgentPrompt::BuyCards { team_id, .. }) =>
+                Action::BuyCard { home: *team_id == gs.game.team_home.id, card_type: None },
             Some(AgentPrompt::BuyInducements { team_id, available, budget }) => {
                 let subsets = legal_inducement_purchases(available, *budget);
                 let idx = self.pick(subsets.len().max(1));

@@ -266,6 +266,9 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
         // Agent-only half of the block dialog; the GUI shows Brawler/Pro on the BlockChoice dialog.
         AgentPrompt::BlockSkillReRoll { .. } => None,
         AgentPrompt::GazeTarget { .. } => None,
+        // bb2016 card purchase: no WireDialog for DialogBuyCardsParameter yet (headless only).
+        AgentPrompt::BuyCards { .. } => None,
+        AgentPrompt::KickSkill { .. } => None,
         AgentPrompt::BlockChoice { attacker_id, defender_id, dice, own_choice, nr_of_dice } =>
             Some(WireDialog::BlockChoice {
                 attacker_id: attacker_id.clone(), defender_id: defender_id.clone(),

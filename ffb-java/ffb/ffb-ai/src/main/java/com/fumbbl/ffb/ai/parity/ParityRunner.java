@@ -1589,6 +1589,15 @@ public class ParityRunner {
                     comm.clearCaptured();
                     comm.sendUseSkill(su.getSkill(), useSkill, su.getPlayerId());
                     injectCaptured(dialog, game, gameState);
+                    // A step that consumes the answer without hiding the dialog (StepInitBomb's
+                    // Kaboom! offer) leaves the SAME object set, and the loop re-answered it ~500
+                    // times -- one heuristic.useSkill draw pair each -- until DIALOG_LOOP_CLEARED
+                    // (star tier: Bomber Dribblesnot, underworld vs goblin bb2020). Rust answers the
+                    // prompt once. Clear only that object: a step that re-shows the dialog sets a
+                    // NEW one (the RE_ROLL_PROPERTIES precedent).
+                    if (game.getDialogParameter() == dialog) {
+                        game.setDialogParameter(null);
+                    }
                 } else {
                     game.setDialogParameter(null);
                 }
@@ -1724,8 +1733,27 @@ public class ParityRunner {
                 break;
             }
 
-            case PLAYER_CHOICE:
+            // ── Kick skill (all editions' StepKickoffScatterRoll): always DECLINE, zero RNG ──
+            // It shared the PLAYER_CHOICE arm, whose non-PlayerChoice branch only cleared the
+            // dialog locally, so the step never got its CLIENT_USE_SKILL and spun as
+            // UNHANDLED_STEP KICKOFF_SCATTER_ROLL (star tier: Dolfar Longstride kicking from the
+            // centre field). The Rust agents answer AgentPrompt::KickSkill the same way.
             case KICK_SKILL: {
+                com.fumbbl.ffb.dialog.DialogKickSkillParameter ks =
+                    (com.fumbbl.ffb.dialog.DialogKickSkillParameter) dialog;
+                Player<?> kicker = game.getPlayerById(ks.getPlayerId());
+                com.fumbbl.ffb.model.skill.Skill kick = (kicker == null) ? null
+                    : kicker.getSkillWithProperty(com.fumbbl.ffb.model.property.NamedProperties.canReduceKickDistance);
+                game.setDialogParameter(null);
+                if (kick != null) {
+                    MatchRunner.injectForTeam(gameState,
+                        new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(kick, false, kicker.getId(), null, false),
+                        game.getTeamHome().hasPlayer(kicker));
+                }
+                break;
+            }
+
+            case PLAYER_CHOICE: {
                 // Most PlayerChoice modes: decline with empty selection.
                 // Exception: MVP must have a non-empty selection (server loops otherwise).
                 if (dialog instanceof DialogPlayerChoiceParameter) {
@@ -1991,6 +2019,23 @@ public class ParityRunner {
             // Fires when a SW player was ejected and the team is offered a bribe
             // reroll. Use RandomStrategy to send a valid decline command; just clearing
             // the dialog causes the server to re-fire it 100,000 times (MAX_ITERATIONS).
+            // ── bb2016 card purchase: always decline (the pregame "purchases declined" policy) ──
+            // Reached once a team-value gap reaches the cheapest card (the star tier, BACKLOG §L:
+            // a hired star's cost is in Java's recomputed TV). The default arm's RandomStrategy
+            // sent sendCardSelection(null) -- a different command StepBuyCards never handles --
+            // so the dialog re-fired until MAX_ITERATIONS. CLIENT_BUY_CARD with a null type marks
+            // that team done; it must come from the dialog's team (StepBuyCards checks the
+            // session). Zero RNG; the Rust agents answer AgentPrompt::BuyCards the same way.
+            case BUY_CARDS: {
+                com.fumbbl.ffb.dialog.DialogBuyCardsParameter bc =
+                    (com.fumbbl.ffb.dialog.DialogBuyCardsParameter) dialog;
+                game.setDialogParameter(null);
+                MatchRunner.injectForTeam(gameState,
+                    new com.fumbbl.ffb.net.commands.ClientCommandBuyCard(null),
+                    bc.getTeamId().equals(game.getTeamHome().getId()));
+                break;
+            }
+
             case BRIBERY_AND_CORRUPTION_RE_ROLL: {
                 comm.clearCaptured();
                 RandomStrategy.respondToDialog(dialog, game, comm);

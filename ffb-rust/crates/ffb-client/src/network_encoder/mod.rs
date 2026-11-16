@@ -252,6 +252,7 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
         // are not yet added to ffb-protocol. The engine handles these internally.
         Action::UseBrawler { .. } => None,
         Action::UseHatred => None,
+        Action::BuyCard { .. } => None,
         Action::UseProReRollForBlock { .. } => None,
         Action::UseConsummateReRollForBlock { .. } => None,
         Action::UseSingleBlockDieReRoll { .. } => None,

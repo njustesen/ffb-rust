@@ -47,6 +47,8 @@ pub struct StepKickoffScatterRoll {
     pub kickoff_bounds: Option<FieldCoordinateBounds>,
     /// Java: fTouchback
     pub touchback: bool,
+    /// The kicker shown DialogKickSkillParameter (Java `kickingPlayer`), for the skill report.
+    pub kicking_player_id: Option<String>,
 }
 
 impl StepKickoffScatterRoll {
@@ -60,6 +62,7 @@ impl StepKickoffScatterRoll {
             kicking_player_coordinate: None,
             kickoff_bounds: None,
             touchback: false,
+            kicking_player_id: None,
         }
     }
 }
@@ -81,7 +84,7 @@ impl Step for StepKickoffScatterRoll {
             if self.use_kick_choice.is_none() {
                 self.use_kick_choice = Some(*use_skill);
                 if *use_skill {
-                    let pid = game.acting_player.player_id.clone();
+                    let pid = self.kicking_player_id.clone();
                     game.report_list.add(ReportSkillUse::new(
                         pid,
                         SkillId::Kick,
@@ -143,7 +146,24 @@ impl StepKickoffScatterRoll {
                     .unwrap_or(default_kicker),
             );
 
-            // client-only: DialogKickSkillParameter — headless auto-declines Kick skill
+            // Java: a kicker with canReduceKickDistance standing in its CENTER_FIELD gets
+            // DialogKickSkillParameter and the step waits for CLIENT_USE_SKILL; otherwise
+            // fUseKickChoice = false. This used to auto-decline with no prompt, which left Java
+            // waiting on a dialog the harness never answered (star tier: Dolfar Longstride).
+            let center = if game.home_playing {
+                FieldCoordinateBounds::CENTER_FIELD_HOME
+            } else {
+                FieldCoordinateBounds::CENTER_FIELD_AWAY
+            };
+            let kick_dialog = kicking_player.as_deref()
+                .filter(|id| game.player(id).map(|p| p.has_skill_property(
+                    ffb_model::model::property::named_properties::NamedProperties::CAN_REDUCE_KICK_DISTANCE)).unwrap_or(false))
+                .filter(|id| game.field_model.player_coordinate(id).map(|c| center.is_in_bounds(c)).unwrap_or(false))
+                .map(str::to_string);
+            if let Some(pid) = kick_dialog {
+                self.kicking_player_id = Some(pid.clone());
+                return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::KickSkill { player_id: pid });
+            }
             self.use_kick_choice = Some(false);
         }
 

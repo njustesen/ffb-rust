@@ -1,0 +1,5463 @@
+{
+ "edition": "bb2016",
+ "stars": [
+  {
+   "id": "star.20821",
+   "name": "Bryce 'The Slice' Cambuel",
+   "cost": 130000,
+   "players": [
+    {
+     "position": {
+      "id": "star.20821",
+      "name": "Bryce 'The Slice' Cambuel",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 5,
+      "st": 3,
+      "ag": 2,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Chainsaw",
+       "Loner",
+       "Regeneration",
+       "Secret Weapon",
+       "Stand Firm",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.20821\">\n\t\t<quantity>1</quantity>\n\t\t<name>Bryce 'The Slice' Cambuel</name>\n\t\t<type>Star</type>\n\t\t<cost>130000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stand Firm</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "khemri_fumbbl"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.20825",
+   "name": "Ivan 'The Animal' Deathshroud",
+   "cost": 230000,
+   "players": [
+    {
+     "position": {
+      "id": "star.20825",
+      "name": "Ivan 'The Animal' Deathshroud",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 230000,
+      "ma": 6,
+      "st": 4,
+      "ag": 2,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Block",
+       "Disturbing Presence",
+       "Juggernaut",
+       "Loner",
+       "Regeneration",
+       "Strip Ball",
+       "Tackle"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.20825\">\n\t\t<quantity>1</quantity>\n\t\t<name>Ivan 'The Animal' Deathshroud</name>\n\t\t<type>Star</type>\n\t\t<cost>230000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>4</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Disturbing Presence</skill>\n\t\t\t<skill>Juggernaut</skill>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Strip Ball</skill>\n\t\t\t<skill>Tackle</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "khemri_fumbbl"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.22963",
+   "name": "Skrull Halfheight",
+   "cost": 190000,
+   "players": [
+    {
+     "position": {
+      "id": "star.22963",
+      "name": "Skrull Halfheight",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 190000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Accurate",
+       "Loner",
+       "Nerves of Steel",
+       "Pass",
+       "Regeneration",
+       "Sure Hands",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.22963\">\n\t\t<quantity>1</quantity>\n\t\t<name>Skrull Halfheight</name>\n\t\t<type>Star</type>\n\t\t<cost>190000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Pass</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "khemri_fumbbl"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.3024",
+   "name": "Helmut Wulf",
+   "cost": 110000,
+   "players": [
+    {
+     "position": {
+      "id": "star.3024",
+      "name": "Helmut Wulf",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Chainsaw",
+       "Loner",
+       "Secret Weapon",
+       "Stand Firm"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.3024\">\n\t\t<quantity>1</quantity>\n\t\t<name>Helmut Wulf</name>\n\t\t<type>Star</type>\n\t\t<cost>110000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stand Firm</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "slann_fumbbl"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.3025",
+   "name": "Hemlock",
+   "cost": 170000,
+   "players": [
+    {
+     "position": {
+      "id": "star.3025",
+      "name": "Hemlock",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 170000,
+      "ma": 8,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Block",
+       "Dodge",
+       "Jump Up",
+       "Loner",
+       "Side Step",
+       "Stab",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.3025\">\n\t\t<quantity>1</quantity>\n\t\t<name>Hemlock</name>\n\t\t<type>Star</type>\n\t\t<cost>170000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t\t<skill>Stab</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "slann_fumbbl"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.3036",
+   "name": "Lottabottol",
+   "cost": 220000,
+   "players": [
+    {
+     "position": {
+      "id": "star.3036",
+      "name": "Lottabottol",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 8,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Catch",
+       "Diving Tackle",
+       "Jump Up",
+       "Leap",
+       "Loner",
+       "Pass Block",
+       "Shadowing",
+       "Very Long Legs"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.3036\">\n\t\t<quantity>1</quantity>\n\t\t<name>Lottabottol</name>\n\t\t<type>Star</type>\n\t\t<cost>220000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Diving Tackle</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Leap</skill>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Pass Block</skill>\n\t\t\t<skill>Shadowing</skill>\n\t\t\t<skill>Very Long Legs</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "slann_fumbbl"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.3039",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.3039",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Block",
+       "Loner",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.3039\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "slann_fumbbl",
+    "nippon"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.3044",
+   "name": "Quetzal Leap",
+   "cost": 250000,
+   "players": [
+    {
+     "position": {
+      "id": "star.3044",
+      "name": "Quetzal Leap",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 8,
+      "st": 2,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Catch",
+       "Diving Catch",
+       "Fend",
+       "Kick-Off Return",
+       "Leap",
+       "Loner",
+       "Nerves of Steel",
+       "Very Long Legs"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.3044\">\n\t\t<quantity>1</quantity>\n\t\t<name>Quetzal Leap</name>\n\t\t<type>Star</type>\n\t\t<cost>250000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>2</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Diving Catch</skill>\n\t\t\t<skill>Fend</skill>\n\t\t\t<skill>Kick-Off Return</skill>\n\t\t\t<skill>Leap</skill>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Very Long Legs</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "slann_fumbbl"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.3045",
+   "name": "Ramtut III",
+   "cost": 360000,
+   "players": [
+    {
+     "position": {
+      "id": "star.3045",
+      "name": "Ramtut III",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 360000,
+      "ma": 5,
+      "st": 6,
+      "ag": 1,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Break Tackle",
+       "Loner",
+       "Mighty Blow",
+       "Regeneration",
+       "Wrestle"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.3045\">\n\t\t<quantity>1</quantity>\n\t\t<name>Ramtut III</name>\n\t\t<type>Star</type>\n\t\t<cost>360000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>6</strength>\n\t\t<agility>1</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Break Tackle</skill>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Wrestle</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "khemri_fumbbl"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.3051",
+   "name": "Slibli",
+   "cost": 250000,
+   "players": [
+    {
+     "position": {
+      "id": "star.3051",
+      "name": "Slibli",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 7,
+      "st": 4,
+      "ag": 1,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Block",
+       "Grab",
+       "Guard",
+       "Loner",
+       "Stand Firm"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.3051\">\n\t\t<quantity>1</quantity>\n\t\t<name>Slibli</name>\n\t\t<type>Star</type>\n\t\t<cost>250000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>4</strength>\n\t\t<agility>1</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Grab</skill>\n\t\t\t<skill>Guard</skill>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Stand Firm</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "slann_fumbbl"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.amazon_bigfist",
+   "name": "Bertha Bigfist",
+   "cost": 290000,
+   "players": [
+    {
+     "position": {
+      "id": "star.amazon_bigfist",
+      "name": "Bertha Bigfist",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 6,
+      "st": 5,
+      "ag": 2,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Bone-Head",
+       "Break Tackle",
+       "Dodge",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.amazon_bigfist\">\n\t\t<quantity>1</quantity>\n\t\t<name>Bertha Bigfist</name>\n\t\t<type>Star</type>\n\t\t<cost>290000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>5</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Bone-Head</skill>\n\t\t\t<skill>Break Tackle</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "amazon"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.amazon_helmut",
+   "name": "Helmut Wulf",
+   "cost": 110000,
+   "players": [
+    {
+     "position": {
+      "id": "star.amazon_helmut",
+      "name": "Helmut Wulf",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Chainsaw",
+       "Secret Weapon",
+       "Stand Firm"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.amazon_helmut\">\n\t\t<quantity>1</quantity>\n\t\t<name>Helmut Wulf</name>\n\t\t<type>Star</type>\n\t\t<cost>110000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stand Firm</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "amazon"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.amazon_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.amazon_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.amazon_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "amazon"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.amazon_roxanna",
+   "name": "Roxanna Darknail",
+   "cost": 250000,
+   "players": [
+    {
+     "position": {
+      "id": "star.amazon_roxanna",
+      "name": "Roxanna Darknail",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 8,
+      "st": 3,
+      "ag": 5,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Dodge",
+       "Frenzy",
+       "Jump Up",
+       "Juggernaut",
+       "Leap"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.amazon_roxanna\">\n\t\t<quantity>1</quantity>\n\t\t<name>Roxanna Darknail</name>\n\t\t<type>Star</type>\n\t\t<cost>250000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>5</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Frenzy</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Juggernaut</skill>\n\t\t\t<skill>Leap</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "amazon"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.amazon_willow",
+   "name": "Willow Rosebark",
+   "cost": 150000,
+   "players": [
+    {
+     "position": {
+      "id": "star.amazon_willow",
+      "name": "Willow Rosebark",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 5,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Dauntless",
+       "Side Step",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.amazon_willow\">\n\t\t<quantity>1</quantity>\n\t\t<name>Willow Rosebark</name>\n\t\t<type>Star</type>\n\t\t<cost>150000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dauntless</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "amazon"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.amazon_zara",
+   "name": "Zara the Slayer",
+   "cost": 270000,
+   "players": [
+    {
+     "position": {
+      "id": "star.amazon_zara",
+      "name": "Zara the Slayer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dauntless",
+       "Dodge",
+       "Jump Up",
+       "Stab",
+       "Stakes"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.amazon_zara\">\n\t\t<quantity>1</quantity>\n\t\t<name>Zara the Slayer</name>\n\t\t<type>Star</type>\n\t\t<cost>270000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dauntless</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Stab</skill>\n\t\t\t<skill>Stakes</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "amazon"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaos_borak",
+   "name": "Lord Borak the Despoiler",
+   "cost": 270000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaos_borak",
+      "name": "Lord Borak the Despoiler",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 5,
+      "st": 5,
+      "ag": 3,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dirty Player",
+       "Mighty Blow"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaos_borak\">\n\t\t<quantity>1</quantity>\n\t\t<name>Lord Borak the Despoiler</name>\n\t\t<type>Star</type>\n\t\t<cost>270000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>5</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dirty Player</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaos_farth",
+   "name": "Brick Far'th",
+   "cost": 290000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaos_farth",
+      "name": "Brick Far'th",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 5,
+      "st": 5,
+      "ag": 2,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Bone-Head",
+       "Mighty Blow",
+       "Nerves of Steel",
+       "Strong Arm",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaos_farth\">\n\t\t<quantity>1</quantity>\n\t\t<name>Brick Far'th</name>\n\t\t<type>Star</type>\n\t\t<cost>290000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>5</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Bone-Head</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Strong Arm</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaos_grashnak",
+   "name": "Grashnak Blackhoof",
+   "cost": 310000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaos_grashnak",
+      "name": "Grashnak Blackhoof",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 310000,
+      "ma": 6,
+      "st": 6,
+      "ag": 2,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Frenzy",
+       "Horns",
+       "Mighty Blow",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaos_grashnak\">\n\t\t<quantity>1</quantity>\n\t\t<name>Grashnak Blackhoof</name>\n\t\t<type>Star</type>\n\t\t<cost>310000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Frenzy</skill>\n\t\t\t<skill>Horns</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaos_grotty",
+   "name": "Grotty",
+   "cost": 290000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaos_grotty",
+      "name": "Grotty",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 6,
+      "st": 2,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Dodge",
+       "Right Stuff",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaos_grotty\">\n\t\t<quantity>1</quantity>\n\t\t<name>Grotty</name>\n\t\t<type>Star</type>\n\t\t<cost>290000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaos_lewdgrip",
+   "name": "Lewdgrip Whiparm",
+   "cost": 150000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaos_lewdgrip",
+      "name": "Lewdgrip Whiparm",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Pass",
+       "Strong Arm",
+       "Sure Hands",
+       "Tentacles"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaos_lewdgrip\">\n\t\t<quantity>1</quantity>\n\t\t<name>Lewdgrip Whiparm</name>\n\t\t<type>Star</type>\n\t\t<cost>150000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Pass</skill>\n\t\t\t<skill>Strong Arm</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t\t<skill>Tentacles</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaos_max",
+   "name": "Max Spleenripper",
+   "cost": 130000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaos_max",
+      "name": "Max Spleenripper",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Chainsaw",
+       "Secret Weapon"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaos_max\">\n\t\t<quantity>1</quantity>\n\t\t<name>Max Spleenripper</name>\n\t\t<type>Star</type>\n\t\t<cost>130000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaos_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaos_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaos_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaosdwarf_grashnak",
+   "name": "Grashnak Blackhoof",
+   "cost": 310000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaosdwarf_grashnak",
+      "name": "Grashnak Blackhoof",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 310000,
+      "ma": 6,
+      "st": 6,
+      "ag": 2,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Frenzy",
+       "Horns",
+       "Mighty Blow",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaosdwarf_grashnak\">\n\t\t<quantity>1</quantity>\n\t\t<name>Grashnak Blackhoof</name>\n\t\t<type>Star</type>\n\t\t<cost>310000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Frenzy</skill>\n\t\t\t<skill>Horns</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos_dwarf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaosdwarf_hthark",
+   "name": "Hthark the Unstoppable",
+   "cost": 310000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaosdwarf_hthark",
+      "name": "Hthark the Unstoppable",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 310000,
+      "ma": 6,
+      "st": 5,
+      "ag": 2,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Block",
+       "Break Tackle",
+       "Juggernaut",
+       "Sprint",
+       "Sure Feet",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaosdwarf_hthark\">\n\t\t<quantity>1</quantity>\n\t\t<name>Hthark the Unstoppable</name>\n\t\t<type>Star</type>\n\t\t<cost>310000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>5</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Break Tackle</skill>\n\t\t\t<skill>Juggernaut</skill>\n\t\t\t<skill>Sprint</skill>\n\t\t\t<skill>Sure Feet</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos_dwarf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaosdwarf_madeye",
+   "name": "Zzharg Madeye",
+   "cost": 90000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaosdwarf_madeye",
+      "name": "Zzharg Madeye",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 90000,
+      "ma": 4,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Hail Mary Pass",
+       "Pass",
+       "Secret Weapon",
+       "Strong Arm",
+       "Sure Hands",
+       "Tackle",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaosdwarf_madeye\">\n\t\t<quantity>1</quantity>\n\t\t<name>Zzharg Madeye</name>\n\t\t<type>Star</type>\n\t\t<cost>90000</cost>\n\t\t<movement>4</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Hail Mary Pass</skill>\n\t\t\t<skill>Pass</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Strong Arm</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t\t<skill>Tackle</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos_dwarf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaosdwarf_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaosdwarf_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaosdwarf_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos_dwarf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaosdwarf_nobbla",
+   "name": "Nobbla Blackwart",
+   "cost": 130000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaosdwarf_nobbla",
+      "name": "Nobbla Blackwart",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dodge",
+       "Chainsaw",
+       "Secret Weapon",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaosdwarf_nobbla\">\n\t\t<quantity>1</quantity>\n\t\t<name>Nobbla Blackwart</name>\n\t\t<type>Star</type>\n\t\t<cost>130000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos_dwarf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaosdwarf_rashnak",
+   "name": "Rashnak Backstabber",
+   "cost": 200000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaosdwarf_rashnak",
+      "name": "Rashnak Backstabber",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 200000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Dodge",
+       "Side Step",
+       "Sneaky Git",
+       "Stab"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaosdwarf_rashnak\">\n\t\t<quantity>1</quantity>\n\t\t<name>Rashnak Backstabber</name>\n\t\t<type>Star</type>\n\t\t<cost>200000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t\t<skill>Sneaky Git</skill>\n\t\t\t<skill>Stab</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos_dwarf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaospact_dribblesnot",
+   "name": "Bomber Dribblesnot",
+   "cost": 60000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaospact_dribblesnot",
+      "name": "Bomber Dribblesnot",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Accurate",
+       "Bombardier",
+       "Dodge",
+       "Right Stuff",
+       "Secret Weapon",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaospact_dribblesnot\">\n\t\t<quantity>1</quantity>\n\t\t<name>Bomber Dribblesnot</name>\n\t\t<type>Star</type>\n\t\t<cost>60000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill>Bombardier</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos_pact",
+    "renegades"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaospact_igor",
+   "name": "Crazy Igor",
+   "cost": 120000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaospact_igor",
+      "name": "Crazy Igor",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 120000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Dauntless",
+       "Regeneration",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaospact_igor\">\n\t\t<quantity>1</quantity>\n\t\t<name>Crazy Igor</name>\n\t\t<type>Star</type>\n\t\t<cost>120000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dauntless</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos_pact",
+    "renegades"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaospact_ithaca",
+   "name": "Ithaca Benoin",
+   "cost": 220000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaospact_ithaca",
+      "name": "Ithaca Benoin",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Accurate",
+       "Dump-Off",
+       "Nerves of Steel",
+       "Pass",
+       "Regeneration",
+       "Sure Hands"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaospact_ithaca\">\n\t\t<quantity>1</quantity>\n\t\t<name>Ithaca Benoin</name>\n\t\t<type>Star</type>\n\t\t<cost>220000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill>Dump-Off</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Pass</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos_pact",
+    "renegades"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaospact_madeye",
+   "name": "Zzharg Madeye",
+   "cost": 90000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaospact_madeye",
+      "name": "Zzharg Madeye",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 90000,
+      "ma": 4,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Hail Mary Pass",
+       "Pass",
+       "Secret Weapon",
+       "Strong Arm",
+       "Sure Hands",
+       "Tackle",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaospact_madeye\">\n\t\t<quantity>1</quantity>\n\t\t<name>Zzharg Madeye</name>\n\t\t<type>Star</type>\n\t\t<cost>90000</cost>\n\t\t<movement>4</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Hail Mary Pass</skill>\n\t\t\t<skill>Pass</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Strong Arm</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t\t<skill>Tackle</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos_pact",
+    "renegades"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaospact_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaospact_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaospact_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos_pact",
+    "renegades"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.chaospact_ugroth",
+   "name": "Ugroth Bolgrot",
+   "cost": 100000,
+   "players": [
+    {
+     "position": {
+      "id": "star.chaospact_ugroth",
+      "name": "Ugroth Bolgrot",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Chainsaw",
+       "Secret Weapon"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.chaospact_ugroth\">\n\t\t<quantity>1</quantity>\n\t\t<name>Ugroth Bolgrot</name>\n\t\t<type>Star</type>\n\t\t<cost>100000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "chaos_pact",
+    "renegades"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.darkelf_horkon",
+   "name": "Horkon Heartripper",
+   "cost": 210000,
+   "players": [
+    {
+     "position": {
+      "id": "star.darkelf_horkon",
+      "name": "Horkon Heartripper",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 210000,
+      "ma": 7,
+      "st": 3,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Dodge",
+       "Leap",
+       "Multiple Block",
+       "Shadowing",
+       "Stab"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.darkelf_horkon\">\n\t\t<quantity>1</quantity>\n\t\t<name>Horkon Heartripper</name>\n\t\t<type>Star</type>\n\t\t<cost>210000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Leap</skill>\n\t\t\t<skill>Multiple Block</skill>\n\t\t\t<skill>Shadowing</skill>\n\t\t\t<skill>Stab</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "dark_elf",
+    "dark_elf_league_fumbbl"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.darkelf_hubris",
+   "name": "Hubris Rakarth",
+   "cost": 260000,
+   "players": [
+    {
+     "position": {
+      "id": "star.darkelf_hubris",
+      "name": "Hubris Rakarth",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 260000,
+      "ma": 7,
+      "st": 4,
+      "ag": 4,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dirty Player",
+       "Jump Up",
+       "Mighty Blow",
+       "Strip Ball"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.darkelf_hubris\">\n\t\t<quantity>1</quantity>\n\t\t<name>Hubris Rakarth</name>\n\t\t<type>Star</type>\n\t\t<cost>260000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>4</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dirty Player</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Strip Ball</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "dark_elf",
+    "dark_elf_league_fumbbl"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.darkelf_ithica",
+   "name": "Ithaca Benoin",
+   "cost": 220000,
+   "players": [
+    {
+     "position": {
+      "id": "star.darkelf_ithica",
+      "name": "Ithaca Benoin",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Accurate",
+       "Dump-Off",
+       "Nerves of Steel",
+       "Pass",
+       "Regeneration",
+       "Sure Hands"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.darkelf_ithica\">\n\t\t<quantity>1</quantity>\n\t\t<name>Ithaca Benoin</name>\n\t\t<type>Star</type>\n\t\t<cost>220000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill>Dump-Off</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Pass</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "dark_elf",
+    "dark_elf_league_fumbbl"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.darkelf_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.darkelf_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.darkelf_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "dark_elf",
+    "dark_elf_league_fumbbl"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.darkelf_roxanna",
+   "name": "Roxanna Darknail",
+   "cost": 250000,
+   "players": [
+    {
+     "position": {
+      "id": "star.darkelf_roxanna",
+      "name": "Roxanna Darknail",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 8,
+      "st": 3,
+      "ag": 5,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Dodge",
+       "Frenzy",
+       "Jump Up",
+       "Juggernaut",
+       "Leap"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.darkelf_roxanna\">\n\t\t<quantity>1</quantity>\n\t\t<name>Roxanna Darknail</name>\n\t\t<type>Star</type>\n\t\t<cost>250000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>5</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Frenzy</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Juggernaut</skill>\n\t\t\t<skill>Leap</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "dark_elf",
+    "dark_elf_league_fumbbl"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.darkelf_sidewinder",
+   "name": "Eldril Sidewinder",
+   "cost": 200000,
+   "players": [
+    {
+     "position": {
+      "id": "star.darkelf_sidewinder",
+      "name": "Eldril Sidewinder",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 200000,
+      "ma": 8,
+      "st": 3,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Catch",
+       "Dodge",
+       "Hypnotic Gaze",
+       "Nerves of Steel",
+       "Pass Block"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.darkelf_sidewinder\">\n\t\t<quantity>1</quantity>\n\t\t<name>Eldril Sidewinder</name>\n\t\t<type>Star</type>\n\t\t<cost>200000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Hypnotic Gaze</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Pass Block</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "dark_elf",
+    "dark_elf_league_fumbbl"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.dwarf_churnblade",
+   "name": "Flint Churnblade",
+   "cost": 130000,
+   "players": [
+    {
+     "position": {
+      "id": "star.dwarf_churnblade",
+      "name": "Flint Churnblade",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 5,
+      "st": 3,
+      "ag": 2,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Chainsaw",
+       "Secret Weapon",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.dwarf_churnblade\">\n\t\t<quantity>1</quantity>\n\t\t<name>Flint Churnblade</name>\n\t\t<type>Star</type>\n\t\t<cost>130000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "dwarf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.dwarf_eziasson",
+   "name": "Boomer Eziasson",
+   "cost": 60000,
+   "players": [
+    {
+     "position": {
+      "id": "star.dwarf_eziasson",
+      "name": "Boomer Eziasson",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 4,
+      "st": 3,
+      "ag": 2,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Accurate",
+       "Block",
+       "Bombardier",
+       "Secret Weapon",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.dwarf_eziasson\">\n\t\t<quantity>1</quantity>\n\t\t<name>Boomer Eziasson</name>\n\t\t<type>Star</type>\n\t\t<cost>60000</cost>\n\t\t<movement>4</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Bombardier</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "dwarf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.dwarf_farblast",
+   "name": "Barik Farblast",
+   "cost": 60000,
+   "players": [
+    {
+     "position": {
+      "id": "star.dwarf_farblast",
+      "name": "Barik Farblast",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Hail Mary Pass",
+       "Pass",
+       "Secret Weapon",
+       "Strong Arm",
+       "Sure Hands",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.dwarf_farblast\">\n\t\t<quantity>1</quantity>\n\t\t<name>Barik Farblast</name>\n\t\t<type>Star</type>\n\t\t<cost>60000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Hail Mary Pass</skill>\n\t\t\t<skill>Pass</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Strong Arm</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "dwarf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.dwarf_ironjaw",
+   "name": "Grim Ironjaw",
+   "cost": 220000,
+   "players": [
+    {
+     "position": {
+      "id": "star.dwarf_ironjaw",
+      "name": "Grim Ironjaw",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 5,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dauntless",
+       "Frenzy",
+       "Mighty Blow",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.dwarf_ironjaw\">\n\t\t<quantity>1</quantity>\n\t\t<name>Grim Ironjaw</name>\n\t\t<type>Star</type>\n\t\t<cost>220000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dauntless</skill>\n\t\t\t<skill>Frenzy</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "dwarf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.dwarf_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.dwarf_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.dwarf_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "dwarf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.dwarf_zara",
+   "name": "Zara the Slayer",
+   "cost": 270000,
+   "players": [
+    {
+     "position": {
+      "id": "star.dwarf_zara",
+      "name": "Zara the Slayer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dauntless",
+       "Dodge",
+       "Jump Up",
+       "Stab",
+       "Stakes"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.dwarf_zara\">\n\t\t<quantity>1</quantity>\n\t\t<name>Zara the Slayer</name>\n\t\t<type>Star</type>\n\t\t<cost>270000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dauntless</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Stab</skill>\n\t\t\t<skill>Stakes</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "dwarf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.elf_hubris",
+   "name": "Hubris Rakarth",
+   "cost": 260000,
+   "players": [
+    {
+     "position": {
+      "id": "star.elf_hubris",
+      "name": "Hubris Rakarth",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 260000,
+      "ma": 7,
+      "st": 4,
+      "ag": 4,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dirty Player",
+       "Jump Up",
+       "Mighty Blow",
+       "Strip Ball"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.elf_hubris\">\n\t\t<quantity>1</quantity>\n\t\t<name>Hubris Rakarth</name>\n\t\t<type>Star</type>\n\t\t<cost>260000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>4</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dirty Player</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Strip Ball</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.elf_jordell",
+   "name": "Jordell Freshbreeze",
+   "cost": 260000,
+   "players": [
+    {
+     "position": {
+      "id": "star.elf_jordell",
+      "name": "Jordell Freshbreeze",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 260000,
+      "ma": 8,
+      "st": 3,
+      "ag": 5,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Block",
+       "Diving Catch",
+       "Dodge",
+       "Leap",
+       "Side Step"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.elf_jordell\">\n\t\t<quantity>1</quantity>\n\t\t<name>Jordell Freshbreeze</name>\n\t\t<type>Star</type>\n\t\t<cost>260000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>5</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Diving Catch</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Leap</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.elf_longstride",
+   "name": "Dolfar Longstride",
+   "cost": 150000,
+   "players": [
+    {
+     "position": {
+      "id": "star.elf_longstride",
+      "name": "Dolfar Longstride",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 7,
+      "st": 3,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Diving Catch",
+       "Hail Mary Pass",
+       "Kick",
+       "Kick-Off Return",
+       "Pass Block"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.elf_longstride\">\n\t\t<quantity>1</quantity>\n\t\t<name>Dolfar Longstride</name>\n\t\t<type>Star</type>\n\t\t<cost>150000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Diving Catch</skill>\n\t\t\t<skill>Hail Mary Pass</skill>\n\t\t\t<skill>Kick</skill>\n\t\t\t<skill>Kick-Off Return</skill>\n\t\t\t<skill>Pass Block</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.elf_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.elf_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.elf_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.elf_prince",
+   "name": "Prince Moranion",
+   "cost": 230000,
+   "players": [
+    {
+     "position": {
+      "id": "star.elf_prince",
+      "name": "Prince Moranion",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 230000,
+      "ma": 7,
+      "st": 4,
+      "ag": 4,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dauntless",
+       "Tackle",
+       "Wrestle"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.elf_prince\">\n\t\t<quantity>1</quantity>\n\t\t<name>Prince Moranion</name>\n\t\t<type>Star</type>\n\t\t<cost>230000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>4</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dauntless</skill>\n\t\t\t<skill>Tackle</skill>\n\t\t\t<skill>Wrestle</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.elf_sidewinder",
+   "name": "Eldril Sidewinder",
+   "cost": 200000,
+   "players": [
+    {
+     "position": {
+      "id": "star.elf_sidewinder",
+      "name": "Eldril Sidewinder",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 200000,
+      "ma": 8,
+      "st": 3,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Catch",
+       "Dodge",
+       "Hypnotic Gaze",
+       "Nerves of Steel",
+       "Pass Block"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.elf_sidewinder\">\n\t\t<quantity>1</quantity>\n\t\t<name>Eldril Sidewinder</name>\n\t\t<type>Star</type>\n\t\t<cost>200000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Hypnotic Gaze</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Pass Block</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.goblin_dribblesnot",
+   "name": "Bomber Dribblesnot",
+   "cost": 60000,
+   "players": [
+    {
+     "position": {
+      "id": "star.goblin_dribblesnot",
+      "name": "Bomber Dribblesnot",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Accurate",
+       "Bombardier",
+       "Dodge",
+       "Right Stuff",
+       "Secret Weapon",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.goblin_dribblesnot\">\n\t\t<quantity>1</quantity>\n\t\t<name>Bomber Dribblesnot</name>\n\t\t<type>Star</type>\n\t\t<cost>60000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill>Bombardier</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "goblin"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.goblin_fungus",
+   "name": "Fungus the Loon",
+   "cost": 80000,
+   "players": [
+    {
+     "position": {
+      "id": "star.goblin_fungus",
+      "name": "Fungus the Loon",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 80000,
+      "ma": 4,
+      "st": 7,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Ball and Chain",
+       "Mighty Blow",
+       "No Hands",
+       "Secret Weapon",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.goblin_fungus\">\n\t\t<quantity>1</quantity>\n\t\t<name>Fungus the Loon</name>\n\t\t<type>Star</type>\n\t\t<cost>80000</cost>\n\t\t<movement>4</movement>\n\t\t<strength>7</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Ball and Chain</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>No Hands</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "goblin"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.goblin_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.goblin_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.goblin_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "goblin"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.goblin_nobbla",
+   "name": "Nobbla Blackwart",
+   "cost": 130000,
+   "players": [
+    {
+     "position": {
+      "id": "star.goblin_nobbla",
+      "name": "Nobbla Blackwart",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dodge",
+       "Chainsaw",
+       "Secret Weapon",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.goblin_nobbla\">\n\t\t<quantity>1</quantity>\n\t\t<name>Nobbla Blackwart</name>\n\t\t<type>Star</type>\n\t\t<cost>130000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "goblin"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.goblin_ripper",
+   "name": "Ripper",
+   "cost": 270000,
+   "players": [
+    {
+     "position": {
+      "id": "star.goblin_ripper",
+      "name": "Ripper",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 4,
+      "st": 6,
+      "ag": 1,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Grab",
+       "Mighty Blow",
+       "Regeneration",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.goblin_ripper\">\n\t\t<quantity>1</quantity>\n\t\t<name>Ripper</name>\n\t\t<type>Star</type>\n\t\t<cost>270000</cost>\n\t\t<movement>4</movement>\n\t\t<strength>6</strength>\n\t\t<agility>1</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Grab</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "goblin"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.goblin_scrappa",
+   "name": "Scrappa Sorehead",
+   "cost": 150000,
+   "players": [
+    {
+     "position": {
+      "id": "star.goblin_scrappa",
+      "name": "Scrappa Sorehead",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 7,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Dirty Player",
+       "Dodge",
+       "Leap",
+       "Right Stuff",
+       "Sprint",
+       "Stunty",
+       "Sure Feet",
+       "Very Long Legs"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.goblin_scrappa\">\n\t\t<quantity>1</quantity>\n\t\t<name>Scrappa Sorehead</name>\n\t\t<type>Star</type>\n\t\t<cost>150000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dirty Player</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Leap</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Sprint</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t\t<skill>Sure Feet</skill>\n\t\t\t<skill>Very Long Legs</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "goblin"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.halfling_bigfist",
+   "name": "Bertha Bigfist",
+   "cost": 290000,
+   "players": [
+    {
+     "position": {
+      "id": "star.halfling_bigfist",
+      "name": "Bertha Bigfist",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 6,
+      "st": 5,
+      "ag": 2,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Bone-Head",
+       "Break Tackle",
+       "Dodge",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.halfling_bigfist\">\n\t\t<quantity>1</quantity>\n\t\t<name>Bertha Bigfist</name>\n\t\t<type>Star</type>\n\t\t<cost>290000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>5</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Bone-Head</skill>\n\t\t\t<skill>Break Tackle</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "halfling"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.halfling_deeproot",
+   "name": "Deeproot Strongbranch",
+   "cost": 300000,
+   "players": [
+    {
+     "position": {
+      "id": "star.halfling_deeproot",
+      "name": "Deeproot Strongbranch",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 300000,
+      "ma": 2,
+      "st": 7,
+      "ag": 1,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Stand Firm",
+       "Strong Arm",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.halfling_deeproot\">\n\t\t<quantity>1</quantity>\n\t\t<name>Deeproot Strongbranch</name>\n\t\t<type>Star</type>\n\t\t<cost>300000</cost>\n\t\t<movement>2</movement>\n\t\t<strength>7</strength>\n\t\t<agility>1</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Stand Firm</skill>\n\t\t\t<skill>Strong Arm</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "halfling"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.halfling_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.halfling_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.halfling_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "halfling"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.halfling_puggy",
+   "name": "Puggy Baconbreath",
+   "cost": 140000,
+   "players": [
+    {
+     "position": {
+      "id": "star.halfling_puggy",
+      "name": "Puggy Baconbreath",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 6,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dodge",
+       "Nerves of Steel",
+       "Right Stuff",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.halfling_puggy\">\n\t\t<quantity>1</quantity>\n\t\t<name>Puggy Baconbreath</name>\n\t\t<type>Star</type>\n\t\t<cost>140000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>6</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "halfling"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.halfling_willow",
+   "name": "Willow Rosebark",
+   "cost": 150000,
+   "players": [
+    {
+     "position": {
+      "id": "star.halfling_willow",
+      "name": "Willow Rosebark",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 5,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Dauntless",
+       "Side Step",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.halfling_willow\">\n\t\t<quantity>1</quantity>\n\t\t<name>Willow Rosebark</name>\n\t\t<type>Star</type>\n\t\t<cost>150000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dauntless</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "halfling"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.halfling_zara",
+   "name": "Zara the Slayer",
+   "cost": 270000,
+   "players": [
+    {
+     "position": {
+      "id": "star.halfling_zara",
+      "name": "Zara the Slayer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dauntless",
+       "Dodge",
+       "Jump Up",
+       "Stab",
+       "Stakes"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.halfling_zara\">\n\t\t<quantity>1</quantity>\n\t\t<name>Zara the Slayer</name>\n\t\t<type>Star</type>\n\t\t<cost>270000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dauntless</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Stab</skill>\n\t\t\t<skill>Stakes</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "halfling"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.highelf_longstride",
+   "name": "Dolfar Longstride",
+   "cost": 150000,
+   "players": [
+    {
+     "position": {
+      "id": "star.highelf_longstride",
+      "name": "Dolfar Longstride",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 7,
+      "st": 3,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Diving Catch",
+       "Hail Mary Pass",
+       "Kick",
+       "Kick-Off Return",
+       "Pass Block"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.highelf_longstride\">\n\t\t<quantity>1</quantity>\n\t\t<name>Dolfar Longstride</name>\n\t\t<type>Star</type>\n\t\t<cost>150000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Diving Catch</skill>\n\t\t\t<skill>Hail Mary Pass</skill>\n\t\t\t<skill>Kick</skill>\n\t\t\t<skill>Kick-Off Return</skill>\n\t\t\t<skill>Pass Block</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "high_elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.highelf_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.highelf_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.highelf_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "high_elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.highelf_prince",
+   "name": "Prince Moranion",
+   "cost": 230000,
+   "players": [
+    {
+     "position": {
+      "id": "star.highelf_prince",
+      "name": "Prince Moranion",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 230000,
+      "ma": 7,
+      "st": 4,
+      "ag": 4,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dauntless",
+       "Tackle",
+       "Wrestle"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.highelf_prince\">\n\t\t<quantity>1</quantity>\n\t\t<name>Prince Moranion</name>\n\t\t<type>Star</type>\n\t\t<cost>230000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>4</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dauntless</skill>\n\t\t\t<skill>Tackle</skill>\n\t\t\t<skill>Wrestle</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "high_elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.highelf_sidewinder",
+   "name": "Eldril Sidewinder",
+   "cost": 200000,
+   "players": [
+    {
+     "position": {
+      "id": "star.highelf_sidewinder",
+      "name": "Eldril Sidewinder",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 200000,
+      "ma": 8,
+      "st": 3,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Catch",
+       "Dodge",
+       "Hypnotic Gaze",
+       "Nerves of Steel",
+       "Pass Block"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.highelf_sidewinder\">\n\t\t<quantity>1</quantity>\n\t\t<name>Eldril Sidewinder</name>\n\t\t<type>Star</type>\n\t\t<cost>200000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Hypnotic Gaze</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Pass Block</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "high_elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.highelf_soaren",
+   "name": "Soaren Hightower",
+   "cost": 180000,
+   "players": [
+    {
+     "position": {
+      "id": "star.highelf_soaren",
+      "name": "Soaren Hightower",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 180000,
+      "ma": 6,
+      "st": 3,
+      "ag": 4,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Fend",
+       "Kick-Off Return",
+       "Pass",
+       "Safe Throw",
+       "Sure Hands",
+       "Strong Arm"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.highelf_soaren\">\n\t\t<quantity>1</quantity>\n\t\t<name>Soaren Hightower</name>\n\t\t<type>Star</type>\n\t\t<cost>180000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Fend</skill>\n\t\t\t<skill>Kick-Off Return</skill>\n\t\t\t<skill>Pass</skill>\n\t\t\t<skill>Safe Throw</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t\t<skill>Strong Arm</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "high_elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.highelf_zara",
+   "name": "Zara the Slayer",
+   "cost": 270000,
+   "players": [
+    {
+     "position": {
+      "id": "star.highelf_zara",
+      "name": "Zara the Slayer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dauntless",
+       "Dodge",
+       "Jump Up",
+       "Stab",
+       "Stakes"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.highelf_zara\">\n\t\t<quantity>1</quantity>\n\t\t<name>Zara the Slayer</name>\n\t\t<type>Star</type>\n\t\t<cost>270000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dauntless</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Stab</skill>\n\t\t\t<skill>Stakes</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "high_elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.human_griff",
+   "name": "Griff Oberwald",
+   "cost": 320000,
+   "players": [
+    {
+     "position": {
+      "id": "star.human_griff",
+      "name": "Griff Oberwald",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 320000,
+      "ma": 7,
+      "st": 4,
+      "ag": 4,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dodge",
+       "Fend",
+       "Sprint",
+       "Sure Feet"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.human_griff\">\n\t\t<quantity>1</quantity>\n\t\t<name>Griff Oberwald</name>\n\t\t<type>Star</type>\n\t\t<cost>320000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>4</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Fend</skill>\n\t\t\t<skill>Sprint</skill>\n\t\t\t<skill>Sure Feet</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "human"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.human_helmut",
+   "name": "Helmut Wulf",
+   "cost": 110000,
+   "players": [
+    {
+     "position": {
+      "id": "star.human_helmut",
+      "name": "Helmut Wulf",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Chainsaw",
+       "Secret Weapon",
+       "Stand Firm"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.human_helmut\">\n\t\t<quantity>1</quantity>\n\t\t<name>Helmut Wulf</name>\n\t\t<type>Star</type>\n\t\t<cost>110000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stand Firm</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "human"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.human_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.human_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.human_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "human"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.human_puggy",
+   "name": "Puggy Baconbreath",
+   "cost": 140000,
+   "players": [
+    {
+     "position": {
+      "id": "star.human_puggy",
+      "name": "Puggy Baconbreath",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 140000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 6,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dodge",
+       "Nerves of Steel",
+       "Right Stuff",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.human_puggy\">\n\t\t<quantity>1</quantity>\n\t\t<name>Puggy Baconbreath</name>\n\t\t<type>Star</type>\n\t\t<cost>140000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>6</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "human"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.human_zara",
+   "name": "Zara the Slayer",
+   "cost": 270000,
+   "players": [
+    {
+     "position": {
+      "id": "star.human_zara",
+      "name": "Zara the Slayer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dauntless",
+       "Dodge",
+       "Jump Up",
+       "Stab",
+       "Stakes"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.human_zara\">\n\t\t<quantity>1</quantity>\n\t\t<name>Zara the Slayer</name>\n\t\t<type>Star</type>\n\t\t<cost>270000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dauntless</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Stab</skill>\n\t\t\t<skill>Stakes</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "human"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.human_zug",
+   "name": "Mighty Zug",
+   "cost": 260000,
+   "players": [
+    {
+     "position": {
+      "id": "star.human_zug",
+      "name": "Mighty Zug",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 260000,
+      "ma": 4,
+      "st": 5,
+      "ag": 2,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.human_zug\">\n\t\t<quantity>1</quantity>\n\t\t<name>Mighty Zug</name>\n\t\t<type>Star</type>\n\t\t<cost>260000</cost>\n\t\t<movement>4</movement>\n\t\t<strength>5</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "human"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.khemri_hackenslash",
+   "name": "Hack Enslash",
+   "cost": 120000,
+   "players": [
+    {
+     "position": {
+      "id": "star.khemri_hackenslash",
+      "name": "Hack Enslash",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 120000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Chainsaw",
+       "Regeneration",
+       "Secret Weapon",
+       "Side Step"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.khemri_hackenslash\">\n\t\t<quantity>1</quantity>\n\t\t<name>Hack Enslash</name>\n\t\t<type>Star</type>\n\t\t<cost>120000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "khemri"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.khemri_humerus",
+   "name": "Humerus Carpal",
+   "cost": 130000,
+   "players": [
+    {
+     "position": {
+      "id": "star.khemri_humerus",
+      "name": "Humerus Carpal",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 7,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Catch",
+       "Dodge",
+       "Regeneration",
+       "Nerves of Steel"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.khemri_humerus\">\n\t\t<quantity>1</quantity>\n\t\t<name>Humerus Carpal</name>\n\t\t<type>Star</type>\n\t\t<cost>130000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "khemri"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.khemri_ithaca",
+   "name": "Ithaca Benoin",
+   "cost": 220000,
+   "players": [
+    {
+     "position": {
+      "id": "star.khemri_ithaca",
+      "name": "Ithaca Benoin",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 7,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Accurate",
+       "Dump-Off",
+       "Nerves of Steel",
+       "Pass",
+       "Regeneration",
+       "Sure Hands"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.khemri_ithaca\">\n\t\t<quantity>1</quantity>\n\t\t<name>Ithaca Benoin</name>\n\t\t<type>Star</type>\n\t\t<cost>220000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill>Dump-Off</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Pass</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "khemri"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.khemri_ramtut",
+   "name": "Ramtut III",
+   "cost": 380000,
+   "players": [
+    {
+     "position": {
+      "id": "star.khemri_ramtut",
+      "name": "Ramtut III",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 380000,
+      "ma": 5,
+      "st": 6,
+      "ag": 1,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Break Tackle",
+       "Mighty Blow",
+       "Regeneration",
+       "Wrestle"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.khemri_ramtut\">\n\t\t<quantity>1</quantity>\n\t\t<name>Ramtut III</name>\n\t\t<type>Star</type>\n\t\t<cost>380000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>6</strength>\n\t\t<agility>1</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Break Tackle</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Wrestle</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "khemri"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.khemri_setekh",
+   "name": "Setekh",
+   "cost": 220000,
+   "players": [
+    {
+     "position": {
+      "id": "star.khemri_setekh",
+      "name": "Setekh",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 6,
+      "st": 4,
+      "ag": 2,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Break Tackle",
+       "Juggernaut",
+       "Regeneration",
+       "Strip Ball"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.khemri_setekh\">\n\t\t<quantity>1</quantity>\n\t\t<name>Setekh</name>\n\t\t<type>Star</type>\n\t\t<cost>220000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>4</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Break Tackle</skill>\n\t\t\t<skill>Juggernaut</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Strip Ball</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "khemri"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.khemri_sinnedbad",
+   "name": "Sinnedbad",
+   "cost": 80000,
+   "players": [
+    {
+     "position": {
+      "id": "star.khemri_sinnedbad",
+      "name": "Sinnedbad",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 80000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Block",
+       "Jump Up",
+       "Pass Block",
+       "Regeneration",
+       "Secret Weapon",
+       "Side Step",
+       "Stab"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.khemri_sinnedbad\">\n\t\t<quantity>1</quantity>\n\t\t<name>Sinnedbad</name>\n\t\t<type>Star</type>\n\t\t<cost>80000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Pass Block</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t\t<skill>Stab</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "khemri"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.lizardman_helmut",
+   "name": "Helmut Wulf",
+   "cost": 110000,
+   "players": [
+    {
+     "position": {
+      "id": "star.lizardman_helmut",
+      "name": "Helmut Wulf",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Chainsaw",
+       "Secret Weapon",
+       "Stand Firm"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.lizardman_helmut\">\n\t\t<quantity>1</quantity>\n\t\t<name>Helmut Wulf</name>\n\t\t<type>Star</type>\n\t\t<cost>110000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stand Firm</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "lizardman"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.lizardman_hemlock",
+   "name": "Hemlock",
+   "cost": 170000,
+   "players": [
+    {
+     "position": {
+      "id": "star.lizardman_hemlock",
+      "name": "Hemlock",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 170000,
+      "ma": 8,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dodge",
+       "Side Step",
+       "Jump Up",
+       "Stab",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.lizardman_hemlock\">\n\t\t<quantity>1</quantity>\n\t\t<name>Hemlock</name>\n\t\t<type>Star</type>\n\t\t<cost>170000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Stab</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "lizardman"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.lizardman_lottabottal",
+   "name": "Lottabottol",
+   "cost": 220000,
+   "players": [
+    {
+     "position": {
+      "id": "star.lizardman_lottabottal",
+      "name": "Lottabottol",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 8,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Catch",
+       "Diving Tackle",
+       "Jump Up",
+       "Leap",
+       "Pass Block",
+       "Shadowing",
+       "Very Long Legs"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.lizardman_lottabottal\">\n\t\t<quantity>1</quantity>\n\t\t<name>Lottabottol</name>\n\t\t<type>Star</type>\n\t\t<cost>220000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Diving Tackle</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Leap</skill>\n\t\t\t<skill>Pass Block</skill>\n\t\t\t<skill>Shadowing</skill>\n\t\t\t<skill>Very Long Legs</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "lizardman"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.lizardman_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.lizardman_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.lizardman_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "lizardman"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.lizardman_quetzal",
+   "name": "Quetzal Leap",
+   "cost": 250000,
+   "players": [
+    {
+     "position": {
+      "id": "star.lizardman_quetzal",
+      "name": "Quetzal Leap",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 8,
+      "st": 2,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Catch",
+       "Diving Catch",
+       "Fend",
+       "Kick-Off Return",
+       "Leap",
+       "Nerves of Steel",
+       "Very Long Legs"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.lizardman_quetzal\">\n\t\t<quantity>1</quantity>\n\t\t<name>Quetzal Leap</name>\n\t\t<type>Star</type>\n\t\t<cost>250000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>2</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Diving Catch</skill>\n\t\t\t<skill>Fend</skill>\n\t\t\t<skill>Kick-Off Return</skill>\n\t\t\t<skill>Leap</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Very Long Legs</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "lizardman"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.lizardman_slibli",
+   "name": "Slibli",
+   "cost": 250000,
+   "players": [
+    {
+     "position": {
+      "id": "star.lizardman_slibli",
+      "name": "Slibli",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 7,
+      "st": 4,
+      "ag": 1,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Block",
+       "Grab",
+       "Guard",
+       "Stand Firm"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.lizardman_slibli\">\n\t\t<quantity>1</quantity>\n\t\t<name>Slibli</name>\n\t\t<type>Star</type>\n\t\t<cost>250000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>4</strength>\n\t\t<agility>1</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Grab</skill>\n\t\t\t<skill>Guard</skill>\n\t\t\t<skill>Stand Firm</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "lizardman"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.necromantic_count",
+   "name": "Count Luthor von Drakenborg",
+   "cost": 390000,
+   "players": [
+    {
+     "position": {
+      "id": "star.necromantic_count",
+      "name": "Count Luthor von Drakenborg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 390000,
+      "ma": 6,
+      "st": 5,
+      "ag": 4,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Block",
+       "Hypnotic Gaze",
+       "Side Step",
+       "Regeneration"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.necromantic_count\">\n\t\t<quantity>1</quantity>\n\t\t<name>Count Luthor von Drakenborg</name>\n\t\t<type>Star</type>\n\t\t<cost>390000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>5</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Hypnotic Gaze</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "necromantic"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.necromantic_earlice",
+   "name": "J. Earlice",
+   "cost": 180000,
+   "players": [
+    {
+     "position": {
+      "id": "star.necromantic_earlice",
+      "name": "J. Earlice",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 180000,
+      "ma": 8,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Catch",
+       "Diving Catch",
+       "Dodge",
+       "Sprint"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.necromantic_earlice\">\n\t\t<quantity>1</quantity>\n\t\t<name>J. Earlice</name>\n\t\t<type>Star</type>\n\t\t<cost>180000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Diving Catch</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Sprint</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "necromantic"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.necromantic_hackenslash",
+   "name": "Hack Enslash",
+   "cost": 120000,
+   "players": [
+    {
+     "position": {
+      "id": "star.necromantic_hackenslash",
+      "name": "Hack Enslash",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 120000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Chainsaw",
+       "Regeneration",
+       "Secret Weapon",
+       "Side Step"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.necromantic_hackenslash\">\n\t\t<quantity>1</quantity>\n\t\t<name>Hack Enslash</name>\n\t\t<type>Star</type>\n\t\t<cost>120000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "necromantic"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.necromantic_ramtut",
+   "name": "Ramtut III",
+   "cost": 380000,
+   "players": [
+    {
+     "position": {
+      "id": "star.necromantic_ramtut",
+      "name": "Ramtut III",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 380000,
+      "ma": 5,
+      "st": 6,
+      "ag": 1,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Break Tackle",
+       "Mighty Blow",
+       "Regeneration",
+       "Wrestle"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.necromantic_ramtut\">\n\t\t<quantity>1</quantity>\n\t\t<name>Ramtut III</name>\n\t\t<type>Star</type>\n\t\t<cost>380000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>6</strength>\n\t\t<agility>1</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Break Tackle</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Wrestle</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "necromantic"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.necromantic_setekh",
+   "name": "Setekh",
+   "cost": 220000,
+   "players": [
+    {
+     "position": {
+      "id": "star.necromantic_setekh",
+      "name": "Setekh",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 6,
+      "st": 4,
+      "ag": 2,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Break Tackle",
+       "Juggernaut",
+       "Regeneration",
+       "Strip Ball"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.necromantic_setekh\">\n\t\t<quantity>1</quantity>\n\t\t<name>Setekh</name>\n\t\t<type>Star</type>\n\t\t<cost>220000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>4</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Break Tackle</skill>\n\t\t\t<skill>Juggernaut</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Strip Ball</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "necromantic"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.necromantic_whilhelm",
+   "name": "Wilhelm Chaney",
+   "cost": 240000,
+   "players": [
+    {
+     "position": {
+      "id": "star.necromantic_whilhelm",
+      "name": "Wilhelm Chaney",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 240000,
+      "ma": 8,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Catch",
+       "Claw",
+       "Frenzy",
+       "Regeneration",
+       "Wrestle"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.necromantic_whilhelm\">\n\t\t<quantity>1</quantity>\n\t\t<name>Wilhelm Chaney</name>\n\t\t<type>Star</type>\n\t\t<cost>240000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Claw</skill>\n\t\t\t<skill>Frenzy</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Wrestle</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "necromantic"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.norse_eziasson",
+   "name": "Boomer Eziasson",
+   "cost": 60000,
+   "players": [
+    {
+     "position": {
+      "id": "star.norse_eziasson",
+      "name": "Boomer Eziasson",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 4,
+      "st": 3,
+      "ag": 2,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Accurate",
+       "Block",
+       "Bombardier",
+       "Secret Weapon",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.norse_eziasson\">\n\t\t<quantity>1</quantity>\n\t\t<name>Boomer Eziasson</name>\n\t\t<type>Star</type>\n\t\t<cost>60000</cost>\n\t\t<movement>4</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Bombardier</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "norse"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.norse_helmut",
+   "name": "Helmut Wulf",
+   "cost": 110000,
+   "players": [
+    {
+     "position": {
+      "id": "star.norse_helmut",
+      "name": "Helmut Wulf",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Chainsaw",
+       "Secret Weapon",
+       "Stand Firm"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.norse_helmut\">\n\t\t<quantity>1</quantity>\n\t\t<name>Helmut Wulf</name>\n\t\t<type>Star</type>\n\t\t<cost>110000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stand Firm</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "norse"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.norse_icepelt",
+   "name": "Icepelt Hammerblow",
+   "cost": 330000,
+   "players": [
+    {
+     "position": {
+      "id": "star.norse_icepelt",
+      "name": "Icepelt Hammerblow",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 330000,
+      "ma": 5,
+      "st": 6,
+      "ag": 1,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Claw",
+       "Disturbing Presence",
+       "Frenzy",
+       "Regeneration",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.norse_icepelt\">\n\t\t<quantity>1</quantity>\n\t\t<name>Icepelt Hammerblow</name>\n\t\t<type>Star</type>\n\t\t<cost>330000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>6</strength>\n\t\t<agility>1</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Claw</skill>\n\t\t\t<skill>Disturbing Presence</skill>\n\t\t\t<skill>Frenzy</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "norse"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.norse_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.norse_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.norse_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "norse"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.norse_whilhelm",
+   "name": "Wilhelm Chaney",
+   "cost": 240000,
+   "players": [
+    {
+     "position": {
+      "id": "star.norse_whilhelm",
+      "name": "Wilhelm Chaney",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 240000,
+      "ma": 8,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Catch",
+       "Claw",
+       "Frenzy",
+       "Regeneration",
+       "Wrestle"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.norse_whilhelm\">\n\t\t<quantity>1</quantity>\n\t\t<name>Wilhelm Chaney</name>\n\t\t<type>Star</type>\n\t\t<cost>240000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Claw</skill>\n\t\t\t<skill>Frenzy</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Wrestle</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "norse"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.norse_zara",
+   "name": "Zara the Slayer",
+   "cost": 270000,
+   "players": [
+    {
+     "position": {
+      "id": "star.norse_zara",
+      "name": "Zara the Slayer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dauntless",
+       "Dodge",
+       "Jump Up",
+       "Stab",
+       "Stakes"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.norse_zara\">\n\t\t<quantity>1</quantity>\n\t\t<name>Zara the Slayer</name>\n\t\t<type>Star</type>\n\t\t<cost>270000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dauntless</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Stab</skill>\n\t\t\t<skill>Stakes</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "norse"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.nurgle_borak",
+   "name": "Lord Borak the Despoiler",
+   "cost": 270000,
+   "players": [
+    {
+     "position": {
+      "id": "star.nurgle_borak",
+      "name": "Lord Borak the Despoiler",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 5,
+      "st": 5,
+      "ag": 3,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dirty Player",
+       "Mighty Blow"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.nurgle_borak\">\n\t\t<quantity>1</quantity>\n\t\t<name>Lord Borak the Despoiler</name>\n\t\t<type>Star</type>\n\t\t<cost>270000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>5</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dirty Player</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "nurgle"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.nurgle_farth",
+   "name": "Brick Far'th",
+   "cost": 290000,
+   "players": [
+    {
+     "position": {
+      "id": "star.nurgle_farth",
+      "name": "Brick Far'th",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 5,
+      "st": 5,
+      "ag": 2,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Bone-Head",
+       "Mighty Blow",
+       "Nerves of Steel",
+       "Strong Arm",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.nurgle_farth\">\n\t\t<quantity>1</quantity>\n\t\t<name>Brick Far'th</name>\n\t\t<type>Star</type>\n\t\t<cost>290000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>5</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Bone-Head</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Strong Arm</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "nurgle"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.nurgle_grashnak",
+   "name": "Grashnak Blackhoof",
+   "cost": 310000,
+   "players": [
+    {
+     "position": {
+      "id": "star.nurgle_grashnak",
+      "name": "Grashnak Blackhoof",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 310000,
+      "ma": 6,
+      "st": 6,
+      "ag": 2,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Frenzy",
+       "Horns",
+       "Mighty Blow",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.nurgle_grashnak\">\n\t\t<quantity>1</quantity>\n\t\t<name>Grashnak Blackhoof</name>\n\t\t<type>Star</type>\n\t\t<cost>310000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Frenzy</skill>\n\t\t\t<skill>Horns</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "nurgle"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.nurgle_grotty",
+   "name": "Grotty",
+   "cost": 290000,
+   "players": [
+    {
+     "position": {
+      "id": "star.nurgle_grotty",
+      "name": "Grotty",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 6,
+      "st": 2,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Dodge",
+       "Right Stuff",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.nurgle_grotty\">\n\t\t<quantity>1</quantity>\n\t\t<name>Grotty</name>\n\t\t<type>Star</type>\n\t\t<cost>290000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "nurgle"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.nurgle_lewdgrip",
+   "name": "Lewdgrip Whiparm",
+   "cost": 150000,
+   "players": [
+    {
+     "position": {
+      "id": "star.nurgle_lewdgrip",
+      "name": "Lewdgrip Whiparm",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Pass",
+       "Strong Arm",
+       "Sure Hands",
+       "Tentacles"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.nurgle_lewdgrip\">\n\t\t<quantity>1</quantity>\n\t\t<name>Lewdgrip Whiparm</name>\n\t\t<type>Star</type>\n\t\t<cost>150000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Pass</skill>\n\t\t\t<skill>Strong Arm</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t\t<skill>Tentacles</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "nurgle"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.nurgle_max",
+   "name": "Max Spleenripper",
+   "cost": 130000,
+   "players": [
+    {
+     "position": {
+      "id": "star.nurgle_max",
+      "name": "Max Spleenripper",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Chainsaw",
+       "Secret Weapon"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.nurgle_max\">\n\t\t<quantity>1</quantity>\n\t\t<name>Max Spleenripper</name>\n\t\t<type>Star</type>\n\t\t<cost>130000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "nurgle"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.nurgle_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.nurgle_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.nurgle_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "nurgle"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.ogre_bigfist",
+   "name": "Bertha Bigfist",
+   "cost": 290000,
+   "players": [
+    {
+     "position": {
+      "id": "star.ogre_bigfist",
+      "name": "Bertha Bigfist",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 6,
+      "st": 5,
+      "ag": 2,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Bone-Head",
+       "Break Tackle",
+       "Dodge",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.ogre_bigfist\">\n\t\t<quantity>1</quantity>\n\t\t<name>Bertha Bigfist</name>\n\t\t<type>Star</type>\n\t\t<cost>290000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>5</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Bone-Head</skill>\n\t\t\t<skill>Break Tackle</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "ogre"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.ogre_dribblesnot",
+   "name": "Bomber Dribblesnot",
+   "cost": 60000,
+   "players": [
+    {
+     "position": {
+      "id": "star.ogre_dribblesnot",
+      "name": "Bomber Dribblesnot",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Accurate",
+       "Bombardier",
+       "Dodge",
+       "Right Stuff",
+       "Secret Weapon",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.ogre_dribblesnot\">\n\t\t<quantity>1</quantity>\n\t\t<name>Bomber Dribblesnot</name>\n\t\t<type>Star</type>\n\t\t<cost>60000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill>Bombardier</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "ogre"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.ogre_farth",
+   "name": "Brick Far'th",
+   "cost": 290000,
+   "players": [
+    {
+     "position": {
+      "id": "star.ogre_farth",
+      "name": "Brick Far'th",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 5,
+      "st": 5,
+      "ag": 2,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Bone-Head",
+       "Mighty Blow",
+       "Nerves of Steel",
+       "Strong Arm",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.ogre_farth\">\n\t\t<quantity>1</quantity>\n\t\t<name>Brick Far'th</name>\n\t\t<type>Star</type>\n\t\t<cost>290000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>5</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Bone-Head</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Strong Arm</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "ogre"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.ogre_grotty",
+   "name": "Grotty",
+   "cost": 290000,
+   "players": [
+    {
+     "position": {
+      "id": "star.ogre_grotty",
+      "name": "Grotty",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 6,
+      "st": 2,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Dodge",
+       "Right Stuff",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.ogre_grotty\">\n\t\t<quantity>1</quantity>\n\t\t<name>Grotty</name>\n\t\t<type>Star</type>\n\t\t<cost>290000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "ogre"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.ogre_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.ogre_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.ogre_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "ogre"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.ogre_nobbla",
+   "name": "Nobbla Blackwart",
+   "cost": 130000,
+   "players": [
+    {
+     "position": {
+      "id": "star.ogre_nobbla",
+      "name": "Nobbla Blackwart",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dodge",
+       "Chainsaw",
+       "Secret Weapon",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.ogre_nobbla\">\n\t\t<quantity>1</quantity>\n\t\t<name>Nobbla Blackwart</name>\n\t\t<type>Star</type>\n\t\t<cost>130000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "ogre"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.ogre_scrappa",
+   "name": "Scrappa Sorehead",
+   "cost": 150000,
+   "players": [
+    {
+     "position": {
+      "id": "star.ogre_scrappa",
+      "name": "Scrappa Sorehead",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 7,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Dirty Player",
+       "Dodge",
+       "Leap",
+       "Right Stuff",
+       "Sprint",
+       "Stunty",
+       "Sure Feet",
+       "Very Long Legs"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.ogre_scrappa\">\n\t\t<quantity>1</quantity>\n\t\t<name>Scrappa Sorehead</name>\n\t\t<type>Star</type>\n\t\t<cost>150000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dirty Player</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Leap</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Sprint</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t\t<skill>Sure Feet</skill>\n\t\t\t<skill>Very Long Legs</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "ogre"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.orc_dribblesnot",
+   "name": "Bomber Dribblesnot",
+   "cost": 60000,
+   "players": [
+    {
+     "position": {
+      "id": "star.orc_dribblesnot",
+      "name": "Bomber Dribblesnot",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Accurate",
+       "Bombardier",
+       "Dodge",
+       "Right Stuff",
+       "Secret Weapon",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.orc_dribblesnot\">\n\t\t<quantity>1</quantity>\n\t\t<name>Bomber Dribblesnot</name>\n\t\t<type>Star</type>\n\t\t<cost>60000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill>Bombardier</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "orc"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.orc_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.orc_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.orc_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "orc"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.orc_ripper",
+   "name": "Ripper",
+   "cost": 270000,
+   "players": [
+    {
+     "position": {
+      "id": "star.orc_ripper",
+      "name": "Ripper",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 4,
+      "st": 6,
+      "ag": 1,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Grab",
+       "Mighty Blow",
+       "Regeneration",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.orc_ripper\">\n\t\t<quantity>1</quantity>\n\t\t<name>Ripper</name>\n\t\t<type>Star</type>\n\t\t<cost>270000</cost>\n\t\t<movement>4</movement>\n\t\t<strength>6</strength>\n\t\t<agility>1</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Grab</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "orc"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.orc_scrappa",
+   "name": "Scrappa Sorehead",
+   "cost": 150000,
+   "players": [
+    {
+     "position": {
+      "id": "star.orc_scrappa",
+      "name": "Scrappa Sorehead",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 7,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Dirty Player",
+       "Dodge",
+       "Leap",
+       "Right Stuff",
+       "Sprint",
+       "Stunty",
+       "Sure Feet",
+       "Very Long Legs"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.orc_scrappa\">\n\t\t<quantity>1</quantity>\n\t\t<name>Scrappa Sorehead</name>\n\t\t<type>Star</type>\n\t\t<cost>150000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dirty Player</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Leap</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Sprint</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t\t<skill>Sure Feet</skill>\n\t\t\t<skill>Very Long Legs</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "orc"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.orc_ugroth",
+   "name": "Ugroth Bolgrot",
+   "cost": 100000,
+   "players": [
+    {
+     "position": {
+      "id": "star.orc_ugroth",
+      "name": "Ugroth Bolgrot",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 5,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Chainsaw",
+       "Secret Weapon"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.orc_ugroth\">\n\t\t<quantity>1</quantity>\n\t\t<name>Ugroth Bolgrot</name>\n\t\t<type>Star</type>\n\t\t<cost>100000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "orc"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.orc_varag",
+   "name": "Varag Ghoul-Chewer",
+   "cost": 290000,
+   "players": [
+    {
+     "position": {
+      "id": "star.orc_varag",
+      "name": "Varag Ghoul-Chewer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 290000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Block",
+       "Jump Up",
+       "Mighty Blow",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.orc_varag\">\n\t\t<quantity>1</quantity>\n\t\t<name>Varag Ghoul-Chewer</name>\n\t\t<type>Star</type>\n\t\t<cost>290000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "orc"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.skaven_fezglitch",
+   "name": "Fezglitch",
+   "cost": 100000,
+   "players": [
+    {
+     "position": {
+      "id": "star.skaven_fezglitch",
+      "name": "Fezglitch",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 4,
+      "st": 7,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Ball and Chain",
+       "Disturbing Presence",
+       "Foul Appearance",
+       "No Hands",
+       "Secret Weapon"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.skaven_fezglitch\">\n\t\t<quantity>1</quantity>\n\t\t<name>Fezglitch</name>\n\t\t<type>Star</type>\n\t\t<cost>100000</cost>\n\t\t<movement>4</movement>\n\t\t<strength>7</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Ball and Chain</skill>\n\t\t\t<skill>Disturbing Presence</skill>\n\t\t\t<skill>Foul Appearance</skill>\n\t\t\t<skill>No Hands</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "skaven"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.skaven_glart",
+   "name": "Glart Smashrip Jr.",
+   "cost": 210000,
+   "players": [
+    {
+     "position": {
+      "id": "star.skaven_glart",
+      "name": "Glart Smashrip Jr.",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 210000,
+      "ma": 7,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Claw",
+       "Juggernaut"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.skaven_glart\">\n\t\t<quantity>1</quantity>\n\t\t<name>Glart Smashrip Jr.</name>\n\t\t<type>Star</type>\n\t\t<cost>210000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Claw</skill>\n\t\t\t<skill>Juggernaut</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "skaven"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.skaven_hackflem",
+   "name": "Hakflem Skuttlespike",
+   "cost": 200000,
+   "players": [
+    {
+     "position": {
+      "id": "star.skaven_hackflem",
+      "name": "Hakflem Skuttlespike",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 200000,
+      "ma": 9,
+      "st": 3,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Dodge",
+       "Extra Arms",
+       "Prehensile Tail",
+       "Two Heads"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.skaven_hackflem\">\n\t\t<quantity>1</quantity>\n\t\t<name>Hakflem Skuttlespike</name>\n\t\t<type>Star</type>\n\t\t<cost>200000</cost>\n\t\t<movement>9</movement>\n\t\t<strength>3</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Extra Arms</skill>\n\t\t\t<skill>Prehensile Tail</skill>\n\t\t\t<skill>Two Heads</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "skaven"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.skaven_headsplitter",
+   "name": "Headsplitter",
+   "cost": 340000,
+   "players": [
+    {
+     "position": {
+      "id": "star.skaven_headsplitter",
+      "name": "Headsplitter",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 340000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Frenzy",
+       "Mighty Blow",
+       "Prehensile Tail"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.skaven_headsplitter\">\n\t\t<quantity>1</quantity>\n\t\t<name>Headsplitter</name>\n\t\t<type>Star</type>\n\t\t<cost>340000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Frenzy</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Prehensile Tail</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "skaven"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.skaven_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.skaven_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.skaven_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "skaven"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.skaven_skitter",
+   "name": "Skitter Stab-Stab",
+   "cost": 160000,
+   "players": [
+    {
+     "position": {
+      "id": "star.skaven_skitter",
+      "name": "Skitter Stab-Stab",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 160000,
+      "ma": 9,
+      "st": 2,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Dodge",
+       "Prehensile Tail",
+       "Shadowing",
+       "Stab"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.skaven_skitter\">\n\t\t<quantity>1</quantity>\n\t\t<name>Skitter Stab-Stab</name>\n\t\t<type>Star</type>\n\t\t<cost>160000</cost>\n\t\t<movement>9</movement>\n\t\t<strength>2</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Prehensile Tail</skill>\n\t\t\t<skill>Shadowing</skill>\n\t\t\t<skill>Stab</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "skaven"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.slann_helmut",
+   "name": "Helmut Wulf",
+   "cost": 110000,
+   "players": [
+    {
+     "position": {
+      "id": "star.slann_helmut",
+      "name": "Helmut Wulf",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Chainsaw",
+       "Secret Weapon",
+       "Stand Firm"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.slann_helmut\">\n\t\t<quantity>1</quantity>\n\t\t<name>Helmut Wulf</name>\n\t\t<type>Star</type>\n\t\t<cost>110000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stand Firm</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "slann"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.slann_hemlock",
+   "name": "Hemlock",
+   "cost": 170000,
+   "players": [
+    {
+     "position": {
+      "id": "star.slann_hemlock",
+      "name": "Hemlock",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 170000,
+      "ma": 8,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dodge",
+       "Side Step",
+       "Jump Up",
+       "Stab",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.slann_hemlock\">\n\t\t<quantity>1</quantity>\n\t\t<name>Hemlock</name>\n\t\t<type>Star</type>\n\t\t<cost>170000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Stab</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "slann"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.slann_lottabottal",
+   "name": "Lottabottol",
+   "cost": 220000,
+   "players": [
+    {
+     "position": {
+      "id": "star.slann_lottabottal",
+      "name": "Lottabottol",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 8,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Catch",
+       "Diving Tackle",
+       "Jump Up",
+       "Leap",
+       "Pass Block",
+       "Shadowing",
+       "Very Long Legs"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.slann_lottabottal\">\n\t\t<quantity>1</quantity>\n\t\t<name>Lottabottol</name>\n\t\t<type>Star</type>\n\t\t<cost>220000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Diving Tackle</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Leap</skill>\n\t\t\t<skill>Pass Block</skill>\n\t\t\t<skill>Shadowing</skill>\n\t\t\t<skill>Very Long Legs</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "slann"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.slann_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.slann_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.slann_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "slann"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.slann_quetzal",
+   "name": "Quetzal Leap",
+   "cost": 250000,
+   "players": [
+    {
+     "position": {
+      "id": "star.slann_quetzal",
+      "name": "Quetzal Leap",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 8,
+      "st": 2,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Catch",
+       "Diving Catch",
+       "Fend",
+       "Kick-Off Return",
+       "Leap",
+       "Nerves of Steel",
+       "Very Long Legs"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.slann_quetzal\">\n\t\t<quantity>1</quantity>\n\t\t<name>Quetzal Leap</name>\n\t\t<type>Star</type>\n\t\t<cost>250000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>2</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Diving Catch</skill>\n\t\t\t<skill>Fend</skill>\n\t\t\t<skill>Kick-Off Return</skill>\n\t\t\t<skill>Leap</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Very Long Legs</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "slann"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.slann_slibli",
+   "name": "Slibli",
+   "cost": 250000,
+   "players": [
+    {
+     "position": {
+      "id": "star.slann_slibli",
+      "name": "Slibli",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 250000,
+      "ma": 7,
+      "st": 4,
+      "ag": 1,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Block",
+       "Grab",
+       "Guard",
+       "Stand Firm"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.slann_slibli\">\n\t\t<quantity>1</quantity>\n\t\t<name>Slibli</name>\n\t\t<type>Star</type>\n\t\t<cost>250000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>4</strength>\n\t\t<agility>1</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Grab</skill>\n\t\t\t<skill>Guard</skill>\n\t\t\t<skill>Stand Firm</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "slann"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.undead_count",
+   "name": "Count Luthor von Drakenborg",
+   "cost": 390000,
+   "players": [
+    {
+     "position": {
+      "id": "star.undead_count",
+      "name": "Count Luthor von Drakenborg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 390000,
+      "ma": 6,
+      "st": 5,
+      "ag": 4,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Block",
+       "Hypnotic Gaze",
+       "Side Step",
+       "Regeneration"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.undead_count\">\n\t\t<quantity>1</quantity>\n\t\t<name>Count Luthor von Drakenborg</name>\n\t\t<type>Star</type>\n\t\t<cost>390000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>5</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Hypnotic Gaze</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "undead"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.undead_earlice",
+   "name": "J. Earlice",
+   "cost": 180000,
+   "players": [
+    {
+     "position": {
+      "id": "star.undead_earlice",
+      "name": "J. Earlice",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 180000,
+      "ma": 8,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Catch",
+       "Diving Catch",
+       "Dodge",
+       "Sprint"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.undead_earlice\">\n\t\t<quantity>1</quantity>\n\t\t<name>J. Earlice</name>\n\t\t<type>Star</type>\n\t\t<cost>180000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Diving Catch</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Sprint</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "undead"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.undead_hackenslash",
+   "name": "Hack Enslash",
+   "cost": 120000,
+   "players": [
+    {
+     "position": {
+      "id": "star.undead_hackenslash",
+      "name": "Hack Enslash",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 120000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Chainsaw",
+       "Regeneration",
+       "Secret Weapon",
+       "Side Step"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.undead_hackenslash\">\n\t\t<quantity>1</quantity>\n\t\t<name>Hack Enslash</name>\n\t\t<type>Star</type>\n\t\t<cost>120000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "undead"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.undead_ramtut",
+   "name": "Ramtut III",
+   "cost": 380000,
+   "players": [
+    {
+     "position": {
+      "id": "star.undead_ramtut",
+      "name": "Ramtut III",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 380000,
+      "ma": 5,
+      "st": 6,
+      "ag": 1,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Break Tackle",
+       "Mighty Blow",
+       "Regeneration",
+       "Wrestle"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.undead_ramtut\">\n\t\t<quantity>1</quantity>\n\t\t<name>Ramtut III</name>\n\t\t<type>Star</type>\n\t\t<cost>380000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>6</strength>\n\t\t<agility>1</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Break Tackle</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Wrestle</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "undead"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.undead_setekh",
+   "name": "Setekh",
+   "cost": 220000,
+   "players": [
+    {
+     "position": {
+      "id": "star.undead_setekh",
+      "name": "Setekh",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 220000,
+      "ma": 6,
+      "st": 4,
+      "ag": 2,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Break Tackle",
+       "Juggernaut",
+       "Regeneration",
+       "Strip Ball"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.undead_setekh\">\n\t\t<quantity>1</quantity>\n\t\t<name>Setekh</name>\n\t\t<type>Star</type>\n\t\t<cost>220000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>4</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Break Tackle</skill>\n\t\t\t<skill>Juggernaut</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Strip Ball</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "undead"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.undead_sinnedbad",
+   "name": "Sinnedbad",
+   "cost": 80000,
+   "players": [
+    {
+     "position": {
+      "id": "star.undead_sinnedbad",
+      "name": "Sinnedbad",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 80000,
+      "ma": 6,
+      "st": 3,
+      "ag": 2,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Block",
+       "Jump Up",
+       "Pass Block",
+       "Regeneration",
+       "Secret Weapon",
+       "Side Step",
+       "Stab"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.undead_sinnedbad\">\n\t\t<quantity>1</quantity>\n\t\t<name>Sinnedbad</name>\n\t\t<type>Star</type>\n\t\t<cost>80000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Pass Block</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t\t<skill>Stab</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "undead"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.underworld_dribblesnot",
+   "name": "Bomber Dribblesnot",
+   "cost": 60000,
+   "players": [
+    {
+     "position": {
+      "id": "star.underworld_dribblesnot",
+      "name": "Bomber Dribblesnot",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 60000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Accurate",
+       "Bombardier",
+       "Dodge",
+       "Right Stuff",
+       "Secret Weapon",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.underworld_dribblesnot\">\n\t\t<quantity>1</quantity>\n\t\t<name>Bomber Dribblesnot</name>\n\t\t<type>Star</type>\n\t\t<cost>60000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill>Bombardier</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "underworld"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.underworld_fezglitch",
+   "name": "Fezglitch",
+   "cost": 100000,
+   "players": [
+    {
+     "position": {
+      "id": "star.underworld_fezglitch",
+      "name": "Fezglitch",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 100000,
+      "ma": 4,
+      "st": 7,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Ball and Chain",
+       "Disturbing Presence",
+       "Foul Appearance",
+       "No Hands",
+       "Secret Weapon"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.underworld_fezglitch\">\n\t\t<quantity>1</quantity>\n\t\t<name>Fezglitch</name>\n\t\t<type>Star</type>\n\t\t<cost>100000</cost>\n\t\t<movement>4</movement>\n\t\t<strength>7</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Ball and Chain</skill>\n\t\t\t<skill>Disturbing Presence</skill>\n\t\t\t<skill>Foul Appearance</skill>\n\t\t\t<skill>No Hands</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "underworld"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.underworld_glart",
+   "name": "Glart Smashrip Jr.",
+   "cost": 210000,
+   "players": [
+    {
+     "position": {
+      "id": "star.underworld_glart",
+      "name": "Glart Smashrip Jr.",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 210000,
+      "ma": 7,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Claw",
+       "Juggernaut"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.underworld_glart\">\n\t\t<quantity>1</quantity>\n\t\t<name>Glart Smashrip Jr.</name>\n\t\t<type>Star</type>\n\t\t<cost>210000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Claw</skill>\n\t\t\t<skill>Juggernaut</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "underworld"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.underworld_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.underworld_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.underworld_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "underworld"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.underworld_nobbla",
+   "name": "Nobbla Blackwart",
+   "cost": 130000,
+   "players": [
+    {
+     "position": {
+      "id": "star.underworld_nobbla",
+      "name": "Nobbla Blackwart",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 130000,
+      "ma": 6,
+      "st": 2,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dodge",
+       "Chainsaw",
+       "Secret Weapon",
+       "Stunty"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.underworld_nobbla\">\n\t\t<quantity>1</quantity>\n\t\t<name>Nobbla Blackwart</name>\n\t\t<type>Star</type>\n\t\t<cost>130000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "underworld"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.underworld_skitter",
+   "name": "Skitter Stab-Stab",
+   "cost": 160000,
+   "players": [
+    {
+     "position": {
+      "id": "star.underworld_skitter",
+      "name": "Skitter Stab-Stab",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 160000,
+      "ma": 9,
+      "st": 2,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Dodge",
+       "Prehensile Tail",
+       "Shadowing",
+       "Stab"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.underworld_skitter\">\n\t\t<quantity>1</quantity>\n\t\t<name>Skitter Stab-Stab</name>\n\t\t<type>Star</type>\n\t\t<cost>160000</cost>\n\t\t<movement>9</movement>\n\t\t<strength>2</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Prehensile Tail</skill>\n\t\t\t<skill>Shadowing</skill>\n\t\t\t<skill>Stab</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "underworld"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.vampire_count",
+   "name": "Count Luthor von Drakenborg",
+   "cost": 390000,
+   "players": [
+    {
+     "position": {
+      "id": "star.vampire_count",
+      "name": "Count Luthor von Drakenborg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 390000,
+      "ma": 6,
+      "st": 5,
+      "ag": 4,
+      "pa": 0,
+      "av": 9,
+      "skills": [
+       "Loner",
+       "Block",
+       "Hypnotic Gaze",
+       "Side Step",
+       "Regeneration"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.vampire_count\">\n\t\t<quantity>1</quantity>\n\t\t<name>Count Luthor von Drakenborg</name>\n\t\t<type>Star</type>\n\t\t<cost>390000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>5</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Hypnotic Gaze</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "vampire"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.vampire_earlice",
+   "name": "J. Earlice",
+   "cost": 180000,
+   "players": [
+    {
+     "position": {
+      "id": "star.vampire_earlice",
+      "name": "J. Earlice",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 180000,
+      "ma": 8,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Catch",
+       "Diving Catch",
+       "Dodge",
+       "Sprint"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.vampire_earlice\">\n\t\t<quantity>1</quantity>\n\t\t<name>J. Earlice</name>\n\t\t<type>Star</type>\n\t\t<cost>180000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Diving Catch</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Sprint</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "vampire"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.vampire_helmut",
+   "name": "Helmut Wulf",
+   "cost": 110000,
+   "players": [
+    {
+     "position": {
+      "id": "star.vampire_helmut",
+      "name": "Helmut Wulf",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 110000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Chainsaw",
+       "Secret Weapon",
+       "Stand Firm"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.vampire_helmut\">\n\t\t<quantity>1</quantity>\n\t\t<name>Helmut Wulf</name>\n\t\t<type>Star</type>\n\t\t<cost>110000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Chainsaw</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stand Firm</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "vampire"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.vampire_igor",
+   "name": "Crazy Igor",
+   "cost": 120000,
+   "players": [
+    {
+     "position": {
+      "id": "star.vampire_igor",
+      "name": "Crazy Igor",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 120000,
+      "ma": 6,
+      "st": 3,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Dauntless",
+       "Regeneration",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.vampire_igor\">\n\t\t<quantity>1</quantity>\n\t\t<name>Crazy Igor</name>\n\t\t<type>Star</type>\n\t\t<cost>120000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>3</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dauntless</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "vampire"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.vampire_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.vampire_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.vampire_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "vampire"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.vampire_whilhelm",
+   "name": "Wilhelm Chaney",
+   "cost": 240000,
+   "players": [
+    {
+     "position": {
+      "id": "star.vampire_whilhelm",
+      "name": "Wilhelm Chaney",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 240000,
+      "ma": 8,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Catch",
+       "Claw",
+       "Frenzy",
+       "Regeneration",
+       "Wrestle"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.vampire_whilhelm\">\n\t\t<quantity>1</quantity>\n\t\t<name>Wilhelm Chaney</name>\n\t\t<type>Star</type>\n\t\t<cost>240000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Claw</skill>\n\t\t\t<skill>Frenzy</skill>\n\t\t\t<skill>Regeneration</skill>\n\t\t\t<skill>Wrestle</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "vampire"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.woodelf_jordell",
+   "name": "Jordell Freshbreeze",
+   "cost": 260000,
+   "players": [
+    {
+     "position": {
+      "id": "star.woodelf_jordell",
+      "name": "Jordell Freshbreeze",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 260000,
+      "ma": 8,
+      "st": 3,
+      "ag": 5,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Block",
+       "Diving Catch",
+       "Dodge",
+       "Leap",
+       "Side Step"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.woodelf_jordell\">\n\t\t<quantity>1</quantity>\n\t\t<name>Jordell Freshbreeze</name>\n\t\t<type>Star</type>\n\t\t<cost>260000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>5</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Diving Catch</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Leap</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "wood_elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.woodelf_longstride",
+   "name": "Dolfar Longstride",
+   "cost": 150000,
+   "players": [
+    {
+     "position": {
+      "id": "star.woodelf_longstride",
+      "name": "Dolfar Longstride",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 7,
+      "st": 3,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Diving Catch",
+       "Hail Mary Pass",
+       "Kick",
+       "Kick-Off Return",
+       "Pass Block"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.woodelf_longstride\">\n\t\t<quantity>1</quantity>\n\t\t<name>Dolfar Longstride</name>\n\t\t<type>Star</type>\n\t\t<cost>150000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Diving Catch</skill>\n\t\t\t<skill>Hail Mary Pass</skill>\n\t\t\t<skill>Kick</skill>\n\t\t\t<skill>Kick-Off Return</skill>\n\t\t\t<skill>Pass Block</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "wood_elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.woodelf_morg",
+   "name": "Morg 'n' Thorg",
+   "cost": 430000,
+   "players": [
+    {
+     "position": {
+      "id": "star.woodelf_morg",
+      "name": "Morg 'n' Thorg",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 430000,
+      "ma": 6,
+      "st": 6,
+      "ag": 3,
+      "pa": 0,
+      "av": 10,
+      "skills": [
+       "Loner",
+       "Block",
+       "Mighty Blow",
+       "Thick Skull",
+       "Throw Team-Mate"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.woodelf_morg\">\n\t\t<quantity>1</quantity>\n\t\t<name>Morg 'n' Thorg</name>\n\t\t<type>Star</type>\n\t\t<cost>430000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>6</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Throw Team-Mate</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "wood_elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.woodelf_sidewinder",
+   "name": "Eldril Sidewinder",
+   "cost": 200000,
+   "players": [
+    {
+     "position": {
+      "id": "star.woodelf_sidewinder",
+      "name": "Eldril Sidewinder",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 200000,
+      "ma": 8,
+      "st": 3,
+      "ag": 4,
+      "pa": 0,
+      "av": 7,
+      "skills": [
+       "Loner",
+       "Catch",
+       "Dodge",
+       "Hypnotic Gaze",
+       "Nerves of Steel",
+       "Pass Block"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.woodelf_sidewinder\">\n\t\t<quantity>1</quantity>\n\t\t<name>Eldril Sidewinder</name>\n\t\t<type>Star</type>\n\t\t<cost>200000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>4</agility>\n\t\t<passing>0</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Hypnotic Gaze</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Pass Block</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "wood_elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.woodelf_willow",
+   "name": "Willow Rosebark",
+   "cost": 150000,
+   "players": [
+    {
+     "position": {
+      "id": "star.woodelf_willow",
+      "name": "Willow Rosebark",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 150000,
+      "ma": 5,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Dauntless",
+       "Side Step",
+       "Thick Skull"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.woodelf_willow\">\n\t\t<quantity>1</quantity>\n\t\t<name>Willow Rosebark</name>\n\t\t<type>Star</type>\n\t\t<cost>150000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Dauntless</skill>\n\t\t\t<skill>Side Step</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "wood_elf"
+   ],
+   "dropped_skills": []
+  },
+  {
+   "id": "star.woodelf_zara",
+   "name": "Zara the Slayer",
+   "cost": 270000,
+   "players": [
+    {
+     "position": {
+      "id": "star.woodelf_zara",
+      "name": "Zara the Slayer",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 270000,
+      "ma": 6,
+      "st": 4,
+      "ag": 3,
+      "pa": 0,
+      "av": 8,
+      "skills": [
+       "Loner",
+       "Block",
+       "Dauntless",
+       "Dodge",
+       "Jump Up",
+       "Stab",
+       "Stakes"
+      ],
+      "keywords": []
+     },
+     "position_xml": "\t<position id=\"star.woodelf_zara\">\n\t\t<quantity>1</quantity>\n\t\t<name>Zara the Slayer</name>\n\t\t<type>Star</type>\n\t\t<cost>270000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>4</strength>\n\t\t<agility>3</agility>\n\t\t<passing>0</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Loner</skill>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dauntless</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Jump Up</skill>\n\t\t\t<skill>Stab</skill>\n\t\t\t<skill>Stakes</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+    }
+   ],
+   "eligible": [
+    "wood_elf"
+   ],
+   "dropped_skills": []
+  }
+ ]
+}

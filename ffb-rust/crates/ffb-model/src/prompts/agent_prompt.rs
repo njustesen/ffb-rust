@@ -229,7 +229,19 @@ pub enum AgentPrompt {
     /// INIT_PASSING with EndTurn (declining the re-throw), and the Rust agent mirrors that.
     BombRethrow { player_id: PlayerId },
 
+    /// Java `DialogKickSkillParameter` (all three editions' StepKickoffScatterRoll): the kicker
+    /// has Kick (canReduceKickDistance) and stands in the centre field. Answered with
+    /// `Action::UseSkill { skill_id: Kick, use_skill }`; both parity agents and ParityRunner's
+    /// KICK_SKILL arm DECLINE with zero RNG (the kick choice changes the scatter dice in bb2025).
+    KickSkill { player_id: PlayerId },
+
     // ── Inducements ────────────────────────────────────────────────────────────
+    /// bb2016 `StepBuyCards` / `DialogBuyCardsParameter`: the team may buy one card at a time
+    /// with `available_gold`. Answered with `Action::BuyCard { card_type }`; `None` = done.
+    BuyCards {
+        team_id: String,
+        available_gold: i32,
+    },
     BuyInducements {
         team_id: String,
         available: Vec<(String, i32)>,

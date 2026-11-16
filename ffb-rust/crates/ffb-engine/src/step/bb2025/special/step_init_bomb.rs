@@ -7,6 +7,7 @@ use ffb_model::report::report_scatter_ball::ReportScatterBall;
 use ffb_model::util::rng::GameRng;
 use ffb_model::util::util_cards::UtilCards;
 use ffb_model::enums::Direction;
+use ffb_model::enums::SkillId;
 use ffb_model::option::game_option_id;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, CatchScatterThrowInMode};
@@ -125,27 +126,22 @@ impl Step for StepInitBomb {
         // overwrite `explode_skill_used`.
         if let Action::UseSkill { skill_id, use_skill } = action {
             if skill_id.properties().contains(&NamedProperties::CAN_FORCE_BOMB_EXPLOSION) {
+                self.explode_skill_used = Some(*use_skill);
+                let pid = game.acting_player.player_id.clone();
+                // Java: addReport(new ReportSkillUse(playerId, skill, isSkillUsed, FORCE_BOMB_EXPLOSION))
+                // -- for a decline too. It was missing entirely (star tier: Bomber Dribblesnot's
+                // Kaboom!, underworld vs goblin bb2020).
+                game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                    pid.clone(), *skill_id, *use_skill,
+                    ffb_model::model::skill_use::SkillUse::FORCE_BOMB_EXPLOSION));
                 if *use_skill {
-                    // Java: actingPlayer.markSkillUsed(skill)
-                    if let Some(pid) = game.acting_player.player_id.clone() {
-                        let sid = game.player(&pid).and_then(|p| UtilCards::get_unused_skill_with_property(
-                            p, NamedProperties::CAN_FORCE_BOMB_EXPLOSION));
-                        if let Some(sid) = sid {
-                            // Java: addReport(new ReportSkillUse(skill, true))
-                            let skill_event = GameEvent::SkillUse {
-                                player_id: pid.clone(),
-                                skill_id: sid as u16,
-                                used: true,
-                            };
-                            let is_home = game.team_home.player(&pid).is_some();
-                            if is_home { game.team_home.player_mut(&pid).map(|p| p.used_skills.insert(sid)); }
-                            else { game.team_away.player_mut(&pid).map(|p| p.used_skills.insert(sid)); }
-                            self.explode_skill_used = Some(*use_skill);
-                            return self.execute_step(game, rng).with_event(skill_event);
-                        }
+                    if let Some(pid) = pid {
+                        // Java: getActingPlayer().markSkillUsed(skill)
+                        crate::step::util_server_steps::mark_skill_used(game, &pid, *skill_id);
+                        let skill_event = GameEvent::SkillUse { player_id: pid, skill_id: *skill_id as u16, used: true };
+                        return self.execute_step(game, rng).with_event(skill_event);
                     }
                 }
-                self.explode_skill_used = Some(*use_skill);
             }
         }
         self.execute_step(game, rng)
@@ -193,8 +189,17 @@ impl StepInitBomb {
         if self.catcher_id.is_some() {
             if self.explode_skill_used.is_none() {
                 if has_explode_skill {
-                    // Java: show dialog → CONTINUE, wait for CLIENT_USE_SKILL
-                    return StepOutcome::cont();
+                    // Java: showDialog(new DialogSkillUseParameter(actingPlayer, explodeSkill, 0))
+                    // and wait for CLIENT_USE_SKILL. This returned a bare cont() -- no prompt, so
+                    // the game STALLED at the first caught bomb of a Kaboom! thrower (star tier).
+                    let pid = game.acting_player.player_id.clone().unwrap_or_default();
+                    let sid = game.player(&pid).and_then(|p| UtilCards::get_unused_skill_with_property(
+                        p, NamedProperties::CAN_FORCE_BOMB_EXPLOSION)).unwrap_or(SkillId::Kaboom);
+                    return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
+                        player_id: pid,
+                        skill_id: sid as u16,
+                        skill_name: format!("{:?}", sid),
+                    });
                 } else {
                     // No skill → auto-skip explode
                     self.explode_skill_used = Some(false);

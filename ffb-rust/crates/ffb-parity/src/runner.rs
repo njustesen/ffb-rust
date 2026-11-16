@@ -908,7 +908,14 @@ pub(crate) fn make_team(roster_name: &str, side: &str, edition: &str) -> Team {
         return make_lineman_team(side, roster_name);
     }
     match make_team_from_file(roster_name, side, edition) {
-        Ok(team) => return team,
+        Ok(mut team) => {
+            // Star tier (BACKLOG §L): one hired star on top of the squad, see `stars.rs`.
+            if let Some(star) = crate::stars::star_for(side) {
+                crate::stars::apply_star(&mut team, side, edition, roster_name, &star)
+                    .unwrap_or_else(|e| panic!("star tier: {e}"));
+            }
+            return team;
+        }
         Err(e) => log::debug!("No team file for '{roster_name}' ({edition}): {e}; using legacy builder"),
     }
     make_team_from_roster(roster_name, side, edition)

@@ -168,7 +168,12 @@ impl StepKickoffScatterRollAskAfter {
                 .map(|p| p.has_skill_property(NamedProperties::CAN_REDUCE_KICK_DISTANCE))
                 .unwrap_or(false);
             if has_kick {
-                return StepOutcome::cont();
+                // Java: showDialog(DialogKickSkillParameter) and wait for CLIENT_USE_SKILL. This was
+                // a bare cont() with NO prompt -- the stall shape -- reached as soon as a Kick
+                // kicker stands in the centre field (star tier: Dolfar Longstride).
+                return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::KickSkill {
+                    player_id: self.kicking_player_id.clone().unwrap_or_default(),
+                });
             }
             self.use_kick_choice = Some(false);
         }

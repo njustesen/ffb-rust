@@ -140,6 +140,9 @@ pub enum Action {
     /// prompted for `AgentPrompt::BuyInducements`/`BuyPrayersAndInducements` before either
     /// responds) — mirrors `Action::PettyCash`'s `home` field for the same reason.
     BuyInducements { home: bool, purchases: Vec<InducementPurchase> },
+    /// Java: CLIENT_BUY_CARD (bb2016 `StepBuyCards`). `card_type` None = the team is done buying;
+    /// `home` names the sending coach (StepBuyCards keys the team on the session).
+    BuyCard { home: bool, card_type: Option<String> },
     /// Play a card from the hand, optionally targeting a player.
     PlayCard { card_id: String, target_player_id: Option<PlayerId> },
     /// Use a purchased inducement during the game (Java: CLIENT_USE_INDUCEMENT).

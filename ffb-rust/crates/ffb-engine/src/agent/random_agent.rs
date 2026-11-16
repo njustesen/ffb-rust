@@ -1579,6 +1579,12 @@ impl Agent for RandomAgent {
             // 0 RNG consumed on either side.
             Some(AgentPrompt::KickoffEventPlacement { .. }) => Action::EndTurn,
             // Inducement / pre-game: always decline / acknowledge with no RNG consumed.
+            // bb2016 cards: ParityRunner BUY_CARDS arm sends CLIENT_BUY_CARD(null) for the team.
+            // Kick: ParityRunner KICK_SKILL arm declines (CLIENT_USE_SKILL false), zero RNG.
+            Some(AgentPrompt::KickSkill { .. }) =>
+                Action::UseSkill { skill_id: ffb_model::enums::SkillId::Kick, use_skill: false },
+            Some(AgentPrompt::BuyCards { team_id, .. }) =>
+                Action::BuyCard { home: *team_id == gs.game.team_home.id, card_type: None },
             Some(AgentPrompt::BuyInducements { team_id, .. }) =>
                 Action::BuyInducements { home: *team_id == gs.game.team_home.id, purchases: vec![] },
             Some(AgentPrompt::BuyPrayersAndInducements { team_id, .. }) =>

@@ -1,4 +1,5 @@
 mod runner;
+mod stars;
 mod log_format;
 mod comparator;
 mod report_compare;
@@ -189,6 +190,9 @@ impl ParityArgs {
                 "--mode" if i + 1 < raw.len() => { agent_mode = raw[i + 1].clone(); i += 1; }
                 "--mode-away" if i + 1 < raw.len() => { agent_mode_away = Some(raw[i + 1].clone()); i += 1; }
                 "--home" if i + 1 < raw.len() => { home = raw[i + 1].clone(); i += 1; }
+                // Star tier (BACKLOG §L): one hired star per team, read by runner::make_team.
+                "--home-star" if i + 1 < raw.len() => { std::env::set_var("FFB_HOME_STAR", &raw[i + 1]); i += 1; }
+                "--away-star" if i + 1 < raw.len() => { std::env::set_var("FFB_AWAY_STAR", &raw[i + 1]); i += 1; }
                 "--away" if i + 1 < raw.len() => { away = raw[i + 1].clone(); i += 1; }
                 "--edition" if i + 1 < raw.len() => { edition = raw[i + 1].clone(); i += 1; }
                 "--tier" if i + 1 < raw.len() => { tier = parse_flag::<u8>("--tier", &raw[i + 1]); i += 1; }
@@ -226,6 +230,25 @@ fn main() {
     env_logger::init();
 
     let args = ParityArgs::parse();
+
+    // Star tier: give Java a private server dir holding the two squads with their stars, so the
+    // shared ffb-server/teams tree never grows a variant per (squad, star).
+    if stars::star_for("home").is_some() || stars::star_for("away").is_some() {
+        let base = std::env::var("FFB_SERVER_DIR").ok().map(std::path::PathBuf::from)
+            .or_else(|| ["../ffb-java/ffb/ffb-server", "ffb-java/ffb/ffb-server"].iter()
+                .map(std::path::PathBuf::from).find(|p| p.exists()))
+            .expect("star tier: no ffb-server dir");
+        let out = std::path::PathBuf::from(log_format::matchup_dir(&args.edition, &args.home, &args.away))
+            .join("java_server");
+        let home_star = stars::star_for("home");
+        let away_star = stars::star_for("away");
+        let dir = stars::prepare_java_server_dir(&base, &out, &args.edition,
+            (&args.home, &args.home_java, home_star.as_deref()),
+            (&args.away, &args.away_java, away_star.as_deref()))
+            .unwrap_or_else(|e| { eprintln!("star tier: {e}"); std::process::exit(2) });
+        let abs = std::fs::canonicalize(&dir).unwrap_or(dir);
+        std::env::set_var("FFB_SERVER_DIR", abs.to_string_lossy().trim_start_matches(r"\\?\").to_string());
+    }
 
     if args.network {
         println!("Running network integration test...");
