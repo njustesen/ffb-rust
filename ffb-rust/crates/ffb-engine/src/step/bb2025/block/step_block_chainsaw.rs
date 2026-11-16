@@ -247,8 +247,14 @@ impl StepBlockChainsaw {
         let armor_broken = injury_result_attacker.injury_context().is_armor_broken();
         let causes_turn_over = causes_turn_over_chainsaw(player_has_ball, chainsaw_option, armor_broken);
 
-        // Java: modifiedInjuryCausesTurnover — requires ModifiedInjuryContext (not yet ported)
-        let modified_injury_causes_turnover = false;
+        // Java: if (injuryContext.getModifiedInjuryContext() != null) modifiedInjuryCausesTurnover =
+        //   causesTurnOver(hasBall, chainsawOption, modifiedInjuryContext). Rust hardcoded false, so
+        // an Old Pro armour re-roll on a kickback cancelled the turnover the default "kickback"
+        // option always applies (star tier: Helmut Wulf, chaos_pact vs slann bb2020 seed 2).
+        let modified_injury_causes_turnover = injury_result_attacker.injury_context()
+            .get_modified_injury_context()
+            .map(|m| causes_turn_over_chainsaw(player_has_ball, chainsaw_option, m.is_armor_broken()))
+            .unwrap_or(false);
 
         let end_turn_without_knockdown = chainsaw_option == CHAINSAW_TURNOVER_KICKBACK;
 

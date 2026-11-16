@@ -161,6 +161,10 @@ impl InjuryContextModification for OldProModification {
             crate::injury::recalc_armor_broken(game, &mut new_ctx, &defender_id);
         }
 
+        // Java: newContext.addReport(new ReportOldPro(selfInflicted ? defenderId : attackerId,
+        //   oldValue, newValue, selfInflicted)) -- replayed on a successful skill use.
+        let report_player = if self_inflicted { new_ctx.defender_id.clone() } else { new_ctx.attacker_id.clone() };
+        new_ctx.pending_old_pro_report = Some((report_player, old_value, new_value, self_inflicted));
         new_ctx.set_modification(ffb_model::injury::context::InjuryModification::ARMOUR);
         if let Some(id) = self.skill_id() {
             new_ctx.set_used_skill_id(id);

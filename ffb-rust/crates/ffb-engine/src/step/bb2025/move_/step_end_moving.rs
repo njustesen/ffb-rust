@@ -250,6 +250,7 @@ impl StepEndMoving {
                 block_defender_id: Some(defender_id.clone()),
                 using_chainsaw: self.using_chainsaw,
                 ask_for_block_kind,
+                rules: game.rules,
                 ..Default::default()
             });
             return StepOutcome::next().push_seq(seq);
@@ -289,7 +290,8 @@ impl StepEndMoving {
                     move_stack: self.move_stack.clone(),
                     move_start: self.move_start,
                     bloodlust_action: self.bloodlust_action,
-                    rules: game.rules,                    ..Default::default()
+                    rules: game.rules,
+                    ..Default::default()
                 })
             };
             return StepOutcome::next().push_seq(seq);
@@ -333,7 +335,8 @@ impl StepEndMoving {
             } else {
                 Move::build_sequence(&MoveParams {
                     bloodlust_action: self.bloodlust_action,
-                    rules: game.rules,                    ..Default::default()
+                    rules: game.rules,
+                    ..Default::default()
                 })
             };
             return StepOutcome::next().push_seq(seq);

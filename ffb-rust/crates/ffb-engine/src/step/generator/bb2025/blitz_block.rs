@@ -19,6 +19,9 @@ pub struct BlitzBlockParams {
     pub using_chomp: bool,
     pub ask_for_block_kind: bool,
     pub publish_defender: bool,
+    /// Java `BlitzBlock.SequenceParams.frenzyBlock`: bb2020 adds FOUL_APPEARANCE only for a
+    /// frenzy follow-up block (`bb2020/BlitzBlock.java:31-33`).
+    pub frenzy_block: bool,
     /// Ruleset this sequence is being built for.
     ///
     /// The shared BB2025 step-set runs BB2020 games too, but the two editions' BlitzBlock
@@ -43,6 +46,7 @@ impl Default for BlitzBlockParams {
             using_chomp: false,
             ask_for_block_kind: false,
             publish_defender: false,
+            frenzy_block: false,
             rules: Rules::Bb2025,
         }
     }
@@ -90,9 +94,8 @@ impl BlitzBlock {
         // `bb2020/BlitzBlock.java:31-33` adds it here ONLY for a frenzy follow-up block; the
         // primary blitz rolls it a phase earlier, in `bb2020/SelectBlitzTarget.java:35` (mirrored
         // by the SELECT sequence's `in_select` copy). The frenzy re-block sites in
-        // `step_end_blocking.rs` build with the default (BB2025) params, so they keep this entry —
-        // which is exactly the frenzyBlock branch BB2020 wants.
-        if params.rules != Rules::Bb2020 {
+        // `step_end_blocking.rs` pass `frenzy_block: true` (Java StepEndBlocking:286) to keep it.
+        if params.rules != Rules::Bb2020 || params.frenzy_block {
             seq.add(StepId::FoulAppearance, vec![
                 StepParameter::GotoLabelOnFailure(fl.into()),
             ]);

@@ -136,6 +136,13 @@ impl StepHandleDropPlayerContext {
     fn successful_skill_use(&mut self, game: &mut Game) {
         if let Some(ctx) = self.drop_player_context.as_mut() {
             if let Some(ir) = ctx.injury_result.as_mut() {
+                // Java: modifiedInjuryContext.getReports().forEach(addReport) -- before the swap.
+                let pending = ir.injury_context().modified_injury_context.as_ref()
+                    .and_then(|m| m.pending_old_pro_report.clone());
+                if let Some((pid, old, new, self_inflicted)) = pending {
+                    game.report_list.add(ffb_model::report::mixed::report_old_pro::ReportOldPro::new(
+                        pid, old, new, self_inflicted));
+                }
                 ir.swap_to_alternate_context(game);
             }
             ctx.end_turn = ctx.modified_injury_ends_turn;

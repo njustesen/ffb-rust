@@ -75,6 +75,10 @@ pub struct InjuryContext {
     pub sound: Option<SoundId>,
     /// Java: fModifiedInjuryContext — apothecary's alternate context (second injury context).
     pub modified_injury_context: Option<Box<InjuryContext>>,
+    /// Java `ModifiedInjuryContext.reports`: the ReportOldPro an Old Pro armour re-roll adds to
+    /// the alternate context, replayed by StepHandleDropPlayerContext.successfulSkillUse.
+    /// `(playerId, oldValue, newValue, selfInflicted)`.
+    pub pending_old_pro_report: Option<(Option<String>, i32, i32, bool)>,
     /// Java: InjuryType.getClass().getSimpleName() — stored for post-injury checks (e.g. isBlock()).
     pub injury_type_name: Option<String>,
     /// Java: InjuryType.getName() — the report-facing name (see `InjuryTypeServer::java_type_name`).
@@ -124,6 +128,7 @@ impl InjuryContext {
             send_to_box_reason: None,
             sound: None,
             modified_injury_context: None,
+            pending_old_pro_report: None,
             injury_type_name: None,
             java_type_name: None,
             is_caused_by_opponent: false,

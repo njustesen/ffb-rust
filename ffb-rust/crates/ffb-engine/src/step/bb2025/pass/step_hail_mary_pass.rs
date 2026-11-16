@@ -270,6 +270,12 @@ impl StepHailMaryPass {
             | ffb_mechanics::pass_result::PassResult::SAVED_FUMBLE);
         self.saved_fumble = raw_result == ffb_mechanics::pass_result::PassResult::SAVED_FUMBLE
             || (is_fumble && self.using_safe_pass == Some(true));
+        // bb2020 PassBehaviour: the bb2020 pass mechanic can return WILDLY_INACCURATE, which
+        // takes the same re-roll cascade as a fumble (`FUMBLE || WILDLY_INACCURATE ||
+        // SAVED_FUMBLE`) and reaches StepMissedPass as WILDLY_INACCURATE (deviate from the
+        // thrower). Rust folded it into INACCURATE (star tier: Barik Farblast, bb2020).
+        let wildly = game.rules == ffb_model::enums::Rules::Bb2020
+            && raw_result == ffb_mechanics::pass_result::PassResult::WILDLY_INACCURATE;
 
         // Java PassBehaviour(bb2025) :152-157: `passState.setResult(result); addReport(new
         // ReportPassRoll(thrower, roll, minimumRoll, reRolled, modifiers, LONG_BOMB, bombAction,
@@ -308,7 +314,7 @@ impl StepHailMaryPass {
         // it (HeuristicDriver.useSkill "Pass" w=0.50, two sampler draws) and can DECLINE —
         // elf bb2025 seed 51: Java declines the fumbled HMP's Pass re-roll (JSKILL idx=1)
         // while Rust silently re-rolled. Prompt like StepPass.pass_skill_offer instead.
-        if is_fumble && !self.saved_fumble && self.re_rolled_action.is_none() {
+        if (is_fumble || wildly) && !self.saved_fumble && self.re_rolled_action.is_none() {
             if !self.pass_skill_used {
                 if let Some(source) = crate::step::abstract_step_with_re_roll::find_skill_reroll_source(game, REROLLED_ACTION_PASS) {
                     // Java: state.passSkillUsed = true; showDialog(DialogSkillUseParameter(
@@ -338,6 +344,8 @@ impl StepHailMaryPass {
         // FUMBLE stays FUMBLE; SAVED_FUMBLE stays SAVED_FUMBLE.
         self.result = Some(if is_fumble {
             PassOutcome::Fumble  // Java: FUMBLE or SAVED_FUMBLE; model has no SAVED_FUMBLE variant
+        } else if wildly {
+            PassOutcome::WildlyInaccurate
         } else {
             PassOutcome::Inaccurate  // Java: INACCURATE (includes converted ACCURATE)
         });
@@ -397,8 +405,15 @@ impl StepHailMaryPass {
             } else {
                 game.field_model.ball_coordinate = game.pass_coordinate;
             }
-            StepOutcome::next()
-                .publish(StepParameter::PassFumble(false))
+            let out = StepOutcome::next()
+                .publish(StepParameter::PassFumble(false));
+            // Java bb2020 StepMissedPass reads PassState.result; Rust hands it over as a parameter.
+            if game.rules == ffb_model::enums::Rules::Bb2020 {
+                out.publish(StepParameter::PassResultParam(
+                    if wildly { PassOutcome::WildlyInaccurate } else { PassOutcome::Inaccurate }))
+            } else {
+                out
+            }
         }
     }
 }

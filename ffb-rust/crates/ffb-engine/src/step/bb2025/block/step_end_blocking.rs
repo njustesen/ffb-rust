@@ -294,7 +294,8 @@ impl StepEndBlocking {
             }
             let seq = Move::build_sequence(&MoveParams {
                 bloodlust_action: self.bloodlust_action,
-                rules: game.rules,                ..Default::default()
+                rules: game.rules,
+                ..Default::default()
             });
             return StepOutcome::next().push_seq(seq);
         }
@@ -381,6 +382,8 @@ impl StepEndBlocking {
                     block_defender_id: defender_id,
                     using_stab: self.using_stab,
                     publish_defender: true,
+                    frenzy_block: true,
+                    rules: game.rules,
                     ..Default::default()
                 });
                 return StepOutcome::next().push_seq(seq);
@@ -390,6 +393,7 @@ impl StepEndBlocking {
                 let seq = Block::build_sequence(&BlockParams {
                     block_defender_id: defender_id,
                     using_stab: self.using_stab,
+                    rules: game.rules,
                     ..Default::default()
                 });
                 return StepOutcome::next()
@@ -512,6 +516,7 @@ impl StepEndBlocking {
             game.field_model.target_selection_state = None;
             let seq = Block::build_sequence(&BlockParams {
                 publish_defender: true,
+                rules: game.rules,
                 ..Default::default()
             });
             return StepOutcome::next().push_seq(seq);
@@ -698,6 +703,7 @@ impl StepEndBlocking {
             let seq = Block::build_sequence(&BlockParams {
                 using_chainsaw: self.using_chainsaw,
                 publish_defender: true,
+                rules: game.rules,
                 ..Default::default()
             });
             ServerUtilBlock::update_dice_decorations(game);
@@ -724,6 +730,7 @@ impl StepEndBlocking {
             if is_blitz {
                 let seq = BlitzBlock::build_sequence(&BlitzBlockParams {
                     publish_defender: true,
+                    rules: game.rules,
                     ..Default::default()
                 });
                 return StepOutcome::next().push_seq(seq);
@@ -731,6 +738,7 @@ impl StepEndBlocking {
                 let seq = Block::build_sequence(&BlockParams {
                     using_chainsaw: true,
                     publish_defender: true,
+                    rules: game.rules,
                     ..Default::default()
                 });
                 return StepOutcome::next().push_seq(seq);
