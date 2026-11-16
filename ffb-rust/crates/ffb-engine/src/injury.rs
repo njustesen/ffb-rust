@@ -79,6 +79,11 @@ pub struct InjuryContext {
     /// the alternate context, replayed by StepHandleDropPlayerContext.successfulSkillUse.
     /// `(playerId, oldValue, newValue, selfInflicted)`.
     pub pending_old_pro_report: Option<(Option<String>, i32, i32, bool)>,
+    /// Transient: when set, `do_injury_roll_for_player*` rolls the injury dice but does NOT
+    /// interpret them. Used for the Java injury types whose `injuryRoll` ends with the
+    /// context-LESS `setInjury(pDefender, gameState, diceRoller)` — that interprets the MEMBER
+    /// (original) context, not the alternate one passed in (see `set_injury_java_member`).
+    pub defer_interpretation: bool,
     /// Java: InjuryType.getClass().getSimpleName() — stored for post-injury checks (e.g. isBlock()).
     pub injury_type_name: Option<String>,
     /// Java: InjuryType.getName() — the report-facing name (see `InjuryTypeServer::java_type_name`).
@@ -129,6 +134,7 @@ impl InjuryContext {
             sound: None,
             modified_injury_context: None,
             pending_old_pro_report: None,
+            defer_interpretation: false,
             injury_type_name: None,
             java_type_name: None,
             is_caused_by_opponent: false,
@@ -566,7 +572,26 @@ fn do_injury_roll_for_player_impl(rng: &mut GameRng, ctx: &mut InjuryContext, ga
     let d1 = rng.d6();
     let d2 = rng.d6();
     ctx.injury_roll = Some([d1, d2]);
+    if ctx.defer_interpretation {
+        return;
+    }
     interpret_and_set_injury(rng, ctx, game, defender_id, apply_stunty);
+}
+
+/// Java `InjuryTypeServer.setInjury(pDefender, gameState, diceRoller)` applied to a context that
+/// may carry NO injury roll — the context-less overload reached from an alternate-context
+/// `injuryRoll`, which interprets the MEMBER (original) context. `interpretInjuryRoll` with a null
+/// roll returns the context's existing injury; when that is null too, `setInjury` rolls a casualty
+/// on it (`setCasualtyRoll(rollCasualty())` + interpretation). With a roll present this is the
+/// ordinary interpretation.
+pub fn set_injury_java_member(rng: &mut GameRng, ctx: &mut InjuryContext, game: &Game, defender_id: &str) {
+    if ctx.injury_roll.is_some() {
+        interpret_and_set_injury(rng, ctx, game, defender_id, true);
+        return;
+    }
+    if ctx.injury.is_none() {
+        ctx.injury = Some(outcome_to_player_state(rng, ctx, InjuryOutcome::Casualty, game, defender_id));
+    }
 }
 
 /// Java: `InjuryTypeServer.setInjury(pDefender, gameState, diceRoller, injuryContext)` —

@@ -51,6 +51,8 @@ impl InjuryTypeServer for InjuryTypeStab {
     fn failed_armour_places_prone(&self) -> bool { false }
 }
 impl ModificationAwareInjuryType for InjuryTypeStab {
+    /// Java `injuryRoll` ends with the context-less `setInjury(pDefender, gameState, diceRoller)`.
+    fn interprets_member_injury(&self) -> bool { true }
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str, roll: bool) {
         stab_armour_roll(&mut self.ctx, self.add_defender_chainsaw, game, rng, attacker_id, defender_id, roll);
     }

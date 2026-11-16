@@ -67,6 +67,13 @@ pub trait ModificationAwareInjuryType: InjuryTypeServer {
         defender_id: &str,
     );
 
+    /// True for the Java injury types whose `injuryRoll` calls the context-LESS
+    /// `setInjury(pDefender, gameState, diceRoller)`, which interprets the MEMBER context: on the
+    /// alternate-context path the alternate gets the injury dice and modifiers but no
+    /// interpretation, and the ORIGINAL context is interpreted instead (BlockProne/Stunned,
+    /// BreatheFire, ProjectileVomit, QuickBite, Stab, ThenIStartedBlastin, and their ForSpp twins).
+    fn interprets_member_injury(&self) -> bool { false }
+
     /// Java: protected void savedByArmour(InjuryContext). Default: set PRONE.
     /// Override for Chainsaw/Stab (no injury), BlockStunned (STUNNED).
     fn saved_by_armour(&mut self) {
@@ -139,7 +146,19 @@ pub fn modification_aware_handle_injury<T: ModificationAwareInjuryType>(
             this.injury_context_mut().armor_broken = false;
             this.armour_roll(game, rng, attacker_id, defender_id, false);
             if this.injury_context().armor_broken {
-                this.injury_roll(game, rng, attacker_id, defender_id);
+                if this.interprets_member_injury() {
+                    // Java: `injuryRoll(..., alternateInjuryContext)` sets the alternate's dice and
+                    // modifiers, then `setInjury(pDefender, gameState, diceRoller)` interprets the
+                    // MEMBER — the original — context (star tier: Skitter Stab-Stab's Master
+                    // Assassin armour re-roll, skaven vs human bb2025 seed 1: Java rolls the
+                    // original's casualty dice, two more than Rust did).
+                    this.injury_context_mut().defer_interpretation = true;
+                    this.injury_roll(game, rng, attacker_id, defender_id);
+                    this.injury_context_mut().defer_interpretation = false;
+                    crate::injury::set_injury_java_member(rng, &mut original, game, defender_id);
+                } else {
+                    this.injury_roll(game, rng, attacker_id, defender_id);
+                }
             } else {
                 this.saved_by_armour();
             }

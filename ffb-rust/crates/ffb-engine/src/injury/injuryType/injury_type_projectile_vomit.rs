@@ -36,6 +36,8 @@ impl InjuryTypeServer for InjuryTypeProjectileVomit {
     fn failed_armour_places_prone(&self) -> bool { false }
 }
 impl ModificationAwareInjuryType for InjuryTypeProjectileVomit {
+    /// Java `injuryRoll` ends with the context-less `setInjury(pDefender, gameState, diceRoller)`.
+    fn interprets_member_injury(&self) -> bool { true }
     fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
         do_armor_roll(game, rng, &mut self.ctx, defender_id);
     }
