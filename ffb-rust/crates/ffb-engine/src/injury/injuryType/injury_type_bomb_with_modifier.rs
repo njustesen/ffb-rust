@@ -65,7 +65,9 @@ impl InjuryTypeServer for InjuryTypeBombWithModifier {
                 factory.set_use_all(is_option_enabled(game, BOMB_USES_MB));
                 let attacker = attacker_id.and_then(|aid| game.player(aid));
                 let mods = factory.special_effect_armour_modifiers(SpecialEffect::BOMB, defender);
-                added_special_armor_modifier = !mods.is_empty();
+                // Java: `noneMatch(modifier -> modifier instanceof SpecialEffectArmourModifier)` —
+                // Iron Hard Skin's marker is a StaticArmourModifier and does not count.
+                added_special_armor_modifier = mods.iter().any(|m| m.get_special_effect().is_some());
                 for m in mods {
                     self.ctx.add_armor_modifier(leak_armor_modifier(m.as_ref(), attacker, defender, game.rules));
                 }

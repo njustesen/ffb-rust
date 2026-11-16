@@ -78,15 +78,13 @@ impl ArmorModifierFactory {
         special_effect: SpecialEffect,
         defender: &Player,
     ) -> Vec<Box<dyn ArmorModifier>> {
-        // NOT `iron_hard_skin_modifiers()` here, unlike the other two early returns. Java returns
-        // the skill's own modifier from this site too, but `injury_type_lightning.rs:38` asks this
-        // function only whether the result IS EMPTY and adds ARMOR_LIGHTNING when it is not --
-        // so naming the skill here would flip that test and BREAK ARMOUR that currently holds.
-        // That is a behaviour change, and the sweep cannot adjudicate it: Lightning is a wizard
-        // effect and `wizardUse` is never produced, so no gate exercises this path. Left as the
-        // empty vec until the emptiness test is rewritten to ask what it actually means.
+        // Java returns the skill's own value-0 modifier here too, so a bomb that bounces off an
+        // Iron Hard Skin player NAMES the skill in its injury report (star tier: Bomber
+        // Dribblesnot vs the chaos_dwarf Blocker, bb2025 halfling vs chaos_dwarf seed 1). Callers
+        // must therefore ask whether a SPECIAL-EFFECT modifier came back (Java's `instanceof
+        // SpecialEffectArmourModifier`), not whether the set is empty.
         if defender.has_skill_property(NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS) {
-            return vec![];
+            return iron_hard_skin_modifiers();
         }
         self.armor_modifiers.values()
             .into_iter()
@@ -624,7 +622,9 @@ mod tests {
         let f = ArmorModifierFactory::new(Rules::Bb2025);
         let defender = player_with_skill("d", SkillId::IronHardSkin);
         let mods = f.special_effect_armour_modifiers(SpecialEffect::FIREBALL, &defender);
-        assert!(mods.is_empty());
+        assert_eq!(mods.len(), 1, "Java returns Iron Hard Skin's own marker");
+        assert_eq!(mods[0].get_name(), "Iron Hard Skin");
+        assert!(mods[0].get_special_effect().is_none(), "the marker is not a special-effect modifier");
     }
 
     #[test]

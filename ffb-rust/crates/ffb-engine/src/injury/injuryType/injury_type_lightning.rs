@@ -35,8 +35,16 @@ impl InjuryTypeServer for InjuryTypeLightning {
             if !self.ctx.armor_broken {
                 if let Some(defender) = game.player(defender_id) {
                     let factory = ArmorModifierFactory::new(game.rules);
-                    if !factory.special_effect_armour_modifiers(SpecialEffect::LIGHTNING, defender).is_empty() {
-                        self.ctx.add_armor_modifier(ARMOR_LIGHTNING);
+                    // Java adds every returned modifier: the Lightning special effect, or Iron
+                    // Hard Skin's value-0 marker for an IHS defender.
+                    for m in factory.special_effect_armour_modifiers(SpecialEffect::LIGHTNING, defender) {
+                        if m.get_special_effect().is_some() {
+                            self.ctx.add_armor_modifier(ARMOR_LIGHTNING);
+                        } else {
+                            // The only non-special-effect result: Iron Hard Skin's marker.
+                            self.ctx.add_armor_modifier(ffb_mechanics::modifiers::Modifier::new(
+                                "Iron Hard Skin", 0, game.rules));
+                        }
                     }
                 }
                 recalc_armor_broken(game, &mut self.ctx, defender_id);

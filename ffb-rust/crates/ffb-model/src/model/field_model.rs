@@ -27,6 +27,15 @@ pub struct FieldModel {
 
     /// Maps player id → field coordinate. Absent = not on pitch.
     pub player_coordinates: HashMap<PlayerId, FieldCoordinate>,
+    /// Arrival order per player: the value of `arrival_counter` when the player last CHANGED
+    /// square. Java keeps `fPlayerIdByCoordinate` as an ordered list and `getPlayer(coordinate)`
+    /// returns the LAST player to arrive; Rust's `player_at` scanned a HashMap, so when two
+    /// players share a square (Java allows it — a shadower stepping onto a standing player's
+    /// square) the answer changed from process to process.
+    #[serde(skip)]
+    pub coordinate_arrival: HashMap<PlayerId, u64>,
+    #[serde(skip)]
+    pub arrival_counter: u64,
     /// Maps player id → current PlayerState.
     pub player_states: HashMap<PlayerId, PlayerState>,
 
@@ -95,6 +104,8 @@ impl FieldModel {
             bomb_moving: false,
             out_of_bounds: false,
             player_coordinates: HashMap::new(),
+            coordinate_arrival: HashMap::new(),
+            arrival_counter: 0,
             player_states: HashMap::new(),
             range_ruler: None,
             move_squares: HashMap::new(),
@@ -144,6 +155,12 @@ impl FieldModel {
     }
 
     pub fn set_player_coordinate(&mut self, id: &str, coord: FieldCoordinate) {
+        // Java `setPlayerCoordinate`: only a CHANGED coordinate re-appends the player to the
+        // square's list (`if (!FieldCoordinate.equals(pCoordinate, oldCoordinate))`).
+        if self.player_coordinates.get(id) != Some(&coord) {
+            self.arrival_counter += 1;
+            self.coordinate_arrival.insert(id.to_owned(), self.arrival_counter);
+        }
         self.player_coordinates.insert(id.to_owned(), coord);
     }
 
@@ -251,9 +268,11 @@ impl FieldModel {
     }
 
     pub fn player_at(&self, coord: FieldCoordinate) -> Option<&PlayerId> {
+        // Java `getPlayer(coordinate)`: the LAST player to arrive on the square.
         self.player_coordinates
             .iter()
-            .find(|(_, &c)| c == coord)
+            .filter(|(_, &c)| c == coord)
+            .max_by_key(|(id, _)| self.coordinate_arrival.get(*id).copied().unwrap_or(0))
             .map(|(id, _)| id)
     }
 
@@ -562,6 +581,26 @@ mod tests {
         fm.set_player_coordinate("p1", coord);
         assert_eq!(fm.player_at(coord).map(|s| s.as_str()), Some("p1"));
         assert!(fm.player_at(FieldCoordinate::new(0, 0)).is_none());
+    }
+
+    /// Java `FieldModel.getPlayer(coordinate)` returns the LAST player to arrive on a shared
+    /// square; re-setting the same coordinate does not reorder (star tier: a shadower stepping
+    /// onto a standing Treeman's square, halfling vs chaos_dwarf bb2025 seed 1 — Rust's HashMap
+    /// scan flipped between the two players run to run).
+    #[test]
+    fn player_at_returns_the_last_arrival_on_a_shared_square() {
+        for _ in 0..20 {
+            let mut fm = FieldModel::new();
+            let coord = FieldCoordinate::new(12, 10);
+            for i in 0..8 {
+                fm.set_player_coordinate(&format!("filler{i}"), FieldCoordinate::new(i, 0));
+            }
+            fm.set_player_coordinate("treeman", coord);
+            fm.set_player_coordinate("shadower", FieldCoordinate::new(12, 11));
+            fm.set_player_coordinate("shadower", coord);
+            fm.set_player_coordinate("treeman", coord); // unchanged: no re-append
+            assert_eq!(fm.player_at(coord).map(|s| s.as_str()), Some("shadower"));
+        }
     }
 
     #[test]
