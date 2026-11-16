@@ -119,6 +119,9 @@ impl StepCheckStalling {
 
     /// Java: `hasOpenPathToEndzone(Game, Player)` — a path to ANY square of the opposing endzone,
     /// costed against the player's FULL movement (Java passes `0` as the current move).
+    /// `ArrayTool.isProvided` is false for an EMPTY path too: a carrier already standing in the
+    /// endzone gets a zero-length path and is not stalling (norse bb2020 seed 15: handoff catch
+    /// in the endzone under Throw a Rock).
     fn has_open_path_to_endzone(game: &Game, player: &ffb_model::model::player::Player) -> bool {
         let endzone = if game.team_home.has_player(&player.id) {
             FieldCoordinateBounds::ENDZONE_AWAY
@@ -129,7 +132,7 @@ impl StepCheckStalling {
             endzone.coordinates().into_iter().collect();
         PathFinderWithPassBlockSupport::new()
             .get_shortest_path_for_player(game, &end_coords, player, 0)
-            .is_some()
+            .is_some_and(|path| !path.is_empty())
     }
 }
 

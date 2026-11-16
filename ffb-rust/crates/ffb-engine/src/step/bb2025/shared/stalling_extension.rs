@@ -90,7 +90,8 @@ impl StallingExtension {
             .collect();
         PathFinderWithPassBlockSupport::new()
             .get_shortest_path_for_player(game, &end_coords, player, 0)
-            .is_some()
+            // Java `ArrayTool.isProvided`: an empty path (carrier already in the endzone) is not one.
+            .is_some_and(|path| !path.is_empty())
     }
 
     /// Java `handleStaller(IStep, Player<?> player)`.
@@ -262,6 +263,25 @@ mod tests {
         add_player(&mut game, false, "a1", FieldCoordinate::new(6, 5));
         let ext = StallingExtension::new();
         assert!(!ext.is_considered_stalling(&game, "h1"));
+    }
+
+    /// Java `ArrayTool.isProvided(getShortestPath(...))`: a carrier already standing in the
+    /// endzone gets an EMPTY path, which is not "provided", so he is not stalling; the same
+    /// carrier a few squares out is.
+    #[test]
+    fn carrier_already_in_the_endzone_is_not_stalling() {
+        let mut game = make_game();
+        game.field_model.ball_in_play = true;
+        let in_endzone = FieldCoordinate::new(25, 7);
+        add_player(&mut game, true, "h1", in_endzone);
+        game.field_model.ball_coordinate = Some(in_endzone);
+        let ext = StallingExtension::new();
+        assert!(!ext.is_considered_stalling(&game, "h1"));
+
+        let near = FieldCoordinate::new(21, 7);
+        game.field_model.set_player_coordinate("h1", near);
+        game.field_model.ball_coordinate = Some(near);
+        assert!(ext.is_considered_stalling(&game, "h1"));
     }
 
     #[test]

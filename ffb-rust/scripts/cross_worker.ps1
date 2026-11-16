@@ -20,9 +20,12 @@ param(
   [Parameter(Mandatory=$true)][string]$scratch,
   [string]$root = "D:/ffb_cross/sweep",
   [string]$seeds = "1-3",
-  [string]$scale = "1.0"
+  [string]$scale = "1.0",
+  # A frozen copy of the binary, so a certification never runs whatever target/release holds.
+  [string]$exe = ""
 )
 $repo = "C:\Users\Admin\niels\ffb-rust\ffb-rust"
+if (-not $exe) { $exe = Join-Path $repo "target\release\ffb-parity.exe" }
 # One verdict log PER WORKER: a `tail -f` monitor on a shared sweep.log locked it on Windows and
 # every worker's Add-Content failed for 30 minutes (1,110 verdicts lost, recovered by
 # scripts/cross_recover.py). Concatenate sweep_w*.log for scripts/sweep_verdicts.py.
@@ -40,7 +43,7 @@ foreach ($line in (Get-Content $jobfile)) {
   $cell = $hm + "_vs_" + $aw
   $out = Join-Path $scratch ("cw_" + $cell + "_" + $ed + ".log")
   $t0 = Get-Date
-  $p = Start-Process -FilePath (Join-Path $repo "target\release\ffb-parity.exe") -WorkingDirectory $repo `
+  $p = Start-Process -FilePath $exe -WorkingDirectory $repo `
      -NoNewWindow -PassThru -ArgumentList @("--home",$hm,"--away",$aw,"--edition",$ed,"--tier","3",
        "--seeds",$seeds,"--no-abort","--agent","heuristic","--heur-scale",$scale,"--heur-classes","all") `
      -RedirectStandardOutput $out -RedirectStandardError "$out.err"
@@ -49,17 +52,19 @@ foreach ($line in (Get-Content $jobfile)) {
   $p.WaitForExit()
   # Scrape the verdict from BOTH streams, preferring the "games match" line; keep the first
   # PARITY FAIL line too so the verdict table can say where each red diverged.
-  $v = $null; $ff = $null
+  $v = $null; $ff = $null; $rep = $null
   foreach ($g in @($out,"$out.err")) {
     if (Test-Path $g) {
       $c = Get-Content $g -ErrorAction SilentlyContinue
       $h = ($c | Where-Object {$_ -match '^PARITY: '} | Select-Object -Last 1)
       if ($h) { if (-not $v -or $h -match 'games match') { $v = $h } }
       if (-not $ff) { $ff = ($c | Where-Object {$_ -match '^PARITY FAIL seed='} | Select-Object -First 1) }
+      if (-not $rep) { $rep = ($c | Where-Object {$_ -match '^REPORTS: '} | Select-Object -Last 1) }
     }
   }
   if (-not $v) { $v = "NO VERDICT exit=" + $p.ExitCode }
   if ($ff -and $ff -match '^PARITY FAIL seed=(\d+)[^,]*, step (\d+)') { $v = $v + "  first-fail seed=" + $matches[1] + " step=" + $matches[2] }
+  if ($rep) { $v = $v + "  " + $rep }
   $line = ("{0,-50} {1,5}m  {2}" -f ("$cell $ed @$scale"), [math]::Round(((Get-Date)-$t0).TotalMinutes,1), $v)
   $ok = $false
   for ($try = 0; $try -lt 20 -and -not $ok; $try++) {
