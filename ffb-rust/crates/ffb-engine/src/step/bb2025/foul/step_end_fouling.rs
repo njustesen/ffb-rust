@@ -97,7 +97,13 @@ impl StepEndFouling {
         let can_move_after_foul = player_id.as_deref()
             .and_then(|id| game.player(id))
             .map(|p| p.has_skill_property(NamedProperties::CAN_MOVE_AFTER_FOUL))
-            .unwrap_or(false);
+            .unwrap_or(false)
+            // bb2020 StepEndFouling adds `sneakyMove.isEnabled()` (SNEAKY_GIT_CAN_MOVE_AFTER_FOUL,
+            // default false): a bb2020 Sneaky Git ends the action after fouling (star tier: Lord
+            // Borak, elf vs chaos bb2020 seed 1).
+            && (game.rules != ffb_model::enums::Rules::Bb2020
+                || ffb_model::option::util_game_option::is_option_enabled(
+                    game, ffb_model::option::game_option_id::SNEAKY_GIT_CAN_MOVE_AFTER_FOUL));
 
         if !self.end_turn && is_on_pitch && can_move_after_foul && UtilPlayer::is_next_move_possible(game, false) {
             // Java: Select.pushSequence(new Select.SequenceParams(getGameState(), true))

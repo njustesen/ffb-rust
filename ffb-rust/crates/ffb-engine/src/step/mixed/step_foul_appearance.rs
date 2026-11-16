@@ -108,13 +108,14 @@ impl StepFoulAppearance {
         // PLAYER_CHOICE arm sets `game.setDefenderId(shadower)`, and the next square's move sequence
         // runs this step against it — a Foul-Appearance shadower costs the mover a d6 on every
         // square (star tier: Gretchen Wächter, elf vs vampire bb2025 seed 1). A shadower is always
-        // an OPPONENT, while the receiver channel above carries a team-mate; the foul/gaze victims
-        // that channel also carries are opponents Java has not made the defender yet, so those
-        // actions stay excluded.
+        // an OPPONENT, while the receiver channel above carries a team-mate. The foul victim that
+        // channel also carries is an opponent Java has not made the defender yet (StepInitFouling
+        // does), so fouls stay excluded. A GAZE victim IS Java's defender here: the bb2025 Move
+        // sequence runs SET_DEFENDER (`withEventualDefender(gazeVictimId)`) before this step
+        // (star tier: Count Luthor gazing a Nurgle player, vampire vs nurgle bb2025 seed 1).
         let shadower_defender = !action_can_block
             && !game.acting_player.player_action
-                .map(|pa| matches!(pa, PlayerAction::Foul | PlayerAction::FoulMove
-                    | PlayerAction::Gaze | PlayerAction::GazeMove))
+                .map(|pa| matches!(pa, PlayerAction::Foul | PlayerAction::FoulMove))
                 .unwrap_or(true)
             && defender_id.as_deref().map(|d| {
                 let acting_home = game.home_playing;

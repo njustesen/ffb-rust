@@ -149,8 +149,9 @@ impl StepUnchannelledFury {
             if self.has_unused_fury_of_blood_god(game, &player_id)
                 && player_action == Some(PlayerAction::Block)
             {
-                // client-only: DialogSkillUseParameter for FuryOfTheBloodGod
-                return StepOutcome::cont(); // wait for UseSkill response
+                // Java: showDialog(DialogSkillUseParameter(actingPlayer, furyOfTheBloodGod, 0)).
+                // Rust parked with NO prompt -- a stall (star tier: Scyla Anfingrimm, bb2025).
+                return StepOutcome::cont().with_prompt(Self::fury_prompt(&player_id));
             }
             cancel_unchannelled_fury_action(game, &player_id);
             return self.goto_failure(&player_id);
@@ -239,12 +240,20 @@ impl StepUnchannelledFury {
         if self.has_unused_fury_of_blood_god(game, &player_id)
             && player_action.map(|a| a.is_block_action()).unwrap_or(false)
         {
-            // client-only: DialogSkillUseParameter for FuryOfTheBloodGod
-            return StepOutcome::cont().with_event(event);
+            // Java: showDialog(DialogSkillUseParameter(actingPlayer, furyOfTheBloodGod, 0)).
+            return StepOutcome::cont().with_event(event).with_prompt(Self::fury_prompt(&player_id));
         }
 
         cancel_unchannelled_fury_action(game, &player_id);
         self.goto_failure(&player_id).with_event(event)
+    }
+
+    fn fury_prompt(player_id: &str) -> ffb_model::prompts::AgentPrompt {
+        ffb_model::prompts::AgentPrompt::SkillUse {
+            player_id: player_id.to_string(),
+            skill_id: SkillId::FuryOfTheBloodGod as u16,
+            skill_name: format!("{:?}", SkillId::FuryOfTheBloodGod),
+        }
     }
 
     fn goto_failure(&self, _player_id: &str) -> StepOutcome {

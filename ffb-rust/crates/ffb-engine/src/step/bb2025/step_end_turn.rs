@@ -494,6 +494,31 @@ impl StepEndTurn {
                 let t = if is_home { &game.team_home } else { &game.team_away };
                 t.players.iter().map(|p| p.id.clone()).collect()
             };
+            // Java bb2020/bb2025 `getPlayerIds(team)` builds the argue list for the WHOLE team
+            // first, spending I'll be back! (ignoreFirstSecretWeaponSentOff) on every eligible
+            // player as it goes -- before any argue roll. Rust spent it inside the argue loop, which
+            // breaks on a coach ban, so a later Kreek lost his skill to an earlier team-mate's
+            // natural 1 (star tier: snotling bb2020, chaos_pact vs snotling seed 2).
+            if game.rules != ffb_model::enums::Rules::Bb2016 {
+                for pid in ids.iter() {
+                    if !game.game_result.team_result_mut(is_home).player_result_mut(pid).has_used_secret_weapon {
+                        continue;
+                    }
+                    let removed = game.field_model.player_state(pid)
+                        .map(|s| s.is_casualty() || s.base() == PS_BANNED)
+                        .unwrap_or(true);
+                    if removed { continue; }
+                    let ignore_skill = game.player(pid).and_then(|p| p.all_skill_ids().find(|sk|
+                        sk.properties().contains(&NamedProperties::IGNORE_FIRST_SECRET_WEAPON_SENT_OFF)
+                            && !p.used_skills.contains(sk)));
+                    if let Some(sk) = ignore_skill {
+                        game.game_result.team_result_mut(is_home).player_result_mut(pid).has_used_secret_weapon = false;
+                        if let Some(p) = game.player_mut(pid) { p.used_skills.insert(sk); }
+                        game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                            Some(pid.clone()), sk, true, ffb_model::model::skill_use::SkillUse::IGNORE_SENT_OFF));
+                    }
+                }
+            }
             for pid in ids {
                 let coach_banned = if is_home { game.turn_data_home.coach_banned } else { game.turn_data_away.coach_banned };
                 if coach_banned { break; }

@@ -125,6 +125,19 @@ impl Step for StepInitSelecting {
             }
         }
 
+        // Move-after-foul continuation (canMoveAfterFoul: bb2025 Sneaky Git / Quick Foul):
+        // StepEndFouling changes the action to MOVE and pushes this Select sequence; Java leaves
+        // the acting player in place and ParityRunner's phase 2 moves him (sendMoveAction). The
+        // `acted` gate below (Rust-only) saw has_fouled and handed the activation to another
+        // player (star tier: Dribl & Drull, slann vs khemri bb2025 seed 2).
+        if game.acting_player.has_fouled
+            && game.acting_player.player_action == Some(PlayerAction::Move)
+            && game.acting_player.player_id.is_some()
+        {
+            self.dispatch_player_action = Some(PlayerAction::Move);
+            return self.execute_step(game, _rng);
+        }
+
         if !acted {
             match game.acting_player.player_action {
                 Some(PlayerAction::PassMove) => {

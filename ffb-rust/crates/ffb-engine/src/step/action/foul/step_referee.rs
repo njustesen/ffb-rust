@@ -108,7 +108,11 @@ impl StepReferee {
                 || (has_sneaky_git && sneaky_git_ban_to_ko))
         {
             match ctx.get_armor_roll() {
-                Some(armor) => referee_spots_foul = armor[0] == armor[1],
+                // bb2020 SneakyGitBehaviour: `(armorRoll[0] == armorRoll[1]) && !hasSkill(SneakyGit)`
+                // -- an armour double is never spotted on a Sneaky Git fouler, even when the armour
+                // breaks (bb2016/bb2025 have no such term). Star tier: Lord Borak, bb2020.
+                Some(armor) => referee_spots_foul = armor[0] == armor[1]
+                    && !(game.rules == ffb_model::enums::Rules::Bb2020 && has_sneaky_git),
                 // JD-002 (docs/JAVA_DEFECTS.md): Java reads `armorRoll[0]` here with no null
                 // guard. A Ball & Chain victim's armour is marked broken WITHOUT dice
                 // (`UtilServerInjury.handleInjury`, `placedProneCausesInjuryRoll`), so the stock
@@ -411,6 +415,18 @@ mod tests {
 
         let outcome = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(outcome.action, StepAction::NextStep, "armor doubles when armor broken overrides SneakyGit protection");
+    }
+
+    #[test]
+    fn bb2020_sneaky_git_armour_double_is_never_spotted() {
+        // bb2020 SneakyGitBehaviour: refereeSpotsFoul = doubles && !hasSkill(SneakyGit).
+        let (mut game, _) = make_game_with_player(vec![SkillId::SneakyGit]);
+        game.rules = ffb_model::enums::Rules::Bb2020;
+        let mut step = StepReferee::new();
+        step.goto_label_on_end = "NO_FOUL".into();
+        step.injury_result_defender = Some(make_injury_result(Some([6, 6]), true, Some([6, 1])));
+        let outcome = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(outcome.action, StepAction::GotoLabel);
     }
 
     /// Stock Java crashes on a missing armour roll (JD-002, tested above); this is the corrected

@@ -422,6 +422,12 @@ impl InjuryResult {
         let base = final_state.base();
         if base == PS_KNOCKED_OUT || final_state.is_casualty() || base == PS_RESERVE {
             UtilBox::put_player_into_box(game, defender_id);
+            // Java InjuryResult.applyTo: UtilServerGame.checkForWastedSkills(defender, ...) and
+            // updatePlayerStateDependentProperties(pStep). The live Rust applyTo stopped at the
+            // box, so a KO'd/injured Leader never took its team re-roll away (star tier: Lord
+            // Borak bb2025, nurgle vs chaos_pact seed 2 -- Java r3, Rust r4).
+            crate::util::util_server_game::UtilServerGame::check_for_wasted_skills(game, defender_id);
+            crate::util::util_server_game::UtilServerGame::update_player_state_dependent_properties(game);
         }
     }
 }

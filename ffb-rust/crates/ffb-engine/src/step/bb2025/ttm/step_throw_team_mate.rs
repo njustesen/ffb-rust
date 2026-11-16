@@ -235,7 +235,17 @@ impl StepThrowTeamMate {
             };
             if offer_eligible && self.re_rolled_action.is_none() && player_can_pass {
                 let is_fumble = pass_result == PassOutcome::Fumble;
-                if let Some(prompt) = ask_for_reroll_if_available(game, rerolled_action_key, self.minimum_roll, is_fumble) {
+                // bb2025 ThrowTeamMateBehaviour passes the thrower PLAYER (no action-keyed skill
+                // source -- Morg 'n' Thorg's The Ballista is not offered on a TTM); bb2020 passes
+                // the ACTING player (action-keyed lookup). Star tier: undead vs halfling bb2025.
+                let ask = if game.rules == Rules::Bb2025 {
+                    let thrower = game.acting_player.player_id.clone();
+                    crate::step::util_server_re_roll::ask_for_reroll_if_available_for(
+                        game, thrower.as_deref(), rerolled_action_key, self.minimum_roll, is_fumble)
+                } else {
+                    ask_for_reroll_if_available(game, rerolled_action_key, self.minimum_roll, is_fumble)
+                };
+                if let Some(prompt) = ask {
                     self.re_rolled_action = Some(rerolled_action_key.into());
                     self.re_roll_source = Some("TRR".into());
                     return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
