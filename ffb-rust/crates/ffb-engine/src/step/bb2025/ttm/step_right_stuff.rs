@@ -18,7 +18,7 @@ use crate::step::framework::{DeferredCommand, StepId, StepParameter};
 use crate::step::bb2025::command::RightStuffCommand;
 use std::sync::Arc;
 use crate::step::util_server_injury::{drop_player_rng, handle_injury_by_name};
-use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available_for, use_reroll};
 use crate::step::util_server_steps::check_touchdown;
 use ffb_mechanics::pass_result::PassResult as MechanicPassResult;
 use ffb_mechanics::modifiers::right_stuff_modifier_factory::RightStuffModifierFactory;
@@ -394,7 +394,10 @@ impl StepRightStuff {
                 }
 
                 // TRR offer
-                if let Some(prompt) = ask_for_reroll_if_available(game, "RIGHT_STUFF", minimum_roll, false) {
+                // Java: askForReRollIfAvailable(gameState, thrownPlayer, RIGHT_STUFF, ...) -- the PLAYER
+            // overload; the acting-player one consulted the THROWER's Thinking Man's Troll
+            // (star tier: elf vs ogre bb2025 seed 2, Ripper Bolgrot).
+            if let Some(prompt) = ask_for_reroll_if_available_for(game, Some(&player_id), "RIGHT_STUFF", minimum_roll, false) {
                     self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
                     self.roll = 0;
                     return StepOutcome::cont().with_prompt(prompt);
@@ -593,6 +596,40 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::ThrownPlayerCoordinate(None))));
+    }
+
+    /// Java asks `askForReRollIfAvailable(gameState, thrownPlayer, RIGHT_STUFF, …)`: the THROWN
+    /// player's skills count, not the thrower's. A thrower holding an unused Thinking Man's Troll
+    /// with the team re-rolls spent raises no offer for a skill-less thrown player's failed landing.
+    #[test]
+    fn failed_landing_ignores_the_throwers_single_die_reroll() {
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::{PS_STANDING, PlayerState, SkillId};
+        use ffb_model::types::FieldCoordinate;
+        for seed in 0..40u64 {
+            let mut game = make_game();
+            let mut thrower = Player::default();
+            thrower.id = "t1".into();
+            thrower.starting_skills.push(SkillWithValue::new(SkillId::ThinkingMansTroll));
+            game.team_home.players.push(thrower);
+            let mut p = Player::default();
+            p.id = "p1".into();
+            p.agility = 6;
+            game.team_home.players.push(p);
+            game.field_model.set_player_coordinate("t1", FieldCoordinate::new(4, 4));
+            game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
+            game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
+            game.home_playing = true;
+            game.acting_player.player_id = Some("t1".into());
+            game.turn_data_mut().rerolls = 0;
+            let mut step = StepRightStuff::new("success".into());
+            step.thrown_player_id = Some("p1".into());
+            step.thrown_player_has_ball = Some(false);
+            step.old_player_state = Some(PlayerState::new(PS_STANDING));
+            let out = step.start(&mut game, &mut GameRng::new(seed));
+            assert!(out.prompt.is_none(), "seed {seed}: no re-roll offer expected");
+        }
     }
 
     #[test]

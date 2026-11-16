@@ -29,7 +29,7 @@ use crate::dice_interpreter::DiceInterpreter;
 use crate::injury::injuryType::injury_type_ttm_landing::InjuryTypeTTMLanding;
 use crate::step::util_server_injury;
 use crate::step::abstract_step_with_re_roll::{ReRollState, find_skill_reroll_source};
-use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available_for, use_reroll};
 
 /// Java: `StepRightStuff` (bb2016/ttm).
 pub struct StepRightStuff {
@@ -204,7 +204,10 @@ impl StepRightStuff {
             }
 
             // TRR offer
-            if let Some(prompt) = ask_for_reroll_if_available(game, "RIGHT_STUFF", minimum_roll, false) {
+            // Java: askForReRollIfAvailable(gameState, thrownPlayer, RIGHT_STUFF, ...) -- the PLAYER
+            // overload; the acting-player one consulted the THROWER's Thinking Man's Troll
+            // (star tier: elf vs ogre bb2025 seed 2, Ripper Bolgrot).
+            if let Some(prompt) = ask_for_reroll_if_available_for(game, Some(&player_id), "RIGHT_STUFF", minimum_roll, false) {
                 self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
                 self.roll = 0;
                 return StepOutcome::cont().with_prompt(prompt);
