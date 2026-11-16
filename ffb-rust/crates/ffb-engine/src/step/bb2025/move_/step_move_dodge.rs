@@ -134,8 +134,22 @@ impl Step for StepMoveDodge {
                 }
                 self.execute_step(game, rng)
             }
-            // client-only: CLIENT_USE_SKILL → canChooseToIgnoreDodgeModifierAfterRoll /
-            //       canRerollDodge — headless auto-declines skill dialogs.
+            // Java: CLIENT_USE_SKILL with a canChooseToIgnoreDodgeModifierAfterRoll skill (Swift As
+            // The Breeze) → `usingModifierIgnoringSkill = isSkillUsed(); if (!used)
+            // setReRollSource(findSkillReRollSource(DODGE))` — the source is only SET; the re-entry
+            // gate spends it. EXECUTE_STEP (star tier: Jordell Freshbreeze, slann_fumbbl vs
+            // wood_elf bb2020 seed 1).
+            Action::UseSkill { skill_id, use_skill }
+                if skill_id.properties().contains(
+                    &ffb_model::model::property::named_properties::NamedProperties::CAN_CHOOSE_TO_IGNORE_DODGE_MODIFIER_AFTER_ROLL) =>
+            {
+                self.using_modifier_ignoring_skill = Some(*use_skill);
+                if !*use_skill {
+                    self.re_roll_state.re_roll_source = find_skill_reroll_source(game, "DODGE");
+                }
+                self.execute_step(game, rng)
+            }
+            // client-only: CLIENT_USE_SKILL → canRerollDodge — headless auto-declines.
             // Java: CLIENT_PLAYER_CHOICE (ARM_BAR mode) → armBarPlayerId = command.getPlayerId();
             // armBarChoice = true; EXECUTE_STEP. The agent's generic PlayerChoice decline sends
             // SelectPlayer with an empty id (no arm-bar player chosen).
@@ -267,6 +281,63 @@ impl StepMoveDodge {
         if self.dodge_roll == 0 {
             self.dodge_roll = rng.d6();
             self.dodge_roll_to_publish = Some(self.dodge_roll);
+        }
+
+        // Java `dodge()`: `minimumRollWithoutModifiers = mechanic.minimumRollDodge(game, player,
+        // emptySet()); successWithoutModifiers = isSkillRollSuccessful(fDodgeRoll, …)`. When the
+        // bare roll passes, an UNUSED canChooseToIgnoreDodgeModifierAfterRoll skill (Swift As The
+        // Breeze) may be chosen; once chosen it passes the dodge outright, once declined (with no
+        // re-roll source left) the dodge fails.
+        let ignore_modifier_skill: Option<ffb_model::enums::SkillId> = {
+            let bare_min = player_id.as_deref().and_then(|pid| game.player(pid))
+                .map(|p| DodgeModifierFactory::minimum_roll(p.agility as i32, &[]))
+                .unwrap_or(2);
+            if DiceInterpreter::is_skill_roll_successful(self.dodge_roll, bare_min) {
+                player_id.as_deref().and_then(|pid| game.player(pid)).and_then(|p| {
+                    p.all_skill_ids().find(|id| {
+                        id.properties().contains(
+                            &ffb_model::model::property::named_properties::NamedProperties::CAN_CHOOSE_TO_IGNORE_DODGE_MODIFIER_AFTER_ROLL)
+                            && !p.used_skills.contains(id)
+                            && !game.acting_player.used_skills.contains(id)
+                    })
+                })
+            } else {
+                None
+            }
+        };
+        // `successWithoutModifiers` survives only when the skill is present.
+        let success_without_modifiers = ignore_modifier_skill.is_some();
+        if let Some(skill) = ignore_modifier_skill {
+            if self.using_modifier_ignoring_skill == Some(true) {
+                // Java: `actingPlayer.markSkillUsed(skill); addReport(ReportSkillUse(pid, skill,
+                // true, PASS_DODGE_WITHOUT_MODIFIERS)); return SUCCESS` — no ReportDodgeRoll.
+                if let Some(pid) = player_id.as_deref() {
+                    if let Some(p) = game.team_home.player_mut(pid).or_else(|| game.team_away.player_mut(pid)) {
+                        p.used_skills.insert(skill);
+                    }
+                    game.acting_player.used_skills.insert(skill);
+                    game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                        Some(pid.to_string()), skill, true,
+                        ffb_model::model::skill_use::SkillUse::PASS_DODGE_WITHOUT_MODIFIERS,
+                    ));
+                }
+                let re_rolled = self.re_roll_state.re_rolled_action.as_ref()
+                    .map(|a| a.name == "DODGE").unwrap_or(false)
+                    && self.re_roll_state.re_roll_source.is_some();
+                return StepOutcome::next()
+                    .publish(StepParameter::ReRollUsed(self.re_roll_used || re_rolled));
+            }
+            // Java: `if (FALSE.equals(usingModifierIgnoringSkill) && getReRollSource() == null &&
+            // getReRolledAction() != null) return FAILURE;`
+            if self.using_modifier_ignoring_skill == Some(false)
+                && self.re_roll_state.re_roll_source.is_none()
+                && self.re_roll_state.re_rolled_action.is_some()
+            {
+                if game.options.is_enabled("standFirmNoDropOnFailedDodge") {
+                    return StepOutcome::next().publish(StepParameter::EndPlayerAction(true));
+                }
+                return self.fail_dodge(game);
+            }
         }
 
         // Java `actingPlayer.statBasedModifier(canAddStrengthToDodge)`: the skill's
@@ -588,7 +659,11 @@ impl StepMoveDodge {
             // only `!fReRollUsed && …`, so there the re-evaluation can still be re-rolled.
             let dt_blocks_reroll = game.rules == ffb_model::enums::Rules::Bb2025
                 && self.using_diving_tackle.is_some();
-            if !already_rerolled && !dt_blocks_reroll && !self.re_roll_used {
+            // Java: `(getReRolledAction() != DODGE || (successWithoutModifiers &&
+            // !TRUE.equals(usingModifierIgnoringSkill)))`.
+            let reroll_branch_open = !already_rerolled
+                || (success_without_modifiers && self.using_modifier_ignoring_skill != Some(true));
+            if reroll_branch_open && !dt_blocks_reroll && !self.re_roll_used {
                 use ffb_model::model::re_rolled_action::ReRolledAction;
                 self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("DODGE"));
 
@@ -617,6 +692,14 @@ impl StepMoveDodge {
                     //   showDialog(DialogSkillUseParameter(pid, modifyingSkill, 0)); WAITING }` —
                     // Incorporeal is offered BEFORE the Dodge skill re-roll is spent.
                     if let (Some(skill), None) = (modifying_skill, self.using_modifying_skill) {
+                        return self.modifying_skill_prompt(game, skill).with_event(roll_event);
+                    }
+                    // Java: `else if (ignoreModifierSkill.isPresent()) { addReport(
+                    // ReportModifiedDodgeResultSuccessful(skill)); showDialog(DialogSkillUse
+                    // Parameter(pid, skill, 0)); usingModifierIgnoringSkill = null; }` — Swift As
+                    // The Breeze is offered BEFORE the Dodge skill re-roll is spent.
+                    if let Some(skill) = ignore_modifier_skill {
+                        self.using_modifier_ignoring_skill = None;
                         return self.modifying_skill_prompt(game, skill).with_event(roll_event);
                     }
                     // Java `RollMechanic.askForReRollIfAvailable` only SETS reRolledAction +
@@ -659,6 +742,10 @@ impl StepMoveDodge {
                 // bb2025's DialogReRollPropertiesParameter always reaches the coach; bb2020's
                 // DialogReRollParameter is answered null (no draw) by the harness when the team
                 // re-roll is not an option — the dodge then fails on re-entry.
+                // Java: `if (modifyingSkill == null && ignoreModifierSkill.isPresent())
+                // modifyingSkill = ignoreModifierSkill.get();` — it rides on the same dialog.
+                let ignore_rides = modifying_skill.is_none() && ignore_modifier_skill.is_some();
+                let modifying_skill = modifying_skill.or(ignore_modifier_skill);
                 let mut prompt = ask_for_reroll_if_available_for(
                     game, player_id.as_deref(), "DODGE", minimum_roll, false);
                 if prompt.is_none() && modifying_skill.is_some()
@@ -676,6 +763,9 @@ impl StepMoveDodge {
                         ffb_model::report::mixed::report_modified_dodge_result_successful::ReportModifiedDodgeResultSuccessful::new(Some(skill)));
                 }
                 if let Some(prompt) = prompt {
+                    if ignore_rides {
+                        self.using_modifier_ignoring_skill = None;
+                    }
                     self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
                     self.dodge_roll = 0; // reset so the re-roll gets a fresh d6
                     return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
@@ -689,6 +779,11 @@ impl StepMoveDodge {
                 // Successful); showDialog(DialogSkillUseParameter(pid, modifyingSkill, minimumRoll)) }`
                 // — e.g. after Incorporeal was DECLINED, the Dodge re-roll spent and the fresh die
                 // failed again.
+                return self.modifying_skill_prompt(game, skill).with_event(roll_event);
+            } else if let Some(skill) = ignore_modifier_skill {
+                // Java: `else if (ignoreModifierSkill.isPresent()) { …report; showDialog(…);
+                // usingModifierIgnoringSkill = null; }`
+                self.using_modifier_ignoring_skill = None;
                 return self.modifying_skill_prompt(game, skill).with_event(roll_event);
             }
 
@@ -850,6 +945,41 @@ mod tests {
         step.coordinate_from = Some(FieldCoordinate::new(5, 5));
         step.coordinate_to = Some(FieldCoordinate::new(6, 5));
         (game, step)
+    }
+
+    /// Java `dodge()`: a roll that fails with modifiers but passes bare offers an unused Swift As
+    /// The Breeze BEFORE the Dodge skill re-roll is spent; using it passes the dodge on the same die
+    /// and marks the skill used.
+    #[test]
+    fn swift_as_the_breeze_is_offered_before_the_dodge_reroll_and_passes_the_dodge() {
+        use ffb_model::enums::{PS_STANDING, PlayerState as PSt, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let (mut game, mut step) = dt_threat_fixture_for(2, ffb_model::enums::Rules::Bb2020);
+        {
+            let p = game.team_home.player_mut("dodger").unwrap();
+            p.starting_skills.push(SkillWithValue { skill_id: SkillId::Dodge, value: None });
+            p.starting_skills.push(SkillWithValue { skill_id: SkillId::SwiftAsTheBreeze, value: None });
+        }
+        // A marker on the destination: min = max(2, 2 + 1) = 3, while the bare minimum is 2.
+        game.team_away.players.push(ffb_model::model::player::Player {
+            id: "marker".into(), name: "m".into(), nr: 3, position_id: "pos".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8, ..Default::default()
+        });
+        game.field_model.set_player_coordinate("marker", FieldCoordinate::new(7, 5));
+        game.field_model.set_player_state("marker", PSt::new(PS_STANDING));
+        step.dodge_roll = 2;
+        let mut rng = GameRng::new(1);
+        let out = step.start(&mut game, &mut rng);
+        match out.prompt {
+            Some(ffb_model::prompts::AgentPrompt::SkillUse { skill_id, .. }) =>
+                assert_eq!(skill_id, SkillId::SwiftAsTheBreeze as u16),
+            other => panic!("expected the Swift As The Breeze dialog, got {other:?}"),
+        }
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::SwiftAsTheBreeze, use_skill: true }, &mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.acting_player.used_skills.contains(&SkillId::SwiftAsTheBreeze));
+        assert!(!game.team_home.player("dodger").unwrap().used_skills.contains(&SkillId::Dodge));
     }
 
     /// Java's bb2020 `failDodge()` has no Arm Bar dialog: with TWO adjacent Arm Bar players and
