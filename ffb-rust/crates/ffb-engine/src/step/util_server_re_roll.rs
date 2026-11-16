@@ -470,7 +470,13 @@ pub fn use_reroll_with_events(
     if let Some(player) = player_opt {
         let skill_ids: Vec<SkillId> = player.all_skill_ids().collect();
         for id in skill_ids {
-            if format!("{:?}", id) == skill_name || id.class_name() == skill_name.as_str() {
+            // Java's ReRollSource carries the skill's DISPLAY name ("Monstrous Mouth"); the bb2016/
+            // bb2020 Monstrous Mouth catch hook records exactly that, which matched neither the
+            // Debug nor the class name, so the re-roll was never consumed and the failed catch
+            // bounced (star tier: Guffle Pussmaw, nurgle vs chaos_chaosogre bb2020 seed 1).
+            if format!("{:?}", id) == skill_name || id.class_name() == skill_name.as_str()
+                || id.category_and_name_for(game.rules).1 == skill_name.as_str()
+            {
                 // Java (bb2025 RollMechanic.useReRoll, skill branch): `successful` is
                 // `!player.isUsed(skill)` for a skill tracked outside its activation, else
                 // `hasSkill` (true here — the id came from the player); then
@@ -499,6 +505,27 @@ pub fn use_reroll_with_events(
 
 #[cfg(test)]
 mod tests {
+    /// The bb2020 Monstrous Mouth catch hook records `ReRollSource("Monstrous Mouth")` (Java's
+    /// display name); `use_reroll` must resolve it to the skill and consume it.
+    #[test]
+    fn display_named_skill_source_is_consumed() {
+        use ffb_model::enums::{ReRollSource, Rules, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = ffb_model::model::game::Game::new(
+            crate::step::framework::test_team("home", 0),
+            crate::step::framework::test_team("away", 0),
+            Rules::Bb2020,
+        );
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "mm".into(), name: "mm".into(), nr: 1, position_id: "pos".into(),
+            movement: 5, strength: 4, agility: 4, passing: 6, armour: 10,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::MonstrousMouth, value: None }],
+            ..Default::default()
+        });
+        let mut rng = ffb_model::util::rng::GameRng::new(0);
+        assert!(use_reroll(&mut game, &ReRollSource::new("Monstrous Mouth"), "mm", &mut rng));
+    }
+
     /// Java `RollMechanic.askForReRollIfAvailable` lists `ReRollProperty.PRO` alongside TRR and
     /// shows the dialog when ANY listed property `isActualReRoll()`. So a Pro carrier whose team
     /// re-roll is already spent is STILL asked. Rust never consulted the Pro check and simply
