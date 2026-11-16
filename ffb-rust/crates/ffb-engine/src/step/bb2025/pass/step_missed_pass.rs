@@ -54,6 +54,9 @@ pub struct StepMissedPass {
     /// BB2025's PassMechanic can never return WILDLY_INACCURATE (it returns FUMBLE instead),
     /// so the field stays `None` outside BB2020 and the deviate branch is unreachable there.
     pub pass_result: Option<ffb_mechanics::pass_result::PassResult>,
+    /// Java `PassState.usingBlastIt` (tri-state for the pass): set true once Blast It! is used
+    /// (it is then re-offered on every later square), false only on "never use".
+    pub using_blast_it: Option<bool>,
 }
 
 impl StepMissedPass {
@@ -70,6 +73,21 @@ impl StepMissedPass {
             do_roll: true,
             re_rolling: false,
             pass_result: None,
+            using_blast_it: None,
+        }
+    }
+
+    /// Java `reportDirectionRoll()`: ReportScatterBall of the current single square, plus the
+    /// out-of-bounds notice when it would leave the pitch.
+    fn report_direction_roll(&self, game: &mut Game) {
+        if let Some(dir) = self.direction {
+            game.report_list.add(ReportScatterBall::new(vec![dir], vec![self.roll], false));
+        }
+        if let Some(end) = self.coordinate_end {
+            if !end.is_on_pitch() {
+                game.report_list.add(ffb_model::report::mixed::report_event::ReportEvent::new(Some(
+                    "The ball would land out of bounds!".to_string())));
+            }
         }
     }
 
@@ -101,15 +119,25 @@ impl Step for StepMissedPass {
         //   if neverUse → getGameState().getPassState().setUsingBlastIt(false)
         // local tracking via self.do_roll/self.re_rolling — Java PassState not needed here
         match action {
-            Action::UseSkill { skill_id, use_skill } => {
-                // Blast-It answer: if used → re-roll the direction; else keep current
-                self.do_roll = *use_skill;
-                self.re_rolling = true;
-                if *use_skill {
-                    // Java: game.getActingPlayer().markSkillUsed(skill) — inserts into player.used_skills
-                    if let Some(pid) = game.acting_player.player_id.clone() {
-                        game.mark_skill_used(&pid, *skill_id);
+            Action::UseSkill { skill_id, use_skill }
+                if skill_id.properties().contains(&ffb_model::model::property::named_properties::NamedProperties::CAN_RE_ROLL_HMP_SCATTER) =>
+            {
+                // Java: if (rollList.size() < 3) { doRoll = isSkillUsed; if (doRoll)
+                //   actingPlayer.markSkillUsed(skill) }; addReport(ReportSkillUse(player, skill, doRoll,
+                //   RE_ROLL_DIRECTION)); if used -> passState.usingBlastIt = true.
+                if self.roll_list.len() < 3 {
+                    self.do_roll = *use_skill;
+                    if *use_skill {
+                        if let Some(pid) = game.acting_player.player_id.clone() {
+                            crate::step::util_server_steps::mark_skill_used(game, &pid, *skill_id);
+                        }
                     }
+                }
+                let thrower = game.thrower_id.clone();
+                game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                    thrower, *skill_id, self.do_roll, ffb_model::model::skill_use::SkillUse::RE_ROLL_DIRECTION));
+                if *use_skill {
+                    self.using_blast_it = Some(true);
                 }
             }
             _ => {}
@@ -261,22 +289,41 @@ impl StepMissedPass {
                 }
             }
 
-            // Java: Blast-It HMP re-roll dialog check:
-            // boolean hasBlastIt = UtilCards.hasSkillWithProperty(actingPlayer.getPlayer(), canReRollHmpScatter)
-            // boolean hasUnusedBlastIt = UtilCards.hasUnusedSkillWithProperty(actingPlayer, canReRollHmpScatter)
-            // if (HAIL_MARY_PASS && ((hasUnusedBlastIt && usingBlastIt==null) || (hasBlastIt && usingBlastIt)) && !reRolling)
-            //     → reportDirectionRoll(); showDialog(DialogSkillUseParameter(...)); reRolling=true;
-            //       fieldModel.add(MoveSquare(coordinateEnd, 0, 0)); return StepAction.CONTINUE
-            // client-only: Blast-It! dialog (UtilCards.hasUnusedSkillWithProperty, PassState.getUsingBlastIt)
-            // Headless skips the dialog; Blast-It! reroll never triggered (safe for non-Goblin rosters).
+            // Java: Blast-It HMP re-roll dialog:
+            //   hasBlastIt = hasSkillWithProperty(actingPlayer.getPlayer(), canReRollHmpScatter)
+            //   hasUnusedBlastIt = hasUnusedSkillWithProperty(actingPlayer, canReRollHmpScatter)
+            //   if (HAIL_MARY_PASS && ((hasUnusedBlastIt && usingBlastIt == null)
+            //       || (hasBlastIt && usingBlastIt)) && !reRolling)
+            //     { reportDirectionRoll(); showDialog(DialogSkillUseParameter); reRolling = true; return; }
+            // Rust skipped the dialog ("headless"), scattering all three squares at once (star tier:
+            // Barik Farblast, bb2020).
+            {
+                use ffb_model::model::property::named_properties::NamedProperties as NP;
+                let acting = game.acting_player.player_id.clone().unwrap_or_default();
+                let blast_skill = game.player(&acting).and_then(|p| p.skill_id_with_property(NP::CAN_RE_ROLL_HMP_SCATTER));
+                let has_unused = blast_skill.map(|sk| !game.acting_player.used_skills.contains(&sk)
+                    && !game.player(&acting).map(|p| p.used_skills.contains(&sk)).unwrap_or(false)).unwrap_or(false);
+                let is_hmp = game.acting_player.player_action == Some(PlayerAction::HailMaryPass);
+                if is_hmp && blast_skill.is_some()
+                    && ((has_unused && self.using_blast_it.is_none()) || self.using_blast_it == Some(true))
+                    && !self.re_rolling
+                {
+                    self.report_direction_roll(game);
+                    self.re_rolling = true;
+                    game.field_model.move_squares.clear();
+                    let sk = blast_skill.unwrap();
+                    return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
+                        player_id: game.thrower_id.clone().unwrap_or_default(),
+                        skill_id: sk as u16,
+                        skill_name: format!("{:?}", sk),
+                    });
+                }
+            }
 
-            // Java: if (reRolling && doRoll) reportDirectionRoll() — partial scatter during re-roll
+            // Java: if (reRolling && doRoll) reportDirectionRoll() -- the CURRENT square only
+            // (Rust reported every direction rolled so far).
             if self.re_rolling && self.do_roll {
-                game.report_list.add(ReportScatterBall::new(
-                    self.direction_list.clone(),
-                    self.roll_list.clone(),
-                    false,
-                ));
+                self.report_direction_roll(game);
             }
 
             // Java: rollList.add(roll); directionList.add(direction);

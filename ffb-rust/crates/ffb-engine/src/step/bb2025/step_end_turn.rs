@@ -514,11 +514,20 @@ impl StepEndTurn {
                     .map(|s| if is_bb2016_sw { s.base() == PS_BANNED } else { s.is_casualty() || s.base() == PS_BANNED })
                     .unwrap_or(true);
                 if removed { continue; }
-                let ignore = !is_bb2016_sw && game.player(&pid)
-                    .map(|p| p.has_skill_property(NamedProperties::IGNORE_FIRST_SECRET_WEAPON_SENT_OFF))
-                    .unwrap_or(false);
-                if ignore {
+                // Java: `UtilCards.getUnusedSkillWithProperty(player, ignoreFirstSecretWeaponSentOff)`
+                // present -> setHasUsedSecretWeapon(false); player.markUsed(skill, game);
+                // addReport(ReportSkillUse(player, skill, true, IGNORE_SENT_OFF)). Rust only cleared
+                // the flag: no report, and the skill was never spent (star tier: Kreek Rustgouger).
+                let ignore_skill = if is_bb2016_sw { None } else {
+                    game.player(&pid).and_then(|p| p.all_skill_ids().find(|sk|
+                        sk.properties().contains(&NamedProperties::IGNORE_FIRST_SECRET_WEAPON_SENT_OFF)
+                            && !p.used_skills.contains(sk)))
+                };
+                if let Some(sk) = ignore_skill {
                     game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = false;
+                    if let Some(p) = game.player_mut(&pid) { p.used_skills.insert(sk); }
+                    game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                        Some(pid.clone()), sk, true, ffb_model::model::skill_use::SkillUse::IGNORE_SENT_OFF));
                     continue;
                 }
                 // Argue (ParityRunner always argues). rollArgueTheCall d6; +1 if friendsWithTheRef and roll>1.

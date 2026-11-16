@@ -249,8 +249,19 @@ impl StepThrowTeamMate {
                     .map(|p| p.has_skill_property(NamedProperties::CAN_SKIP_TTM_SCATTER_ON_SUPERB_THROW))
                     .unwrap_or(false);
                 if pass_result == PassOutcome::Complete && has_bullseye && self.using_bullseye.is_none() {
-                    // Server-side auto-decide: don't use Bullseye
-                    self.using_bullseye = Some(false);
+                    // Java: showDialog(new DialogSkillUseParameter(thrower, Bullseye, 0)) + CONTINUE.
+                    // Rust auto-declined with no prompt, so the coach (and the heuristic's two
+                    // skill-use draws) never saw it (star tier: underworld bb2025, a Bullseye troll).
+                    let sid = game.player(&thrower_id)
+                        .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_SKIP_TTM_SCATTER_ON_SUPERB_THROW))
+                        .unwrap_or(SkillId::Bullseye);
+                    return StepOutcome::cont()
+                        .with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
+                            player_id: thrower_id.clone(),
+                            skill_id: sid as u16,
+                            skill_name: format!("{:?}", sid),
+                        })
+                        .with_event(roll_event);
                 }
 
                 // Java StepThrowTeamMate only rolls the throw here and advances — the scatter itself
@@ -350,6 +361,26 @@ impl Step for StepThrowTeamMate {
                     self.re_rolled_action = None;
                     self.re_roll_source = None;
                 }
+            }
+            // Java BullseyeBehaviour.handleCommandHook: usingBullseye = isSkillUsed; if used,
+            // actingPlayer.markSkillUsed(skill); addReport(ReportSkillUse(.., BULLSEYE)); publish
+            // USING_BULLSEYE + PASS_RESULT; NEXT_STEP (SKIP_STEP -- the step is not re-executed).
+            Action::UseSkill { skill_id, use_skill }
+                if skill_id.properties().contains(&NamedProperties::CAN_SKIP_TTM_SCATTER_ON_SUPERB_THROW)
+                    && self.pass_result == Some(PassOutcome::Complete) && self.using_bullseye.is_none() =>
+            {
+                self.using_bullseye = Some(*use_skill);
+                let pid = game.acting_player.player_id.clone();
+                if *use_skill {
+                    if let Some(ref p) = pid {
+                        crate::step::util_server_steps::mark_skill_used(game, p, *skill_id);
+                    }
+                }
+                game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                    pid, *skill_id, *use_skill, ffb_model::model::skill_use::SkillUse::BULLSEYE));
+                return StepOutcome::next()
+                    .publish(StepParameter::UsingBullseye(*use_skill))
+                    .publish(StepParameter::PassResultParam(PassOutcome::Complete));
             }
             Action::UseSkill { use_skill, .. } => {
                 if !use_skill {

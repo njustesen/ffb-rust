@@ -766,6 +766,12 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         };
         let chosen = action_label(&action);
         let is_activation = matches!(action, ffb_engine::action::Action::ActivatePlayer { .. });
+        if ffb_engine::parity_trace_enabled() {
+            if let ffb_engine::action::Action::Move { path } = &action {
+                let sq: Vec<String> = path.iter().map(|c| format!("[{}, {}]", c.x, c.y)).collect();
+                eprintln!("RUST_MOVEPATH len={} path=[{}]", path.len(), sq.join(", "));
+            }
+        }
 
         match engine.apply(side, action) {
             Ok(evs) => all_events.extend(evs),

@@ -11,7 +11,11 @@ use ffb_mechanics::pass_result::PassResult;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
-use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+// Java (every edition's StepPass): `askForReRollIfAvailable(gameState, game.getThrower(), PASS,
+// minimumRoll, fumble, modificationSkill, null)` -- the PLAYER overload with reRollSkill = null, so
+// an action-keyed skill source is NOT offered on a pass (star tier: Morg's The Ballista registers a
+// PASS source; Rust offered it after a fumble and the heuristic spent draws Java never did).
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available, ask_for_reroll_if_available_for, use_reroll};
 use crate::step::abstract_step_with_re_roll::find_skill_reroll_source;
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.pass.StepPass.
@@ -515,7 +519,7 @@ impl StepPass {
                         if let Some(ev) = roll_event { out = out.with_event(ev); }
                         return out;
                     }
-                    if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, true) {
+                    if let Some(prompt) = ask_for_reroll_if_available_for(game, game.thrower_id.clone().as_deref(), "PASS", self.minimum_roll, true) {
                         self.re_rolled_action = Some("PASS".into());
                         self.re_roll_source = Some("TRR".into());
                         let mut out = StepOutcome::cont().with_prompt(prompt);
@@ -606,7 +610,7 @@ impl StepPass {
                         if let Some(ev) = roll_event { out = out.with_event(ev); }
                         return out;
                     }
-                    if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, true) {
+                    if let Some(prompt) = ask_for_reroll_if_available_for(game, game.thrower_id.clone().as_deref(), "PASS", self.minimum_roll, true) {
                         self.re_rolled_action = Some("PASS".into());
                         self.re_roll_source = Some("TRR".into());
                         let mut out = StepOutcome::cont().with_prompt(prompt);
@@ -647,7 +651,7 @@ impl StepPass {
                         if let Some(ev) = roll_event { out = out.with_event(ev); }
                         return out;
                     }
-                    if let Some(prompt) = ask_for_reroll_if_available(game, "PASS", self.minimum_roll, false) {
+                    if let Some(prompt) = ask_for_reroll_if_available_for(game, game.thrower_id.clone().as_deref(), "PASS", self.minimum_roll, false) {
                         self.re_rolled_action = Some("PASS".into());
                         self.re_roll_source = Some("TRR".into());
                         let mut out = StepOutcome::cont().with_prompt(prompt);

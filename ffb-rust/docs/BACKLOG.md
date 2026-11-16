@@ -9651,3 +9651,39 @@ the skill (Multiple Block, Kick 'em, Putrid Regurgitation, Chomp — stars only)
    path) declares FOUL_MOVE, so every random gate with a foul had a `foul`/`foulMove` report diff
    with identical steps; now FOUL_MOVE in all editions (random human bb2016/2020/2025 10/10).
 7. Data (G5): draft carriers of Multiple Block / Kick 'em / Putrid Regurgitation / Chomp.
+   **Superseded 2026-11-16 by §L** -- Kick 'em While They're Down (Nobbla) and Putrid
+   Regurgitation (Bilerot) are star skills; the star tier fields every star on every squad that
+   can hire it, so they are reached there instead of by an R6 exception.
+
+## §L — 2026-11-16: STAR-PLAYER PARITY TIER — one hired star per team, every squad pair (in progress)
+
+**Goal (user, 2026-11-16):** "test proper rosters with all star players on teams they can
+actually be hired from ... every team plays every team with every star player they can have",
+refined to ONE star per team per game. The squads stay R6-legal; the star is an inducement on top.
+
+**Built:**
+- `scripts/build_star_catalog.py` -> `data/star_players/{bb2016,bb2020,bb2025}.json`. bb2020 and
+  bb2025 profiles + hiring lists come from the rulebook pages (`rules/(bb2020/)star_players`,
+  "Accept to play for", mapped to squads; R3 variants take their base race, FUMBBL legacy squads
+  their nearest official team, Nippon the any-team stars); bb2016 from FFB's unsuffixed LRB6
+  rosters. A skill Java cannot resolve for the edition is dropped for both engines and listed
+  (bb2020 Mesmerizing Gaze; bb2025 Consummate Professional, Dwarfen Grit, I'll Carry You).
+  157 / 63 / 62 stars; 170 / 627 / 481 (squad, star) pairs.
+- `ffb-parity --home-star/--away-star` (`crates/ffb-parity/src/stars.rs`): Rust appends the star
+  (next free shirt; its cost added to TV, as Java's `UtilTeamValue` does); Java gets a private
+  server dir per matchup (all rosters with the star positions spliced in, plus the two team XMLs),
+  so the shared `teams/` tree never grows a variant per star.
+- `scripts/star_jobs.py`: covering schedule of 4012 gates -- every ordered squad pair once; each
+  squad cycles its home star through every star it can hire; the away side round-robins its own.
+  Every (squad, star) pair is played at home, all but two also away. `scripts/star_worker.ps1`.
+
+**Pilot (120 gates, 40 per edition, 2 seeds):** 69 green / 51 red at first. Fixed 1:1 so far
+(commits `1444e06e3`, and the follow-up): bb2016 card purchase dialog; Kaboom! stall + missing
+report + harness stale-dialog re-answers; Kick dialog (all editions); bb2016 pass block (stub
+reach check, wrong step logic); bb2016 Fend stall; bb2016 Jump Up minimum; bb2020 Then I Started
+Blastin' (offer + step); bb2020 Zoat offer; bb2020 Wisdom (reversed rule + usage type); Blind
+Rage report/usage; Whirling Dervish dialog type.
+
+**Next:** clear the remaining pilot reds, then the full 4012-gate star sweep, then the mirror (330)
++ cross (4012) re-certification on the same build (every fix above touches shared steps).
+

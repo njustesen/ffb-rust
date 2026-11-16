@@ -175,6 +175,8 @@ impl StepHailMaryPass {
                         m.get_name(), m.get_report_string(), m.get_modifier(), m.get_type(),
                     ))
                     .collect();
+                // Skill modifiers (Cannoneer on LONG_BOMB) -- StepPass folds them in, this step did not.
+                modifiers.extend(factory.find_skill_modifiers(&ctx));
                 modifiers.extend(factory.find_card_modifiers(&ctx));
                 Bb2025PassMechanic.minimum_roll_simple(t, PassingDistance::LongBomb, &modifiers)
             }).flatten().unwrap_or(4);
@@ -244,6 +246,10 @@ impl StepHailMaryPass {
                             m.get_name(), m.get_report_string(), m.get_modifier(), m.get_type(),
                         ))
                         .collect();
+                    // Skill modifiers (Cannoneer on LONG_BOMB): Java's PassModifierFactory includes
+                    // the thrower's skills; Rust keeps them in find_skill_modifiers (star tier:
+                    // Barik Farblast's Hail Mary).
+                    modifiers.extend(factory.find_skill_modifiers(&ctx));
                     modifiers.extend(factory.find_card_modifiers(&ctx));
                     let bomb_action = game.thrower_action
                         == Some(ffb_model::enums::PlayerAction::HailMaryBomb);
@@ -270,7 +276,11 @@ impl StepHailMaryPass {
         // result, true, statBased))` — written under `doRoll`, BEFORE the fumble re-roll
         // cascade, so a fumble that is then re-rolled reports BOTH rolls. Rust wrote one report
         // after the cascade with no distance/result/modifiers (elf bb2025 seed 5).
-        let bb2025_report = game.rules == ffb_model::enums::Rules::Bb2025;
+        // bb2020's PassBehaviour hook writes the same report (LONG_BOMB, live modifiers, result):
+        // the legacy distance-less report below is bb2016's shape (and bb2016 is routed to its own
+        // StepHailMaryPass), so a bb2020 Cannoneer Hail Mary reported no modifiers (star tier:
+        // Barik Farblast).
+        let bb2025_report = game.rules != ffb_model::enums::Rules::Bb2016;
         if bb2025_report && do_roll {
             use ffb_mechanics::pass_result::PassResult as PR;
             let state_result = if raw_result == PR::ACCURATE { PR::INACCURATE } else { raw_result };

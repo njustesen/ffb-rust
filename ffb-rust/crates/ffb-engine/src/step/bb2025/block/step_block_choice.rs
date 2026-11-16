@@ -105,14 +105,35 @@ impl StepBlockChoice {
                 // If Tackle on attacker cancels it, fall + pushback. Otherwise goto dodge.
                 let defender_id = game.defender_id.clone();
                 let acting_player_id = game.acting_player.player_id.clone();
-                let defender_has_dodge = defender_id.as_deref()
+                let mut defender_has_dodge = defender_id.as_deref()
                     .and_then(|id| game.player(id))
                     .map(|p| p.has_skill_property(NamedProperties::IGNORE_DEFENDER_STUMBLES_RESULT))
                     .unwrap_or(false);
+                // Java: `if (defenderDodgeSkill == null && blockedByOpponent)` an UNUSED
+                // ignoresDefenderStumblesResultForFirstBlock skill (Watch Out!) stands in for Dodge
+                // (`usesWatchOut`); Tackle cancels it through its own cancel property. Rust had no
+                // such branch, so a Watch Out defender was simply knocked down (star tier:
+                // Withergrasp Doubledrool, bb2020).
+                let blocked_by_opponent = acting_player_id.as_deref().zip(defender_id.as_deref())
+                    .map(|(a, d)| game.player_team_id(a) != game.player_team_id(d))
+                    .unwrap_or(true);
+                let mut uses_watch_out = false;
+                if !defender_has_dodge && blocked_by_opponent {
+                    uses_watch_out = defender_id.as_deref()
+                        .and_then(|id| game.player(id))
+                        .map(|p| p.has_unused_skill_with_property(NamedProperties::IGNORES_DEFENDER_STUMBLES_RESULT_FOR_FIRST_BLOCK))
+                        .unwrap_or(false);
+                    defender_has_dodge = uses_watch_out;
+                }
                 if defender_has_dodge {
+                    let cancel_property = if uses_watch_out {
+                        NamedProperties::CANCELS_IGNORES_DEFENDER_STUMBLES_RESULT_FOR_FIRST_BLOCK
+                    } else {
+                        NamedProperties::CANCELS_IGNORE_DEFENDER_STUMBLES_RESULT
+                    };
                     let attacker_has_tackle = acting_player_id.as_deref()
                         .and_then(|id| game.player(id))
-                        .map(|p| p.has_skill_property(NamedProperties::CANCELS_IGNORE_DEFENDER_STUMBLES_RESULT))
+                        .map(|p| p.has_skill_property(cancel_property))
                         .unwrap_or(false);
                     let attacker_can_block_same_team = acting_player_id.as_deref()
                         .and_then(|id| game.player(id))
@@ -152,7 +173,8 @@ impl StepBlockChoice {
                                 use ffb_model::model::skill_use::SkillUse;
                                 use ffb_model::report::report_skill_use::ReportSkillUse;
                                 game.report_list.add(ReportSkillUse::new(
-                                    Some(aid.clone()), SkillId::Tackle, true, SkillUse::CANCEL_DODGE,
+                                    Some(aid.clone()), SkillId::Tackle, true,
+                                    if uses_watch_out { SkillUse::CANCEL_WATCH_OUT } else { SkillUse::CANCEL_DODGE },
                                 ));
                             }
                             if let Some(ref did) = defender_id {

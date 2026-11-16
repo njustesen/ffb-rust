@@ -252,10 +252,16 @@ impl StepWrestle {
             // old stub set both PRONE but skipped the ball scatter → a knocked-down ball-carrier
             // never fumbled → the d8 bounce (and its turnover) went unrolled (high_elf seed 72).
             // eligibleForSafePairOfHands = true (Java's literal 4th arg).
+            // The rng-aware dropPlayer: a Ball & Chain player (placedProneCausesInjuryRoll) takes an
+            // InjuryTypeBallAndChain roll inside Java's dropPlayer. The rng-less variant skipped it,
+            // so a B&C attacker brought down by Wrestle rolled two dice fewer than Java (star tier:
+            // Kreek Rustgouger, underworld bb2025).
             if let Some(did) = &defender_id {
-                drop_params.extend(crate::step::util_server_injury::drop_player(game, did, true));
+                drop_params.extend(crate::step::util_server_injury::drop_player_rng(
+                    game, rng, did, true, ApothecaryMode::Defender));
             }
-            drop_params.extend(crate::step::util_server_injury::drop_player(game, player_id, true));
+            drop_params.extend(crate::step::util_server_injury::drop_player_rng(
+                game, rng, player_id, true, ApothecaryMode::Attacker));
 
             // Java (performWrestle:92-97): a Ball&Chain defender (placedProneCausesInjuryRoll) takes
             // an InjuryTypeBallAndChain roll published as INJURY_RESULT, attacker = actingPlayer.

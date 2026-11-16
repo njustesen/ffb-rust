@@ -235,8 +235,10 @@ impl StepDauntless {
             outcome = outcome.publish(StepParameter::SuccessfulDauntless(true));
             self.resolve_indomitable(game, &player_id, outcome)
         } else {
-            // Java: if (status == null && askForReRollIfAvailable(...)) → CONTINUE
-            if !re_rolled {
+            // Java: `else if (!reRolled && askForReRollIfAvailable(...))` -- `reRolled` is computed
+            // AFTER the inline Blind Rage re-roll, so a Blind-Raged roll that still fails is never
+            // offered again. This read the pre-re-roll flag and asked anyway (star tier: Akhorne).
+            if !re_rolled && !reported_rerolled {
                 if let Some(prompt) = ask_for_reroll_if_available(game, "DAUNTLESS", min_roll, false) {
                     self.re_rolled_action = Some("DAUNTLESS".into());
                     self.re_roll_source = Some("TRR".into());

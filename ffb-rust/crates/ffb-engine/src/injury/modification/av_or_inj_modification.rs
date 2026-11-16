@@ -48,12 +48,23 @@ impl InjuryContextModification for AvOrInjModification {
     /// on the context, return false (would double-count). Otherwise switch to
     /// ADD_INJURY_MODIFIER and fall through to super.
     fn modify_injury_internal(&self, game: &Game, rng: &mut GameRng, ctx: &mut InjuryContext) -> bool {
-        // Check for overlap: if any armour modifier on ctx has the same name as
-        // the skill's armour modifiers, this modification cannot help.
-        // In Java: Collections.disjoint(ctx.armorModifiers, skill.armorModifiers)
-        // client-only: the overlap check controls whether to offer the skill in the dialog;
-        // headless skips the dialog entirely so skipping this check is correct.
+        // Java: `if (!Collections.disjoint(ctx.getArmorModifiers(), getSkill().getArmorModifiers()))
+        // return false;` -- the skill's +1 already went on the armour roll, it cannot also go on
+        // the injury roll. Then setSkillUse(ADD_INJURY_MODIFIER) and super.modifyInjuryInternal,
+        // which ADDS the skill's injury modifiers before re-interpreting (both were missing).
+        let defender = ctx.defender_id.clone().unwrap_or_default();
+        if let Some(skill) = self.skill_id() {
+            let own: Vec<&'static str> = crate::injury::modification::injury_context_modification::skill_armour_modifiers(
+                skill, game, &defender).iter().map(|m| m.name).collect();
+            if ctx.armor_modifiers.iter().any(|m| own.contains(&m.name)) {
+                return false;
+            }
+        }
         ctx.set_skill_use_modification(SkillUse::ADD_INJURY_MODIFIER);
+        if let Some(skill) = self.skill_id() {
+            ctx.add_injury_modifiers(crate::injury::modification::injury_context_modification::skill_injury_modifiers(
+                skill, game, &defender));
+        }
         let old_injury = ctx.injury;
         let new_injury = self.interpret_injury(game, ctx);
         if old_injury != new_injury {

@@ -4017,7 +4017,7 @@ public class ParityRunner {
         }
         if (DEBUG) System.err.println("JAVA_PATH pid=" + playerId + " len=" + path.size()
             + " currentMove=" + (game.getActingPlayer() != null ? game.getActingPlayer().getCurrentMove() : -1)
-            + " multimove=" + multimove);
+            + " multimove=" + multimove + " path=" + path);
         ClientCommandMove moveCmd = new ClientCommandMove(playerId, cmdFrom, cmdPath, null);
         MatchRunner.inject(gameState, moveCmd);
     }

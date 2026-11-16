@@ -13,6 +13,47 @@ use ffb_model::util::rng::GameRng;
 use crate::injury::InjuryContext;
 use crate::injury::modification::ModificationParams;
 use crate::mechanic::roll_mechanic_for;
+use ffb_mechanics::modifiers::Modifier;
+
+fn defender_is_dwarf(game: &Game, defender_id: &str) -> bool {
+    game.player(defender_id).map(|p| p.keywords.iter().any(|k| k.eq_ignore_ascii_case("dwarf"))).unwrap_or(false)
+}
+
+/// Java: `getSkill().getArmorModifiers()` for the skills whose behaviours register an
+/// InjuryContextModification (the skill classes' `registerModifier(new StaticArmourModifier(..))` /
+/// `VariableArmourModifier`). The Rust default `applyArmourModification` was a no-op, so every
+/// ADD_ARMOUR_MODIFIER special (Crushing Blow, Ram, Slayer, Ghostly Flames, Dwarfen Scourge) re-
+/// evaluated the armour without its +N and never fired (star tier: Mighty Zug, bb2020).
+pub(crate) fn skill_armour_modifiers(skill: SkillId, game: &Game, defender_id: &str) -> Vec<Modifier> {
+    let r = game.rules;
+    match skill {
+        SkillId::CrushingBlow => vec![Modifier::new("Crushing Blow", 1, r)],
+        SkillId::Ram => vec![Modifier::new("Ram", 1, r)],
+        SkillId::Slayer => vec![Modifier::new("Slayer", 1, r)],
+        SkillId::GhostlyFlames => vec![Modifier::new("Ghostly Flames", 4, r)],
+        SkillId::DwarfenScourge =>
+            vec![Modifier::new("DwarfenScourge", if defender_is_dwarf(game, defender_id) { 2 } else { 1 }, r)],
+        SkillId::DwarvenScourge =>
+            vec![Modifier::new("DwarvenScourge", if defender_is_dwarf(game, defender_id) { 2 } else { 1 }, r)],
+        _ => vec![],
+    }
+}
+
+/// Java: `getSkill().getInjuryModifiers()` for the same skills (StaticInjuryModifierAttacker /
+/// VariableInjuryModifierAttacker). Both Scourge classes name their injury modifier
+/// "DwarfenScourge".
+pub(crate) fn skill_injury_modifiers(skill: SkillId, game: &Game, defender_id: &str) -> Vec<Modifier> {
+    let r = game.rules;
+    match skill {
+        SkillId::Ram => vec![Modifier::new("Ram", 1, r)],
+        SkillId::Slayer => vec![Modifier::new("Slayer", 1, r)],
+        SkillId::BrutalBlock => vec![Modifier::new("Brutal Block", 1, r)],
+        SkillId::ToxinConnoisseur => vec![Modifier::new("Toxin Connoisseur", 1, r)],
+        SkillId::DwarfenScourge | SkillId::DwarvenScourge =>
+            vec![Modifier::new("DwarfenScourge", if defender_is_dwarf(game, defender_id) { 2 } else { 1 }, r)],
+        _ => vec![],
+    }
+}
 
 /// Java: IInjuryContextModification interface + InjuryContextModification abstract class.
 pub trait InjuryContextModification: Send + Sync {
@@ -116,8 +157,12 @@ pub trait InjuryContextModification: Send + Sync {
 
     /// Java: applyArmourModification(T params) — default: add skill's armor modifiers.
     fn apply_armour_modification(&self, params: &mut ModificationParams) {
-        // Default: no-op (concrete types add their skill's modifiers in overrides).
-        // Subclasses that use ADD_ARMOUR_MODIFIER override this.
+        // Java: params.getNewContext().addArmorModifiers(skill.getArmorModifiers())
+        if let Some(skill) = self.skill_id() {
+            let defender = params.new_context.defender_id.clone().unwrap_or_default();
+            let mods = skill_armour_modifiers(skill, params.game, &defender);
+            params.new_context.add_armor_modifiers(mods);
+        }
     }
 
     // ── Injury modification pipeline ─────────────────────────────────────────
@@ -153,8 +198,13 @@ pub trait InjuryContextModification: Send + Sync {
     /// Java: modifyInjuryInternal(ModifiedInjuryContext, GameState) — default: add
     /// skill's injury modifiers and re-interpret the roll.
     fn modify_injury_internal(&self, game: &Game, _rng: &mut GameRng, ctx: &mut InjuryContext) -> bool {
-        // Default: add injury modifiers from skill (ADD_INJURY_MODIFIER path).
+        // Java: injuryContext.addInjuryModifiers(getSkill().getInjuryModifiers()) -- this was
+        // missing, so the re-interpretation saw the same roll and could never change the injury.
         // Concrete types that RE_ROLL_INJURY override this entirely.
+        if let Some(skill) = self.skill_id() {
+            let defender = ctx.defender_id.clone().unwrap_or_default();
+            ctx.add_injury_modifiers(skill_injury_modifiers(skill, game, &defender));
+        }
         let old_injury = ctx.injury;
         let new_injury = self.interpret_injury(game, ctx);
         if old_injury != new_injury {
@@ -188,8 +238,10 @@ pub trait InjuryContextModification: Send + Sync {
 
     /// Java: UtilCards.hasUnusedSkillWithProperty(defender, ignoresArmourModifiersFromSkills).
     /// Stub: always false until UtilCards is fully ported.
-    fn defender_ignores_armour_modifications(&self, _game: &Game, _defender_id: &str) -> bool {
-        false
+    fn defender_ignores_armour_modifications(&self, game: &Game, defender_id: &str) -> bool {
+        game.player(defender_id).map(|p| p.has_unused_skill_with_property(
+            ffb_model::model::property::named_properties::NamedProperties::IGNORES_ARMOUR_MODIFIERS_FROM_SKILLS))
+            .unwrap_or(false)
     }
 
     /// Helper: is the acting player blitzing and in the attacker role?

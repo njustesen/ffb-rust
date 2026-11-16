@@ -313,7 +313,16 @@ pub fn change_acting_player(game: &mut Game, player_id: &str, action: PlayerActi
             if let Some(p) = game.team_home.player_mut(player_id)
                 .or_else(|| game.team_away.player_mut(player_id))
             {
+                // Java keeps two used-skill stores: ActingPlayer.usedSkills (per activation, what
+                // this reset models) and RosterPlayer.usedSkills (`player.markUsed`, never reset for
+                // REGULAR). Rust has one. I'll be back! is REGULAR and marked ONLY on the player
+                // (StepEndTurn.getPlayerIds), so it must survive this reset -- otherwise a sent-off
+                // secret weapon ignores every ban instead of the first (star tier: Kreek Rustgouger).
+                let keep_player_marked = p.used_skills.contains(&ffb_model::enums::SkillId::IllBeBack);
                 p.reset_used_skills_in(ffb_model::enums::SkillUsageType::Regular, rules);
+                if keep_player_marked {
+                    p.used_skills.insert(ffb_model::enums::SkillId::IllBeBack);
+                }
             }
         }
         // Java UtilActingPlayer.changeActingPlayer (`if (changed)` block): resets transient
