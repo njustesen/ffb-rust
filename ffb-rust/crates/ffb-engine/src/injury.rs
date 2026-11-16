@@ -153,16 +153,29 @@ impl InjuryContext {
     pub fn get_apothecary_mode(&self) -> ApothecaryMode { self.apothecary_mode }
 
     // Java: addArmorModifier / addArmorModifiers
-    pub fn add_armor_modifier(&mut self, m: Modifier) { self.armor_modifiers.push(m); }
+    // Java keeps fArmorModifiers / fInjuryModifiers as SETs, so re-adding the same modifier is a
+    // no-op. That matters on the InjuryContextModification alternate path, where the cloned
+    // context already carries the original's modifiers and armourRoll(roll=false) scans them in
+    // again: a Vec counted Mighty Blow twice and broke armour Java leaves intact (star tier:
+    // Varag Ghoul-Chewer's Krump and Smash armour re-roll, black_orc vs underworld bb2025 seed 1).
+    pub fn add_armor_modifier(&mut self, m: Modifier) {
+        if !self.armor_modifiers.contains(&m) {
+            self.armor_modifiers.push(m);
+        }
+    }
     pub fn add_armor_modifiers(&mut self, ms: impl IntoIterator<Item = Modifier>) {
-        self.armor_modifiers.extend(ms);
+        for m in ms { self.add_armor_modifier(m); }
     }
     pub fn clear_armor_modifiers(&mut self) { self.armor_modifiers.clear(); }
 
     // Java: addInjuryModifier / addInjuryModifiers
-    pub fn add_injury_modifier(&mut self, m: Modifier) { self.injury_modifiers.push(m); }
+    pub fn add_injury_modifier(&mut self, m: Modifier) {
+        if !self.injury_modifiers.contains(&m) {
+            self.injury_modifiers.push(m);
+        }
+    }
     pub fn add_injury_modifiers(&mut self, ms: impl IntoIterator<Item = Modifier>) {
-        self.injury_modifiers.extend(ms);
+        for m in ms { self.add_injury_modifier(m); }
     }
 
     // Java: addCasualtyModifier / addCasualtyModifiers
