@@ -231,9 +231,10 @@ mod tests {
         let state = game.field_model.player_state(&player_id).unwrap();
         assert_eq!(state.base(), PS_PRONE);
         assert!(!state.is_active());
-        // Real bug regression guard: bb2025's cancelPlayerAction ALSO sets confused(true) in the
-        // standing-up branch (unlike bb2016/bb2020, which leave confused untouched there).
-        assert!(state.is_confused(), "bb2025 standing-up negatrait failure must also be confused");
+        // Java bb2025 BoneHeadBehaviour.cancelPlayerAction: the standing-up branch is
+        // `changeBase(PRONE).changeActive(false)` — no confused (no Java site combines PRONE
+        // with confused; elf vs imperial_nobility bb2025 seed 1).
+        assert!(!state.is_confused(), "bb2025 standing-up negatrait failure is Prone, not confused");
     }
 
     #[test]

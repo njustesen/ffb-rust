@@ -66,8 +66,12 @@ pub fn cancel_negatrait_player_action(game: &mut Game, player_id: &str) {
 
     if let Some(state) = game.field_model.player_state(player_id) {
         let new_state = if game.acting_player.standing_up {
-            // Java (bb2025): changeBase(PRONE).changeConfused(true).changeActive(false)
-            state.change_base(PS_PRONE).change_confused(true).change_active(false)
+            // Java (bb2025 Bone Head / Really Stupid `cancelPlayerAction`):
+            // `playerState.changeBase(PRONE).changeActive(false)` — NOT confused. Rust also set
+            // confused, which the state hash cannot see but Black Ink / gaze eligibility can
+            // (isDistracted): a stood-up-and-failed Prone Skrorg Snowpelt stopped being a Black
+            // Ink target (star tier: Kiroth Krakeneye, elf vs imperial_nobility bb2025 seed 1).
+            state.change_base(PS_PRONE).change_active(false)
         } else {
             // Java: changeConfused(true).changeActive(false)
             state.change_confused(true).change_active(false)
@@ -99,15 +103,15 @@ mod tests {
     }
 
     #[test]
-    fn standing_up_failure_is_prone_and_confused() {
-        // Real bug: Java's bb2025 cancelPlayerAction ALSO sets changeConfused(true) in the
-        // standing-up branch (unlike bb2016/bb2020, which only set changeBase(PRONE)). A
-        // previous translation dropped `.changeConfused(true)` here.
+    fn standing_up_failure_is_prone_but_not_confused() {
+        // Java bb2025 BoneHeadBehaviour / ReallyStupidBehaviour `cancelPlayerAction`:
+        // `if (actingPlayer.isStandingUp()) changeBase(PRONE).changeActive(false)` — no
+        // changeConfused anywhere on that branch (no Java site combines PRONE with confused).
         let (mut game, pid) = make_game(true);
         cancel_negatrait_player_action(&mut game, &pid);
         let state = game.field_model.player_state(&pid).unwrap();
         assert_eq!(state.base(), PS_PRONE);
-        assert!(state.is_confused(), "bb2025 standing-up failure must also be confused");
+        assert!(!state.is_confused(), "bb2025 standing-up failure is Prone, not confused");
         assert!(!state.is_active());
     }
 
