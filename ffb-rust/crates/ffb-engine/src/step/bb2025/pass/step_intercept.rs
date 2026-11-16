@@ -45,6 +45,9 @@ pub struct StepIntercept {
     // AbstractStepWithReRoll fields
     pub re_rolled_action: Option<String>,
     pub re_roll_source: Option<String>,
+    /// Java `askForReRollIfAvailable(…, pInterceptor, INTERCEPTION, …)` → WAITING_FOR_RE_ROLL: the
+    /// offer raised inside `intercept()`, returned by `execute_step`.
+    pub pending_prompt: Option<ffb_model::prompts::AgentPrompt>,
 }
 
 impl StepIntercept {
@@ -58,6 +61,7 @@ impl StepIntercept {
             pass_result: PassResult::INACCURATE,
             re_rolled_action: None,
             re_roll_source: None,
+            pending_prompt: None,
         }
     }
 
@@ -214,7 +218,9 @@ impl StepIntercept {
         // the same 6 at stream position 46). The rule is edition-independent; it only became
         // reachable once the harnesses started attempting interceptions.
         let successful = roll == 6 || (roll != 1 && roll >= minimum_roll);
-        let re_rolled = self.re_rolled_action.is_some() && self.re_roll_source.is_some();
+        // Java: `reRolled = (getReRolledAction() == INTERCEPTION (bb2016: CATCH)) && source != null`.
+        let rerolled_key = if game.rules == ffb_model::enums::Rules::Bb2016 { "CATCH" } else { "INTERCEPTION" };
+        let re_rolled = self.re_rolled_action.as_deref() == Some(rerolled_key) && self.re_roll_source.is_some();
         let is_bomb = matches!(
             game.thrower_action,
             Some(PlayerAction::ThrowBomb) | Some(PlayerAction::HailMaryBomb)
@@ -254,11 +260,15 @@ impl StepIntercept {
         // BB2020/BB2025 ask for `INTERCEPTION`. Rust never re-rolled, so a Catch-carrying
         // interceptor was one die short of Java for the rest of the game (high_elf bb2016 seed 24
         // i=55: Java spends calls #34 AND #35 on the interception, Rust only #34).
-        // The team-re-roll branch Java falls back to is deliberately NOT ported here: the harness
-        // always declines team re-rolls, and an interceptor is on the non-acting team, so
-        // `isTeamReRollAvailable` is false for it anyway (same reasoning as the bb2016 catch step).
-        if !successful && self.re_rolled_action.is_none() {
-            let action = if game.rules == ffb_model::enums::Rules::Bb2016 { "CATCH" } else { "INTERCEPTION" };
+        // Java: `if (getReRolledAction() != CATCH/INTERCEPTION) { setReRolledAction(…); …skill
+        // source… else if (askForReRollIfAvailable(gameState, pInterceptor, INTERCEPTION,
+        // minimumRoll, false)) status = WAITING_FOR_RE_ROLL; }` — the fallback offer goes to the
+        // INTERCEPTOR, so a non-acting player's unused single-die re-roll skill raises it (star
+        // tier: bb2025 Puggy Baconbreath, nippon vs halfling seed 2: Java shows the dialog and the
+        // coach spends two draws; Rust offered nothing).
+        let action = if game.rules == ffb_model::enums::Rules::Bb2016 { "CATCH" } else { "INTERCEPTION" };
+        if !successful && self.re_rolled_action.as_deref() != Some(action) {
+            self.re_rolled_action = Some(action.to_string());
             let source = game.player(interceptor_id).and_then(|p| {
                 p.all_skill_ids()
                     .filter(|id| !p.used_skills.contains(id))
@@ -276,6 +286,12 @@ impl StepIntercept {
                 let src = ffb_model::enums::ReRollSource::new(format!("{:?}", skill_id));
                 crate::step::util_server_re_roll::use_reroll(game, &src, interceptor_id, rng);
                 return self.intercept(interceptor_id, game, rng);
+            }
+            if let Some(prompt) = crate::step::util_server_re_roll::ask_for_reroll_if_available_for(
+                game, Some(interceptor_id), "INTERCEPTION", minimum_roll, false)
+            {
+                self.re_roll_source = Some("TRR".to_string());
+                self.pending_prompt = Some(prompt);
             }
         }
 
@@ -307,6 +323,14 @@ impl Step for StepIntercept {
                 let chosen = if *attempt { Self::find_interceptors(game).first().cloned() } else { None };
                 self.set_interceptor_id(game, chosen);
                 self.set_interceptor_chosen(game);
+            }
+            // Java AbstractStepWithReRoll CLIENT_USE_RE_ROLL: `setReRolledAction(command action)`
+            // (the dialog's INTERCEPTION) and the source — null on a decline.
+            Action::UseReRoll { use_reroll } => {
+                self.re_rolled_action = Some("INTERCEPTION".to_string());
+                if !*use_reroll {
+                    self.re_roll_source = None;
+                }
             }
             _ => {}
         }
@@ -403,8 +427,22 @@ impl StepIntercept {
             return StepOutcome::goto(&label).publish(StepParameter::InterceptorId(None));
         }
 
+        // Java: `if (INTERCEPTION == getReRolledAction()) { if (source == null ||
+        // !useReRoll(this, source, interceptor)) doIntercept = false; }` — the answer to the
+        // fallback re-roll offer.
+        let mut rerolled_away = false;
+        if self.re_rolled_action.as_deref() == Some("INTERCEPTION") && self.pending_prompt.is_none() {
+            let interceptor = self.interceptor_id(game).unwrap_or_default();
+            let spent = match self.re_roll_source.clone() {
+                Some(s) => crate::step::util_server_re_roll::use_reroll(
+                    game, &ffb_model::enums::ReRollSource::new(s), &interceptor, rng),
+                None => false,
+            };
+            rerolled_away = !spent;
+        }
+
         // Java: if (!state.isInterceptorChosen()) → showDialog, TurnMode=INTERCEPTION, doNextStep=false
-        if !self.interceptor_chosen(game) {
+        if !rerolled_away && !self.interceptor_chosen(game) {
             // Java: UtilServerDialog.showDialog(DialogInterceptionParameter) → the agent answers
             // with Action::Intercept (or SelectPlayer). A bare cont() waited forever.
             return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Interception {
@@ -425,9 +463,14 @@ impl StepIntercept {
         // than routed to the dead twin (see step/driver.rs for why routing does not work).
         let is_bb2020 = game.rules == ffb_model::enums::Rules::Bb2020;
         let mut easy = false;
-        let do_intercept = if let Some(ref interceptor_id) = self.interceptor_id(game) {
+        let interceptor_for_roll = if rerolled_away { None } else { self.interceptor_id(game) };
+        let do_intercept = if let Some(ref interceptor_id) = interceptor_for_roll {
             // Roll the interception
             let (success, easy_intercept) = self.intercept(interceptor_id, game, rng);
+            // Java: WAITING_FOR_RE_ROLL → doNextStep = false.
+            if let Some(prompt) = self.pending_prompt.take() {
+                return StepOutcome::cont().with_prompt(prompt);
+            }
             easy = easy_intercept;
             // Java: game.getFieldModel().setBallMoving(false) / setBombMoving(false)
             let stops_the_ball = success && (!is_bb2020 || easy_intercept);
@@ -887,6 +930,43 @@ mod tests {
         assert_eq!(minimum, 3, "AG3 interceptor with no modifiers should need a 3+");
     }
 
+    /// Java `intercept()` failure: with no skill re-roll source, `askForReRollIfAvailable(
+    /// gameState, pInterceptor, INTERCEPTION, …)` — a non-acting interceptor's unused single-die
+    /// re-roll skill raises the offer (WAITING_FOR_RE_ROLL); without it nothing is offered.
+    #[test]
+    fn failed_interception_offers_the_interceptors_single_die_reroll() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let run = |with_skill: bool, seed: u64| -> (bool, bool) {
+            let mut away = test_team("away", 0);
+            let mut opp = ffb_model::model::player::Player::default();
+            opp.id = "opp1".into();
+            opp.agility = 6;
+            if with_skill {
+                opp.starting_skills.push(SkillWithValue::new(SkillId::ThinkingMansTroll));
+            }
+            away.players.push(opp);
+            let mut game = Game::new(test_team("home", 0), away, Rules::Bb2025);
+            game.home_playing = true;
+            game.thrower_id = Some("t1".into());
+            let mut step = StepIntercept::new("fail".into());
+            step.pass_result = PassResult::FUMBLE;
+            let (ok, _) = step.intercept("opp1", &mut game, &mut GameRng::new(seed));
+            (ok, step.pending_prompt.is_some())
+        };
+        let mut offered = false;
+        for seed in 0..30u64 {
+            let (ok, prompt) = run(true, seed);
+            if !ok {
+                assert!(prompt, "seed {seed}: failed interception must raise the offer");
+                offered = true;
+                let (ok2, prompt2) = run(false, seed);
+                assert!(!ok2 && !prompt2, "seed {seed}: no skill, no offer");
+            }
+        }
+        assert!(offered);
+    }
+
     #[test]
     fn intercept_method_returns_true_for_high_roll() {
         // Directly test the intercept() private method:
@@ -913,6 +993,7 @@ mod tests {
             pass_result: PassResult::FUMBLE,
             re_rolled_action: None,
             re_roll_source: None,
+            pending_prompt: None,
         };
 
         // Try seeds until one gives roll ≥ 2 (easy with AG=2, min=2)
