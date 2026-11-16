@@ -665,6 +665,20 @@ impl StepEndTurn {
         }
     }
 
+    /// Java: `touchdownPlayer = fieldModel.getPlayer(ballCoordinate)` with an UNUSED
+    /// canGrantReRollAfterTouchdown skill (`UtilCards.hasUnusedSkillWithProperty`).
+    fn unused_star_of_the_show(game: &Game) -> Option<(String, ffb_model::enums::SkillId)> {
+        use ffb_model::model::property::named_properties::NamedProperties;
+        let ball = game.field_model.ball_coordinate?;
+        let pid = game.field_model.player_at(ball)?.clone();
+        let p = game.player(&pid)?;
+        if !p.has_unused_skill_with_property(NamedProperties::CAN_GRANT_RE_ROLL_AFTER_TOUCHDOWN) {
+            return None;
+        }
+        let skill = p.skill_id_with_property(NamedProperties::CAN_GRANT_RE_ROLL_AFTER_TOUCHDOWN)?;
+        Some((pid, skill))
+    }
+
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: if (turnNr == 0) capture turnNr + half for later send-to-box use
         if self.turn_nr == 0 {
@@ -693,9 +707,27 @@ impl StepEndTurn {
         }
         let touchdown = self.touchdown.unwrap_or(false);
 
-        // StarOfTheShow: dialog not translated → always false
+        // Java (bb2020 + bb2025 StepEndTurn): on a touchdown, if the scorer has an UNUSED
+        // canGrantReRollAfterTouchdown skill (Star of the Show), show DialogSkillUseParameter and
+        // wait; otherwise (or without a touchdown) useStarOfTheShow = false. Rust never asked
+        // (star tier: Count Luthor von Drakenborg, khemri vs lizardman bb2025 seed 2 — Java's
+        // coach accepted, the team got the one-drive re-roll and two extra draws).
         if self.use_star_of_the_show.is_none() {
-            self.use_star_of_the_show = Some(false);
+            let skill = if touchdown && game.rules != ffb_model::enums::Rules::Bb2016 {
+                Self::unused_star_of_the_show(game)
+            } else {
+                None
+            };
+            match skill {
+                Some((player_id, skill)) => {
+                    return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
+                        player_id,
+                        skill_id: skill as u16,
+                        skill_name: format!("{:?}", skill),
+                    });
+                }
+                None => self.use_star_of_the_show = Some(false),
+            }
         }
 
         // Java `bb2020/StepEndTurn.java:290`: `if (handleStallers()) { return; }` -- BEFORE
@@ -1000,6 +1032,18 @@ impl StepEndTurn {
                 let team_id = if is_home { game.team_home.id.clone() } else { game.team_away.id.clone() };
                 self.pending_turn_end = Some(GameEvent::TurnEnd { team_id, turn_nr: self.turn_nr });
             }
+            // Java: `if ((fNewHalf || fTouchdown) && useStarOfTheShow) { turnData(isHomeTurnEnding)
+            //   .setReRolls(+1); setReRollShowStarOneDrive(+1);
+            //   addReport(new ReportShowStarReRoll(touchdownPlayerId)); }` — just before startTurn.
+            if (self.new_half || touchdown) && self.use_star_of_the_show == Some(true) {
+                let is_home = self.is_home_turn_ending.unwrap_or(game.home_playing);
+                let td = if is_home { &mut game.turn_data_home } else { &mut game.turn_data_away };
+                td.rerolls += 1;
+                td.reroll_show_star_one_drive += 1;
+                game.report_list.add(
+                    ffb_model::report::mixed::report_show_star_re_roll::ReportShowStarReRoll::new(
+                        self.touchdown_player_id.clone()));
+            }
             game.start_turn();
 
             // Java: endGenerator.pushSequence / kickoffGenerator
@@ -1095,7 +1139,24 @@ impl Step for StepEndTurn {
         }
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java CLIENT_USE_SKILL: `if (player.hasUnused(skill) && skill.hasSkillProperty(
+        //   canGrantReRollAfterTouchdown)) { useStarOfTheShow = isSkillUsed();
+        //   if (used) player.markUsed(skill, game); EXECUTE_STEP }`
+        if let Action::UseSkill { skill_id, use_skill } = action {
+            if let Some((player_id, skill)) = Self::unused_star_of_the_show(game) {
+                if skill == *skill_id {
+                    self.use_star_of_the_show = Some(*use_skill);
+                    if *use_skill {
+                        if let Some(p) = game.team_home.player_mut(&player_id)
+                            .or_else(|| game.team_away.player_mut(&player_id))
+                        {
+                            p.used_skills.insert(skill);
+                        }
+                    }
+                }
+            }
+        }
         let out = self.execute_step(game, rng);
         match self.pending_turn_end.take() {
             Some(ev) => out.with_event(ev),
@@ -1573,6 +1634,41 @@ mod tests {
         assert_eq!(game.game_result.home.score, 1);
         assert_eq!(game.turn_mode, TurnMode::Setup);
         assert_eq!(step.touchdown_player_id.as_deref(), Some("scorer"));
+    }
+
+    /// Java StepEndTurn: a touchdown by an UNUSED Star of the Show scorer shows a SkillUse dialog
+    /// and waits; accepting marks the skill used and grants +1 team re-roll and +1 one-drive
+    /// show-star re-roll to the team whose turn ended (Count Luthor, khemri vs lizardman bb2025).
+    #[test]
+    fn star_of_the_show_is_offered_on_a_touchdown_and_grants_a_drive_reroll() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = make_game();
+        let mut scorer = make_player("scorer");
+        scorer.starting_skills.push(SkillWithValue::new(SkillId::StarOfTheShow));
+        game.team_home.players.push(scorer);
+        let ball_coord = FieldCoordinate::new(FIELD_WIDTH - 1, 7);
+        game.field_model.set_player_coordinate("scorer", ball_coord);
+        game.field_model.set_player_state("scorer", PlayerState::new(PS_STANDING));
+        game.field_model.ball_coordinate = Some(ball_coord);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
+        let rerolls_before = game.turn_data_home.rerolls;
+
+        let mut step = StepEndTurn::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::SkillUse { .. })),
+            "expected the Star of the Show dialog, got {:?}", out.prompt);
+        assert_eq!(game.game_result.home.score, 0, "nothing is applied before the answer");
+
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::StarOfTheShow, use_skill: true },
+            &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(game.game_result.home.score, 1);
+        assert_eq!(game.turn_data_home.rerolls, rerolls_before + 1);
+        assert_eq!(game.turn_data_home.reroll_show_star_one_drive, 1);
+        assert!(game.player("scorer").unwrap().used_skills.contains(&SkillId::StarOfTheShow));
     }
 
     #[test]
