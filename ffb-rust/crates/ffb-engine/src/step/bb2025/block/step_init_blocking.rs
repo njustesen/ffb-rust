@@ -174,8 +174,14 @@ impl StepInitBlocking {
                 // with no prompt -- a stall (star tier: Bilerot Vomitflesh, black_orc vs renegades
                 // bb2025). End the turn the same way -- for those re-block actions only, so the
                 // interactive plain-Block path still waits for CLIENT_BLOCK.
+                // Every StepEndBlocking second-block chain (Fury of the Blood God's
+                // allowSecondBlockAction, ...) pushes its Block sequence with PUBLISH_DEFENDER and
+                // resets hasBlocked; with no defender folded in it is the same unhandled
+                // INIT_BLOCKING → EndTurn in ParityRunner (star tier: Scyla Anfingrimm, bb2020
+                // skaven vs chaos_chaostroll seed 2 — Rust stalled and the game ended at step 52).
                 if matches!(game.acting_player.player_action,
                     Some(PlayerAction::PutridRegurgitationBlock) | Some(PlayerAction::MaximumCarnage))
+                    || self.publish_defender
                 {
                     return StepOutcome::goto(&label)
                         .publish(StepParameter::EndTurn(true))
