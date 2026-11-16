@@ -69,6 +69,13 @@ impl Step for StepBlockChoice {
             StepParameter::GotoLabelOnDodge(s)      => { self.goto_label_on_dodge = s.clone(); true }
             StepParameter::GotoLabelOnJuggernaut(s) => { self.goto_label_on_juggernaut = s.clone(); true }
             StepParameter::GotoLabelOnPushback(s)   => { self.goto_label_on_pushback = s.clone(); true }
+            // Java init(): SUPPRESS_EXTRA_EFFECT_HANDLING / SHOW_NAME_IN_REPORT / BLOCK_ROLL_ID —
+            // the multi-block evaluation sequence passes them and ReportBlockChoice carries them;
+            // dropped, every multi-block blockChoice reported false/false/0 (Grim Ironjaw,
+            // dwarf vs slann_fumbbl bb2025 seed 1).
+            StepParameter::SuppressExtraEffectHandling(v) => { self.suppress_extra_effect_handling = *v; true }
+            StepParameter::ShowNameInReport(v)      => { self.show_name_in_report = *v; true }
+            StepParameter::BlockRollId(v)           => { self.block_roll_id = *v; true }
             _ => false,
         }
     }

@@ -1482,6 +1482,13 @@ public class ParityRunner {
                 break;
             }
 
+            // DialogReRollForTargetsParameter reports DialogId.RE_ROLL_FOR_TARGETS, not
+            // RE_ROLL_BLOCK_FOR_TARGETS: without this label its decline branch below was dead and
+            // the dialog fell to the non-seeded RandomStrategy default, which never advanced it --
+            // every multi-block Dauntless/Foul Appearance re-roll offer ended the game at
+            // DIALOG_LOOP_CLEARED (star tier: Grim Ironjaw, dwarf vs slann_fumbbl bb2025 seed 1).
+            case RE_ROLL_FOR_TARGETS:
+            case RE_ROLL_BLOCK_FOR_TARGETS_PROPERTIES:
             case RE_ROLL_BLOCK_FOR_TARGETS: {
                 // Multi-block die selection (DialogReRollBlockForTargetsParameter, shown by
                 // StepBlockRollMultiple): pick DIE INDEX 0 for the first still-unselected
@@ -1500,6 +1507,25 @@ public class ParityRunner {
                         MatchRunner.inject(gameState,
                             new com.fumbbl.ffb.net.commands.ClientCommandBlockOrReRollChoiceForTarget(
                                 pick.getTargetId(), 0, -1, null));
+                    } else {
+                        game.setDialogParameter(null);
+                    }
+                } else if (dialog instanceof com.fumbbl.ffb.dialog.DialogReRollBlockForTargetsPropertiesParameter) {
+                    // bb2025 StepBlockRollMultiple's attacker dialog (BlockRollProperties, no
+                    // shared supertype with BlockRoll): the same die-0 pick for the first
+                    // unselected target, no pro, no re-roll — Rust's headless auto-select-0.
+                    // Unlabelled, it fell to RandomStrategy and the game ended at
+                    // DIALOG_LOOP_CLEARED (Grim Ironjaw, dwarf vs slann_fumbbl bb2025 seed 1).
+                    com.fumbbl.ffb.dialog.DialogReRollBlockForTargetsPropertiesParameter bp =
+                        (com.fumbbl.ffb.dialog.DialogReRollBlockForTargetsPropertiesParameter) dialog;
+                    String pickTarget = null;
+                    for (com.fumbbl.ffb.model.BlockRollProperties roll : bp.getBlockRolls()) {
+                        if (roll.needsSelection()) { pickTarget = roll.getTargetId(); break; }
+                    }
+                    if (pickTarget != null) {
+                        MatchRunner.inject(gameState,
+                            new com.fumbbl.ffb.net.commands.ClientCommandBlockOrReRollChoiceForTarget(
+                                pickTarget, 0, -1, null));
                     } else {
                         game.setDialogParameter(null);
                     }

@@ -339,7 +339,7 @@ impl StepBlockRollMultiple {
         // order the evaluation order, which this iteration preserves directly.
         if let Some(roll) = self.block_rolls.get(self.eval_index).cloned() {
             self.eval_index += 1;
-            let (seq, params) = generate_block_evaluation_sequence(&roll, &self.parameter_to_consume);
+            let (seq, params) = generate_block_evaluation_sequence(&roll, &self.parameter_to_consume, ffb_model::enums::Rules::Bb2020);
             let mut outcome = StepOutcome::next();
             outcome.push_self = true;
             outcome = outcome.push_seq(seq);
@@ -356,7 +356,11 @@ impl StepBlockRollMultiple {
 ///
 /// Builds the per-target block evaluation step sequence and returns
 /// the sequence steps plus parameters to publish.
-pub fn generate_block_evaluation_sequence(roll: &BlockRoll, params_to_consume: &[std::mem::Discriminant<StepParameter>]) -> (Vec<SequenceStep>, Vec<StepParameter>) {
+///
+/// `rules`: bb2025/mutliblock/StepBlockRollMultiple adds `STEADY_FOOTING(DEFENDER)` and
+/// `STEADY_FOOTING(ATTACKER)` between DROP_FALLING_PLAYERS and HANDLE_DROP_PLAYER_CONTEXT; the
+/// bb2020 sequence has neither.
+pub fn generate_block_evaluation_sequence(roll: &BlockRoll, params_to_consume: &[std::mem::Discriminant<StepParameter>], rules: ffb_model::enums::Rules) -> (Vec<SequenceStep>, Vec<StepParameter>) {
     let mut seq = Sequence::new();
 
     seq.add(StepId::SetDefender, vec![
@@ -381,6 +385,11 @@ pub fn generate_block_evaluation_sequence(roll: &BlockRoll, params_to_consume: &
     seq.add_labelled(StepId::Pushback, labels::PUSHBACK, vec![]);
 
     seq.add_labelled(StepId::DropFallingPlayers, labels::DROP_FALLING_PLAYERS, vec![]);
+    if rules == ffb_model::enums::Rules::Bb2025 {
+        use ffb_model::enums::ApothecaryMode;
+        seq.add(StepId::SteadyFooting, vec![StepParameter::ApothecaryMode(ApothecaryMode::Defender)]);
+        seq.add(StepId::SteadyFooting, vec![StepParameter::ApothecaryMode(ApothecaryMode::Attacker)]);
+    }
     seq.add(StepId::HandleDropPlayerContext, vec![]);
     // Java: sequence.add(StepId.CONSUME_PARAMETER, from(CONSUME_PARAMETER, parameterToConsume))
     if !params_to_consume.is_empty() {
@@ -637,7 +646,7 @@ mod tests {
         roll.set_block_roll(vec![4]);
         roll.set_selected_index(0);
         roll.set_nr_of_dice(1);
-        let (seq, _params) = generate_block_evaluation_sequence(&roll, &[]);
+        let (seq, _params) = generate_block_evaluation_sequence(&roll, &[], ffb_model::enums::Rules::Bb2020);
         assert!(seq.iter().any(|s| s.step_id == StepId::SetDefender));
     }
 
@@ -647,11 +656,34 @@ mod tests {
         roll.set_block_roll(vec![2]);
         roll.set_selected_index(0);
         roll.set_nr_of_dice(1);
-        let (seq, _params) = generate_block_evaluation_sequence(&roll, &[]);
+        let (seq, _params) = generate_block_evaluation_sequence(&roll, &[], ffb_model::enums::Rules::Bb2020);
         let bc = seq.iter().find(|s| s.step_id == StepId::BlockChoice).expect("BlockChoice not found");
         assert!(bc.params.iter().any(|p| matches!(p, StepParameter::BlockRollId(3))));
         assert!(bc.params.iter().any(|p| matches!(p, StepParameter::SuppressExtraEffectHandling(true))));
         assert!(bc.params.iter().any(|p| matches!(p, StepParameter::ShowNameInReport(true))));
+    }
+
+    /// Java bb2025/mutliblock/StepBlockRollMultiple.generateBlockEvaluationSequence adds
+    /// STEADY_FOOTING(DEFENDER), STEADY_FOOTING(ATTACKER) between DROP_FALLING_PLAYERS and
+    /// HANDLE_DROP_PLAYER_CONTEXT; bb2020's sequence has none (Grim Ironjaw, dwarf vs
+    /// slann_fumbbl bb2025 seed 1: the knocked-down targets were never resolved).
+    #[test]
+    fn bb2025_evaluation_sequence_runs_steady_footing_for_defender_then_attacker() {
+        use ffb_model::enums::ApothecaryMode;
+        let mut roll = BlockRoll::new_with("target1", None, 0);
+        roll.set_block_roll(vec![6]);
+        roll.set_selected_index(0);
+        roll.set_nr_of_dice(1);
+        let ids = |rules| generate_block_evaluation_sequence(&roll, &[], rules).0
+            .iter().map(|s| s.step_id).collect::<Vec<_>>();
+        let b25 = ids(ffb_model::enums::Rules::Bb2025);
+        let drop = b25.iter().position(|s| *s == StepId::DropFallingPlayers).unwrap();
+        assert_eq!(&b25[drop..drop + 4], &[StepId::DropFallingPlayers, StepId::SteadyFooting,
+            StepId::SteadyFooting, StepId::HandleDropPlayerContext]);
+        let (seq, _) = generate_block_evaluation_sequence(&roll, &[], ffb_model::enums::Rules::Bb2025);
+        assert!(seq[drop + 1].params.iter().any(|p| matches!(p, StepParameter::ApothecaryMode(ApothecaryMode::Defender))));
+        assert!(seq[drop + 2].params.iter().any(|p| matches!(p, StepParameter::ApothecaryMode(ApothecaryMode::Attacker))));
+        assert!(!ids(ffb_model::enums::Rules::Bb2020).contains(&StepId::SteadyFooting));
     }
 
     #[test]
@@ -660,7 +692,7 @@ mod tests {
         roll.set_block_roll(vec![1]);
         roll.set_selected_index(0);
         roll.set_nr_of_dice(1);
-        let (seq, _params) = generate_block_evaluation_sequence(&roll, &[]);
+        let (seq, _params) = generate_block_evaluation_sequence(&roll, &[], ffb_model::enums::Rules::Bb2020);
         let bc = seq.iter().find(|s| s.step_id == StepId::BlockChoice).unwrap();
         assert!(bc.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnDodge(_))));
         assert!(bc.params.iter().any(|p| matches!(p, StepParameter::GotoLabelOnJuggernaut(_))));
@@ -673,7 +705,7 @@ mod tests {
         roll.set_block_roll(vec![3]); // roll=3 → Pushback typically
         roll.set_selected_index(0);
         roll.set_nr_of_dice(1);
-        let (_seq, params) = generate_block_evaluation_sequence(&roll, &[]);
+        let (_seq, params) = generate_block_evaluation_sequence(&roll, &[], ffb_model::enums::Rules::Bb2020);
         assert!(params.iter().any(|p| matches!(p, StepParameter::BlockResult(_))));
         assert!(params.iter().any(|p| matches!(p, StepParameter::NrOfDice(_))));
         assert!(params.iter().any(|p| matches!(p, StepParameter::BlockRoll(_))));

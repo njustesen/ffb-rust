@@ -276,7 +276,7 @@ impl StepBlockRollMultiple {
         let any_unselected = self.block_rolls.iter().any(|r| r.needs_selection());
 
         if !any_unselected {
-            return self.next_step();
+            return self.next_step(game.rules);
         }
 
         // Java: update re-roll sources — remove unavailable, prune Brawler/Hatred when no trigger.
@@ -326,11 +326,12 @@ impl StepBlockRollMultiple {
             }
         }
 
-        self.next_step()
+        self.next_step(game.rules)
     }
 
-    /// Java: nextStep() — reverse rolls, push evaluation sequence for each.
-    fn next_step(&mut self) -> StepOutcome {
+    /// Java: nextStep() — reverse rolls, push evaluation sequence for each. `rules` picks the
+    /// edition's sequence (bb2020 games are routed to this file too).
+    fn next_step(&mut self, rules: ffb_model::enums::Rules) -> StepOutcome {
         // Java: Collections.reverse(state.blockRolls); state.blockRolls.forEach(generate...)
         // — each generate call PUSHES its evaluation sequence and THEN publishes that roll's
         // parameters, so the publish is scoped to the just-pushed sequence (it stops at that
@@ -343,7 +344,7 @@ impl StepBlockRollMultiple {
         // order the evaluation order, which this iteration preserves directly.
         if let Some(roll) = self.block_rolls.get(self.eval_index).cloned() {
             self.eval_index += 1;
-            let (seq, params) = generate_block_evaluation_sequence(&roll, &self.parameter_to_consume);
+            let (seq, params) = generate_block_evaluation_sequence(&roll, &self.parameter_to_consume, rules);
             let mut outcome = StepOutcome::next();
             outcome.push_self = true;
             outcome = outcome.push_seq(seq);

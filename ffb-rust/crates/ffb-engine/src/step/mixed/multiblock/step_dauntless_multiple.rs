@@ -90,6 +90,48 @@ impl StepDauntlessMultiple {
         minimum_roll_dauntless(attacker_base_str, defender_str)
     }
 
+    /// Java: `AbstractStepModifierMultipleBlock.roll` with DauntlessBehaviour's callbacks.
+    ///
+    /// On a failure, `UtilCards.getUnusedRerollSource(actingPlayer, DAUNTLESS)` gives an inline
+    /// re-roll (only Blind Rage registers one — the same hardcoded check as `step_dauntless.rs`):
+    /// report the failed roll, roll again, drop the target, report the ReRoll. Java only FINDS
+    /// that source and never marks it used. Then report the (final) roll — the multi-block
+    /// ReportDauntlessRoll names the target and carries its strengthWithModifiers.
+    fn roll(&mut self, game: &mut Game, rng: &mut GameRng, attacker_id: &str, target_id: &str,
+            min_roll: i32, re_rolling: bool, mut outcome: StepOutcome) -> StepOutcome {
+        use ffb_model::report::report_dauntless_roll::ReportDauntlessRoll;
+        use ffb_model::report::report_re_roll::ReportReRoll;
+        let target_strength = game.player(target_id).map(|p| p.strength_with_modifiers()).unwrap_or(0);
+        let mut roll = rng.d6();
+        let mut successful = DiceInterpreter::is_skill_roll_successful(roll, min_roll);
+        self.minimum_rolls.insert(target_id.to_string(), min_roll);
+
+        if !successful {
+            let has_blind_rage = game.player(attacker_id)
+                .map(|p| p.has_skill(SkillId::BlindRage) && !p.used_skills.contains(&SkillId::BlindRage))
+                .unwrap_or(false);
+            if has_blind_rage {
+                game.report_list.add(ReportDauntlessRoll::new(Some(attacker_id.to_string()), false,
+                    roll, min_roll, re_rolling, target_strength, Some(target_id.to_string())));
+                roll = rng.d6();
+                successful = roll >= min_roll;
+                self.block_targets.retain(|t| t != target_id);
+                game.report_list.add(ReportReRoll::new(Some(attacker_id.to_string()),
+                    ReRollSource::new("Blind Rage"), successful, min_roll));
+            }
+        }
+
+        game.report_list.add(ReportDauntlessRoll::new(Some(attacker_id.to_string()), successful,
+            roll, min_roll, re_rolling, target_strength, Some(target_id.to_string())));
+        if successful {
+            // Java: successFulRollCallback → publishParameter(PLAYER_ID_DAUNTLESS_SUCCESS)
+            self.block_targets.retain(|t| t != target_id);
+            outcome = outcome.publish(StepParameter::PlayerIdDauntlessSuccess(target_id.to_string()));
+        }
+        // Java: failedRollEffect → no-op for Dauntless
+        outcome
+    }
+
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let attacker_id = match game.acting_player.player_id.clone() {
             Some(id) => id,
@@ -133,39 +175,7 @@ impl StepDauntlessMultiple {
             // Java: for (String targetId : ...) { roll(step, actingPlayer, targetId, false, ...) }
             let mut outcome = StepOutcome::next();
             for (target_id, min_roll) in targets_with_rolls {
-                self.minimum_rolls.insert(target_id.clone(), min_roll);
-                let mut roll = rng.d6();
-                let mut successful = DiceInterpreter::is_skill_roll_successful(roll, min_roll);
-
-                // Java: `roll()`'s inline auto-reroll — on a failed non-reRolling roll, try an
-                // unused reroll source immediately. Only Blind Rage (Akhorne's unique skill)
-                // registers a non-TRR reroll source for ReRolledActions.DAUNTLESS in this
-                // codebase's data (matches the same hardcoded check already used by the
-                // singular `step_dauntless.rs`); the target is removed from `block_targets`
-                // once this auto-reroll is attempted, win or lose, matching Java's unconditional
-                // `state.blockTargets.remove(currentTargetId)` inside that branch.
-                if !successful {
-                    let has_blind_rage = game.player(&attacker_id)
-                        .map(|p| p.has_skill(SkillId::BlindRage) && !p.used_skills.contains(&SkillId::BlindRage))
-                        .unwrap_or(false);
-                    if has_blind_rage {
-                        if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == attacker_id)
-                            .or_else(|| game.team_away.players.iter_mut().find(|p| p.id == attacker_id))
-                        {
-                            p.used_skills.insert(SkillId::BlindRage);
-                        }
-                        roll = rng.d6();
-                        successful = DiceInterpreter::is_skill_roll_successful(roll, min_roll);
-                        self.block_targets.retain(|t| t != &target_id);
-                    }
-                }
-
-                if successful {
-                    // Java: successFulRollCallback → publishParameter(PLAYER_ID_DAUNTLESS_SUCCESS)
-                    self.block_targets.retain(|t| t != &target_id);
-                    outcome = outcome.publish(StepParameter::PlayerIdDauntlessSuccess(target_id));
-                }
-                // Java: failedRollEffect → no-op for Dauntless
+                outcome = self.roll(game, rng, &attacker_id, &target_id, min_roll, false, outcome);
             }
 
             // Java: state.reRollAvailableAgainst.addAll(state.blockTargets)
@@ -186,29 +196,29 @@ impl StepDauntlessMultiple {
             return outcome;
         }
 
-        // Re-roll path (UseReRollForTarget command)
+        // Java: `if (!StringTool.isProvided(state.reRollTarget) || state.reRollSource == null)
+        // nextStep(step, state);` — a declined dialog goes straight on, it is NOT re-offered.
+        // Re-running decideNextStep here re-raised the same dialog forever (a NO_PROGRESS abort:
+        // Grim Ironjaw's Multiple Block, dwarf vs slann_fumbbl bb2025 seed 1). For Dauntless
+        // nextStep is NEXT_STEP: the step's init never sets a failure label and both callbacks
+        // are no-ops.
+        let (target, source) = match (self.re_roll_target.clone(), self.re_roll_source.clone()) {
+            (Some(t), Some(s)) if !t.is_empty() => (t, s),
+            _ => return StepOutcome::next(),
+        };
         let mut outcome = StepOutcome::next();
-        if let (Some(target), Some(source)) = (self.re_roll_target.clone(), self.re_roll_source.clone()) {
-            if use_reroll(game, &source, &attacker_id, rng) {
-                // Recompute min roll for this target
-                let min_roll = {
-                    let attacker = game.player(&attacker_id);
-                    let opponent = game.player(&target);
-                    match (attacker, opponent) {
-                        (Some(a), Some(o)) => Self::compute_min_roll(a, o),
-                        _ => 6,
-                    }
-                };
-                self.minimum_rolls.insert(target.clone(), min_roll);
-                let roll = rng.d6();
-                let successful = DiceInterpreter::is_skill_roll_successful(roll, min_roll);
-                if successful {
-                    self.block_targets.retain(|t| t != &target);
-                    outcome = outcome.publish(StepParameter::PlayerIdDauntlessSuccess(target.clone()));
+        if use_reroll(game, &source, &attacker_id, rng) {
+            let min_roll = {
+                let attacker = game.player(&attacker_id);
+                let opponent = game.player(&target);
+                match (attacker, opponent) {
+                    (Some(a), Some(o)) => Self::compute_min_roll(a, o),
+                    _ => 6,
                 }
-            }
-            self.re_roll_available_against.retain(|t| t != &target);
+            };
+            outcome = self.roll(game, rng, &attacker_id, &target, min_roll, true, outcome);
         }
+        self.re_roll_available_against.retain(|t| t != &target);
 
         // Java: decideNextStep — offer the re-roll-choice dialog again if a source remains.
         match build_reroll_prompt(game, &attacker_id, "DAUNTLESS", &self.block_targets, &self.minimum_rolls, &self.re_roll_available_against) {
@@ -502,8 +512,41 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(seed));
         assert_eq!(out.action, StepAction::NextStep, "silent Blind Rage reroll, no dialog");
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::PlayerIdDauntlessSuccess(id) if id == "defender")));
-        assert!(game.player("attacker").unwrap().used_skills.contains(&SkillId::BlindRage));
+        // Java getUnusedRerollSource only finds the source; roll() never marks it used.
+        assert!(!game.player("attacker").unwrap().used_skills.contains(&SkillId::BlindRage));
         assert!(step.block_targets.is_empty());
+        // failed dauntlessRoll, reRoll, final dauntlessRoll
+        use ffb_model::report::report_id::ReportId;
+        let ids: Vec<ReportId> = game.report_list.get_reports().iter().map(|r| r.get_id()).collect();
+        assert_eq!(ids, vec![ReportId::DAUNTLESS_ROLL, ReportId::RE_ROLL, ReportId::DAUNTLESS_ROLL]);
+    }
+
+    /// Java AbstractStepModifierMultipleBlock: a UseReRollForTarget with no target / no source
+    /// goes to nextStep — it must not re-raise the dialog (the harness's decline looped forever:
+    /// Grim Ironjaw, dwarf vs slann_fumbbl bb2025 seed 1). Every roll is reported with its target.
+    #[test]
+    fn declined_reroll_dialog_moves_on_and_rolls_are_reported() {
+        let seed = seed_for_d6(1);
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        add_player(&mut game, true, "attacker", FieldCoordinate::new(5, 5), 3, vec![SkillId::Dauntless]);
+        add_player(&mut game, false, "defender", FieldCoordinate::new(5, 6), 4, vec![]);
+        game.acting_player.player_id = Some("attacker".into());
+
+        let mut step = StepDauntlessMultiple::new();
+        step.set_parameter(&StepParameter::BlockTargets(vec!["defender".into()]));
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(out.action, StepAction::Continue);
+        use ffb_model::report::report_id::ReportId;
+        assert!(game.report_list.has_report(ReportId::DAUNTLESS_ROLL));
+
+        let out2 = step.handle_command(
+            &Action::UseReRollForTarget { re_rolled_action: Some("DAUNTLESS".into()), re_roll_source: None, target_id: None },
+            &mut game, &mut GameRng::new(0));
+        assert_eq!(out2.action, StepAction::NextStep);
+        assert!(out2.prompt.is_none());
+        assert_eq!(game.turn_data_home.rerolls, 1, "declined: no TRR spent");
     }
 
     #[test]
@@ -524,7 +567,7 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         assert!(!out.published.iter().any(|p| matches!(p, StepParameter::PlayerIdDauntlessSuccess(_))));
         assert!(step.block_targets.is_empty(), "target removed even on failed auto-reroll");
-        assert!(game.player("attacker").unwrap().used_skills.contains(&SkillId::BlindRage));
+        assert!(!game.player("attacker").unwrap().used_skills.contains(&SkillId::BlindRage));
     }
 
     fn seed_for_d6_pair(first: i32, second: i32) -> u64 {

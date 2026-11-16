@@ -125,15 +125,7 @@ impl StepFoulAppearanceMultiple {
             // no-op here; not implemented as active code since there is nothing to trigger it.
             let targets_to_roll: Vec<String> = self.block_targets.clone();
             for target_id in targets_to_roll {
-                self.minimum_rolls.insert(target_id.clone(), min_roll);
-                let roll = rng.d6();
-                // Java: isSkillRollSuccessful(roll, minimumRoll) = roll==6 || (roll!=1 && roll>=min)
-                let successful = DiceInterpreter::is_skill_roll_successful(roll, min_roll);
-                if successful {
-                    // Java: state.blockTargets.remove(currentTargetId); successFulRollCallback (no-op for FA)
-                    self.block_targets.retain(|t| t != &target_id);
-                }
-                // client-only: SoundId.EW sound effect — no audio in headless engine
+                self.roll(game, rng, &attacker_id, &target_id, min_roll, false);
             }
 
             // Java: state.reRollAvailableAgainst.addAll(state.blockTargets)
@@ -141,20 +133,39 @@ impl StepFoulAppearanceMultiple {
 
             self.decide_next_step(game, &attacker_id)
         } else {
-            // Java: re-roll path — called after UseReRollForTarget command
-            if let (Some(target), Some(source)) = (self.re_roll_target.clone(), self.re_roll_source.clone()) {
-                if use_reroll(game, &source, &attacker_id, rng) {
-                    self.minimum_rolls.insert(target.clone(), min_roll);
-                    let roll = rng.d6();
-                    let successful = DiceInterpreter::is_skill_roll_successful(roll, min_roll);
-                    if successful {
-                        self.block_targets.retain(|t| t != &target);
-                    }
-                }
-                self.re_roll_available_against.retain(|t| t != &target);
+            // Java: `if (!StringTool.isProvided(state.reRollTarget) || state.reRollSource == null)
+            // nextStep(step, state);` — a declined dialog resolves the remaining targets, it is NOT
+            // re-offered (re-offering looped forever on the harness's decline).
+            let (target, source) = match (self.re_roll_target.clone(), self.re_roll_source.clone()) {
+                (Some(t), Some(s)) if !t.is_empty() => (t, s),
+                _ => return self.handle_remaining(game),
+            };
+            if use_reroll(game, &source, &attacker_id, rng) {
+                self.roll(game, rng, &attacker_id, &target, min_roll, true);
             }
+            self.re_roll_available_against.retain(|t| t != &target);
             self.decide_next_step(game, &attacker_id)
         }
+    }
+
+    /// Java: `AbstractStepModifierMultipleBlock.roll` with FoulAppearanceBehaviour's callbacks:
+    /// roll, record the minimum, report `ReportFoulAppearanceRoll(.., reRolling, null, target)`,
+    /// drop the target on success. The inline `getUnusedRerollSource(actingPlayer,
+    /// FOUL_APPEARANCE)` branch has no registered source in the skill data, so it never fires.
+    fn roll(&mut self, game: &mut Game, rng: &mut GameRng, attacker_id: &str, target_id: &str,
+            min_roll: i32, re_rolling: bool) {
+        let roll = rng.d6();
+        // Java: isSkillRollSuccessful(roll, minimumRoll) = roll==6 || (roll!=1 && roll>=min)
+        let successful = DiceInterpreter::is_skill_roll_successful(roll, min_roll);
+        self.minimum_rolls.insert(target_id.to_string(), min_roll);
+        game.report_list.add(ffb_model::report::report_foul_appearance_roll::ReportFoulAppearanceRoll::new(
+            Some(attacker_id.to_string()), successful, roll, min_roll, re_rolling, vec![],
+            Some(target_id.to_string())));
+        if successful {
+            // Java: state.blockTargets.remove(currentTargetId); successFulRollCallback (no-op for FA)
+            self.block_targets.retain(|t| t != target_id);
+        }
+        // client-only: failedRollEffect = SoundId.EW — no audio in headless engine
     }
 
     /// Java: `decideNextStep` — offer the re-roll-choice dialog if a source is available,
@@ -180,7 +191,14 @@ impl StepFoulAppearanceMultiple {
         }
 
         if !self.goto_label_on_failure.is_empty() && self.block_targets.len() == self.initial_count {
-            // All required-roll targets failed — attacker is fully blocked
+            // All required-roll targets failed — attacker is fully blocked. Java's nextStep also
+            // clears the selected stab/block bits of every remaining target on this branch.
+            for target_id in self.block_targets.clone() {
+                if let Some(state) = game.field_model.player_state(&target_id) {
+                    game.field_model.set_player_state(&target_id,
+                        state.change_selected_stab_target(false).change_selected_block_target(false));
+                }
+            }
             StepOutcome::goto(&self.goto_label_on_failure.clone())
         } else {
             // Java: unhandledTargetsCallback — deselect remaining targets, publish PLAYER_ID_TO_REMOVE
@@ -512,5 +530,33 @@ mod tests {
         assert_eq!(out2.action, StepAction::NextStep);
         assert!(step.block_targets.is_empty());
         assert_eq!(game.turn_data_home.rerolls, 0, "TRR token consumed");
+    }
+
+    /// Java AbstractStepModifierMultipleBlock: a decline (no target / no source) goes to
+    /// nextStep — the all-failed GOTO here — instead of re-raising the dialog; each roll is
+    /// reported as a foulAppearanceRoll naming its target.
+    #[test]
+    fn declined_reroll_dialog_resolves_and_rolls_are_reported() {
+        let seed = seed_for_d6(1);
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        add_player(&mut game, true, "attacker", FieldCoordinate::new(5, 5), vec![]);
+        add_player(&mut game, false, "def_fa", FieldCoordinate::new(5, 6), vec![SkillId::FoulAppearance]);
+        game.acting_player.player_id = Some("attacker".into());
+
+        let mut step = StepFoulAppearanceMultiple::new("fail");
+        step.set_parameter(&StepParameter::BlockTargets(vec!["def_fa".into()]));
+        let out = step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(out.action, StepAction::Continue);
+        use ffb_model::report::report_id::ReportId;
+        assert!(game.report_list.has_report(ReportId::FOUL_APPEARANCE_ROLL));
+
+        let out2 = step.handle_command(
+            &Action::UseReRollForTarget { re_rolled_action: Some("FOUL_APPEARANCE".into()), re_roll_source: None, target_id: None },
+            &mut game, &mut GameRng::new(0));
+        assert_eq!(out2.action, StepAction::GotoLabel);
+        assert!(out2.prompt.is_none());
+        assert_eq!(game.turn_data_home.rerolls, 1, "declined: no TRR spent");
     }
 }

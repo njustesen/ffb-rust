@@ -165,7 +165,54 @@ impl StepApothecaryMultiple {
         // Phase 1: Regeneration — for each injury, roll Regeneration if player has the skill.
         // Successful regeneration: remove from injury_results (injury nullified).
         // Failed: move to regeneration_failed_results for apothecary processing.
-        if self.regeneration_failed_results.is_empty() {
+        let bb2025 = game.rules == ffb_model::enums::Rules::Bb2025;
+        let first_pass = self.regeneration_failed_results.is_empty();
+        if first_pass {
+            // Java bb2025 regenerationHandled (first call): "report injuries without cas rolls" —
+            // result.report(this) on every result while still preRegeneration (skip CAS), then
+            // setAlreadyReported(false) so the post-regeneration pass reports the cas part.
+            // Missing, a multi-block's knockdowns wrote no injury reports at all (Grim Ironjaw,
+            // dwarf vs slann_fumbbl bb2025 seed 1).
+            if bb2025 {
+                for r in self.injury_results.iter_mut() {
+                    r.report(game);
+                    r.set_already_reported(false);
+                }
+            } else {
+                // Java bb2020/multiblock/StepApothecaryMultiple.executeStep groups by status and
+                // reports the DO_REQUEST group (`injuryResult.report(this)` before the apothecary
+                // question), then the NO_APOTHECARY group — both ahead of the regeneration roll
+                // (halfling vs necromantic bb2020 seed 2: Grim Ironjaw's two POWs).
+                for r in self.injury_results.iter_mut() {
+                    if r.injury_context().apothecary_status == ApothecaryStatus::DoRequest {
+                        r.report(game);
+                    }
+                }
+                // With an apothecary left Java shows DialogUseApothecariesParameter and returns;
+                // the declined answer re-runs executeStep, whose DO_NOT_USE_APOTHECARY group adds
+                // `ReportApothecaryRoll(defender, null, null, null, null, casualtyModifiers)` before
+                // the NO_APOTHECARY reports (Grim Ironjaw vs a halfling team with an apothecary,
+                // old_world_alliance_ogre vs halfling bb2020 seed 2). Headless declines.
+                let apos_left = self.team_id.as_ref().map(|t| {
+                    let total = if *t == game.team_home.id { game.team_home.apothecaries } else { game.team_away.apothecaries };
+                    total - self.apos_used > 0
+                }).unwrap_or(false);
+                if apos_left {
+                    let declined: Vec<(Option<String>, Vec<String>)> = self.injury_results.iter()
+                        .filter(|r| r.injury_context().apothecary_status == ApothecaryStatus::DoRequest)
+                        .map(|r| (r.injury_context().defender_id.clone(),
+                                  r.injury_context().casualty_modifiers.iter().map(|m| m.name.to_string()).collect()))
+                        .collect();
+                    for (defender, mods) in declined {
+                        game.report_list.add(ReportApothecaryRoll::new(defender, vec![], None, None, None, mods));
+                    }
+                }
+                for r in self.injury_results.iter_mut() {
+                    if r.injury_context().apothecary_status == ApothecaryStatus::NoApothecary {
+                        r.report(game);
+                    }
+                }
+            }
             let mut results_to_keep = Vec::new();
             for r in self.injury_results.drain(..) {
                 let player_id = r.injury_context().defender_id.clone();
@@ -181,6 +228,9 @@ impl StepApothecaryMultiple {
                     _ => false,
                 };
                 if !regen_rolled {
+                    // Java: every result that is not regenerated calls passedRegeneration().
+                    let mut r = r;
+                    r.passed_regeneration();
                     results_to_keep.push(r);
                 }
                 // regen succeeded → injury nullified, not added back
@@ -192,6 +242,14 @@ impl StepApothecaryMultiple {
         // (injury_results is now empty; swap to regeneration_failed_results for phase 2+)
         if self.injury_results.is_empty() {
             std::mem::swap(&mut self.injury_results, &mut self.regeneration_failed_results);
+        }
+
+        // Java bb2025 executeStep: `regenerationFailedResults.forEach(result -> result.report(this))`
+        // — "only report cas rolls" (preRegeneration is now false: EVERYTHING_BUT_CAS).
+        if bb2025 && first_pass {
+            for r in self.injury_results.iter_mut() {
+                r.report(game);
+            }
         }
 
         // Step 4: Get remaining apothecaries.
@@ -418,6 +476,41 @@ mod tests {
         let state = game.field_model.player_state("home_02").expect("state");
         assert_eq!(state.base(), PS_KNOCKED_OUT,
             "the acting-team apothecary step must apply the attacker's KO");
+    }
+
+    /// Java bb2025 StepApothecaryMultiple: regenerationHandled reports every result pre-regen
+    /// (skipInjuryParts CAS), then executeStep reports the regeneration-failed ones again with
+    /// EVERYTHING_BUT_CAS — for two targets: CAS, CAS, EVERYTHING_BUT_CAS, EVERYTHING_BUT_CAS
+    /// (Grim Ironjaw's Multiple Block, dwarf vs slann_fumbbl bb2025 seed 1).
+    #[test]
+    fn bb2025_reports_each_injury_pre_and_post_regeneration() {
+        use ffb_model::enums::{PlayerState, PS_PRONE, PS_STANDING};
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        for id in ["away_04", "away_05"] {
+            game.team_away.players.push(ffb_model::model::player::Player {
+                id: id.into(), name: id.into(), nr: 4, position_id: "lineman".into(),
+                movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+                ..Default::default()
+            });
+            game.field_model.set_player_coordinate(id, FieldCoordinate::new(12, 6));
+            game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+        }
+        game.home_playing = true;
+        let mut step = StepApothecaryMultiple::default();
+        step.set_parameter(&StepParameter::ActingTeam(false));
+        for id in ["away_05", "away_04"] {
+            let mut ir = make_injury(id, ApothecaryMode::Defender, ApothecaryStatus::NoApothecary);
+            ir.injury_context_mut().injury = Some(PlayerState::new(PS_PRONE));
+            step.set_parameter(&StepParameter::InjuryResult(ir));
+        }
+        step.start(&mut game, &mut GameRng::new(0));
+        let skips: Vec<String> = game.report_list.get_reports().iter()
+            .filter(|r| r.get_id() == ReportId::INJURY)
+            .filter_map(|r| r.to_json())
+            .map(|j| j["skipInjuryParts"].as_str().unwrap_or("").to_string())
+            .collect();
+        assert_eq!(skips, vec!["CAS", "CAS", "EVERYTHING_BUT_CAS", "EVERYTHING_BUT_CAS"]);
     }
 
     #[test]
