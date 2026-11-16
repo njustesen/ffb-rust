@@ -15,6 +15,9 @@ pub struct ReportSkillUse {
     /// Juggernaut that is not used): the JSON then carries `"skillUse": null`. `skill_use` keeps
     /// a placeholder for the accessors; this flag is what the serialiser honours.
     pub skill_use_is_null: bool,
+    /// Java passes a null `skill` where the step looked the skill up as UNUSED and it no longer
+    /// is (Catch of the Day's re-roll pass): the JSON carries `"skill": null`.
+    pub skill_is_null: bool,
 }
 
 impl ReportSkillUse {
@@ -24,12 +27,19 @@ impl ReportSkillUse {
         used: bool,
         skill_use: SkillUse,
     ) -> Self {
-        Self { player_id, skill, used, skill_use, skill_use_is_null: false }
+        Self { player_id, skill, used, skill_use, skill_use_is_null: false, skill_is_null: false }
+    }
+
+    /// Java `new ReportSkillUse(playerId, null, used, skillUse)` — `skill` names the skill the
+    /// step is about only for the accessors; the JSON writes null.
+    pub fn with_null_skill(mut self) -> Self {
+        self.skill_is_null = true;
+        self
     }
 
     /// Java `new ReportSkillUse(playerId, skill, used, null)`.
     pub fn new_without_skill_use(player_id: Option<String>, skill: SkillId, used: bool) -> Self {
-        Self { player_id, skill, used, skill_use: SkillUse::WOULD_NOT_HELP, skill_use_is_null: true }
+        Self { player_id, skill, used, skill_use: SkillUse::WOULD_NOT_HELP, skill_use_is_null: true, skill_is_null: false }
     }
 
     pub fn get_player_id(&self) -> Option<&str> { self.player_id.as_deref() }
@@ -43,7 +53,8 @@ impl ReportSkillUse {
             "playerId": self.player_id,
             // Java `IJsonOption.SKILL.addTo(jsonObject, skill)` writes `skill.getName()` — the
             // display name ("Eye Gouge"), not the class name ("EyeGouge").
-            "skill": self.skill.display_name(),
+            "skill": if self.skill_is_null { serde_json::Value::Null }
+                     else { serde_json::Value::from(self.skill.display_name()) },
             "used": self.used,
             "skillUse": if self.skill_use_is_null { serde_json::Value::Null }
                         else { serde_json::Value::from(self.skill_use.get_name()) },
@@ -57,6 +68,7 @@ impl ReportSkillUse {
             used: json["used"].as_bool().unwrap_or(false),
             skill_use: json["skillUse"].as_str().and_then(SkillUse::for_name).unwrap_or(SkillUse::WOULD_NOT_HELP),
             skill_use_is_null: json["skillUse"].is_null(),
+            skill_is_null: json["skill"].is_null(),
         }
     }
 }

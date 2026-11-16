@@ -41,7 +41,7 @@ impl ReportTentaclesShadowingRoll {
     pub fn to_json_value(&self) -> serde_json::Value {
         serde_json::json!({
             "reportId": self.get_id().get_name(),
-            "skill": self.skill.map(|s| s.class_name()),
+            "skill": self.skill.map(|s| s.display_name()),
             "defenderId": self.defender_id,
             "roll": self.roll,
             "successful": self.successful,

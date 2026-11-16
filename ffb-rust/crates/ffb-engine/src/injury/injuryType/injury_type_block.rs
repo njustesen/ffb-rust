@@ -240,7 +240,7 @@ impl ModificationAwareInjuryType for InjuryTypeBlock {
             }
         } else {
             if has_chainsaw {
-                self.ctx.add_armor_modifier(chainsaw_modifier);
+                self.ctx.add_armor_modifier(chainsaw_modifier.clone());
             }
             // Java handleChainsawAndMb: if both a chainsaw and a Mighty-Blow-family modifier are
             // present, evaluate without Mighty Blow first; only re-add it if armor didn't break.
@@ -248,6 +248,14 @@ impl ModificationAwareInjuryType for InjuryTypeBlock {
             if has_chainsaw {
                 if let Some(idx) = mb_idx {
                     let mb = mods.remove(idx);
+                    // Java handleChainsawAndMb: `injuryContext.clearArmorModifiers();
+                    // injuryContext.addArmorModifiers(armorModifiers)` — armorModifiers holds the
+                    // chainsaw plus the rest. The clear matters on the InjuryContextModification
+                    // alternate context, which arrives carrying the modifying skill's own modifier:
+                    // Crushing Blow's +1 is wiped and Mighty Blow lands on armour again (Zug vs
+                    // Max Spleenripper's chainsaw, human vs renegades bb2025 seed 1).
+                    self.ctx.clear_armor_modifiers();
+                    self.ctx.add_armor_modifier(chainsaw_modifier.clone());
                     for m in &mods {
                         self.ctx.add_armor_modifier(leak_modifier(m.as_ref(), Some(attacker), defender, game.rules));
                     }
@@ -772,6 +780,22 @@ mod tests {
         let mut rng = GameRng::new(0);
         t.armour_roll(&game, &mut rng, Some("attacker"), "defender", true);
         assert!(t.ctx.armor_modifiers.iter().any(|m| m.name == "Chainsaw" && m.value == 3));
+    }
+
+    /// Java handleChainsawAndMb clears the context's armour modifiers before re-adding the
+    /// chainsaw + scan set. On a Crushing Blow alternate context (re-evaluated with roll=false and
+    /// carrying "Crushing Blow"), that clear drops CB and Mighty Blow goes back on armour.
+    #[test]
+    fn chainsaw_and_mighty_blow_clear_a_prior_modifier_on_re_evaluation() {
+        let mut game = game_with_attacker_and_defender(vec![SkillId::Chainsaw, SkillId::MightyBlow], 20);
+        game.options.set(MB_STACKS_AGAINST_CHAINSAW, "true");
+        let mut t = InjuryTypeBlock::new(BlockMode::Regular, true);
+        t.ctx.armor_roll = Some([3, 2]);
+        t.ctx.add_armor_modifier(Modifier::new("Crushing Blow", 1, game.rules));
+        t.armour_roll(&game, &mut GameRng::new(0), Some("attacker"), "defender", false);
+        let names: Vec<&str> = t.ctx.armor_modifiers.iter().map(|m| &*m.name).collect();
+        assert!(!names.contains(&"Crushing Blow"), "{names:?}");
+        assert!(names.contains(&"Chainsaw") && names.contains(&"Mighty Blow"), "{names:?}");
     }
 
     #[test]

@@ -1045,8 +1045,10 @@ impl SkillId {
             SkillId::WorkingInTandem => (SkillCategory::Trait, "Working in Tandem"),
             SkillId::Wrestle => (SkillCategory::General, "Wrestle"),
             SkillId::Yoink => (SkillCategory::Trait, "Yoink!"),
-            // The handful of Rust-only ids with no Java skill class carry no category.
-            _ => (SkillCategory::Trait, self.class_name()),
+            // Java spells these three star specials with literal double quotes in the name.
+            SkillId::ExcuseMeAreYouAZoat => (SkillCategory::Trait, "\"Excuse Me, Are You a Zoat?\""),
+            SkillId::ThenIStartedBlastin => (SkillCategory::Trait, "\"Then I Started Blastin'!\""),
+            SkillId::BlastinSolvesEverything => (SkillCategory::Trait, "\"Blastin' Solves Everything\""),
         }
     }
 

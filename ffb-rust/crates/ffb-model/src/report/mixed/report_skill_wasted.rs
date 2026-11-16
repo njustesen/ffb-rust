@@ -23,7 +23,7 @@ impl ReportSkillWasted {
         serde_json::json!({
             "reportId": self.get_id().get_name(),
             "playerId": self.player_id,
-            "skill": self.skill.map(|s| s.class_name()),
+            "skill": self.skill.map(|s| s.display_name()),
         })
     }
 

@@ -131,6 +131,23 @@ impl StepHailMaryPass {
             let result = if roll == 1 { PassOutcome::Fumble } else { PassOutcome::Inaccurate };
             self.result = Some(result);
             let rerolled = re_rolled && self.re_roll_source.is_some();
+            // Java: addReport(new ReportPassRoll(throwerId, roll, reRolled, bomb, result)) — the
+            // 5-arg constructor: minimumRoll 2, no distance, hailMaryPass true, so `successful` is
+            // INACCURATE (HMP never lands ACCURATE). Missing, every bb2016 Hail Mary lost its
+            // passRoll report (Longstride, wood_elf vs elf bb2016 seed 1).
+            game.report_list.add(ffb_model::report::mixed::report_pass_roll::ReportPassRoll::new(
+                Some(thrower_id.clone()),
+                result == PassOutcome::Inaccurate,
+                roll,
+                2,
+                rerolled,
+                vec![],
+                None,
+                is_bomb,
+                Some(if result == PassOutcome::Fumble { "FUMBLE" } else { "INACCURATE" }.to_string()),
+                true,
+                None,
+            ));
 
             let event = GameEvent::PassRoll {
                 player_id: thrower_id.clone(),
@@ -276,6 +293,23 @@ mod tests {
         let mut step = StepHailMaryPass::new();
         assert!(step.set_parameter(&StepParameter::PassResultParam(PassOutcome::Fumble)));
         assert_eq!(step.result, Some(PassOutcome::Fumble));
+    }
+
+    /// Java bb2016 PassBehaviour (StepHailMaryPass hook) adds ReportPassRoll(thrower, roll,
+    /// reRolled, bomb, result): minimumRoll 2, hailMaryPass, successful = INACCURATE.
+    #[test]
+    fn hail_mary_roll_writes_pass_roll_report() {
+        use ffb_model::report::report_id::ReportId;
+        let (mut game, _) = make_thrower_game(PlayerAction::HailMaryPass, vec![]);
+        StepHailMaryPass::new().start(&mut game, &mut GameRng::new(seed_for_d6(6)));
+        let json = game.report_list.get_reports().iter()
+            .find(|r| r.get_id() == ReportId::PASS_ROLL)
+            .and_then(|r| r.to_json()).expect("passRoll report");
+        assert_eq!(json["roll"], 6);
+        assert_eq!(json["minimumRoll"], 2);
+        assert_eq!(json["successful"], true);
+        assert_eq!(json["hailMaryPass"], true);
+        assert_eq!(json["passResult"], "INACCURATE");
     }
 
     #[test]

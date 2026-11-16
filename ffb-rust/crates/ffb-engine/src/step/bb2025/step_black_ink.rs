@@ -60,11 +60,12 @@ impl Step for StepBlackInk {
                 if player_id.is_empty() {
                     // Java: addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, false, SkillUse.DISTRACT_OPPONENT));
                     if let Some(ref pid) = game.acting_player.player_id.clone() {
+                        let skill_use = Self::skill_use(game);
                         game.report_list.add(ReportSkillUse::new(
                             Some(pid.clone()),
                             SkillId::BlackInk,
                             false,
-                            SkillUse::DISTRACT_OPPONENT,
+                            skill_use,
                         ));
                     }
                     // Declined: restore old player state (not translated), report not used, NEXT_STEP
@@ -118,11 +119,12 @@ impl StepBlackInk {
                 return StepOutcome::next();
             }
             // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, SkillUse.DISTRACT_OPPONENT));
+            let skill_use = Self::skill_use(game);
             game.report_list.add(ReportSkillUse::new(
                 Some(player_id.clone()),
                 SkillId::BlackInk,
                 true,
-                SkillUse::DISTRACT_OPPONENT,
+                skill_use,
             ));
             if eligibles.len() == 1 {
                 self.player_id = Some(eligibles[0].clone());
@@ -141,8 +143,14 @@ impl StepBlackInk {
 
         // Java: player = game.getPlayerById(playerId); confuse + mark skill used
         if let Some(ref target_id) = self.player_id.clone() {
+            // Java bb2025: changeConfused(true); bb2020/StepBlackInk: changeHypnotized(true).
             if let Some(state) = game.field_model.player_state(target_id) {
-                game.field_model.set_player_state(target_id, state.change_confused(true));
+                let gazed = if game.rules == ffb_model::enums::Rules::Bb2020 {
+                    state.change_hypnotized(true)
+                } else {
+                    state.change_confused(true)
+                };
+                game.field_model.set_player_state(target_id, gazed);
             }
             // Java: actingPlayer.markSkillUsed(skill)
             // Java: actingPlayer.markSkillUsed(skill) — acting-player mark (a hasActed() term,
@@ -160,12 +168,24 @@ impl StepBlackInk {
         StepOutcome::next()
     }
 
-    /// Java: findPlayers — adjacent standing-or-prone non-distracted opponents.
+    /// Java bb2025 reports SkillUse.DISTRACT_OPPONENT; bb2020/StepBlackInk reports
+    /// SkillUse.REMOVE_TACKLEZONE (bb2020 is routed to this file by the driver).
+    fn skill_use(game: &Game) -> SkillUse {
+        if game.rules == ffb_model::enums::Rules::Bb2020 {
+            SkillUse::REMOVE_TACKLEZONE
+        } else {
+            SkillUse::DISTRACT_OPPONENT
+        }
+    }
+
+    /// Java: findPlayers — adjacent standing-or-prone opponents; bb2025 also drops distracted
+    /// ones, bb2020/StepBlackInk.findPlayers does not.
     fn find_adjacent_opponents(game: &Game, actor_id: &str) -> Vec<String> {
         let actor_coord = match game.field_model.player_coordinate(actor_id) {
             Some(c) => c,
             None => return vec![],
         };
+        let bb2020 = game.rules == ffb_model::enums::Rules::Bb2020;
         game.inactive_team().players.iter()
             .filter(|p| {
                 let state = game.field_model.player_state(&p.id);
@@ -173,7 +193,7 @@ impl StepBlackInk {
                 match (state, coord) {
                     (Some(s), Some(c)) => {
                         (s.is_standing() || s.is_prone())
-                            && !s.is_distracted()
+                            && (bb2020 || !s.is_distracted())
                             && c.is_adjacent(actor_coord)
                     }
                     _ => false,
@@ -283,6 +303,26 @@ mod tests {
         let state = game.field_model.player_state(&target_id).unwrap();
         assert!(state.is_confused(), "target should be confused");
         assert!(game.team_home.player(&actor_id).unwrap().used_skills.contains(&SkillId::BlackInk));
+    }
+
+    /// Java bb2020/StepBlackInk: changeHypnotized (not changeConfused), SkillUse.REMOVE_TACKLEZONE,
+    /// and no distracted filter (Kiroth Krakeneye, elf vs chaos_dwarf bb2020 seed 1).
+    #[test]
+    fn bb2020_hypnotizes_and_reports_remove_tacklezone() {
+        let (mut game, _actor_id) = make_game_with_black_ink();
+        game.rules = Rules::Bb2020;
+        let target_id = "opp1".to_string();
+        game.team_away.players.push(make_player(&target_id, None));
+        game.field_model.set_player_coordinate(&target_id, FieldCoordinate::new(11, 7));
+        game.field_model.set_player_state(&target_id,
+            PlayerState::new(PS_STANDING).change_active(true).change_confused(true));
+        assert_eq!(StepBlackInk::find_adjacent_opponents(&game, "actor"), vec![target_id.clone()]);
+        assert_eq!(StepBlackInk::skill_use(&game), SkillUse::REMOVE_TACKLEZONE);
+
+        let mut step = StepBlackInk::new();
+        step.player_id = Some(target_id.clone());
+        step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.field_model.player_state(&target_id).unwrap().is_hypnotized());
     }
 
     #[test]

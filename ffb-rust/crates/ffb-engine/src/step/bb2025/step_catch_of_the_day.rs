@@ -92,7 +92,8 @@ impl StepCatchOfTheDay {
 
         // Java: if (endTurn || endPlayerAction) → ReportSkillWasted + GOTO_LABEL + markUsages
         if self.end_turn || self.end_player_action {
-            game.report_list.add(ReportSkillWasted::new(Some(player_id.clone()), Some(SkillId::CatchOfTheDay)));
+            game.report_list.add(ReportSkillWasted::new(Some(player_id.clone()),
+                if has_skill { Some(SkillId::CatchOfTheDay) } else { None }));
             Self::mark_action_used(game, &player_id);
             Self::mark_skill_used(game, &player_id);
             return StepOutcome::goto(&self.goto_label_on_failure);
@@ -119,7 +120,10 @@ impl StepCatchOfTheDay {
         }
 
         // Java: addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, GET_BALL_ON_GROUND))
-        game.report_list.add(ReportSkillUse::new(Some(player_id.clone()), SkillId::CatchOfTheDay, true, SkillUse::GET_BALL_ON_GROUND));
+        // `skill` is getUnusedSkillWithProperty's result: null on the re-roll pass, the skill having
+        // been marked used on the first (Rodney Roachbait, gnome vs slann_fumbbl bb2025 seed 1).
+        let report = ReportSkillUse::new(Some(player_id.clone()), SkillId::CatchOfTheDay, true, SkillUse::GET_BALL_ON_GROUND);
+        game.report_list.add(if has_skill { report } else { report.with_null_skill() });
 
         let player_coord = match game.field_model.player_coordinate(&player_id) {
             Some(c) => c,
@@ -144,9 +148,10 @@ impl StepCatchOfTheDay {
                 game.field_model.ball_moving = false;
             }
 
-            // Java: addReport(new ReportCatchOfTheDayRoll(actingPlayer.getPlayerId(), success, roll, 3, reRolled))
-            game.report_list.add(ReportCatchOfTheDayRoll::new(Some(player_id.clone()), success, roll, 3, is_rerolled));
-
+            // Java writes `ReportCatchOfTheDayRoll(.., getReRolledAction() == CATCH_OF_THE_DAY)`
+            // AFTER the re-roll offer, so a failed first roll that raises the offer already
+            // reports reRolled=true (Rodney Roachbait, gnome vs chaos bb2020 seed 1).
+            let mut offer = None;
             if !success {
                 // Java: else if (getReRolledAction() != CATCH_OF_THE_DAY &&
                 //         UtilServerReRoll.askForReRollIfAvailable(..., CATCH_OF_THE_DAY, 3, false)) {
@@ -156,10 +161,15 @@ impl StepCatchOfTheDay {
                     if let Some(prompt) = ask_for_reroll_if_available(game, "CATCH_OF_THE_DAY", 3, false) {
                         self.re_rolled_action = Some("CATCH_OF_THE_DAY".into());
                         self.re_roll_source = Some("TRR".into());
-                        return StepOutcome::cont().with_prompt(prompt);
+                        offer = Some(prompt);
                     }
                 }
                 // client-only: SoundId.BOUNCE — sound playback is client-side only (dropped).
+            }
+            let reported_rerolled = self.re_rolled_action.as_deref() == Some("CATCH_OF_THE_DAY");
+            game.report_list.add(ReportCatchOfTheDayRoll::new(Some(player_id.clone()), success, roll, 3, reported_rerolled));
+            if let Some(prompt) = offer {
+                return StepOutcome::cont().with_prompt(prompt);
             }
         } else {
             // Java: not in range → addReport(new ReportSkillWasted(actingPlayer.getPlayerId(), skill))
@@ -365,6 +375,12 @@ mod tests {
         // Ball must not have moved yet — the roll is being re-attempted.
         assert_eq!(game.field_model.ball_coordinate, Some(ball_coord));
         assert!(game.field_model.ball_moving);
+        // Java adds the roll report AFTER setReRolledAction: the offered first roll says reRolled.
+        use ffb_model::report::report_id::ReportId;
+        let json = game.report_list.get_reports().iter()
+            .find(|r| r.get_id() == ReportId::CATCH_OF_THE_DAY)
+            .and_then(|r| r.to_json()).expect("catchOfTheDay report");
+        assert_eq!(json["reRolled"], true);
         let _ = &pid;
     }
 

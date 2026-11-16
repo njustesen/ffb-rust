@@ -33,7 +33,6 @@ pub enum Keyword {
     SNOTLING,
     SPAWN,
     SPECIAL,
-    SPITE,
     SQUIRREL,
     THRALL,
     THROWER,
@@ -44,7 +43,6 @@ pub enum Keyword {
     WEREWOLF,
     WRAITH,
     YHETEE,
-    ZOAT,
     ZOMBIE,
     ALL,
     UNKNOWN,
@@ -84,7 +82,6 @@ impl Keyword {
             Keyword::SNOTLING      => "Snotling",
             Keyword::SPAWN         => "Spawn",
             Keyword::SPECIAL       => "Special",
-            Keyword::SPITE         => "Spite",
             Keyword::SQUIRREL      => "Squirrel",
             Keyword::THRALL        => "Thrall",
             Keyword::THROWER       => "Thrower",
@@ -95,7 +92,6 @@ impl Keyword {
             Keyword::WEREWOLF      => "Werewolf",
             Keyword::WRAITH        => "Wraith",
             Keyword::YHETEE        => "Yhetee",
-            Keyword::ZOAT          => "Zoat",
             Keyword::ZOMBIE        => "Zombie",
             Keyword::ALL           => "all",
             Keyword::UNKNOWN       => "Unknown",
@@ -136,7 +132,6 @@ impl Keyword {
             "snotling"     => Keyword::SNOTLING,
             "spawn"        => Keyword::SPAWN,
             "special"      => Keyword::SPECIAL,
-            "spite"        => Keyword::SPITE,
             "squirrel"     => Keyword::SQUIRREL,
             "thrall"       => Keyword::THRALL,
             "thrower"      => Keyword::THROWER,
@@ -147,7 +142,6 @@ impl Keyword {
             "werewolf"     => Keyword::WEREWOLF,
             "wraith"       => Keyword::WRAITH,
             "yhetee"       => Keyword::YHETEE,
-            "zoat"         => Keyword::ZOAT,
             "zombie"       => Keyword::ZOMBIE,
             "all"          => Keyword::ALL,
             _              => Keyword::UNKNOWN,
@@ -196,6 +190,16 @@ mod tests {
         assert_eq!(Keyword::for_name("not a keyword"), Keyword::UNKNOWN);
     }
 
+    /// The Java oracle's Keyword enum has no Zoat or Spite: a star's "Zoat" position keyword
+    /// resolves to UNKNOWN, and Getting Even reports keyword "Unknown" (high_elf vs halfling
+    /// bb2025 seed 2, Zolcath the Zoat).
+    #[test]
+    fn zoat_and_spite_are_not_java_keywords() {
+        assert_eq!(Keyword::for_name("Zoat"), Keyword::UNKNOWN);
+        assert_eq!(Keyword::for_name("Spite"), Keyword::UNKNOWN);
+        assert_eq!(Keyword::UNKNOWN.get_name(), "Unknown");
+    }
+
     #[test]
     fn all_named_keywords_have_unique_names() {
         let all = [
@@ -206,10 +210,10 @@ mod tests {
             Keyword::HALFLING, Keyword::HUMAN, Keyword::LINEMAN, Keyword::LIZARDMAN,
             Keyword::MINOTAUR, Keyword::OGRE, Keyword::ORC, Keyword::RUNNER,
             Keyword::SKAVEN, Keyword::SKELETON, Keyword::SNAKEMAN, Keyword::SNOTLING,
-            Keyword::SPAWN, Keyword::SPECIAL, Keyword::SPITE, Keyword::SQUIRREL,
+            Keyword::SPAWN, Keyword::SPECIAL, Keyword::SQUIRREL,
             Keyword::THRALL, Keyword::THROWER, Keyword::TREEMAN, Keyword::TROLL,
             Keyword::UNDEAD, Keyword::VAMPIRE, Keyword::WEREWOLF, Keyword::WRAITH,
-            Keyword::YHETEE, Keyword::ZOAT, Keyword::ZOMBIE, Keyword::ALL,
+            Keyword::YHETEE, Keyword::ZOMBIE, Keyword::ALL,
         ];
         let names: std::collections::HashSet<_> = all.iter().map(|k| k.get_name()).collect();
         assert_eq!(names.len(), all.len(), "all keywords must have unique names");
