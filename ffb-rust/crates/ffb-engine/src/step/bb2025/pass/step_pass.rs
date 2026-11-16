@@ -221,6 +221,134 @@ impl StepPass {
         })
     }
 
+    /// Java `actingPlayer.statBasedModifier(canAddStrengthToPass)`: Strong Passing Game's
+    /// StatBasedRollModifier (the player's ST) while the skill is UNUSED, else null.
+    fn unused_strength_pass_skill(game: &Game) -> Option<(ffb_model::enums::SkillId, i32)> {
+        use ffb_model::model::property::named_properties::NamedProperties;
+        let pid = game.acting_player.player_id.as_deref()?;
+        let p = game.player(pid)?;
+        let skill = p.skill_id_with_property(NamedProperties::CAN_ADD_STRENGTH_TO_PASS)?;
+        if p.used_skills.contains(&skill) || game.acting_player.used_skills.contains(&skill) {
+            return None;
+        }
+        Some((skill, p.strength_with_modifiers() as i32))
+    }
+
+    /// Java `getModifyingSkill(mechanic, passingDistance, passModifiers, isBomb)` (bb2020 and
+    /// bb2025): when the thrower is the acting player and adding the unused stat modifier would
+    /// change the pass result, `addReport(new ReportModifiedPassResult(skill, modifiedResult))` and
+    /// return the skill. The report is a side effect of EVERY call, as in Java.
+    fn modifying_skill(
+        &self,
+        game: &mut Game,
+        passing_dist: Option<PassingDistance>,
+        pass_modifiers: &[PassModifier],
+        is_bomb: bool,
+    ) -> Option<ffb_model::enums::SkillId> {
+        use ffb_model::model::property::named_properties::NamedProperties;
+        let thrower_id = game.thrower_id.clone()?;
+        if game.acting_player.player_id.as_deref() != Some(thrower_id.as_str()) {
+            return None;
+        }
+        let dist = passing_dist?;
+        let stat = Self::unused_strength_pass_skill(game).map(|(skill, st)| {
+            ffb_mechanics::modifiers::stat_based_roll_modifier::StatBasedRollModifier::new(
+                skill.category_and_name_for(game.rules).1, st)
+        });
+        let thrower = game.player(&thrower_id)?;
+        let modified = crate::mechanic::pass_mechanic_for(game.rules)
+            .evaluate_pass(thrower, self.roll, dist, pass_modifiers, is_bomb, stat.as_ref());
+        if Some(modified) == self.pass_result {
+            return None;
+        }
+        let skill = thrower.skill_id_with_property(NamedProperties::CAN_ADD_STRENGTH_TO_PASS);
+        game.report_list.add(
+            ffb_model::report::mixed::report_modified_pass_result::ReportModifiedPassResult::new(
+                skill, modified.get_name().to_string()));
+        skill
+    }
+
+    /// Java `DialogSkillUseParameter(throwerId, modifyingSkill, …)`.
+    fn modifying_skill_prompt(game: &Game, skill: ffb_model::enums::SkillId) -> ffb_model::prompts::AgentPrompt {
+        ffb_model::prompts::AgentPrompt::SkillUse {
+            player_id: game.thrower_id.clone().unwrap_or_default(),
+            skill_id: skill as u16,
+            skill_name: format!("{:?}", skill),
+        }
+    }
+
+    /// Java (bb2020 + bb2025 `StepPass`), the failed-pass offers:
+    /// ```java
+    /// if (getReRolledAction() == null && mechanic.eligibleToReRoll(...)) {
+    ///     setReRolledAction(PASS);
+    ///     Skill modificationSkill = getModifyingSkill(...);
+    ///     if (passingReroll != null && !state.isPassSkillUsed()) { …pass-skill dialog… }
+    ///     else if (askForReRollIfAvailable(…, modificationSkill, null)) { wait }
+    /// } else if (usingModifyingSkill == null && showUseModifyingSkillDialog(...)) { wait }
+    /// ```
+    /// The modifying skill rides on the re-roll dialog (`dialogShown` counts it): bb2025's
+    /// DialogReRollPropertiesParameter always reaches the coach; bb2020's DialogReRollParameter
+    /// is answered null (no draw) when the team re-roll is not an option, and the re-entry then
+    /// fails the pass — the same as no prompt. Strong Passing Game was never offered (star tier:
+    /// bb2025 Skrull Halfheight, vampire vs undead seed 1).
+    #[allow(clippy::too_many_arguments)]
+    fn failed_pass_offers(
+        &mut self,
+        game: &mut Game,
+        already_rerolled: bool,
+        fumble: bool,
+        passing_dist: Option<PassingDistance>,
+        pass_modifiers: &[PassModifier],
+        is_bomb: bool,
+        roll_event: &Option<ffb_model::events::GameEvent>,
+        java_returned_before_report: bool,
+    ) -> Option<StepOutcome> {
+        let wrap = |prompt: ffb_model::prompts::AgentPrompt| {
+            let mut out = StepOutcome::cont().with_prompt(prompt);
+            if let Some(ev) = roll_event.clone() { out = out.with_event(ev); }
+            out
+        };
+        // A re-entry Java resolves with an early `handleFailedPass(); return;` (declined or
+        // unspendable re-roll) never reaches these offers.
+        if java_returned_before_report {
+            return None;
+        }
+        let modifying_enabled = game.rules != ffb_model::enums::Rules::Bb2016;
+        if !already_rerolled && thrower_eligible_to_reroll(game) {
+            let modifying = if modifying_enabled {
+                self.modifying_skill(game, passing_dist, pass_modifiers, is_bomb)
+            } else {
+                None
+            };
+            if let Some(prompt) = self.pass_skill_offer(game) {
+                return Some(wrap(prompt));
+            }
+            let thrower = game.thrower_id.clone();
+            let mut prompt = ask_for_reroll_if_available_for(
+                game, thrower.as_deref(), "PASS", self.minimum_roll, fumble);
+            if prompt.is_none() && modifying.is_some() && game.rules == ffb_model::enums::Rules::Bb2025 {
+                let team_id = if game.home_playing { game.team_home.id.clone() } else { game.team_away.id.clone() };
+                prompt = Some(ffb_model::prompts::AgentPrompt::ReRollOffer {
+                    source: ReRollSource::new("TRR"),
+                    action: "PASS".to_owned(),
+                    team_id,
+                });
+            }
+            if let Some(prompt) = prompt {
+                self.re_rolled_action = Some("PASS".into());
+                self.re_roll_source = Some("TRR".into());
+                return Some(wrap(prompt));
+            }
+            return None;
+        }
+        if modifying_enabled && self.using_modifying_skill.is_none() {
+            if let Some(skill) = self.modifying_skill(game, passing_dist, pass_modifiers, is_bomb) {
+                return Some(wrap(Self::modifying_skill_prompt(game, skill)));
+            }
+        }
+        None
+    }
+
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java guard: if thrower or throwerAction is null → return (no-op).
         // Java's `return;` here leaves StepResult's default nextAction (CONTINUE) untouched —
@@ -240,6 +368,10 @@ impl StepPass {
         // have returned and skip just the duplicate report; the flow, the dice and the state are
         // untouched, so no parity verdict can move.
         let mut java_returned_before_report = false;
+        // Java: `else if (!useReRoll(...)) { if (usingModifyingSkill != null ||
+        // !showUseModifyingSkillDialog(...)) handleFailedPass(); return; }` — resolved below, once
+        // the passing distance and modifiers the dialog probe needs are known.
+        let mut reroll_unspent = false;
         if self.re_rolled_action.as_deref() == Some("PASS") {
             let thrower_id = game.thrower_id.clone().unwrap_or_default();
             // Java's guard is `usingModifyingSkill == null || !usingModifyingSkill`: the
@@ -250,6 +382,7 @@ impl StepPass {
                 let source = ReRollSource::new(source_name.as_str());
                 let used = use_reroll(game, &source, &thrower_id, rng);
                 java_returned_before_report = !used && self.using_modifying_skill != Some(true);
+                reroll_unspent = !used && self.using_modifying_skill.is_none();
                 if used {
                     // Java: `roll = 0; setReRollSource(null);` -- the source is spent by ONE
                     // successful use. Without the clear, every later re-entry of this step (the
@@ -340,6 +473,12 @@ impl StepPass {
             vec![]
         };
 
+        if reroll_unspent && game.rules != ffb_model::enums::Rules::Bb2016 {
+            if let Some(skill) = self.modifying_skill(game, passing_dist, &pass_modifiers, is_bomb) {
+                return StepOutcome::cont().with_prompt(Self::modifying_skill_prompt(game, skill));
+            }
+        }
+
         if std::env::var("FFB_TRACE").is_ok() {
             eprintln!("RUST_STEPPASS thrower={:?} action={:?} pass_coord={:?} thrower_coord={:?} dist={:?} roll={} result={:?} safe={:?} rerolled={:?}/{:?}",
                 game.thrower_id, game.thrower_action, game.pass_coordinate, thrower_coord, passing_dist, self.roll,
@@ -376,7 +515,40 @@ impl StepPass {
         // Java: state.setResult(mechanic.evaluatePass(thrower, roll, passingDistance, passModifiers, isBomb))
         // A declined re-roll re-enters this step with the stored roll/result — only a
         // freshly evaluated roll counts as a newly resolved roll for event emission.
-        let freshly_resolved = self.pass_result.is_none();
+        // Java (bb2020 + bb2025): `if (usingModifyingSkill != null && usingModifyingSkill) {
+        //   addReport(ReportSkillUse(thrower, modifyingSkill, true, ADD_STRENGTH_TO_ROLL));
+        //   statBasedRollModifier = actingPlayer.statBasedModifier(canAddStrengthToPass);
+        //   state.setResult(mechanic.evaluatePass(…, statBasedRollModifier));
+        //   actingPlayer.markSkillUsed(modifyingSkill); }` — on EVERY entry while the answer stands.
+        let mut stat_used: Option<(ffb_model::enums::SkillId, i32)> = None;
+        let using_modifying = self.using_modifying_skill == Some(true)
+            && game.rules != ffb_model::enums::Rules::Bb2016;
+        if using_modifying {
+            use ffb_model::model::property::named_properties::NamedProperties;
+            let skill = game.player(&thrower_id)
+                .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_ADD_STRENGTH_TO_PASS));
+            if let Some(skill) = skill {
+                game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                    Some(thrower_id.clone()), skill, true,
+                    ffb_model::model::skill_use::SkillUse::ADD_STRENGTH_TO_ROLL,
+                ));
+            }
+            stat_used = Self::unused_strength_pass_skill(game);
+            let stat = stat_used.map(|(s, st)| {
+                ffb_mechanics::modifiers::stat_based_roll_modifier::StatBasedRollModifier::new(
+                    s.category_and_name_for(game.rules).1, st)
+            });
+            let result = match (game.thrower(), passing_dist) {
+                (Some(thrower), Some(dist)) => crate::mechanic::pass_mechanic_for(game.rules)
+                    .evaluate_pass(thrower, self.roll, dist, &pass_modifiers, is_bomb, stat.as_ref()),
+                _ => PassResult::FUMBLE,
+            };
+            self.pass_result = Some(result);
+            if let Some(skill) = skill {
+                crate::step::util_server_steps::mark_skill_used(game, &thrower_id, skill);
+            }
+        }
+        let freshly_resolved = self.pass_result.is_none() || using_modifying;
         if self.pass_result.is_none() {
             let result = if let Some(thrower) = game.thrower() {
                 if let Some(dist) = passing_dist {
@@ -441,7 +613,7 @@ impl StepPass {
             // are where Accurate / Cannoneer / Disturbing Presence become visible (H.50).
             let dist_name = passing_dist.map(|d| d.name().to_string());
             let mod_names = pass_modifier_names.clone();
-            game.report_list.add(ReportPassRoll::new(
+            let mut report = ReportPassRoll::new(
                 game.thrower_id.clone(),
                 successful,
                 self.roll,
@@ -453,7 +625,11 @@ impl StepPass {
                 pass_result_name,
                 false,
                 None,
-            ));
+            );
+            if let Some((skill, st)) = stat_used {
+                report = report.with_stat_value(skill.category_and_name_for(game.rules).1.to_string(), st);
+            }
+            game.report_list.add(report);
         }
 
         // Emit one GameEvent per resolved roll (monolith parity: initial roll and
@@ -513,19 +689,11 @@ impl StepPass {
                 // reroll block precedes handleFailedPass/handleSafePass, so a Pass-skill
                 // re-roll can roll the fumble away entirely before Safe Pass is consulted
                 // (amazon seed 34 i=45: roll 1 → auto Pass re-roll 5 → ACCURATE → catch).
-                if !already_rerolled && thrower_eligible_to_reroll(game) {
-                    if let Some(prompt) = self.pass_skill_offer(game) {
-                        let mut out = StepOutcome::cont().with_prompt(prompt);
-                        if let Some(ev) = roll_event { out = out.with_event(ev); }
-                        return out;
-                    }
-                    if let Some(prompt) = ask_for_reroll_if_available_for(game, game.thrower_id.clone().as_deref(), "PASS", self.minimum_roll, true) {
-                        self.re_rolled_action = Some("PASS".into());
-                        self.re_roll_source = Some("TRR".into());
-                        let mut out = StepOutcome::cont().with_prompt(prompt);
-                        if let Some(ev) = roll_event { out = out.with_event(ev); }
-                        return out;
-                    }
+                if let Some(out) = self.failed_pass_offers(
+                    game, already_rerolled, true, passing_dist, &pass_modifiers, is_bomb, &roll_event,
+                    java_returned_before_report)
+                {
+                    return out;
                 }
                 // Java `handleSafePass`:
                 //
@@ -603,20 +771,12 @@ impl StepPass {
             }
             PassResult::FUMBLE => {
                 // Java: askForReRollIfAvailable before handling fumble
-                if !already_rerolled && thrower_eligible_to_reroll(game) {
-                    // Java OFFERS the pass skill (a dialog), it does not spend it silently.
-                    if let Some(prompt) = self.pass_skill_offer(game) {
-                        let mut out = StepOutcome::cont().with_prompt(prompt);
-                        if let Some(ev) = roll_event { out = out.with_event(ev); }
-                        return out;
-                    }
-                    if let Some(prompt) = ask_for_reroll_if_available_for(game, game.thrower_id.clone().as_deref(), "PASS", self.minimum_roll, true) {
-                        self.re_rolled_action = Some("PASS".into());
-                        self.re_roll_source = Some("TRR".into());
-                        let mut out = StepOutcome::cont().with_prompt(prompt);
-                        if let Some(ev) = roll_event { out = out.with_event(ev); }
-                        return out;
-                    }
+                // Java OFFERS the pass skill (a dialog), it does not spend it silently.
+                if let Some(out) = self.failed_pass_offers(
+                    game, already_rerolled, true, passing_dist, &pass_modifiers, is_bomb, &roll_event,
+                    java_returned_before_report)
+                {
+                    return out;
                 }
                 if let Some(tc) = thrower_coord {
                     if is_bomb {
@@ -645,19 +805,11 @@ impl StepPass {
             }
             PassResult::INACCURATE | PassResult::WILDLY_INACCURATE => {
                 // Java: askForReRollIfAvailable before routing to missed pass
-                if !already_rerolled && thrower_eligible_to_reroll(game) {
-                    if let Some(prompt) = self.pass_skill_offer(game) {
-                        let mut out = StepOutcome::cont().with_prompt(prompt);
-                        if let Some(ev) = roll_event { out = out.with_event(ev); }
-                        return out;
-                    }
-                    if let Some(prompt) = ask_for_reroll_if_available_for(game, game.thrower_id.clone().as_deref(), "PASS", self.minimum_roll, false) {
-                        self.re_rolled_action = Some("PASS".into());
-                        self.re_roll_source = Some("TRR".into());
-                        let mut out = StepOutcome::cont().with_prompt(prompt);
-                        if let Some(ev) = roll_event { out = out.with_event(ev); }
-                        return out;
-                    }
+                if let Some(out) = self.failed_pass_offers(
+                    game, already_rerolled, false, passing_dist, &pass_modifiers, is_bomb, &roll_event,
+                    java_returned_before_report)
+                {
+                    return out;
                 }
                 if let Some(pass_coord) = game.pass_coordinate {
                     if is_bomb {
@@ -1055,6 +1207,47 @@ mod tests {
             !game.player("t1").unwrap().used_skills.contains(&SkillId::Pass),
             "the skill is spent when the coach ACCEPTS, not when the offer is made"
         );
+    }
+
+    /// Java bb2025 `StepPass`: a failed pass that Strong Passing Game (add ST) would turn into a
+    /// success raises the re-roll dialog even with no team re-roll (`dialogShown` counts the
+    /// modification skill) and writes ReportModifiedPassResult; accepting the skill re-evaluates
+    /// the SAME roll with ST added, marks the skill used and reports ADD_STRENGTH_TO_ROLL (star
+    /// tier: Skrull Halfheight, vampire vs undead bb2025 seed 1).
+    #[test]
+    fn strong_passing_game_is_offered_and_adds_strength_to_the_same_roll() {
+        use ffb_model::enums::{SkillId, TurnMode};
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::prompts::AgentPrompt;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game_with_thrower(4);
+        {
+            let t = game.team_home.player_mut("t1").unwrap();
+            t.strength = 3;
+            t.starting_skills.push(SkillWithValue { skill_id: SkillId::StrongPassingGame, value: None });
+        }
+        game.acting_player.player_id = Some("t1".into());
+        game.turn_mode = TurnMode::Regular;
+        game.turn_data_mut().rerolls = 0;
+
+        let mut step = make_step();
+        step.roll = 3; // quick pass: 3 < PA 4 → INACCURATE; 3 + ST 3 → ACCURATE
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.prompt, Some(AgentPrompt::ReRollOffer { .. })),
+            "the modification skill alone raises the bb2025 re-roll dialog: {:?}", out.prompt);
+        assert!(game.report_list.has_report(ReportId::MODIFIED_PASS_RESULT));
+
+        // The coach answers the skill: same roll, ST added.
+        let mut step = make_step();
+        step.roll = 3;
+        step.using_modifying_skill = Some(true);
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(rng.call_count, 0, "no fresh die when the skill is used");
+        assert_eq!(step.pass_result, Some(PassResult::ACCURATE));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(game.acting_player.used_skills.contains(&SkillId::StrongPassingGame)
+            || game.player("t1").unwrap().used_skills.contains(&SkillId::StrongPassingGame));
     }
 
     #[test]

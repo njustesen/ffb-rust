@@ -16,6 +16,8 @@ pub struct ReportPassRoll {
     pub result: Option<String>,
     /// `statBasedRollModifier` — modifier name, if any.
     pub stat_based_roll_modifier: Option<String>,
+    /// Java `StatBasedRollModifier.value` — serialised with the name as `{name, value}`.
+    pub stat_based_roll_modifier_value: Option<i32>,
 }
 
 impl ReportPassRoll {
@@ -39,7 +41,15 @@ impl ReportPassRoll {
             bomb,
             result,
             stat_based_roll_modifier,
+            stat_based_roll_modifier_value: None,
         }
+    }
+
+    /// Java `new StatBasedRollModifier(name, value)` (Strong Passing Game: the thrower's ST).
+    pub fn with_stat_value(mut self, name: String, value: i32) -> Self {
+        self.stat_based_roll_modifier = Some(name);
+        self.stat_based_roll_modifier_value = Some(value);
+        self
     }
 
     pub fn get_player_id(&self) -> Option<&str> { self.base.get_player_id() }
@@ -74,7 +84,10 @@ impl ReportPassRoll {
             "passResult": self.result,
             "hailMaryPass": self.hail_mary_pass,
             "bomb": self.bomb,
-            "statBasedRollModifier": self.stat_based_roll_modifier,
+            "statBasedRollModifier": match (&self.stat_based_roll_modifier, self.stat_based_roll_modifier_value) {
+                (Some(name), Some(value)) => serde_json::json!({ "name": name, "value": value }),
+                (name, _) => serde_json::json!(name),
+            },
         })
     }
 
@@ -92,7 +105,9 @@ impl ReportPassRoll {
             hail_mary_pass: json["hailMaryPass"].as_bool().unwrap_or(false),
             bomb: json["bomb"].as_bool().unwrap_or(false),
             result: json["passResult"].as_str().map(str::to_string),
-            stat_based_roll_modifier: json["statBasedRollModifier"].as_str().map(str::to_string),
+            stat_based_roll_modifier: json["statBasedRollModifier"].as_str().map(str::to_string)
+                .or_else(|| json["statBasedRollModifier"]["name"].as_str().map(str::to_string)),
+            stat_based_roll_modifier_value: json["statBasedRollModifier"]["value"].as_i64().map(|v| v as i32),
         }
     }
 }

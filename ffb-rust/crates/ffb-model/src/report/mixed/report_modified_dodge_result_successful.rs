@@ -25,7 +25,8 @@ impl ReportModifiedDodgeResultSuccessful {
     pub fn to_json_value(&self) -> serde_json::Value {
         serde_json::json!({
             "reportId": self.get_id().get_name(),
-            "skill": self.skill_id.map(|s| s.class_name()),
+            // Java serialises the skill by its display NAME ("Strong Passing Game").
+            "skill": self.skill_id.map(|s| s.display_name()),
         })
     }
 
