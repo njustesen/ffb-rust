@@ -251,7 +251,13 @@ impl UtilPlayer {
             }
             if let Some(assist_coord) = game.field_model.player_coordinate(assist_id) {
                 let adjacent_defenders = Self::find_adjacent_players_with_tacklezones(game, defender_team, assist_coord, false);
-                let can_always_assist = game.player(assist_id)
+                // Java: `mechanic.canAlwaysAssistFoul(game, assist)` — bb2016/bb2020 SkillMechanic
+                // also require the SNEAKY_GIT_AS_FOUL_GUARD option; only bb2025 is property-only.
+                // Rust skipped the option, so a marked Sneaky Git (The Black Gobbo) assisted a
+                // bb2020 foul (star tier: halfling vs underworld_underworldtroll bb2020 seed 2).
+                let option_ok = game.rules == crate::enums::Rules::Bb2025
+                    || game.options.is_enabled("sneakyGitAsFoulGuard");
+                let can_always_assist = option_ok && game.player(assist_id)
                     .map(|p| p.has_skill_property(NamedProperties::CAN_ALWAYS_ASSIST_FOULS))
                     .unwrap_or(false);
                 let cancelled = adjacent_defenders.iter().any(|def_id| {
@@ -1245,6 +1251,21 @@ mod tests {
         add_player(&mut game, false, "def", FieldCoordinate::new(7, 7), PRONE);
         // assist1 adjacent to def, no standing defender adjacent to assist1
         add_player(&mut game, true, "assist1", FieldCoordinate::new(7, 6), ACTIVE_STANDING);
+        assert_eq!(UtilPlayer::find_offensive_foul_assists(&game, "att", "def"), 1);
+    }
+
+    /// Java bb2020 SkillMechanic.canAlwaysAssistFoul needs SNEAKY_GIT_AS_FOUL_GUARD as well as
+    /// the property: a marked Sneaky Git gives no foul assist unless the option is on.
+    #[test]
+    fn bb2020_marked_sneaky_git_assists_only_with_the_option() {
+        let mut game = minimal_game();
+        game.rules = Rules::Bb2020;
+        add_player(&mut game, true, "att", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        add_player(&mut game, false, "def", FieldCoordinate::new(7, 7), PRONE);
+        add_skilled_player(&mut game, true, "git", FieldCoordinate::new(7, 6), ACTIVE_STANDING, SkillId::SneakyGit);
+        add_player(&mut game, false, "def2", FieldCoordinate::new(7, 5), ACTIVE_STANDING);
+        assert_eq!(UtilPlayer::find_offensive_foul_assists(&game, "att", "def"), 0);
+        game.options.set("sneakyGitAsFoulGuard", "true");
         assert_eq!(UtilPlayer::find_offensive_foul_assists(&game, "att", "def"), 1);
     }
 
