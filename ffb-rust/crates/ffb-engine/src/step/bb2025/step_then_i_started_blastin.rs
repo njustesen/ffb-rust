@@ -22,6 +22,24 @@ use crate::step::util_server_injury::handle_injury;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
 const RE_ROLLED_ACTION_NAME: &str = "BlastinSolvesEverything";
+/// Java bb2020 `ReRolledActions.THEN_I_STARTED_BLASTIN`.
+const RE_ROLLED_ACTION_NAME_BB2020: &str = "ThenIStartedBlastin";
+
+/// The edition's re-rolled action name (Java bb2020 uses THEN_I_STARTED_BLASTIN, bb2025
+/// BLASTIN_SOLVES_EVERYTHING).
+fn re_rolled_action_name(game: &Game) -> &'static str {
+    if game.rules == ffb_model::enums::Rules::Bb2020 { RE_ROLLED_ACTION_NAME_BB2020 } else { RE_ROLLED_ACTION_NAME }
+}
+
+/// Java: `UtilCards.getUnusedSkillWithProperty(actingPlayer, canBlastRemotePlayer)` -- bb2020's
+/// "Then I Started Blastin'!" and bb2025's "Blastin' Solves Everything" both register it. This
+/// keyed on the bb2025 SkillId, so a bb2020 Zzharg declared the special and nothing happened.
+fn unused_blast_skill(game: &Game, player_id: &str) -> Option<SkillId> {
+    game.player(player_id).and_then(|p| p.all_skill_ids().find(|s| {
+        s.properties().contains(&ffb_model::model::property::named_properties::NamedProperties::CAN_BLAST_REMOTE_PLAYER)
+            && !p.used_skills.contains(s)
+    }))
+}
 
 pub struct StepThenIStartedBlastin {
     /// Java: gotoLabelOnEnd — GOTO_LABEL_ON_END init parameter.
@@ -98,8 +116,12 @@ impl Step for StepThenIStartedBlastin {
                 });
             }
             // Java: CLIENT_END_TURN → restoreTurnModes(game); publishParameter(END_PLAYER_ACTION, true); SKIP_STEP + NEXT_STEP
+            // (bb2025 only -- bb2020's StepThenIStartedBlastin publishes nothing here).
             Action::EndTurn => {
                 self.restore_turn_modes(game);
+                if game.rules == ffb_model::enums::Rules::Bb2020 {
+                    return StepOutcome::next();
+                }
                 return StepOutcome::next().publish(StepParameter::EndPlayerAction(true));
             }
             // Java: AbstractStepWithReRoll's inherited handleCommand consumes the re-roll
@@ -137,16 +159,15 @@ impl StepThenIStartedBlastin {
             None => return StepOutcome::next(),
         };
 
+        let rr_name = re_rolled_action_name(game);
+        let bb2020 = game.rules == ffb_model::enums::Rules::Bb2020;
         let is_rerolling = self.re_roll_state.re_rolled_action.as_ref()
-            .map(|a| a.name == RE_ROLLED_ACTION_NAME)
+            .map(|a| a.name == rr_name)
             .unwrap_or(false);
 
         // Java: skill = UtilCards.getUnusedSkillWithProperty(actingPlayer, canBlastRemotePlayer)
-        // canBlastRemotePlayer corresponds to SkillId::BlastinSolvesEverything (BB2025).
-        let has_skill = game.player(&acting_id)
-            .map(|p| p.all_skill_ids().any(|s| s == SkillId::BlastinSolvesEverything)
-                && !p.used_skills.contains(&SkillId::BlastinSolvesEverything))
-            .unwrap_or(false);
+        let blast_skill = unused_blast_skill(game, &acting_id);
+        let has_skill = blast_skill.is_some();
 
         if !has_skill && !is_rerolling {
             return StepOutcome::next();
@@ -167,6 +188,11 @@ impl StepThenIStartedBlastin {
         if game.turn_mode != TurnMode::ThenIStartedBlastin {
             self.old_turn_mode = game.last_turn_mode;
             game.turn_mode = TurnMode::ThenIStartedBlastin;
+            if bb2020 {
+                // Java bb2020: addReport(new ReportThenIStartedBlastin(actingPlayer, null, 0, false, false)).
+                game.report_list.add(ReportThenIStartedBlastin::new(
+                    Some(acting_id.clone()), None, 0, false, false));
+            }
             // Java shows no dialog here — the client answers the turn-mode wait with
             // CLIENT_TARGET_SELECTED. The agents need an explicit ask.
             return StepOutcome::cont().with_prompt(
@@ -177,8 +203,24 @@ impl StepThenIStartedBlastin {
         }
 
         // Java: actingPlayer.markSkillUsed(skill)
-        if has_skill {
-            Self::mark_skill_used(game, &acting_id, SkillId::BlastinSolvesEverything);
+        if let Some(skill) = blast_skill {
+            Self::mark_skill_used(game, &acting_id, skill);
+        }
+        if bb2020 {
+            // Java bb2020 only: the special consumes the team's once-per-turn action it rode on.
+            use ffb_model::enums::PlayerAction as PA;
+            match game.acting_player.player_action {
+                Some(PA::BlitzMove) | Some(PA::KickEmBlitz) => game.turn_data_mut().blitz_used = true,
+                Some(PA::FoulMove) => {
+                    let additional_foul = game.player(&acting_id).map(|p| p.has_skill_property(
+                        ffb_model::model::property::named_properties::NamedProperties::ALLOWS_ADDITIONAL_FOUL)).unwrap_or(false);
+                    if !additional_foul { game.turn_data_mut().foul_used = true; }
+                }
+                Some(PA::HandOverMove) => game.turn_data_mut().hand_over_used = true,
+                Some(PA::PassMove) | Some(PA::ThrowTeamMateMove) => game.turn_data_mut().pass_used = true,
+                Some(PA::KickTeamMateMove) => game.turn_data_mut().ktm_used = true,
+                _ => {}
+            }
         }
 
         // Java: roll = getGameState().getDiceRoller().rollSkill();
@@ -210,8 +252,8 @@ impl StepThenIStartedBlastin {
 
         // Java: failure branch — ask for re-roll (unless already re-rolling) or fail().
         if !is_rerolling {
-            if let Some(prompt) = ask_for_reroll_if_available(game, RE_ROLLED_ACTION_NAME, 3, false) {
-                self.re_roll_state.re_rolled_action = Some(ReRolledAction::new(RE_ROLLED_ACTION_NAME));
+            if let Some(prompt) = ask_for_reroll_if_available(game, rr_name, 3, false) {
+                self.re_roll_state.re_rolled_action = Some(ReRolledAction::new(rr_name));
                 // Java: `AbstractStepWithReRoll` stores the offered source (`fReRollSource`) so
                 // that a later `UtilServerReRoll.useReRoll(this, getReRollSource(), ...)` call
                 // can consume it.
@@ -319,10 +361,12 @@ impl StepThenIStartedBlastin {
 
         self.restore_turn_modes(game);
 
-        // Java: publishParameter(END_PLAYER_ACTION, true) at the end of hitPlayer().
-        StepOutcome::next()
-            .publish(StepParameter::DropPlayerContext(Box::new(dpc)))
-            .publish(StepParameter::EndPlayerAction(true))
+        // Java: publishParameter(END_PLAYER_ACTION, true) at the end of hitPlayer() -- bb2025 only.
+        let out = StepOutcome::next().publish(StepParameter::DropPlayerContext(Box::new(dpc)));
+        if game.rules == ffb_model::enums::Rules::Bb2020 {
+            return out;
+        }
+        out.publish(StepParameter::EndPlayerAction(true))
     }
 
     /// Java: `restoreTurnModes(Game game)`.

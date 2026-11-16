@@ -44,6 +44,9 @@ pub struct StepMoveBallAndChain {
     pub player_scatter: Option<Direction>,
     /// Re-roll tracking (AbstractStepWithReRoll).
     pub re_roll_state: ReRollState,
+    /// The skill re-roll source offered by the skill-use dialog, committed only when the coach
+    /// uses the skill (Java `setReRollSource(rerollSource)` in handleCommand).
+    pub pending_skill_source: Option<ffb_model::enums::ReRollSource>,
 }
 
 impl StepMoveBallAndChain {
@@ -135,7 +138,24 @@ impl StepMoveBallAndChain {
                     // (incorrectly) always offered even with no skill reroll source present.
                     let option_allows_trr = game.options.is_enabled(game_option_id::ALLOW_BALL_AND_CHAIN_RE_ROLL);
 
-                    if has_skill_source || option_allows_trr {
+                    if has_skill_source {
+                        // Java: `UtilServerDialog.showDialog(new DialogSkillUseParameter(actingPlayer,
+                        //   reRollSource.getSkill(game), 0, SETTING_RE_ROLL_BALL_AND_CHAIN, ..ALWAYS))`
+                        // -- a SKILL-USE dialog answered with CLIENT_USE_SKILL, not a re-roll offer.
+                        // Rust raised the team re-roll offer for it, so the agents answered it with
+                        // their re-roll policy while ParityRunner answered Java's SKILL_USE through the
+                        // skill-use one (star tier: Fungus the Loon's Whirling Dervish, bb2025).
+                        let pid = game.acting_player.player_id.clone().unwrap_or_default();
+                        if let Some(sid) = unused_direction_reroll_skill(game, &pid) {
+                            self.pending_skill_source = find_skill_reroll_source(game, RE_ROLLED_ACTION);
+                            return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
+                                player_id: pid,
+                                skill_id: sid as u16,
+                                skill_name: format!("{:?}", sid),
+                            });
+                        }
+                    }
+                    if !has_skill_source && option_allows_trr {
                         if let Some(prompt) = crate::step::util_server_re_roll::ask_for_reroll_if_available(
                             game,
                             RE_ROLLED_ACTION,
@@ -230,6 +250,7 @@ impl Default for StepMoveBallAndChain {
             original_coordinate_to: None,
             player_scatter: None,
             re_roll_state: ReRollState::new(),
+            pending_skill_source: None,
         }
     }
 }
@@ -254,6 +275,21 @@ impl Step for StepMoveBallAndChain {
         // unreachable, so the offered `re_roll_source` (stashed in `execute_step` when the
         // prompt was issued) was never committed on accept nor cleared on decline, and the
         // scatter re-roll could never actually be consumed.
+        // Java: CLIENT_USE_SKILL for a skill with a DIRECTION re-roll source (the skill-use dialog
+        // above): setReRolledAction; addReport(new ReportSkillUse(playerId, skill, skillUsed,
+        // RE_ROLL_DIRECTION)); if (skillUsed) setReRollSource(rerollSource).
+        if let Action::UseSkill { skill_id, use_skill } = action {
+            if skill_id.reroll_sources_for(game.rules).iter().any(|(a, _)| *a == RE_ROLLED_ACTION) {
+                self.re_roll_state.re_rolled_action = Some(ReRolledAction::new(RE_ROLLED_ACTION));
+                let pid = game.acting_player.player_id.clone();
+                game.report_list.add(ReportSkillUse::new(pid, *skill_id, *use_skill, SkillUse::RE_ROLL_DIRECTION));
+                if *use_skill {
+                    self.re_roll_state.re_roll_source = self.pending_skill_source.take();
+                }
+                self.pending_skill_source = None;
+                return self.execute_step(game, rng);
+            }
+        }
         if let Action::UseReRoll { use_reroll } = action {
             // Java writes `ReportSkillUse(..., RE_ROLL_DIRECTION)` only in its CLIENT_USE_SKILL
             // branch — a SKILL re-roll answered through the use-skill dialog. The prompt Rust
@@ -345,6 +381,15 @@ fn is_in_bounds(coord: FieldCoordinate) -> bool {
 }
 
 /// Java: check the reRollSetting to decide whether to ask the player for a re-roll.
+/// Java: `UtilCards.getUnusedRerollSource(actingPlayer, DIRECTION).getSkill(game)` -- the unused
+/// skill that provides the DIRECTION re-roll (Whirling Dervish).
+fn unused_direction_reroll_skill(game: &Game, player_id: &str) -> Option<SkillId> {
+    let p = game.player(player_id)?;
+    p.all_skill_ids()
+        .filter(|id| !p.used_skills.contains(id))
+        .find(|id| id.reroll_sources_for(game.rules).iter().any(|(a, _)| *a == RE_ROLLED_ACTION))
+}
+
 fn should_ask_for_reroll(setting: Option<&str>, game: &Game, coord_to: FieldCoordinate) -> bool {
     const NEVER: &str = "reRollBallAndChainNever";
     const TEAM_MATE: &str = "reRollBallAndChainTeamMate";
@@ -698,9 +743,15 @@ mod tests {
         let out = step.start(&mut game, &mut rng);
 
         assert_eq!(out.action, StepAction::Continue, "a WhirlingDervish skill reroll must be offered regardless of the option");
-        assert_eq!(
-            step.re_roll_state.re_roll_source.as_ref().map(|s| s.name.as_str()),
-            Some("WhirlingDervish"),
-        );
+        // Java offers it as DialogSkillUseParameter (a skill-use prompt); the source is committed
+        // only once the coach uses the skill.
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::SkillUse { ref skill_name, .. })
+            if skill_name == "WhirlingDervish"), "{:?}", out.prompt);
+        assert!(step.re_roll_state.re_roll_source.is_none());
+        assert_eq!(step.pending_skill_source.as_ref().map(|s| s.name.as_str()), Some("WhirlingDervish"));
+        // Declining reports RE_ROLL_DIRECTION used=false and keeps the scatter.
+        let _ = step.handle_command(&Action::UseSkill { skill_id: SkillId::WhirlingDervish, use_skill: false }, &mut game, &mut rng);
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
+        assert!(step.re_roll_state.re_roll_source.is_none());
     }
 }

@@ -435,6 +435,20 @@ impl SkillId {
         }
     }
 
+    /// Java: Skill.getSkillUsageType() of the EDITION's class. `usage_type()` holds one value per
+    /// skill (the latest edition where they differ); the bb2020 classes that differ are overridden
+    /// here (Java skill/bb2020/special): Wisdom of the White Dwarf ONCE_PER_TURN_BY_TEAM_MATE (bb2025:
+    /// ONCE_PER_GAME -- a bb2020 Grombrindal was spent for the whole game after one grant, star
+    /// tier), Frenzied Rush and Putrid Regurgitation ONCE_PER_GAME (bb2025: ONCE_PER_HALF).
+    pub fn usage_type_for(self, rules: crate::enums::Rules) -> crate::enums::SkillUsageType {
+        use crate::enums::SkillUsageType::*;
+        match (self, rules) {
+            (SkillId::WisdomOfTheWhiteDwarf, crate::enums::Rules::Bb2020) => OncePerTurnByTeamMate,
+            (SkillId::FrenziedRush | SkillId::PutridRegurgitation, crate::enums::Rules::Bb2020) => OncePerGame,
+            _ => self.usage_type(),
+        }
+    }
+
     /// Java: Skill.getSkillUsageType() — returns the usage tracking type for this skill.
     pub fn usage_type(self) -> crate::enums::SkillUsageType {
         use crate::enums::SkillUsageType::*;
@@ -1112,6 +1126,12 @@ impl SkillId {
             (SkillId::VeryLongLegs, Rules::Bb2016) => &["cancelsCanCancelInterceptions"],
             (SkillId::VeryLongLegs, Rules::Bb2020) => &["cancelsCanForceInterceptionRerollOfLongPasses"],
             (SkillId::VeryLongLegs, Rules::Bb2025 | Rules::Common) => &["cancelsPassesAreNotIntercepted"],
+            // Java splits the Zoat across two edition classes: bb2020/special registers
+            // canGainGaze, bb2025/special canGazeAutomaticallyThreeSquaresAway. `properties()`
+            // carries the union (the client/test surface relies on it); edition-sensitive callers
+            // ask `has_property_in`.
+            (SkillId::ExcuseMeAreYouAZoat, Rules::Bb2020) => &["canGainGaze"],
+            (SkillId::ExcuseMeAreYouAZoat, Rules::Bb2025 | Rules::Common) => &["canGazeAutomaticallyThreeSquaresAway"],
             _ => self.properties(),
         }
     }
@@ -1150,6 +1170,12 @@ impl SkillId {
             (SkillId::HitAndRun, Rules::Bb2025 | Rules::Common) => &["movesRandomly"],
             _ => &[],
         }
+    }
+
+    /// Does this skill register `property` under `rules`? (`properties_for` falls back to the
+    /// edition-agnostic `properties()` where it has no edition entry.)
+    pub fn has_property_in(self, rules: crate::enums::Rules, property: &str) -> bool {
+        self.properties_for(rules).contains(&property)
     }
 
     pub fn properties(self) -> &'static [&'static str] {

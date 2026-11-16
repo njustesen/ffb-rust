@@ -55,19 +55,90 @@ impl StepPassBlock {
     /// Java `pushCurrentStepOnStack()` equivalent: descriptor re-pushing this step with
     /// its label + resume state, so the continuation instance is reconstructed intact.
     fn self_seq(&self, resume: &PassBlockResumeState) -> Vec<SequenceStep> {
+        let mut resume = resume.clone();
+        resume.end_turn = self.end_turn;
+        resume.end_player_action = self.end_player_action;
         vec![SequenceStep::with_params(StepId::PassBlock, vec![
             StepParameter::GotoLabelOnEnd(self.goto_label_on_end.clone()),
-            StepParameter::PassBlockResume(resume.clone()),
+            StepParameter::PassBlockResume(resume),
         ])]
     }
 
     /// Java: `Select.pushSequence(new Select.SequenceParams(getGameState(), false))`.
-    fn select_seq() -> Vec<SequenceStep> {
+    fn select_seq(rules: ffb_model::enums::Rules) -> Vec<SequenceStep> {
         Select::build_sequence(&SelectParams {
             update_persistence: false,
             is_blitz_move: false,
+            rules,
             ..Default::default()
         })
+    }
+
+    /// Java (bb2016 only): `Move.pushSequence(new Move.SequenceParams(getGameState()))`.
+    fn move_seq(rules: ffb_model::enums::Rules) -> Vec<SequenceStep> {
+        crate::step::generator::bb2025::move_::Move::build_sequence(
+            &crate::step::generator::bb2025::move_::MoveParams { rules, ..Default::default() })
+    }
+
+    /// Java bb2016 `StepPassBlock`'s PASS_BLOCK branch (before the shared end-turn restore). It
+    /// differs from the mixed step in three places: a blocker that has ACTED ends the whole
+    /// window; a blocker not standing on a valid end square is sent back into a Move sequence;
+    /// the "not acted yet" re-select keeps `fEndPlayerAction`. Returns Some(outcome) when it
+    /// pushed a continuation.
+    fn bb2016_pass_block_turn(&mut self, game: &mut Game,
+                              pass_blockers: &std::collections::HashSet<String>) -> Option<StepOutcome> {
+        let valid_end = ffb_model::util::passing::find_valid_pass_block_end_coordinates(game);
+        let rules = game.rules;
+        if let Some(pid) = game.acting_player.player_id.clone() {
+            let has_tz = game.field_model.player_state(&pid).map(|s| s.has_tacklezones()).unwrap_or(false);
+            if !has_tz || (self.end_player_action && game.acting_player.acted()) {
+                crate::step::util_server_steps::change_player_action_to_none(game);
+                self.end_turn = true;
+                self.end_player_action = false;
+            }
+        }
+        if self.end_player_action {
+            if game.acting_player.acted() {
+                let coord = game.acting_player.player_id.as_ref()
+                    .and_then(|id| game.field_model.player_coordinate(id));
+                let resume = self.resume.clone().expect("pass-block re-entry without resume state");
+                if coord.map(|c| valid_end.contains(&c)).unwrap_or(false) {
+                    crate::step::util_server_steps::change_player_action_to_none(game);
+                    if Self::check_no_player_active(game, pass_blockers) {
+                        self.end_turn = true;
+                    } else {
+                        self.end_player_action = false;
+                        return Some(StepOutcome::next()
+                            .push_seq(self.self_seq(&resume))
+                            .push_seq(Self::select_seq(rules)));
+                    }
+                } else {
+                    self.end_player_action = false;
+                    return Some(StepOutcome::next()
+                        .push_seq(self.self_seq(&resume))
+                        .push_seq(Self::move_seq(rules)));
+                }
+            } else if !self.end_turn {
+                crate::step::util_server_steps::change_player_action_to_none(game);
+                let resume = self.resume.clone().expect("pass-block re-entry without resume state");
+                return Some(StepOutcome::next()
+                    .push_seq(self.self_seq(&resume))
+                    .push_seq(Self::select_seq(rules)));
+            }
+        }
+        if self.end_turn {
+            if let Some(pid) = game.acting_player.player_id.clone() {
+                let coord = game.field_model.player_coordinate(&pid);
+                if !coord.map(|c| valid_end.contains(&c)).unwrap_or(false) {
+                    self.end_turn = false;
+                    let resume = self.resume.clone().expect("pass-block re-entry without resume state");
+                    return Some(StepOutcome::next()
+                        .push_seq(self.self_seq(&resume))
+                        .push_seq(Self::move_seq(rules)));
+                }
+            }
+        }
+        None
     }
 
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
@@ -98,11 +169,19 @@ impl StepPassBlock {
         // Java: Set<Player> passBlockers = mechanic.findPassBlockers(game, opposingTeam, false);
         //       if (passBlockers.size() == 0 && fOldTurnMode == null) { NEXT_STEP; return; }
         let pass_blockers = Self::find_pass_blockers(game, &opposing_team, false);
-        if pass_blockers.is_empty() && self.resume.is_none() {
+        // bb2016: `if (passBlockers.size() == 0)` -- no `&& fOldTurnMode == null` clause.
+        let bb2016 = game.rules == ffb_model::enums::Rules::Bb2016;
+        if pass_blockers.is_empty() && (self.resume.is_none() || bb2016) {
             return StepOutcome::next();
         }
 
-        if game.turn_mode == TurnMode::PassBlock {
+        if game.turn_mode == TurnMode::PassBlock && bb2016 {
+            if let Some(out) = self.bb2016_pass_block_turn(game, &pass_blockers) {
+                return out;
+            }
+        }
+
+        if game.turn_mode == TurnMode::PassBlock && !bb2016 {
             // ── Re-entry: the pass-block mini-turn is running ────────────────────────
             // Java: check if actingPlayer has dropped (failed dodge)
             if let Some(pid) = game.acting_player.player_id.clone() {
@@ -125,7 +204,7 @@ impl StepPassBlock {
                         let resume = self.resume.clone().expect("pass-block re-entry without resume state");
                         return StepOutcome::next()
                             .push_seq(self.self_seq(&resume))
-                            .push_seq(Self::select_seq());
+                            .push_seq(Self::select_seq(game.rules));
                     }
                 } else {
                     crate::step::util_server_steps::change_player_action_to_none(game);
@@ -133,10 +212,12 @@ impl StepPassBlock {
                     let resume = self.resume.clone().expect("pass-block re-entry without resume state");
                     return StepOutcome::next()
                         .push_seq(self.self_seq(&resume))
-                        .push_seq(Self::select_seq());
+                        .push_seq(Self::select_seq(game.rules));
                 }
             }
 
+        }
+        if game.turn_mode == TurnMode::PassBlock {
             if self.end_turn {
                 let resume = self.resume.clone().expect("pass-block end without resume state");
                 // Java: restore saved states for on-pitch defenders that still have tacklezones.
@@ -156,7 +237,7 @@ impl StepPassBlock {
                 game.acting_player.player_id = game.thrower_id.clone();
                 game.acting_player.player_action = game.thrower_action;
                 game.acting_player.has_passed = true;
-                if resume.current_move >= 0 {
+                if resume.current_move >= 0 && !bb2016 {
                     game.acting_player.current_move = resume.current_move;
                     game.acting_player.goes_for_it = resume.going_for_it;
                 }
@@ -196,6 +277,8 @@ impl StepPassBlock {
                 old_player_states: Vec::new(), // filled below
                 current_move: game.acting_player.current_move,
                 going_for_it: game.acting_player.goes_for_it,
+                end_turn: false,
+                end_player_action: false,
             };
 
             // The eligible set is exactly what the window is opened for, and `passBlockEligible`
@@ -245,7 +328,7 @@ impl StepPassBlock {
                     home_defending,
                 })
                 .push_seq(self.self_seq(&resume))
-                .push_seq(Self::select_seq())
+                .push_seq(Self::select_seq(game.rules))
         }
     }
 
@@ -253,6 +336,11 @@ impl StepPassBlock {
     /// ignores `checkCanReach` — both calls use the same predicate).
     fn find_pass_blockers(game: &Game, opposing_team: &ffb_model::model::Team, check_can_reach: bool) -> std::collections::HashSet<String> {
         use ffb_mechanics::on_the_ball_mechanic::OnTheBallMechanic as OnTheBallMechanicTrait;
+        if game.rules == ffb_model::enums::Rules::Bb2016 {
+            // Java bb2016 OnTheBallMechanic: the reach check (pathfinder, 3 squares) is real.
+            return ffb_mechanics::bb2016::on_the_ball_mechanic::OnTheBallMechanic::new()
+                .find_pass_blockers(game, opposing_team, check_can_reach);
+        }
         let mechanic = ffb_mechanics::mixed::on_the_ball_mechanic::OnTheBallMechanic::new();
         mechanic.find_pass_blockers(game, opposing_team, check_can_reach)
     }
@@ -284,7 +372,12 @@ impl Step for StepPassBlock {
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             StepParameter::GotoLabelOnEnd(v) => { self.goto_label_on_end = v.clone(); true }
-            StepParameter::PassBlockResume(state) => { self.resume = Some(state.clone()); true }
+            StepParameter::PassBlockResume(state) => {
+                self.end_turn = state.end_turn;
+                self.end_player_action = state.end_player_action;
+                self.resume = Some(state.clone());
+                true
+            }
             StepParameter::EndTurn(v) => { self.end_turn = *v; true }
             StepParameter::EndPlayerAction(v) => { self.end_player_action = *v; true }
             _ => false,

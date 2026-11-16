@@ -23,8 +23,8 @@ impl Mechanic for OnTheBallMechanic {
 impl OnTheBallMechanicTrait for OnTheBallMechanic {
     fn find_pass_blockers(&self, game: &Game, team: &Team, check_can_reach: bool) -> HashSet<String> {
         let mut pass_blockers = HashSet::new();
-        // TODO: get JumpMechanic from game factory (FactoryType.Factory.MECHANIC)
-        let can_jump = false; // TODO: mechanic.canJump(game, player, startPosition)
+        // Java: `JumpMechanic mechanic = game.getFactory(MECHANIC).forName(JUMP)` -- bb2016's.
+        let jump = crate::bb2016::jump_mechanic::JumpMechanic::new();
         let valid_pass_block_end_coordinates = util_passing_find_valid_pass_block_end_coordinates(game);
         for player in &team.players {
             if player.has_skill_property(NamedProperties::CAN_MOVE_WHEN_OPPONENT_PASSES) {
@@ -32,7 +32,12 @@ impl OnTheBallMechanicTrait for OnTheBallMechanic {
                 let start_position = game.field_model.player_coordinate(&player.id);
                 if !check_can_reach || (player_state.has_tacklezones()
                     && start_position.is_some()
-                    && path_finder_allow_pass_block_move_is_provided(game, player, start_position.unwrap(), 3, can_jump, &valid_pass_block_end_coordinates)) {
+                    && path_finder_allow_pass_block_move_is_provided(game, player, start_position.unwrap(), 3,
+                        {
+                            use crate::jump_mechanic::JumpMechanic as _;
+                            jump.can_jump(game, player, start_position.unwrap())
+                        },
+                        &valid_pass_block_end_coordinates)) {
                     pass_blockers.insert(player.id.clone());
                 }
             }
@@ -84,18 +89,20 @@ fn util_passing_find_valid_pass_block_end_coordinates(game: &Game) -> HashSet<Fi
     ffb_model::util::passing::find_valid_pass_block_end_coordinates(game)
 }
 
-/// Stub for ArrayTool.isProvided(PathFinderWithPassBlockSupport.INSTANCE.allowPassBlockMove(...)).
-/// Returns true if the pathfinder found at least one valid move (non-empty result).
-/// TODO: full implementation requires translating PathFinderWithPassBlockSupport.
+/// Java: `ArrayTool.isProvided(PathFinderWithPassBlockSupport.INSTANCE.allowPassBlockMove(...))`.
+/// This was a stub returning `false`, so no bb2016 pass blocker could ever "reach" and the
+/// pass-block window never opened (star tier: Dolfar Longstride).
 fn path_finder_allow_pass_block_move_is_provided(
-    _game: &Game,
-    _player: &Player,
-    _from: FieldCoordinate,
-    _remaining_moves: i32,
-    _can_jump: bool,
-    _valid_end_coordinates: &HashSet<FieldCoordinate>,
+    game: &Game,
+    player: &Player,
+    from: FieldCoordinate,
+    remaining_moves: i32,
+    can_jump: bool,
+    valid_end_coordinates: &HashSet<FieldCoordinate>,
 ) -> bool {
-    false
+    !ffb_model::util::pathfinding::path_finder_with_pass_block_support::PathFinderWithPassBlockSupport::new()
+        .allow_pass_block_move(game, player, from, remaining_moves, can_jump, valid_end_coordinates)
+        .is_empty()
 }
 
 #[cfg(test)]

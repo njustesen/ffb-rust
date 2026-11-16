@@ -720,9 +720,10 @@ impl UtilPlayer {
             .collect();
 
         // Remove per-turn enhancements from all players.
+        let rules = game.rules;
         for p in game.team_home.players.iter_mut().chain(game.team_away.players.iter_mut()) {
-            p.reset_used_skills(SkillUsageType::OncePerTurn);
-            p.reset_used_skills(SkillUsageType::OncePerTurnByTeamMate);
+            p.reset_used_skills_in(SkillUsageType::OncePerTurn, rules);
+            p.reset_used_skills_in(SkillUsageType::OncePerTurnByTeamMate, rules);
             for name in enhancements_to_remove.iter() {
                 p.remove_enhancements(name);
             }

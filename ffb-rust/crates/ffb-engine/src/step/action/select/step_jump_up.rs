@@ -126,7 +126,8 @@ impl StepJumpUp {
         }
 
         // Java: modifierFactory.findModifiers(new JumpUpContext(actingPlayer, game))
-        let agility = game.player(&player_id).map(|p| p.agility).unwrap_or(3);
+        // Java: `pPlayer.getAgilityWithModifiers()` in every edition's AgilityMechanic.
+        let agility = game.player(&player_id).map(|p| p.agility_with_modifiers()).unwrap_or(3);
         let factory = JumpUpModifierFactory::for_rules(game.rules);
         let ctx = JumpUpContext::new(game, &game.acting_player);
         // Java: `new ReportJumpUpRoll(..., modifiers.toArray(new JumpUpModifier[0]))` -- the report
@@ -139,7 +140,15 @@ impl StepJumpUp {
             .iter()
             .map(|(_, v)| Modifier::new("Jump Up", *v, game.rules))
             .collect();
-        let min_roll = minimum_roll_jump_up(agility, &modifiers);
+        let min_roll = if game.rules == ffb_model::enums::Rules::Bb2016 {
+            // Java bb2016 AgilityMechanic.minimumRollJumpUp: AG is a stat, not a target --
+            // max(2, (7 - min(AG, 6)) + modifiers). The bb2020/bb2025 target formula gave a
+            // Jump Up AG4 player a 3+ where Java rolls 2+ (star tier: Roxanna Darknail).
+            let total: i32 = found.iter().map(|(_, v)| *v).sum();
+            (7 - agility.min(6) + total).max(2)
+        } else {
+            minimum_roll_jump_up(agility, &modifiers)
+        };
         let roll = rng.d6();
         // Java `JumpUpBehaviour` uses DiceInterpreter.isSkillRollSuccessful: a natural 6 always succeeds and a
         // natural 1 always fails, whatever the target. Only differs from a bare `>=` when the target
@@ -422,6 +431,22 @@ mod tests {
             game.report_list.has_report(ffb_model::report::report_id::ReportId::JUMP_UP_ROLL),
             "failed roll should add ReportJumpUpRoll"
         );
+    }
+
+    /// Java bb2016 AgilityMechanic.minimumRollJumpUp: max(2, (7 - min(AG, 6)) + modifiers). An AG4
+    /// Jump Up player (star tier: bb2016 Roxanna Darknail) needs a 2+, not the target-number 3+.
+    #[test]
+    fn bb2016_jump_up_minimum_uses_the_stat_formula() {
+        let seed = seed_for_d6(2);
+        let (mut game, _) = make_game_block_standing_up(vec![SkillId::JumpUp], 4);
+        game.rules = Rules::Bb2016;
+        let mut step = StepJumpUp::new();
+        step.goto_label_on_failure = "FAIL".into();
+        step.start(&mut game, &mut GameRng::new(seed));
+        let json: Vec<String> = game.report_list.get_reports().iter()
+            .filter_map(|r| r.to_json()).map(|v| v.to_string()).collect();
+        assert!(json.iter().any(|j| j.contains("\"jumpUpRoll\"") && j.contains("\"minimumRoll\":2")
+            && j.contains("\"successful\":true")), "{json:?}");
     }
 
     #[test]

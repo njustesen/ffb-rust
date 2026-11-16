@@ -502,6 +502,11 @@ impl Player {
         self.used_skills.retain(|id| id.usage_type() != usage_type);
     }
 
+    /// `reset_used_skills` with the edition's usage types (`SkillId::usage_type_for`).
+    pub fn reset_used_skills_in(&mut self, usage_type: crate::enums::SkillUsageType, rules: crate::enums::Rules) {
+        self.used_skills.retain(|id| id.usage_type_for(rules) != usage_type);
+    }
+
     /// Java: RosterPlayer.setPlayerStatus
     pub fn set_player_status(&mut self, status: PlayerStatus) { self.player_status = status; }
 

@@ -174,8 +174,9 @@ impl StateMechanic {
     fn reset_special_skills_at_half_time(&self, game: &mut Game) {
         if game.half <= 2 {
             use ffb_model::enums::SkillUsageType;
+            let rules = game.rules;
             for p in game.team_home.players.iter_mut().chain(game.team_away.players.iter_mut()) {
-                p.reset_used_skills(SkillUsageType::OncePerHalf);
+                p.reset_used_skills_in(SkillUsageType::OncePerHalf, rules);
             }
         }
         self.reset_special_skill_at_end_of_drive(game);

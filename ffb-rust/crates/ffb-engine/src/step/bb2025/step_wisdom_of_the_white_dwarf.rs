@@ -61,11 +61,97 @@ impl StepWisdomOfTheWhiteDwarf {
         Self { player_id: None, granted_skill: None, granting_skill: None }
     }
 
+    /// Java bb2020 `StepWisdomOfTheWhiteDwarf.executeStep()`: the ACTING player is the one who
+    /// GAINS the skill, from an adjacent team-mate (with tackle zones) whose canGrantSkillsToTeamMates
+    /// skill is unused -- the reverse of bb2025, where the star grants it to a team-mate within 2.
+    /// The shared step ran the bb2025 logic for bb2020 (star tier: imperial_nobility+Grombrindal).
+    fn execute_step_bb2020(&mut self, game: &mut Game, acting_id: String) -> StepOutcome {
+        let owned: Vec<SkillId> = game.player(&acting_id).map(|p| p.all_skill_ids().collect()).unwrap_or_default();
+        // Constant.getGrantAbleSkills(..).filter(!owned).sorted(by name) -- already name-sorted.
+        let gain_able_skills: Vec<(SkillId, Option<&'static str>)> = grant_able_skills()
+            .into_iter()
+            .filter(|(id, _)| !owned.contains(id))
+            .collect();
+
+        if self.player_id.is_none() {
+            let Some(coord) = game.field_model.player_coordinate(&acting_id) else {
+                return StepOutcome::next();
+            };
+            let team = if game.team_home.has_player(&acting_id) { &game.team_home } else { &game.team_away };
+            let wise_players: Vec<String> = UtilPlayer::find_adjacent_players_with_tacklezones(game, team, coord, false)
+                .into_iter()
+                .filter(|mate_id| game.player(mate_id).map(|m| m.all_skill_ids().any(|sk|
+                    sk.properties().contains(&NamedProperties::CAN_GRANT_SKILLS_TO_TEAM_MATES)
+                        && !m.used_skills.contains(&sk))).unwrap_or(false))
+                .cloned()
+                .collect();
+            if wise_players.is_empty() {
+                return StepOutcome::next();
+            }
+            if wise_players.len() == 1 {
+                self.player_id = Some(wise_players[0].clone());
+            } else {
+                return StepOutcome::cont().with_prompt(AgentPrompt::PlayerChoice {
+                    eligible_players: wise_players,
+                    reason: "WISDOM".into(),
+                    descriptions: vec![],
+                });
+            }
+        }
+        let wise_id = self.player_id.clone().expect("player_id set above");
+        let granting = game.player(&wise_id)
+            .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_GRANT_SKILLS_TO_TEAM_MATES));
+        self.granting_skill = granting;
+
+        if self.granted_skill.is_none() {
+            // Java: addReport(new ReportSkillUseOtherPlayer(actingPlayerId, grantingSkill,
+            //   SkillUse.GAIN_GRANTED_SKILL, playerId))
+            game.report_list.add(ffb_model::report::bb2020::report_skill_use_other_player::ReportSkillUseOtherPlayer::new(
+                acting_id.clone(),
+                granting.map(|g| g.display_name().to_string()).unwrap_or_default(),
+                SkillUse::GAIN_GRANTED_SKILL.get_name().to_string(),
+                wise_id.clone(),
+            ));
+            if gain_able_skills.len() == 1 {
+                self.granted_skill = Some(gain_able_skills[0].0);
+            } else {
+                return StepOutcome::cont().with_prompt(AgentPrompt::SelectSkill {
+                    player_id: acting_id.clone(),
+                    skill_ids: gain_able_skills.iter().map(|(id, _)| *id as u16).collect(),
+                    reason: "WISDOM_OF_THE_WHITE_DWARF".into(),
+                });
+            }
+        }
+
+        let skill = self.granted_skill.expect("granted_skill set above");
+        let value = gain_able_skills.iter()
+            .find(|(id, _)| *id == skill)
+            .and_then(|(_, v)| *v)
+            .map(|v| v.to_string());
+        // Java: game.getFieldModel().addWisdomSkill(actingPlayer.getPlayerId(), gainedSkill)
+        if let Some(acting_mut) = game.player_mut(&acting_id) {
+            acting_mut.add_prayer_skill(crate::step::util_server_steps::WISDOM_ENHANCEMENT_SOURCE, skill, value);
+        }
+        game.report_list.add(ReportPlayerEvent::new(
+            Some(acting_id.clone()),
+            Some(format!("gains {}", skill.display_name())),
+        ));
+        // Java: player.markUsed(grantingSkill, game); actingPlayer.addGrantedSkill(grantingSkill, player)
+        if let Some(g) = granting {
+            mark_used(game, &wise_id, g);
+            game.acting_player.add_granted_skill(g, Some(wise_id.clone()));
+        }
+        StepOutcome::next()
+    }
+
     /// Java: `executeStep()`.
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
         let Some(acting_id) = game.acting_player.player_id.clone() else {
             return StepOutcome::next();
         };
+        if game.rules == ffb_model::enums::Rules::Bb2020 {
+            return self.execute_step_bb2020(game, acting_id);
+        }
 
         if self.player_id.is_none() {
             let Some(coord) = game.field_model.player_coordinate(&acting_id) else {
@@ -158,7 +244,9 @@ impl StepWisdomOfTheWhiteDwarf {
         }
         game.report_list.add(ReportPlayerEvent::new(
             Some(target_id.clone()),
-            Some(format!("gains {}", skill.class_name())),
+            // Java: "gains " + gainedSkill.getSkill().getName() -- the DISPLAY name ("Break Tackle");
+            // class_name() wrote "BreakTackle" for the three two-word grantable skills.
+            Some(format!("gains {}", skill.display_name())),
         ));
 
         if let Some(granting) = self.granting_skill {

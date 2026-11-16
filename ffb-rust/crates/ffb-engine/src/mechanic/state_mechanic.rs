@@ -255,8 +255,9 @@ pub trait StateMechanic: Send + Sync {
     /// Java: resetSpecialSkillAtEndOfDrive(Game).
     fn reset_special_skill_at_end_of_drive(&self, game: &mut Game) {
         use ffb_model::enums::SkillUsageType;
+        let rules = game.rules;
         for p in game.team_home.players.iter_mut().chain(game.team_away.players.iter_mut()) {
-            p.reset_used_skills(SkillUsageType::OncePerDrive);
+            p.reset_used_skills_in(SkillUsageType::OncePerDrive, rules);
         }
     }
 

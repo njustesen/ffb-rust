@@ -309,10 +309,11 @@ pub fn change_acting_player(game: &mut Game, player_id: &str, action: PlayerActi
         // stayed marked used through turn 7, so find_skill_reroll_source returned None and the pass
         // fell to a declined TRR offer instead of Java's auto-used Pass re-roll.)
         if changed {
+            let rules = game.rules;
             if let Some(p) = game.team_home.player_mut(player_id)
                 .or_else(|| game.team_away.player_mut(player_id))
             {
-                p.reset_used_skills(ffb_model::enums::SkillUsageType::Regular);
+                p.reset_used_skills_in(ffb_model::enums::SkillUsageType::Regular, rules);
             }
         }
         // Java UtilActingPlayer.changeActingPlayer (`if (changed)` block): resets transient

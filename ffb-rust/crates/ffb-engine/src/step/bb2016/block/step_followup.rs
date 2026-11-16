@@ -141,7 +141,17 @@ impl StepFollowup {
                         self.using_skill_preventing_follow_up = Some(false);
                     } else {
                         // Java: UtilServerDialog.showDialog(... DialogSkillUseParameter(defenderId, skill, 0) ...) → CONTINUE
-                        return build_outcome(out_params, StepOutcome::cont());
+                        // Emit the SkillUse prompt (same bridge as bb2025): a bare cont() waited
+                        // forever -- the bb2016 Fend stall (star tier: Quetzal Leap, slann vs norse).
+                        let (sk_id, sk_name) = fend_skill_id
+                            .map(|s| (s as u16, s.class_name().to_string()))
+                            .unwrap_or((SkillId::Fend as u16, "Fend".to_string()));
+                        let prompt = ffb_model::prompts::AgentPrompt::SkillUse {
+                            player_id: game.defender_id.clone().unwrap_or_default(),
+                            skill_id: sk_id,
+                            skill_name: sk_name,
+                        };
+                        return build_outcome(out_params, StepOutcome::cont().with_prompt(prompt));
                     }
                 } else {
                     if self.using_skill_preventing_follow_up == Some(true) {
@@ -405,6 +415,34 @@ mod tests {
         game.defender_id = Some("def".into());
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::SKILL_USE), "NO_TACKLEZONE must emit ReportSkillUse");
+    }
+
+    /// Java: a Fend defender that HAD tackle zones gets DialogSkillUseParameter and the step waits.
+    /// Rust returned a bare cont() -- no prompt, the game stalled (star tier: bb2016 slann vs norse).
+    #[test]
+    fn fend_with_tacklezones_prompts_the_defender() {
+        use ffb_model::enums::{PlayerType, PlayerGender, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut step = StepFollowup::new();
+        step.old_defender_state = Some(PlayerState::new(PS_STANDING));
+        let mut game = make_game();
+        game.team_away.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 1, position_id: "p".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Fend, value: None }],
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.defender_id = Some("def".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::SkillUse { ref player_id, .. }) if player_id == "def"),
+            "{:?}", out.prompt);
+        let out = step.handle_command(&Action::UseSkill { skill_id: SkillId::Fend, use_skill: true }, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep, "Fend used -> no follow-up, step completes");
     }
 
     #[test]

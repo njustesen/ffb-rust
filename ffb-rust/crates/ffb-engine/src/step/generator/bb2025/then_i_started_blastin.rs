@@ -23,10 +23,13 @@ impl ThenIStartedBlastin {
         seq.add(StepId::ThenIStartedBlastin, vec![
             StepParameter::GotoLabelOnEnd(labels::END.into()),
         ]);
-        // 15 STEADY_FOOTING (goto END on success)
-        seq.add(StepId::SteadyFooting, vec![
-            StepParameter::GotoLabelOnSuccess(labels::END.into()),
-        ]);
+        // 15 STEADY_FOOTING (goto END on success) -- bb2025 only: generator/bb2020/ThenIStartedBlastin
+        // has no STEADY_FOOTING step.
+        if rules != ffb_model::enums::Rules::Bb2020 {
+            seq.add(StepId::SteadyFooting, vec![
+                StepParameter::GotoLabelOnSuccess(labels::END.into()),
+            ]);
+        }
         // 16 HANDLE_DROP_PLAYER_CONTEXT
         seq.add(StepId::HandleDropPlayerContext, vec![]);
         // 17 APOTHECARY (DEFENDER)

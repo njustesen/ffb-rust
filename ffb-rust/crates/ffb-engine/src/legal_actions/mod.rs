@@ -559,9 +559,10 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
         // isThenIStartedBlastinAvailable rule — unused canBlastRemotePlayer + any opponent
         // within 3 Chebyshev steps. Offer sits DIRECTLY AFTER Catch of the Day; ParityRunner
         // mirrors the position.
-        if player.has_skill(SkillId::BlastinSolvesEverything)
-            && !player.used_skills.contains(&SkillId::BlastinSolvesEverything)
-        {
+        // Java gates on the PROPERTY (`hasUnusedSkillWithProperty(p, canBlastRemotePlayer)`), which
+        // bb2020's "Then I Started Blastin'!" registers as well; keying on the bb2025 SkillId hid
+        // the offer from every bb2020 Zzharg (star tier: goblin vs black_orc bb2020 step 2).
+        if player.has_unused_skill_with_property(ffb_model::model::property::named_properties::NamedProperties::CAN_BLAST_REMOTE_PLAYER) {
             let opponent_near = opponent_team.players.iter().any(|op| {
                 game.field_model.player_coordinate(&op.id)
                     .map(|c| c.distance_in_steps(coord) <= 3)
@@ -822,6 +823,22 @@ pub fn legal_throw_keg_targets(game: &Game, thrower_id: &str) -> Vec<PlayerId> {
 /// for players that have not acted this activation, so that clause is implicit here.
 pub fn is_wisdom_available(game: &Game, player_id: &str) -> bool {
     let Some(player) = game.player(player_id) else { return false };
+    if game.rules == Rules::Bb2020 {
+        // Java bb2020 GameMechanic.isWisdomAvailable: the player RECEIVES -- it must be missing a
+        // grantable skill and stand next to a team-mate (with tackle zones) holding an unused
+        // canGrantSkillsToTeamMates skill. bb2025's rule (the star grants within 2) ran for
+        // bb2020 too, so Rust offered Wisdom to Grombrindal and Java to his neighbours.
+        let grantable = crate::step::bb2025::step_wisdom_of_the_white_dwarf::grant_able_skills();
+        let can_gain = grantable.iter().any(|(id, _)| !player.all_skill_ids().any(|owned| owned == *id));
+        let Some(coord) = game.field_model.player_coordinate(player_id) else { return false };
+        let own_team = if game.team_home.player(player_id).is_some() { &game.team_home } else { &game.team_away };
+        return can_gain && ffb_model::util::util_player::UtilPlayer::find_adjacent_players_with_tacklezones(
+                game, own_team, coord, false)
+            .into_iter()
+            .any(|mate_id| game.player(mate_id).map(|m| m.all_skill_ids().any(|sk|
+                sk.properties().contains(&ffb_model::model::property::named_properties::NamedProperties::CAN_GRANT_SKILLS_TO_TEAM_MATES)
+                    && !m.used_skills.contains(&sk))).unwrap_or(false));
+    }
     if !player.has_skill(SkillId::WisdomOfTheWhiteDwarf)
         || player.used_skills.contains(&SkillId::WisdomOfTheWhiteDwarf)
     {
@@ -857,8 +874,11 @@ pub fn is_wisdom_available(game: &Game, player_id: &str) -> bool {
 /// `StepInitSelecting` (Java :399 Black Ink, :407 the Zoat).
 pub fn is_auto_gaze_zoat_available(game: &Game, player_id: &str) -> bool {
     let Some(player) = game.player(player_id) else { return false };
-    if !player.has_skill_property(
-        ffb_model::model::property::named_properties::NamedProperties::CAN_GAZE_AUTOMATICALLY_THREE_SQUARES_AWAY)
+    // Edition-aware: bb2020's Zoat registers canGainGaze, NOT this property, so Java never offers
+    // the auto-gaze in bb2020 (star tier: wood_elf+Zolcath bb2020 -- Rust's extra offer shifted
+    // the heuristic's pick at step 5).
+    if !player.all_skill_ids().any(|id| id.has_property_in(game.rules,
+        ffb_model::model::property::named_properties::NamedProperties::CAN_GAZE_AUTOMATICALLY_THREE_SQUARES_AWAY))
     {
         return false;
     }
@@ -2004,6 +2024,22 @@ mod tests {
         game.field_model.set_player_state(id, s);
     }
 
+    /// bb2020's Zoat registers canGainGaze (Java bb2020/special/ExcuseMeAreYouAZoat), not the
+    /// bb2025 auto-gaze property: Java never offers AUTO_GAZE_ZOAT in bb2020.
+    #[test]
+    fn bb2020_zoat_is_not_offered_the_bb2025_auto_gaze() {
+        let mut game = make_game(Rules::Bb2020);
+        add_player(&mut game, true, "zolcath", c(5, 5), PS_STANDING, vec![SkillId::ExcuseMeAreYouAZoat]);
+        activate(&mut game, "zolcath");
+        add_player(&mut game, false, "opp", c(7, 5), PS_STANDING, vec![]);
+        assert_eq!(game.rules, Rules::Bb2020);
+        assert!(!SkillId::ExcuseMeAreYouAZoat.has_property_in(Rules::Bb2020,
+            ffb_model::model::property::named_properties::NamedProperties::CAN_GAZE_AUTOMATICALLY_THREE_SQUARES_AWAY));
+        let ids: Vec<SkillId> = game.player("zolcath").unwrap().all_skill_ids().collect();
+        assert_eq!(ids, vec![SkillId::ExcuseMeAreYouAZoat]);
+        assert!(!is_auto_gaze_zoat_available(&game, "zolcath"));
+    }
+
     /// §11 Batch C: "Excuse Me, Are You a Zoat?" is offered under the CLIENT's
     /// isAutoGazeZoatAvailable rule — unused canGazeAutomaticallyThreeSquaresAway plus an
     /// opponent WITH TACKLE ZONES within 3 that is not already distracted.
@@ -2226,6 +2262,17 @@ mod tests {
         }
         let a2 = legal_activate_player_actions(&game, TeamSide::Home);
         assert!(!has_action(&a2, "zzharg", PlayerActionChoice::ThenIStartedBlastin));
+    }
+
+    /// Star tier: bb2020's "Then I Started Blastin'!" registers the same canBlastRemotePlayer
+    /// property, and Java's offer keys on the property -- so a bb2020 Zzharg gets the action too.
+    #[test]
+    fn bb2020_then_i_started_blastin_is_offered_by_property() {
+        let mut game = make_game(Rules::Bb2020);
+        add_player(&mut game, true, "zzharg", c(5, 5), PS_STANDING, vec![SkillId::ThenIStartedBlastin]);
+        add_player(&mut game, false, "opp", c(8, 5), PS_STANDING, vec![]);
+        let a = legal_activate_player_actions(&game, TeamSide::Home);
+        assert!(has_action(&a, "zzharg", PlayerActionChoice::ThenIStartedBlastin), "{a:?}");
     }
 
     /// §11: All You Can Eat is offered under the CLIENT's rule

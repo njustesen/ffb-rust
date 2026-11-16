@@ -193,15 +193,21 @@ impl StepDauntless {
                     // no defender; only the multi-block report names its target.
                     None,
                 ));
-                if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == player_id)
-                    .or_else(|| game.team_away.players.iter_mut().find(|p| p.id == player_id))
-                {
-                    p.used_skills.insert(SkillId::BlindRage);
-                }
+                // Java never marks the source used here (`getUnusedRerollSource` only FINDS it),
+                // so Blind Rage applies to every failed Dauntless roll -- e.g. the second block of
+                // Akhorne's Frenzy. Marking it used hid it from the second one.
                 roll = rng.d6();
                 success = roll >= min_roll;
                 self.re_rolled_action = Some("DAUNTLESS".into());
                 self.re_roll_source = Some("Blind Rage".into());
+                // Java: addReport(new ReportReRoll(playerId, reRollSource, successful, minimumRoll))
+                // -- the "roll" field carries the MINIMUM roll. It was missing (star tier: Akhorne).
+                game.report_list.add(ffb_model::report::report_re_roll::ReportReRoll::new(
+                    Some(player_id.clone()),
+                    ReRollSource::new("Blind Rage"),
+                    success,
+                    min_roll,
+                ));
                 events.push(GameEvent::DauntlessRoll { player_id: player_id.clone(), roll, success });
             }
         }
@@ -608,7 +614,9 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(seed));
         assert_eq!(out.action, StepAction::NextStep, "Blind Rage reroll succeeds silently, no dialog");
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::SuccessfulDauntless(true))));
-        assert!(game.player("att").unwrap().used_skills.contains(&SkillId::BlindRage));
+        assert!(!game.player("att").unwrap().used_skills.contains(&SkillId::BlindRage),
+            "Java never marks Blind Rage used: it re-rolls every failed Dauntless");
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::RE_ROLL));
         assert_eq!(step.re_roll_source.as_deref(), Some("Blind Rage"));
     }
 

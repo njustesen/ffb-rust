@@ -428,6 +428,11 @@ pub struct PassBlockResumeState {
     pub current_move: i32,
     /// Java: `isGoingForIt` — thrower's saved actingPlayer.isGoingForIt.
     pub going_for_it: bool,
+    /// Java: `fEndTurn` / `fEndPlayerAction` survive `pushCurrentStepOnStack()` (same instance).
+    /// The mixed step resets both before every push, so carrying them is a no-op there; bb2016's
+    /// leaves `fEndPlayerAction` set on its "not acted yet" re-select push.
+    pub end_turn: bool,
+    pub end_player_action: bool,
 }
 
 /// A published parameter carries the consume flag used while walking the stack top→bottom.
