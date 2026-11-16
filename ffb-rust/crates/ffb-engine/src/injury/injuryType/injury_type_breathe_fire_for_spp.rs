@@ -38,8 +38,19 @@ impl InjuryTypeServer for InjuryTypeBreatheFireForSpp {
 impl ModificationAwareInjuryType for InjuryTypeBreatheFireForSpp {
     /// Java `injuryRoll` ends with the context-less `setInjury(pDefender, gameState, diceRoller)`.
     fn interprets_member_injury(&self) -> bool { true }
-    fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, _roll: bool) {
-        do_armor_roll(game, rng, &mut self.ctx, defender_id);
+    fn armour_roll(&mut self, game: &Game, rng: &mut GameRng, _attacker_id: Option<&str>, defender_id: &str, roll: bool) {
+        // Java: `if (!injuryContext.isArmorBroken()) { if (roll) setArmorRoll(rollArmour());
+        // setArmorBroken(isArmourBroken(...)); }` — a Ball & Chain defender arrives pre-broken
+        // (placedProneCausesInjuryRoll) and rolls NO armour; Rust rolled it anyway, so a breathed-on
+        // Fanatic's injury was lost (star tier: chaos_dwarf vs goblin bb2020 seed 1).
+        if self.ctx.armor_broken {
+            return;
+        }
+        if roll {
+            do_armor_roll(game, rng, &mut self.ctx, defender_id);
+        } else {
+            crate::injury::recalc_armor_broken(game, &mut self.ctx, defender_id);
+        }
     }
     fn injury_roll(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str) {
         // Java: `factory.findInjuryModifiers(game, injuryContext, pAttacker, pDefender,
@@ -87,6 +98,15 @@ mod tests {
         let mut t = InjuryTypeBreatheFireForSpp::new(); let mut rng = GameRng::new(1);
         t.handle_injury(&game_with_armor(2), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert!(t.ctx.armor_broken); assert_ne!(t.ctx.injury.map(|s| s.base()), Some(PS_PRONE));
+    }
+    /// Java: armourRoll is wrapped in `if (!injuryContext.isArmorBroken())`.
+    #[test]
+    fn pre_broken_armour_is_not_rerolled() {
+        let mut t = InjuryTypeBreatheFireForSpp::new(); let mut rng = GameRng::new(1);
+        t.ctx.armor_broken = true;
+        t.armour_roll(&game_with_armor(13), &mut rng, None, "p1", true);
+        assert!(t.ctx.armor_broken);
+        assert!(t.ctx.armor_roll.is_none());
     }
     #[test]
     fn turnover_default_true() { assert!(InjuryTypeBreatheFireForSpp::new().falling_down_causes_turnover()); }
