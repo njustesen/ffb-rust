@@ -170,7 +170,7 @@ pub fn find_registered_armour_modifiers(rules: Rules) -> Vec<Box<dyn ArmorModifi
             } else {
                 &ctx.game.team_away
             };
-            defender_team.necromancer || defender_team.vampire_lord
+            defender_is_undead(ctx.game, defender_team, ctx.defender)
         })));
     }
 
@@ -326,10 +326,8 @@ fn skill_to_armor_modifier(
             } else {
                 &context.game.team_away
             };
-            // Java: otherTeam.getRoster().isUndead() — covers Necromantic, Undead, Vampire teams.
-            // NOTE: Khemri is not captured by necromancer/vampire_lord flags (position-level check needed).
-            let team_is_undead = defender_team.necromancer || defender_team.vampire_lord;
-            if team_is_undead {
+            // Java: otherTeam.getRoster().isUndead() || defender.getPosition().isUndead().
+            if defender_is_undead(context.game, defender_team, context.defender) {
                 Some(Box::new(StaticArmourModifier::new("Stakes", 1, false)))
             } else {
                 None
@@ -347,6 +345,23 @@ fn skill_to_armor_modifier(
         }
         _ => None,
     }
+}
+
+
+/// Java (bb2016 `Stakes.appliesToContext`): `otherTeam.getRoster().isUndead() ||
+/// defender.getPosition().isUndead()`. The roster's `<undead>` flag (Khemri, Necromantic, Undead,
+/// Vampire) is carried onto every RosterPosition as `is_undead`. The old proxy —
+/// necromancer || vampire_lord — missed Khemri, so a stab with Stakes against a Khemri player
+/// lacked Java's +1 armour (star tier: Zara the Slayer, dwarf vs khemri bb2016 seed 2).
+fn defender_is_undead(game: &ffb_model::model::game::Game, team: &ffb_model::model::team::Team,
+    defender: &ffb_model::model::player::Player) -> bool {
+    if team.necromancer || team.vampire_lord {
+        return true;
+    }
+    ffb_model::data::loader::find_roster(&team.roster_id, game.rules)
+        .map(|r| r.position(&defender.position_id).map(|p| p.is_undead)
+            .unwrap_or_else(|| r.positions.iter().any(|p| p.is_undead)))
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
