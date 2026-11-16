@@ -198,12 +198,15 @@ impl StepDropFallingPlayers {
                 defender_state = Some(new_s);
             }
         }
-        // Java: if (HIT_ON_GROUND) changeBase(FALLING)
+        // Java: `if (defenderState.getBase() == HIT_ON_GROUND) defenderState =
+        // defenderState.changeBase(FALLING);` — a LOCAL variable only; the field keeps
+        // HIT_ON_GROUND, so StepSteadyFooting later sees it and skips the Steady Footing dialog
+        // (a Ball & Chain blocking an already-prone player). Rust wrote FALLING back to the field
+        // and offered Steady Footing Java never offers (star tier: Fungus the Loon, bretonnian vs
+        // skaven bb2025 seed 1).
         if let Some(s) = defender_state {
             if s.base() == PS_HIT_ON_GROUND {
-                let new_s = s.change_base(PS_FALLING);
-                game.field_model.set_player_state(&defender_id, new_s);
-                defender_state = Some(new_s);
+                defender_state = Some(s.change_base(PS_FALLING));
             }
         }
 
@@ -680,6 +683,9 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         // HIT_ON_GROUND is upgraded → injury is performed → STEADY_FOOTING_CONTEXT published
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))));
+        // ...but only locally: Java leaves the FIELD state HIT_ON_GROUND, which is what makes
+        // StepSteadyFooting skip its dialog.
+        assert_eq!(game.field_model.player_state("def").map(|s| s.base()), Some(PS_HIT_ON_GROUND));
     }
 
     #[test]

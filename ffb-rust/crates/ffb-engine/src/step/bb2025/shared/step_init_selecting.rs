@@ -440,6 +440,17 @@ impl Step for StepInitSelecting {
                     game.original_bombardier = None;
                     game.throw_two_bombs = None;
                 }
+                // THROW_KEG with NO valid target: ParityRunner (both agent paths) checks the targets
+                // BEFORE declaring and, finding none, injects only the deselect
+                // `ClientCommandActingPlayer(null, null, false)` — the THROW_KEG declaration is
+                // never sent, so Java writes no `playerAction: throwKey` report and sets no acting
+                // player. Rust declared it and then deselected (star tier: Thorsson Stoutmead,
+                // bretonnian vs skaven bb2025 seeds 1/3/4).
+                if pa == PlayerAction::ThrowKeg && block_defender_id.is_none() {
+                    game.defender_id = None;
+                    self.end_player_action = true;
+                    return self.execute_step(game, rng);
+                }
                 // A foul is TWO client commands in Java: the declaration `ClientCommandActingPlayer
                 // (FOUL_MOVE)` (ParityRunner.actionFromName maps "Foul" to FOUL_MOVE), then
                 // CLIENT_FOUL, whose `StepInitSelecting:224` arm calls `changePlayerAction(FOUL)`.
