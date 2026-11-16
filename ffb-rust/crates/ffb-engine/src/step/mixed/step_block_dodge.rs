@@ -139,6 +139,15 @@ impl StepBlockDodge {
             grab_squares = &regular_squares;
         }
 
+        // Java wraps the sideline / attacker-half loop in `if (ArrayTool.isProvided(
+        // regularPushbackSquares))`: a CROWD push (every regular square off the pitch) has an
+        // empty regular list, so Grab's adjacent squares are never scanned and no Dodge dialog is
+        // raised. Rust scanned them anyway — a Ninja blocked off the endzone edge by Anqi Panqi
+        // (Grab) was asked about Dodge, two sampler draws Java never spends (star tier: nippon vs
+        // slann bb2025 seed 1).
+        if regular_squares.is_empty() {
+            return chain_push;
+        }
         let sideline_push = grab_squares.iter().any(|sq| {
             let c = sq.coordinate;
             FieldCoordinateBounds::SIDELINE_LOWER.is_in_bounds(c)
@@ -485,6 +494,36 @@ mod tests {
         game.field_model.set_player_coordinate("att", FieldCoordinate::new(12, 7));
         game.field_model.set_player_coordinate("def", FieldCoordinate::new(13, 7));
         // No players on push squares, not near sideline, not first turn after kickoff
+        assert!(!StepBlockDodge::find_dodge_choice(&game));
+    }
+
+    /// Java guards the sideline/attacker-half scan on `ArrayTool.isProvided(regularPushbackSquares)`:
+    /// a crowd push off the endzone edge has no regular squares, so even a Grab attacker (whose
+    /// adjacent squares touch the endzone) does not trigger the Dodge question.
+    #[test]
+    fn find_dodge_choice_crowd_push_never_asks_even_with_grab() {
+        use ffb_model::model::player::Player;
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerAction, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("att".into());
+        game.acting_player.player_action = Some(PlayerAction::Block);
+        game.defender_id = Some("def".into());
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(24, 5));
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(25, 5));
+        game.team_home.players.push(Player {
+            id: "att".into(), name: "att".into(), nr: 1, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 5, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue { skill_id: SkillId::Grab, value: None }],
+            ..Default::default()
+        });
+        game.team_away.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 2, position_id: "lineman".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 5, strength: 3, agility: 3, passing: 4, armour: 9,
+            ..Default::default()
+        });
         assert!(!StepBlockDodge::find_dodge_choice(&game));
     }
 
