@@ -69,7 +69,15 @@ impl ModificationAwareInjuryType for InjuryTypeStab {
                 }
             }
         }
-        do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
+        if self.use_injury_modifiers {
+            do_injury_roll_for_player(rng, &mut self.ctx, game, defender_id);
+        } else {
+            // Java `RollMechanic.interpretInjuryRoll` derives isStunty from a Stunty injury
+            // MODIFIER in the context; bb2016's `new InjuryTypeStab(false)` gathers none, so a
+            // stabbed Stunty goblin's 9 is KO, not Badly Hurt (star tier: bb2016 dark_elf vs
+            // goblin seed 2).
+            crate::injury::do_injury_roll_for_player_no_stunty(rng, &mut self.ctx, game, defender_id);
+        }
     }
     fn saved_by_armour(&mut self) {
         // Stab: no injury when armor holds
@@ -220,6 +228,31 @@ mod tests {
         t.handle_injury(&game_with_armor_and_niggling(2, 0), &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
         assert!(t.ctx.armor_broken);
         assert!(!t.ctx.injury_modifiers.iter().any(|m| m.name.contains("Niggling")));
+    }
+
+    /// Java: isStunty comes from a Stunty injury MODIFIER; bb2016 `new InjuryTypeStab(false)`
+    /// gathers none, so a Stunty defender's injury total of 9 is KO (not Badly Hurt).
+    #[test]
+    fn stab_without_injury_modifiers_ignores_stunty() {
+        use ffb_model::enums::{SkillId, PS_KNOCKED_OUT};
+        use ffb_model::model::SkillWithValue;
+        let mut checked = false;
+        for seed in 0..500u64 {
+            let mut game = game_with_armor_and_niggling(2, 0);
+            game.team_home.players[0].extra_skills.push(SkillWithValue::new(SkillId::Stunty));
+            let mut t = InjuryTypeStab::new(false);
+            let mut rng = GameRng::new(seed);
+            t.handle_injury(&game, &mut rng, None, "p1", coord(), None, None, ApothecaryMode::Defender);
+            if let Some([a, b]) = t.ctx.injury_roll {
+                if a + b == 9 {
+                    assert_eq!(t.ctx.injury.map(|s| s.base()), Some(PS_KNOCKED_OUT),
+                        "a 9 without a Stunty modifier is KO");
+                    checked = true;
+                    break;
+                }
+            }
+        }
+        assert!(checked, "no seed produced an injury total of 9");
     }
 
     #[test]
