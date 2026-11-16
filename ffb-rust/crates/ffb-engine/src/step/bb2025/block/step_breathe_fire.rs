@@ -10,7 +10,7 @@ use crate::action::Action;
 use crate::drop_player_context::{DropPlayerContext, SteadyFootingContext};
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
-use crate::step::util_server_injury::{drop_player, handle_injury_by_name};
+use crate::step::util_server_injury::handle_injury_by_name;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.block.StepBreatheFire.
@@ -27,7 +27,7 @@ use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
 /// otherwise effectiveRoll = roll; minimumRoll = 2; proneRoll = 4
 ///
 /// handleInjury wired via handle_injury_by_name for KNOCK_DOWN and FAILURE paths.
-/// dropPlayer wired via util_server_injury::drop_player for PRONE path.
+/// dropPlayer wired via util_server_injury::drop_player_rng for PRONE path.
 /// Re-roll wired via util_server_re_roll.
 /// grantsSpp: UtilCards.hasSkillWithProperty(attacker, grantsSppFromSpecialActionsCas) — wired.
 pub struct StepBreatheFire {
@@ -242,7 +242,13 @@ impl StepBreatheFire {
                     game.field_model.set_player_state(&defender_id, st.remove_selected_blitz_target());
                 }
                 let mut out = StepOutcome::goto(&self.goto_label_on_success.clone());
-                let drop_params = drop_player(game, &defender_id, true);
+                // Java: `UtilServerInjury.dropPlayer(this, defender, ApothecaryMode.DEFENDER, true)` —
+                // the full body, whose placedProneCausesInjuryRoll branch gives a Ball & Chain
+                // defender an InjuryTypeBallAndChain roll instead of placing it prone. The rng-less
+                // `drop_player` skips that branch, so a breathed-on Fanatic stayed standing (star
+                // tier: chaos_dwarf vs goblin bb2025 seed 1).
+                let drop_params = crate::step::util_server_injury::drop_player_rng(
+                    game, rng, &defender_id, true, ffb_model::enums::ApothecaryMode::Defender);
                 for p in drop_params {
                     out = out.publish(p);
                 }
@@ -335,6 +341,37 @@ mod tests {
         // For normal, minimum_roll = 2: roll=2 → effective=2 → NO_EFFECT (< 4); roll=4 → effective=4 → PRONE
         assert_eq!(StepBreatheFire::evaluate(2, 2), BreatheFireResult::NO_EFFECT);
         assert_eq!(StepBreatheFire::evaluate(4, 4), BreatheFireResult::PRONE);
+    }
+
+    /// Java PRONE branch: `UtilServerInjury.dropPlayer(this, defender, DEFENDER, true)` — a Ball &
+    /// Chain defender (placedProneCausesInjuryRoll) takes an InjuryTypeBallAndChain roll, published
+    /// as INJURY_RESULT, instead of being placed prone.
+    #[test]
+    fn prone_result_on_ball_and_chain_defender_rolls_injury() {
+        use ffb_model::enums::{PlayerAction, PlayerState, PS_STANDING, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut att = Player { id: "att".into(), movement: 4, strength: 3, agility: 4, armour: 9, ..Default::default() };
+        att.starting_skills.push(SkillWithValue { skill_id: SkillId::BreatheFire, value: None });
+        game.team_home.players.push(att);
+        let mut def = Player { id: "def".into(), movement: 3, strength: 7, agility: 3, armour: 8, ..Default::default() };
+        def.starting_skills.push(SkillWithValue { skill_id: SkillId::BallAndChain, value: None });
+        game.team_away.players.push(def);
+        game.field_model.set_player_coordinate("att", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("att", PlayerState::new(PS_STANDING));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.home_playing = true;
+        game.acting_player.set_player("att".into(), PlayerAction::BreatheFire);
+        game.defender_id = Some("def".into());
+        let mut step = StepBreatheFire::new("ok".into(), "fail".into());
+        step.using_breathe_fire = true;
+        step.result = Some(BreatheFireResult::PRONE);
+        let out = step.start(&mut game, &mut GameRng::new(1));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))),
+            "a Ball & Chain defender must get an injury roll");
     }
 
     /// has_skill_with_property correctly identifies grants_spp property (unit check, no full rollout).
