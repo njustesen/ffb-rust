@@ -473,9 +473,12 @@ impl StepEndBlocking {
         //   && ArrayTool.isProvided(findAdjacentBlockablePlayers(...)) && regularBlock
         let can_use_putrid = player_action.map(|a| a.is_block_action()).unwrap_or(false)
             && regular_block
+            // Java hasUnusedSkillWithProperty(actingPlayer, ...): a spent Putrid Regurgitation is
+            // not offered again (star tier: Bilerot Vomitflesh, renegades vs gnome bb2025).
             && attacker_id.as_deref()
                 .and_then(|id| game.player(id))
-                .map(|p| p.has_skill_property(NamedProperties::CAN_USE_VOMIT_AFTER_BLOCK))
+                .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_USE_VOMIT_AFTER_BLOCK)
+                    .map(|sk| !p.used_skills.contains(&sk) && !game.acting_player.used_skills.contains(&sk)))
                 .unwrap_or(false)
             && {
                 let inactive = game.inactive_team();

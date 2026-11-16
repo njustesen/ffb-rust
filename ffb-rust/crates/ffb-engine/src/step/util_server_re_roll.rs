@@ -475,7 +475,7 @@ pub fn use_reroll_with_events(
                 // `!player.isUsed(skill)` for a skill tracked outside its activation, else
                 // `hasSkill` (true here — the id came from the player); then
                 // `addReport(new ReportReRoll(pid, reRollSource, successful, 0))`.
-                let tracked = id.usage_type().track_outside_activation();
+                let tracked = id.usage_type_for(game.rules).track_outside_activation();
                 let successful = if tracked { !player.used_skills.contains(&id) } else { true };
                 player.used_skills.insert(id);
                 game.report_list.add(ffb_model::report::report_re_roll::ReportReRoll::new(
@@ -484,7 +484,10 @@ pub fn use_reroll_with_events(
                     successful,
                     0,
                 ));
-                return (true, Vec::new());
+                // Java `return successful` -- Rust returned true even for a spent skill, so the
+                // stale-source re-entry (ARM_BAR answer into StepMoveDodge) re-rolled a dodge with
+                // an already-used Dodge skill (star tier: Akhorne, nippon vs chaos_troll bb2025).
+                return (successful, Vec::new());
             }
         }
     }

@@ -167,6 +167,20 @@ impl StepInitBlocking {
                     return StepOutcome::goto(&label)
                         .publish(StepParameter::EndPlayerAction(true));
                 }
+                // A target exists but none was declared: only the re-block chains reach this (a
+                // Putrid Regurgitation block, Maximum Carnage -- the agents always fold a defender
+                // into a plain Block). Java waits for CLIENT_BLOCK, which ParityRunner never sends:
+                // its INIT_BLOCKING arm falls to `UNHANDLED_STEP` + ClientCommandEndTurn. Rust parked
+                // with no prompt -- a stall (star tier: Bilerot Vomitflesh, black_orc vs renegades
+                // bb2025). End the turn the same way -- for those re-block actions only, so the
+                // interactive plain-Block path still waits for CLIENT_BLOCK.
+                if matches!(game.acting_player.player_action,
+                    Some(PlayerAction::PutridRegurgitationBlock) | Some(PlayerAction::MaximumCarnage))
+                {
+                    return StepOutcome::goto(&label)
+                        .publish(StepParameter::EndTurn(true))
+                        .publish(StepParameter::CheckForgo(true));
+                }
                 return StepOutcome::cont();
             }
         };
