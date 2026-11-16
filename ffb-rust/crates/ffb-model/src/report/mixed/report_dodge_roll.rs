@@ -7,6 +7,8 @@ use crate::report::report_skill_roll::ReportSkillRoll;
 pub struct ReportDodgeRoll {
     pub base: ReportSkillRoll,
     pub stat_based_roll_modifier: Option<String>,
+    /// Java `StatBasedRollModifier.value` — serialised with the name as `{name, value}`.
+    pub stat_based_roll_modifier_value: Option<i32>,
 }
 
 impl ReportDodgeRoll {
@@ -22,7 +24,15 @@ impl ReportDodgeRoll {
         Self {
             base: ReportSkillRoll::new(player_id, successful, roll, minimum_roll, re_rolled, roll_modifiers),
             stat_based_roll_modifier,
+            stat_based_roll_modifier_value: None,
         }
+    }
+
+    /// Java `new StatBasedRollModifier(name, value)` (e.g. Incorporeal: the player's ST).
+    pub fn with_stat_value(mut self, name: String, value: i32) -> Self {
+        self.stat_based_roll_modifier = Some(name);
+        self.stat_based_roll_modifier_value = Some(value);
+        self
     }
 
     pub fn get_player_id(&self) -> Option<&str> { self.base.get_player_id() }
@@ -49,7 +59,10 @@ impl ReportDodgeRoll {
             "minimumRoll": self.base.minimum_roll,
             "reRolled": self.base.re_rolled,
             "rollModifiers": self.base.roll_modifier_names,
-            "statBasedRollModifier": self.stat_based_roll_modifier,
+            "statBasedRollModifier": match (&self.stat_based_roll_modifier, self.stat_based_roll_modifier_value) {
+                (Some(name), Some(value)) => serde_json::json!({ "name": name, "value": value }),
+                (name, _) => serde_json::json!(name),
+            },
         })
     }
 
@@ -63,7 +76,9 @@ impl ReportDodgeRoll {
                 json["reRolled"].as_bool().unwrap_or(false),
                 json["rollModifiers"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default(),
             ),
-            stat_based_roll_modifier: json["statBasedRollModifier"].as_str().map(str::to_string),
+            stat_based_roll_modifier: json["statBasedRollModifier"].as_str().map(str::to_string)
+                .or_else(|| json["statBasedRollModifier"]["name"].as_str().map(str::to_string)),
+            stat_based_roll_modifier_value: json["statBasedRollModifier"]["value"].as_i64().map(|v| v as i32),
         }
     }
 }

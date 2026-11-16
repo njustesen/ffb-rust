@@ -71,6 +71,9 @@ pub struct StepMoveDodge {
     /// The minimum of the last `dodge()` pass — Java keeps `dodgeModifiers` as a field, so a
     /// re-entry's `getModifyingSkillInCaseItHelps` re-tests the STALE roll against it.
     last_minimum_roll: i32,
+    /// Java `dodge()`: `publishParameter(USING_MODIFYING_SKILL, true)` once Incorporeal's
+    /// strength is applied — published by the `execute_step` wrapper.
+    publish_using_modifying_skill: bool,
 }
 
 impl StepMoveDodge {
@@ -92,6 +95,7 @@ impl StepMoveDodge {
             re_roll_state: ReRollState::new(),
             dodge_roll_to_publish: None,
             last_minimum_roll: 0,
+            publish_using_modifying_skill: false,
         }
     }
 }
@@ -109,7 +113,28 @@ impl Step for StepMoveDodge {
                 self.re_roll_state.re_roll_source = None;
                 self.execute_step(game, rng)
             }
-            // client-only: CLIENT_USE_SKILL → canAddStrengthToDodge / canChooseToIgnoreDodgeModifierAfterRoll /
+            // Java (bb2020 + bb2025 handleCommand): CLIENT_USE_SKILL with a canAddStrengthToDodge
+            // skill (Incorporeal) → `usingModifyingSkill = isSkillUsed()`; a DECLINE spends the
+            // Dodge skill re-roll on the spot (`useSkillReRollSource`), then EXECUTE_STEP. Rust
+            // auto-declined the dialog without ever raising it (star tier: bb2020 Gretchen
+            // Wächter, chaos_pact vs khemri seed 1).
+            Action::UseSkill { skill_id, use_skill }
+                if skill_id.properties().contains(
+                    &ffb_model::model::property::named_properties::NamedProperties::CAN_ADD_STRENGTH_TO_DODGE) =>
+            {
+                self.using_modifying_skill = Some(*use_skill);
+                if !*use_skill {
+                    if let Some(source) = find_skill_reroll_source(game, "DODGE") {
+                        self.re_roll_state.re_roll_source = Some(source.clone());
+                        let pid = game.acting_player.player_id.clone().unwrap_or_default();
+                        use_reroll(game, &source, &pid, rng);
+                        // Java `doRoll = reRolledAction && source != null` → a fresh die.
+                        self.dodge_roll = 0;
+                    }
+                }
+                self.execute_step(game, rng)
+            }
+            // client-only: CLIENT_USE_SKILL → canChooseToIgnoreDodgeModifierAfterRoll /
             //       canRerollDodge — headless auto-declines skill dialogs.
             // Java: CLIENT_PLAYER_CHOICE (ARM_BAR mode) → armBarPlayerId = command.getPlayerId();
             // armBarChoice = true; EXECUTE_STEP. The agent's generic PlayerChoice decline sends
@@ -156,6 +181,9 @@ impl StepMoveDodge {
         if let Some(roll) = self.dodge_roll_to_publish.take() {
             out = out.publish(StepParameter::DodgeRoll(roll));
         }
+        if std::mem::take(&mut self.publish_using_modifying_skill) {
+            out = out.publish(StepParameter::UsingModifyingSkill(true));
+        }
         out
     }
 
@@ -177,7 +205,9 @@ impl StepMoveDodge {
         // && !(dtRerollAsked && getReRollSource() == null))` — DECLINING the pre-emptive
         // Diving-Tackle re-roll keeps the (successful) original roll and proceeds to the DT
         // decision; it must not consume anything or fail the dodge.
-        if already_rerolled && !using_modifier_ignoring
+        // Java nests the consume under `if (usingModifyingSkill == null)`: once the Incorporeal
+        // dialog is answered, the re-roll (if declined) was already spent in handleCommand.
+        if already_rerolled && !using_modifier_ignoring && self.using_modifying_skill.is_none()
             && !(self.dt_reroll_asked && self.re_roll_state.re_roll_source.is_none()) {
             let pid = player_id.as_deref().unwrap_or("").to_owned();
             let source_opt = self.re_roll_state.re_roll_source.clone();
@@ -239,6 +269,41 @@ impl StepMoveDodge {
             self.dodge_roll_to_publish = Some(self.dodge_roll);
         }
 
+        // Java `actingPlayer.statBasedModifier(canAddStrengthToDodge)`: the skill's
+        // StatBasedRollModifier (Incorporeal → the player's ST) while the skill is UNUSED, else null.
+        let unused_strength_skill = |game: &Game| -> Option<(ffb_model::enums::SkillId, i32)> {
+            let pid = game.acting_player.player_id.as_deref()?;
+            let p = game.player(pid)?;
+            let skill = p.skill_id_with_property(
+                ffb_model::model::property::named_properties::NamedProperties::CAN_ADD_STRENGTH_TO_DODGE)?;
+            if p.used_skills.contains(&skill) || game.acting_player.used_skills.contains(&skill) {
+                return None;
+            }
+            Some((skill, p.strength_with_modifiers() as i32))
+        };
+        // Java `dodge()`: `if (TRUE.equals(usingModifyingSkill)) { statBasedRollModifier = …;
+        // actingPlayer.markSkillUsed(canAddStrengthToDodge); addReport(ReportSkillUse(pid, skill,
+        // true, ADD_STRENGTH_TO_ROLL)); publishParameter(USING_MODIFYING_SKILL, true); }`
+        let stat_used: Option<(ffb_model::enums::SkillId, i32)> = if self.using_modifying_skill == Some(true) {
+            unused_strength_skill(game)
+        } else {
+            None
+        };
+        if let Some((skill, _)) = stat_used {
+            if let Some(pid) = player_id.as_deref() {
+                if let Some(p) = game.team_home.player_mut(pid).or_else(|| game.team_away.player_mut(pid)) {
+                    p.used_skills.insert(skill);
+                }
+                game.acting_player.used_skills.insert(skill);
+                game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                    Some(pid.to_string()), skill, true,
+                    ffb_model::model::skill_use::SkillUse::ADD_STRENGTH_TO_ROLL,
+                ));
+            }
+            self.publish_using_modifying_skill = true;
+        }
+        let stat_value = stat_used.map(|(_, st)| st).unwrap_or(0);
+
         let factory = DodgeModifierFactory::for_rules(game.rules);
         // `agility` and the UNCLAMPED modifier sums travel out of this block alongside the
         // clamped minima: Java re-enters `AgilityMechanic.minimumRollDodge` with the augmented
@@ -285,6 +350,21 @@ impl StepMoveDodge {
         } else {
             (2, vec![], false, 2, vec![], 2, 0, 0)
         };
+        // Java `mechanic.minimumRollDodge(game, player, mods, statBasedRollModifier)` =
+        // max(2, agility + sum(mods) - stat).
+        let (minimum_roll, min_no_bt) = if stat_value != 0 {
+            ((dodge_agility + total_all - stat_value).max(2), (dodge_agility + total_no_bt - stat_value).max(2))
+        } else {
+            (minimum_roll, min_no_bt)
+        };
+        // Java `getModifyingSkillInCaseItHelps(mechanic, dodgeModifiers, false)` (failure branch,
+        // BEFORE the Break Tackle removal): the unused canAddStrengthToDodge skill when adding its
+        // stat would turn this roll into a success.
+        let modifying_skill: Option<ffb_model::enums::SkillId> = unused_strength_skill(game).and_then(|(skill, st)| {
+            let with_stat = (dodge_agility + total_all - st).max(2);
+            let failed = !DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll);
+            (failed && DiceInterpreter::is_skill_roll_successful(self.dodge_roll, with_stat)).then_some(skill)
+        });
         // Java StepMoveDodge (the btModifier block after `successful` is computed):
         // - SUCCESS + BT present: recompute WITHOUT Break Tackle; if the roll still succeeds, BT
         //   was not needed — the reported minimum drops and BT is NOT consumed. Otherwise BT is
@@ -300,7 +380,9 @@ impl StepMoveDodge {
         // Java (failure branch, no modifying skill): remove the BT modifier and, when Break
         // Tackle is not already committed this activation, `addReport(new ReportSkillUse(null,
         // btSkill, false, WOULD_NOT_HELP))` — BEFORE the ReportDodgeRoll (dwarf_vs_orc bb2020 s3).
-        if do_roll && has_bt && !self.using_break_tackle
+        // With a modifying skill Java takes the other arm (`if (modifyingSkill != null)`): no
+        // WOULD_NOT_HELP report and `minimumRoll` keeps the Break Tackle modifier.
+        if do_roll && has_bt && !self.using_break_tackle && modifying_skill.is_none()
             && !DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll)
         {
             game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
@@ -308,7 +390,7 @@ impl StepMoveDodge {
                 ffb_model::model::skill_use::SkillUse::WOULD_NOT_HELP,
             ));
         }
-        let (minimum_roll, mod_names, dodge_total) = if has_bt && !bt_saved_it {
+        let (minimum_roll, mod_names, dodge_total) = if has_bt && !bt_saved_it && modifying_skill.is_none() {
             (min_no_bt, names_no_bt, total_no_bt)
         } else {
             (minimum_roll, mod_names, total_all)
@@ -342,15 +424,19 @@ impl StepMoveDodge {
         let is_bb2020 = game.rules == ffb_model::enums::Rules::Bb2020;
         if do_roll || is_bb2020 {
             use ffb_model::report::mixed::report_dodge_roll::ReportDodgeRoll;
-            game.report_list.add(ReportDodgeRoll::new(
+            let mut report = ReportDodgeRoll::new(
                 player_id.clone(),
                 successful,
                 if do_roll { self.dodge_roll } else { 0 },
                 minimum_roll,
                 re_rolled,
                 mod_names,
-                None, // stat_based_roll_modifier: headless never applies modifier-ignoring skill
-            ));
+                None,
+            );
+            if let Some((skill, st)) = stat_used {
+                report = report.with_stat_value(skill.category_and_name_for(game.rules).1.to_string(), st);
+            }
+            game.report_list.add(report);
         }
         // Emit one GameEvent per resolved roll (monolith parity: initial roll and
         // re-rolled resolution each produce their own DodgeRoll event).
@@ -526,6 +612,13 @@ impl StepMoveDodge {
                     ).is_empty()
                 });
                 if let Some(source) = skill_source {
+                    // Java: `if (modifyingSkill != null && usingModifyingSkill == null) {
+                    //   addReport(ReportModifiedDodgeResultSuccessful(modifyingSkill));
+                    //   showDialog(DialogSkillUseParameter(pid, modifyingSkill, 0)); WAITING }` —
+                    // Incorporeal is offered BEFORE the Dodge skill re-roll is spent.
+                    if let (Some(skill), None) = (modifying_skill, self.using_modifying_skill) {
+                        return self.modifying_skill_prompt(game, skill).with_event(roll_event);
+                    }
                     // Java `RollMechanic.askForReRollIfAvailable` only SETS reRolledAction +
                     // reRollSource for a skill source; the single `useReRoll` happens on the
                     // re-entry (`StepMoveDodge.executeStep:229`), which is the `already_rerolled`
@@ -561,13 +654,42 @@ impl StepMoveDodge {
                 // seed 3 i=32: home_10, a Halfling Hopeful with Dodge, dodging out of a Tackle
                 // tacklezone with `r0` — Java takes the failure and the turnover, Rust re-rolled
                 // and drove the bank to `r-1`).
-                if let Some(prompt) = ask_for_reroll_if_available_for(
-                    game, player_id.as_deref(), "DODGE", minimum_roll, false)
+                // The modifying skill rides on the same dialog (`askForReRollIfAvailable(…,
+                // modifyingSkill, null)`): `dialogShown` counts `modificationSkill != null`.
+                // bb2025's DialogReRollPropertiesParameter always reaches the coach; bb2020's
+                // DialogReRollParameter is answered null (no draw) by the harness when the team
+                // re-roll is not an option — the dodge then fails on re-entry.
+                let mut prompt = ask_for_reroll_if_available_for(
+                    game, player_id.as_deref(), "DODGE", minimum_roll, false);
+                if prompt.is_none() && modifying_skill.is_some()
+                    && game.rules == ffb_model::enums::Rules::Bb2025
                 {
+                    let team_id = if game.home_playing { game.team_home.id.clone() } else { game.team_away.id.clone() };
+                    prompt = Some(ffb_model::prompts::AgentPrompt::ReRollOffer {
+                        source: ReRollSource::new("TRR"),
+                        action: "DODGE".to_owned(),
+                        team_id,
+                    });
+                }
+                if let Some(skill) = modifying_skill {
+                    game.report_list.add(
+                        ffb_model::report::mixed::report_modified_dodge_result_successful::ReportModifiedDodgeResultSuccessful::new(Some(skill)));
+                }
+                if let Some(prompt) = prompt {
                     self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
                     self.dodge_roll = 0; // reset so the re-roll gets a fresh d6
                     return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
                 }
+                if modifying_skill.is_some() {
+                    // bb2020: dialog shown, answered null → `failDodge()` on re-entry.
+                    return self.fail_dodge(game).with_event(roll_event);
+                }
+            } else if let Some(skill) = modifying_skill {
+                // Java: `else if (modifyingSkill != null) { addReport(ReportModifiedDodgeResult
+                // Successful); showDialog(DialogSkillUseParameter(pid, modifyingSkill, minimumRoll)) }`
+                // — e.g. after Incorporeal was DECLINED, the Dodge re-roll spent and the fresh die
+                // failed again.
+                return self.modifying_skill_prompt(game, skill).with_event(roll_event);
             }
 
             // Java: if (UtilGameOption.isOptionEnabled(game, GameOptionId.STAND_FIRM_NO_DROP_ON_FAILED_DODGE))
@@ -578,6 +700,19 @@ impl StepMoveDodge {
             }
             self.fail_dodge(game).with_event(roll_event)
         }
+    }
+
+    /// Java: `addReport(new ReportModifiedDodgeResultSuccessful(modifyingSkill));
+    /// UtilServerDialog.showDialog(DialogSkillUseParameter(pid, modifyingSkill, …))` — WAITING.
+    fn modifying_skill_prompt(&mut self, game: &mut Game, skill: ffb_model::enums::SkillId) -> StepOutcome {
+        game.report_list.add(
+            ffb_model::report::mixed::report_modified_dodge_result_successful::ReportModifiedDodgeResultSuccessful::new(Some(skill)));
+        let pid = game.acting_player.player_id.clone().unwrap_or_default();
+        StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
+            player_id: pid,
+            skill_id: skill as u16,
+            skill_name: format!("{:?}", skill),
+        })
     }
 
     fn fail_dodge(&mut self, game: &Game) -> StepOutcome {
@@ -1119,6 +1254,54 @@ mod tests {
         // No Tackle → Dodge skill re-roll fires → one fresh die rolled.
         assert_eq!(dodger_with_tackle_neighbour(false), 1,
             "without Tackle the Dodge skill re-roll must fire (one fresh die)");
+    }
+
+    /// Java bb2020/bb2025 `StepMoveDodge.dodge`: a failed dodge that adding the player's ST would
+    /// save, with the Dodge skill re-roll available, first shows the Incorporeal SkillUse dialog;
+    /// accepting it passes the dodge with NO further die and consumes the skill (star tier:
+    /// bb2020 Gretchen Wächter, chaos_pact vs khemri seed 1).
+    #[test]
+    fn incorporeal_is_offered_before_the_dodge_reroll_and_passes_the_dodge() {
+        use ffb_model::enums::{SkillId, PlayerState, PS_STANDING};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        game.home_playing = true;
+        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.turn_data_home.rerolls = 0;
+        game.team_home.players.push(Player {
+            id: "g".into(), name: "g".into(), nr: 1, position_id: "star".into(),
+            movement: 7, strength: 3, agility: 2, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue::new(SkillId::Dodge), SkillWithValue::new(SkillId::Incorporeal)],
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("g", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("g", PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("g".into());
+        game.acting_player.dodging = true;
+        game.team_away.players.push(Player {
+            id: "opp".into(), name: "opp".into(), nr: 2, position_id: "lineman".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("opp", FieldCoordinate::new(7, 7));
+        game.field_model.set_player_state("opp", PlayerState::new(PS_STANDING));
+
+        let mut step = StepMoveDodge::new("fail".into());
+        step.coordinate_from = Some(FieldCoordinate::new(5, 5));
+        step.coordinate_to = Some(FieldCoordinate::new(6, 6)); // 1 tacklezone → min 3
+        step.dodge_roll = 2;
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::SkillUse { .. })),
+            "Incorporeal must be offered, not the Dodge re-roll: {:?}", out.prompt);
+        assert_eq!(rng.call_count, 0);
+
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Incorporeal, use_skill: true }, &mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep, "2 + ST 3 beats min 3");
+        assert_eq!(rng.call_count, 0, "no fresh die when the skill is used");
+        assert!(game.player("g").unwrap().used_skills.contains(&SkillId::Incorporeal));
+        assert!(!game.player("g").unwrap().used_skills.contains(&SkillId::Dodge));
     }
 
     #[test]
