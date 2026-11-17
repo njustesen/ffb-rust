@@ -650,7 +650,10 @@ fn handle_raise_dead(
         Some(id) => id,
         None => return vec![],
     };
-    let is_rip = injury_context.injury.map(|ps| ps.base() == PS_RIP).unwrap_or(false);
+    // Java: `injuryContext().getPlayerState()` -- the WORSE of the casualty and Decay's second
+    // roll, not `getInjury()`: a Decay player whose second casualty roll is DEAD is raised
+    // (undead vs nurgle bb2016 seed 1: Rotter casualty 18 = BH, decay 63 = RIP → Zombie).
+    let is_rip = injury_context.get_player_state().map(|ps| ps.base() == PS_RIP).unwrap_or(false);
     if !is_rip {
         return vec![];
     }
@@ -1481,6 +1484,27 @@ mod tests {
         assert_eq!(game.team_away.players[0].position_id, "necromantic.zombie");
         assert_eq!(game.game_result.away.raised_dead, 1);
         assert!(events.iter().any(|e| matches!(e, GameEvent::PlayerAdded { team_id, .. } if team_id == "away")));
+    }
+
+    /// Java handleRaiseDead reads `injuryContext().getPlayerState()`, the worse of the casualty and
+    /// Decay's second roll: a BADLY_HURT first roll with a DEAD decay roll is raised.
+    #[test]
+    fn handle_raise_dead_reads_the_decay_roll() {
+        use ffb_model::enums::{ApothecaryMode, PS_BADLY_HURT, PS_RIP, PlayerState};
+        let mut away = test_team("away", 0);
+        away.roster_id = "necromantic.lrb6".into();
+        away.necromancer = true;
+        let mut game = Game::new(test_team("home", 0), away, Rules::Bb2016);
+        add_player(&mut game, "dead1", PS_RIP);
+
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context_mut().defender_id = Some("dead1".into());
+        ir.injury_context_mut().injury = Some(PlayerState::new(PS_BADLY_HURT));
+        ir.injury_context_mut().injury_decay = Some(PlayerState::new(PS_RIP));
+        handle_injury_side_effects(&mut game, &ir);
+
+        assert_eq!(game.team_away.players.len(), 1, "the decayed-to-dead player is raised");
+        assert_eq!(game.game_result.away.raised_dead, 1);
     }
 
     #[test]

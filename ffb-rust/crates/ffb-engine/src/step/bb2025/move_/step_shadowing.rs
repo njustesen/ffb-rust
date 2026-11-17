@@ -32,6 +32,11 @@ pub struct StepShadowing {
     pub re_rolled_action: Option<String>,
     /// Java: AbstractStepWithReRoll.reRollSource
     pub re_roll_source: Option<String>,
+    /// `using_shadowing` as it was before a `JUMPED` parameter cleared it. Only bb2025's
+    /// StepShadowing handles `JUMPED` (`usingShadowing = false`); bb2020's has no such case, so
+    /// a leaper is shadowed there. `set_parameter` cannot see the edition, so the first
+    /// `execute_step` restores this value when the rules are not bb2025.
+    pub using_shadowing_before_jump: Option<Option<bool>>,
 }
 
 impl StepShadowing {
@@ -44,10 +49,18 @@ impl StepShadowing {
             shadower_was_previous_defender: false,
             re_rolled_action: None,
             re_roll_source: None,
+            using_shadowing_before_jump: None,
         }
     }
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // bb2020 StepShadowing ignores JUMPED (lizardman vs slann bb2020 seed 2: a Leap out of a
+        // shadower's tackle zone rolls Shadowing in Java).
+        if let Some(before) = self.using_shadowing_before_jump.take() {
+            if game.rules != ffb_model::enums::Rules::Bb2025 {
+                self.using_shadowing = before;
+            }
+        }
         // BB2025: also exclude players with movesRandomly
         let actor_moves_randomly = game.acting_player.player_id.as_deref()
             .and_then(|id| game.player(id))
@@ -311,8 +324,18 @@ impl Step for StepShadowing {
             StepParameter::CoordinateFrom(v)           => { self.coordinate_from = *v; true }
             StepParameter::DefenderPosition(v)         => { self.defender_position = Some(*v); true }
             StepParameter::UsingDivingTackle(v)        => { self.using_diving_tackle = *v; true }
-            StepParameter::Jumped(_)                   => { self.using_shadowing = Some(false); true }
-            StepParameter::UsingShadowing(v)           => { self.using_shadowing = *v; true }
+            StepParameter::Jumped(_)                   => {
+                if self.using_shadowing_before_jump.is_none() {
+                    self.using_shadowing_before_jump = Some(self.using_shadowing);
+                }
+                self.using_shadowing = Some(false);
+                true
+            }
+            StepParameter::UsingShadowing(v)           => {
+                self.using_shadowing_before_jump = None;
+                self.using_shadowing = *v;
+                true
+            }
             StepParameter::ShadowerWasPreviousDefender(v) => { self.shadower_was_previous_defender = *v; true }
             _ => false,
         }
@@ -477,6 +500,23 @@ mod tests {
         // defender_id not set → skips roll → NEXT_STEP
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    /// Java: only bb2025 StepShadowing.setParameter handles JUMPED (`usingShadowing = false`);
+    /// the bb2020 step has no such case, so a leaper is still offered to shadowers there.
+    #[test]
+    fn jumped_disables_shadowing_in_bb2025_only() {
+        let mut g25 = make_game();
+        let mut s25 = StepShadowing::new();
+        s25.set_parameter(&StepParameter::Jumped(true));
+        let _ = s25.start(&mut g25, &mut GameRng::new(0));
+        assert_eq!(s25.using_shadowing, Some(false));
+
+        let mut g20 = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
+        let mut s20 = StepShadowing::new();
+        s20.set_parameter(&StepParameter::Jumped(true));
+        let _ = s20.start(&mut g20, &mut GameRng::new(0));
+        assert_eq!(s20.using_shadowing, None, "bb2020 ignores JUMPED");
     }
 
     #[test]
