@@ -364,6 +364,9 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
         // Bomb re-throw window: Java's StepInitPassing shows no dialog either, it simply waits
         // for a CLIENT_PASS naming the new target, so there is no wire dialog to send.
         AgentPrompt::BombRethrow { .. } => None,
+        // Dump-Off pass window: the wire dialog is the DEFENDER_ACTION StepDumpOff already showed;
+        // the park itself just waits for the defending coach's CLIENT_PASS.
+        AgentPrompt::DumpOffTarget { .. } => None,
         AgentPrompt::BuyInducements { team_id, available, budget } =>
             Some(WireDialog::BuyInducements {
                 team_id: team_id.clone(),

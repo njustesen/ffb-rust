@@ -124,6 +124,7 @@ impl Step for StepPass {
         // early for a Hail Mary too, so the flag is never read there either.
         game.interceptor_chosen = false;
         game.pass_interceptor_id = None;
+        game.pass_old_turn_mode = None;
         self.execute_step(game, rng)
     }
 
@@ -323,9 +324,21 @@ impl StepPass {
             if let Some(prompt) = self.pass_skill_offer(game) {
                 return Some(wrap(prompt));
             }
-            let thrower = game.thrower_id.clone();
-            let mut prompt = ask_for_reroll_if_available_for(
-                game, thrower.as_deref(), "PASS", self.minimum_roll, fumble);
+            // Java bb2020/bb2025 PassBehaviour: `askForReRollIfAvailable(gameState,
+            // game.getActingPlayer(), PASS, …)` — the ACTING-PLAYER overload, not the thrower.
+            // They differ on a Dump-Off: the thrower is the blocked defender while the acting
+            // player is the blocker, so Java offers the failed dump-off pass a re-roll as if the
+            // BLOCKER had rolled it (its team's TRR, the blocker's skill sources). Rust asked for
+            // the thrower and offered nothing (dark_elf bb2020 seed 8 i=19: Java's RE_ROLL dialog
+            // spent two draws Rust never did). bb2016 passes `game.getThrower()`.
+            let mut prompt = if game.rules == ffb_model::enums::Rules::Bb2016 {
+                let thrower = game.thrower_id.clone();
+                ask_for_reroll_if_available_for(
+                    game, thrower.as_deref(), "PASS", self.minimum_roll, fumble)
+            } else {
+                crate::step::util_server_re_roll::ask_for_reroll_if_available(
+                    game, "PASS", self.minimum_roll, fumble)
+            };
             if prompt.is_none() && modifying.is_some() && game.rules == ffb_model::enums::Rules::Bb2025 {
                 let team_id = if game.home_playing { game.team_home.id.clone() } else { game.team_away.id.clone() };
                 prompt = Some(ffb_model::prompts::AgentPrompt::ReRollOffer {

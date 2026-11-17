@@ -228,6 +228,15 @@ impl StepInitPassing {
             return outcome;
         }
 
+        // DUMP_OFF: Java parks here too, but the DEFENDING coach answers (the DEFENDER_ACTION
+        // dialog StepDumpOff showed) with CLIENT_PASS — never the attacker's END_TURN contract
+        // below, which would end the blocker's TURN. Surface that wait (BACKLOG §M).
+        if game.turn_mode == TurnMode::DumpOff && thrower_action == Some(PlayerAction::DumpOff) {
+            if let Some(tid) = game.thrower_id.clone() {
+                return StepOutcome::cont().with_prompt(AgentPrompt::DumpOffTarget { thrower_id: tid });
+            }
+        }
+
         // No branch matched (the throw is out of range). Java's StepInitPassing leaves the step
         // WAITING and the parity agent (ParityRunner INIT_PASSING handler) unconditionally injects
         // ClientCommandEndTurn — a turnover with the ball unmoved and no roll. Both reference agents
@@ -267,11 +276,20 @@ impl Step for StepInitPassing {
                 game.pass_coordinate = Some(*coord);
                 // Java: catcher = fieldModel.getPlayer(passCoordinate)
                 self.catcher_id = game.field_model.player_at(*coord).cloned();
-                // Java: setThrowerId / setThrowerAction (use actingPlayer defaults)
-                if game.thrower_id.is_none() {
+                // Java sets the thrower UNCONDITIONALLY: the target selection's selected player
+                // (else game.getDefender()) when the defender action is DUMP_OFF, otherwise the
+                // acting player.
+                let defender_id = match game.field_model.target_selection_state.as_ref() {
+                    Some(ts) => ts.selected_player_id.clone(),
+                    None => game.defender_id.clone(),
+                };
+                if defender_id.is_some()
+                    && game.defender_action == Some(ffb_model::enums::PlayerAction::DumpOff)
+                {
+                    game.thrower_id = defender_id;
+                    game.thrower_action = game.defender_action;
+                } else {
                     game.thrower_id = game.acting_player.player_id.clone();
-                }
-                if game.thrower_action.is_none() {
                     game.thrower_action = game.acting_player.player_action;
                 }
                 self.execute_step(game)

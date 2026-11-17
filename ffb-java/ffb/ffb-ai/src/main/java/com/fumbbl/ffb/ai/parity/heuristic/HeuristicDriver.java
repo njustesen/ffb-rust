@@ -168,8 +168,21 @@ public final class HeuristicDriver {
      * @return true to use the skill.
      */
     public boolean useSkill(String skillName) {
+        return useSkill(skillName, null, null);
+    }
+
+    /**
+     * {@link #useSkill(String)} with the board, for skills whose weight depends on it.
+     * DumpOff (BACKLOG §M, mirror of the Rust arm): 0.75 when the carrier has an in-range
+     * team-mate ({@code ParityRunner.dumpOffReceivers}), else the 0.0 decline pin.
+     */
+    public boolean useSkill(String skillName, Game game, String playerId) {
         float wUse;
-        if ("Dodge".equals(skillName)) {
+        if ("DumpOff".equals(skillName)) {
+            wUse = (game != null && playerId != null
+                && !com.fumbbl.ffb.ai.parity.ParityRunner.dumpOffReceivers(game, playerId).isEmpty())
+                ? 0.75f : 0.0f;
+        } else if ("Dodge".equals(skillName)) {
             wUse = 0.95f;
         } else if ("Juggernaut".equals(skillName)) {
             wUse = 0.80f;
@@ -181,7 +194,7 @@ public final class HeuristicDriver {
             wUse = 0.55f;
         } else if ("QuickBite".equals(skillName) || "AnimalSavagery".equals(skillName)) {
             wUse = 0.85f;
-        } else if ("DumpOff".equals(skillName) || "PrimalSavagery".equals(skillName)
+        } else if ("PrimalSavagery".equals(skillName)
             || "SafePairOfHands".equals(skillName) || "Swoop".equals(skillName)) {
             // The skills whose USE path no harness can drive: pinned to DECLINE while still
             // spending the sampler draws, mirroring the Rust agent's table (chaos_pact bb2020

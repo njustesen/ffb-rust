@@ -228,6 +228,12 @@ pub enum AgentPrompt {
     /// to the agent, exactly as `KickoffEventPlacement` does. ParityRunner answers it at
     /// INIT_PASSING with EndTurn (declining the re-throw), and the Rust agent mirrors that.
     BombRethrow { player_id: PlayerId },
+    /// The Dump-Off pass window (TurnMode DUMP_OFF, BACKLOG §M): StepDumpOff showed Java's
+    /// `DialogDefenderActionParameter` and pushed the Pass sequence; StepInitPassing PARKS
+    /// (the stale pass coordinate is out of range) until the DEFENDING coach sends CLIENT_PASS.
+    /// Answer: `Action::Pass` at one of `legal_actions::dump_off_receivers`, or an empty
+    /// `ActivatePlayer` (CLIENT_ACTING_PLAYER null) when there is none.
+    DumpOffTarget { thrower_id: PlayerId },
 
     /// Java `DialogKickSkillParameter` (all three editions' StepKickoffScatterRoll): the kicker
     /// has Kick (canReduceKickDistance) and stands in the centre field. Answered with

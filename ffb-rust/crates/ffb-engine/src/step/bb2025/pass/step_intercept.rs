@@ -48,6 +48,9 @@ pub struct StepIntercept {
     /// Java `askForReRollIfAvailable(…, pInterceptor, INTERCEPTION, …)` → WAITING_FOR_RE_ROLL: the
     /// offer raised inside `intercept()`, returned by `execute_step`.
     pub pending_prompt: Option<ffb_model::prompts::AgentPrompt>,
+    /// Java bb2016 `fOldTurnMode` (bb2020/bb2025 keep it in `PassState.oldTurnMode` =
+    /// `game.pass_old_turn_mode`).
+    pub old_turn_mode: Option<ffb_model::enums::TurnMode>,
 }
 
 impl StepIntercept {
@@ -62,6 +65,27 @@ impl StepIntercept {
             re_rolled_action: None,
             re_roll_source: None,
             pending_prompt: None,
+            old_turn_mode: None,
+        }
+    }
+
+    /// Java: `state.setOldTurnMode(game.getTurnMode()); game.setTurnMode(INTERCEPTION)` when the
+    /// interception dialog is shown.
+    fn enter_interception_mode(&mut self, game: &mut Game) {
+        let old = Some(game.turn_mode);
+        if Self::uses_pass_state(game) {
+            game.pass_old_turn_mode = old;
+        } else {
+            self.old_turn_mode = old;
+        }
+        game.turn_mode = ffb_model::enums::TurnMode::Interception;
+    }
+
+    /// Java (doNextStep tail): `if (oldTurnMode != null) game.setTurnMode(oldTurnMode)`.
+    fn restore_turn_mode(&self, game: &mut Game) {
+        let old = if Self::uses_pass_state(game) { game.pass_old_turn_mode } else { self.old_turn_mode };
+        if let Some(m) = old {
+            game.turn_mode = m;
         }
     }
 
@@ -105,8 +129,17 @@ impl StepIntercept {
         let passes_not_intercepted = game.player(&thrower_id)
             .map(|p| p.has_skill_property_in(game.rules, NamedProperties::PASSES_ARE_NOT_INTERCEPTED))
             .unwrap_or(false);
-        // Opponents: the team that is NOT the active team
-        let opponent_team = game.inactive_team();
+        // Java: `Team otherTeam = game.getTeamHome().hasPlayer(pThrower) ? getTeamAway()
+        // : getTeamHome()` — the THROWER's opponents, not the inactive team. They differ on a
+        // Dump-Off, where the thrower is the blocked (inactive-team) player: `inactive_team()`
+        // searched the thrower's own team-mates, so the blocking side's interceptor was never
+        // offered (dark_elf bb2020 seed 8 i=19: Java rolled away_01's interception of home_02's
+        // dump-off, Rust went straight to the scatter).
+        let opponent_team = if game.team_home.players.iter().any(|p| p.id == thrower_id) {
+            &game.team_away
+        } else {
+            &game.team_home
+        };
         opponent_team.players.iter()
             .filter(|player| {
                 if passes_not_intercepted
@@ -424,6 +457,7 @@ impl StepIntercept {
 
         // Java: boolean doIntercept = (possibleInterceptors.length > 0)
         if possible_interceptors.is_empty() {
+            self.restore_turn_mode(game);
             return StepOutcome::goto(&label).publish(StepParameter::InterceptorId(None));
         }
 
@@ -445,6 +479,7 @@ impl StepIntercept {
         if !rerolled_away && !self.interceptor_chosen(game) {
             // Java: UtilServerDialog.showDialog(DialogInterceptionParameter) → the agent answers
             // with Action::Intercept (or SelectPlayer). A bare cont() waited forever.
+            self.enter_interception_mode(game);
             return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Interception {
                 player_id: possible_interceptors[0].clone(),
                 target_number: 0,
@@ -491,6 +526,8 @@ impl StepIntercept {
             false
         };
 
+        // Java's doNextStep tail restores the turn mode saved when the dialog was shown.
+        self.restore_turn_mode(game);
         if do_intercept {
             let interceptor_id = self.interceptor_id(game);
             // Java: publishParameter(StepParameter.from(StepParameterKey.INTERCEPTOR_ID, pInterceptor.getId()))
@@ -994,6 +1031,7 @@ mod tests {
             re_rolled_action: None,
             re_roll_source: None,
             pending_prompt: None,
+            old_turn_mode: None,
         };
 
         // Try seeds until one gives roll ≥ 2 (easy with AG=2, min=2)
@@ -1246,6 +1284,49 @@ mod tests {
         let interceptors = StepIntercept::find_interceptors(&game);
         assert_eq!(interceptors.len(), 1, "expected 1 interceptor, got {}: {:?}", interceptors.len(), interceptors);
         assert_eq!(interceptors[0], "opp1");
+    }
+
+    /// Java `UtilPassing.findInterceptors`: the THROWER's opponents, even when the thrower is on
+    /// the inactive team (a Dump-Off). `inactive_team()` searched the thrower's own team-mates.
+    #[test]
+    fn dump_off_interceptors_are_the_throwers_opponents() {
+        use ffb_model::enums::PlayerState as PS;
+        let mut home = test_team("home", 0);
+        let mut away = test_team("away", 0);
+        let mut thrower = ffb_model::model::player::Player::default();
+        thrower.id = "t1".into();
+        away.players.push(thrower);
+        let mut mate = ffb_model::model::player::Player::default();
+        mate.id = "mate".into();
+        away.players.push(mate);
+        let mut opp = ffb_model::model::player::Player::default();
+        opp.id = "opp1".into();
+        home.players.push(opp);
+        let mut game = Game::new(home, away, Rules::Bb2020);
+        game.home_playing = true; // the blocker's (home) turn; the dump-off thrower is away
+        game.thrower_id = Some("t1".into());
+        game.thrower_action = Some(PlayerAction::DumpOff);
+        game.pass_coordinate = Some(FieldCoordinate::new(14, 7));
+        game.field_model.set_player_coordinate("t1", FieldCoordinate::new(1, 7));
+        game.field_model.set_player_coordinate("mate", FieldCoordinate::new(6, 7));
+        game.field_model.set_player_coordinate("opp1", FieldCoordinate::new(7, 7));
+        game.field_model.set_player_state("mate", PS::new(ffb_model::enums::PS_STANDING));
+        game.field_model.set_player_state("opp1", PS::new(ffb_model::enums::PS_STANDING));
+        assert_eq!(StepIntercept::find_interceptors(&game), vec!["opp1".to_string()]);
+    }
+
+    /// Java StepIntercept: the interception dialog switches the turn mode to INTERCEPTION (old
+    /// mode saved in PassState), and the step's tail restores it.
+    #[test]
+    fn interception_dialog_switches_to_interception_mode() {
+        let mut game = make_game();
+        game.turn_mode = ffb_model::enums::TurnMode::DumpOff;
+        let mut step = StepIntercept::new("fail".into());
+        step.enter_interception_mode(&mut game);
+        assert_eq!(game.turn_mode, ffb_model::enums::TurnMode::Interception);
+        assert_eq!(game.pass_old_turn_mode, Some(ffb_model::enums::TurnMode::DumpOff));
+        step.restore_turn_mode(&mut game);
+        assert_eq!(game.turn_mode, ffb_model::enums::TurnMode::DumpOff);
     }
 
     #[test]

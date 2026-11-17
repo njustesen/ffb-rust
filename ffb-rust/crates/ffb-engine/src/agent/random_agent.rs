@@ -1624,6 +1624,24 @@ impl Agent for RandomAgent {
                 };
                 Action::Pass { coord }
             }
+            // Dump-Off pass window (BACKLOG §M). 1:1 with ParityRunner's DEFENDER_ACTION arm
+            // (`sendDumpOffPass`): the thrower's in-range team-mates, coordinate-sorted, ONE
+            // actionRng draw; none in range → CLIENT_ACTING_PLAYER(null), zero draws.
+            Some(AgentPrompt::DumpOffTarget { thrower_id }) => {
+                let receivers = crate::legal_actions::dump_off_receivers(&gs.game, thrower_id);
+                if receivers.is_empty() {
+                    Action::ActivatePlayer {
+                        player_id: String::new(),
+                        player_action: PlayerActionChoice::Move,
+                        block_defender_id: None,
+                    }
+                } else {
+                    let idx = self.pick_action(receivers.len());
+                    let coord = gs.game.field_model.player_coordinate(&receivers[idx])
+                        .expect("dump_off_receivers returns on-pitch players");
+                    Action::Pass { coord }
+                }
+            }
             // Confirm-only and informational prompts: single valid response, 0 RNG consumed.
             Some(AgentPrompt::KickoffReturn { .. })
             | Some(AgentPrompt::SetupError { .. })

@@ -75,7 +75,7 @@ impl StepIntercept {
         let passes_not_intercepted = game.player(&thrower_id)
             .map(|p| p.has_skill_property(NamedProperties::PASSES_ARE_NOT_INTERCEPTED))
             .unwrap_or(false);
-        let opponent_team = game.inactive_team();
+        let opponent_team = if game.team_home.players.iter().any(|p| p.id == thrower_id) { &game.team_away } else { &game.team_home }; // Java: the THROWER's opponents
         opponent_team.players.iter()
             .filter(|player| {
                 // Java: if (passesNotIntercepted && !UtilCards.hasSkillToCancelProperty(otherPlayer, passesAreNotIntercepted)) continue;

@@ -86,7 +86,12 @@ impl StepIntercept {
             Some(c) => c,
             None => return Vec::new(),
         };
-        let opponent_team = game.inactive_team();
+        // Java: the THROWER's opponents (see the live bb2025 twin).
+        let opponent_team = if game.team_home.players.iter().any(|p| p.id == thrower_id) {
+            &game.team_away
+        } else {
+            &game.team_home
+        };
         opponent_team.players.iter()
             .filter(|player| {
                 let coord = match game.field_model.player_coordinate(&player.id) {

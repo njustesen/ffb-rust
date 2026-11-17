@@ -177,6 +177,15 @@ impl StepInitPassing {
         // Produce that same observable result directly — turnover, ball unmoved, zero dice —
         // rather than waiting for a prompt the headless driver cannot surface. Identical to the
         // shared `mixed::pass::step_init_passing` handling of this case.
+        // DUMP_OFF: the park is answered by the DEFENDING coach's CLIENT_PASS (StepDumpOff's
+        // DEFENDER_ACTION dialog), not by the attacker's END_TURN — see the mixed twin.
+        if game.turn_mode == ffb_model::enums::TurnMode::DumpOff
+            && thrower_action == Some(PlayerAction::DumpOff)
+        {
+            if let Some(tid) = game.thrower_id.clone() {
+                return StepOutcome::cont().with_prompt(AgentPrompt::DumpOffTarget { thrower_id: tid });
+            }
+        }
         out.action = crate::step::framework::StepAction::GotoLabel;
         out.goto_label = Some(self.goto_label_on_end.clone());
         out.publish(StepParameter::EndTurn(true))

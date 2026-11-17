@@ -5,7 +5,7 @@
 /// The defender must have the DumpOff skill, be holding the ball, and not be confused/hypnotized.
 ///
 /// Expects DEFENDER_POSITION parameter from a preceding step.
-use ffb_model::enums::{PlayerAction, SkillId, TurnMode};
+use ffb_model::enums::{PlayerAction, Rules, SkillId, TurnMode};
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
 use ffb_model::model::skill_use::SkillUse;
@@ -17,7 +17,6 @@ use ffb_model::report::report_id::ReportId;
 use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
-use crate::step::sequences::pass_sequence;
 
 pub struct StepDumpOff {
     /// Java: state.usingDumpOff — None = not asked, Some = decided.
@@ -80,7 +79,7 @@ impl StepDumpOff {
         if self.using_dump_off.is_none() {
             let can_dump_off = self.can_use_dump_off(game);
             if can_dump_off {
-                let defender_id = game.defender_id.clone().unwrap_or_default();
+                let defender_id = self.dump_off_defender(game).unwrap_or_default();
                 return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
                     player_id: defender_id,
                     skill_id: SkillId::DumpOff as u16,
@@ -99,16 +98,31 @@ impl StepDumpOff {
         }
 
         let using = self.using_dump_off.unwrap_or(false);
-        let defender_id = game.defender_id.clone();
         let skill_num = SkillId::DumpOff as u16;
+        // Java bb2020/bb2025: `step.commitTargetSelection()` before either answer is acted on,
+        // and the thrower / reported player is the target selection's selected player when one
+        // exists. bb2016 has no target selection and reads `game.getDefenderId()`.
+        if game.rules != Rules::Bb2016 {
+            if let Some(ts) = game.field_model.target_selection_state.as_mut() {
+                ts.commit();
+            }
+        }
+        let defender_id = if game.rules == Rules::Bb2016 {
+            game.defender_id.clone()
+        } else {
+            game.field_model
+                .target_selection_state
+                .as_ref()
+                .map(|ts| ts.selected_player_id.clone())
+                .unwrap_or_else(|| game.defender_id.clone())
+        };
 
         if using {
-            // Java: save old turn mode, switch to DumpOff, set thrower, push Pass sequence.
+            // Java: save old turn mode, switch to DumpOff, set thrower, show the
+            // DEFENDER_ACTION dialog, pushCurrentStepOnStack(), push the edition's Pass sequence.
             self.old_turn_mode = Some(game.turn_mode);
             game.turn_mode = TurnMode::DumpOff;
-            if let Some(ref did) = defender_id {
-                game.thrower_id = Some(did.clone());
-            }
+            game.thrower_id = defender_id.clone();
             // Java: game.setThrowerAction(PlayerAction.DUMP_OFF) — NOT actingPlayer's action.
             // StepDispatchPassing routes on game.thrower_action, so leaving this unset would
             // make the pushed Pass sequence immediately goto its "end" label instead of
@@ -120,45 +134,88 @@ impl StepDumpOff {
                 skill_id: skill_num,
                 used: true,
             };
-            StepOutcome::next().with_event(event).push_seq(pass_sequence())
-        } else {
-            // Java: addReport(SkillUse false if skill present); NEXT_STEP.
-            let defender_has = defender_id.as_deref()
-                .and_then(|id| game.player(id))
-                .map(|p| p.has_skill(SkillId::DumpOff))
-                .unwrap_or(false);
-            if defender_has {
-                // Java: addReport(new ReportSkillUse(defenderId, skill, false, null))
-                game.report_list.add(ReportSkillUse::new_without_skill_use(
-                    defender_id.clone(),
-                    SkillId::DumpOff,
-                    false,
-                ));
-                let event = GameEvent::SkillUse {
-                    player_id: defender_id.unwrap_or_default(),
-                    skill_id: skill_num,
-                    used: false,
-                };
-                StepOutcome::next().with_event(event)
+            // The per-ruleset SequenceGeneratorFactory Pass sequence (bb2016's own; bb2020 and
+            // bb2025 share the bb2025 generator, parameterised by rules). The old stub
+            // (PickUp/Intercept/Pass/EndPlayerAction) had no InitPassing, no EndPassing and
+            // ended the ATTACKER's action. `push_self` = Java's pushCurrentStepOnStack(): this
+            // step re-runs after the pass, sees TurnMode.DUMP_OFF and restores the old mode.
+            let seq = if game.rules == Rules::Bb2016 {
+                crate::step::generator::bb2016::pass::Pass::build_sequence(
+                    &crate::step::generator::bb2016::pass::PassParams { target_coordinate: None },
+                )
             } else {
-                StepOutcome::next()
+                crate::step::generator::bb2025::pass::Pass::build_sequence(
+                    &crate::step::generator::bb2025::pass::PassParams {
+                        target_coordinate: None,
+                        rules: game.rules,
+                    },
+                )
+            };
+            StepOutcome::next().with_event(event).push_self().push_seq(seq)
+        } else {
+            // Java (every edition): addReport(new ReportSkillUse(defenderId, skill, false, null)).
+            // Only a declined DIALOG reaches this branch, so the defender has the skill.
+            game.report_list.add(ReportSkillUse::new_without_skill_use(
+                defender_id.clone(),
+                SkillId::DumpOff,
+                false,
+            ));
+            let event = GameEvent::SkillUse {
+                player_id: defender_id.unwrap_or_default(),
+                skill_id: skill_num,
+                used: false,
+            };
+            StepOutcome::next().with_event(event)
+        }
+    }
+
+    /// The player the dialog is shown for. Java bb2020: the target selection's selected player
+    /// when a TargetSelectionState exists, else `game.getDefender()`; bb2016/bb2025:
+    /// `game.getDefender()`.
+    fn dump_off_defender(&self, game: &Game) -> Option<String> {
+        if game.rules == Rules::Bb2020 {
+            if let Some(ts) = game.field_model.target_selection_state.as_ref() {
+                return ts.selected_player_id.clone();
             }
+        }
+        game.defender_id.clone()
+    }
+
+    /// The defender's position for the ball check. Java bb2016: `state.defenderPosition` only;
+    /// bb2020: the selected player's FIELD coordinate when a TargetSelectionState exists, else
+    /// `state.defenderPosition`; bb2025: `state.defenderPosition`, falling back to the
+    /// defender's field coordinate when the parameter never arrived.
+    fn dump_off_position(&self, game: &Game, defender_id: &str) -> Option<FieldCoordinate> {
+        match game.rules {
+            Rules::Bb2016 => self.defender_position,
+            Rules::Bb2020 => {
+                if game.field_model.target_selection_state.is_some() {
+                    game.field_model.player_coordinate(defender_id)
+                } else {
+                    self.defender_position
+                }
+            }
+            _ => self.defender_position.or_else(|| game.field_model.player_coordinate(defender_id)),
         }
     }
 
     /// Java: condition check inside the (usingDumpOff == null) branch.
     fn can_use_dump_off(&self, game: &Game) -> bool {
-        let defender_id = match &game.defender_id {
+        let defender_id = match self.dump_off_defender(game) {
             Some(id) => id,
             None => return false,
         };
+        let defender_id = &defender_id;
         let has_skill = game.player(defender_id)
             .map(|p| p.has_skill(SkillId::DumpOff))
             .unwrap_or(false);
         if !has_skill { return false; }
-        if self.defender_position.is_none() { return false; }
+        let position = match self.dump_off_position(game, defender_id) {
+            Some(p) => p,
+            None => return false,
+        };
         // Java: defenderPosition.equals(game.getFieldModel().getBallCoordinate())
-        let ball_at_defender = game.field_model.ball_coordinate == self.defender_position;
+        let ball_at_defender = game.field_model.ball_coordinate == Some(position);
         if !ball_at_defender { return false; }
         // Java: !game.getFieldModel().isBallMoving()
         if game.field_model.ball_moving { return false; }
@@ -329,6 +386,37 @@ mod tests {
             game.report_list.has_report(ReportId::SKILL_USE),
             "SKILL_USE report must be added when defender has DumpOff but does not use it"
         );
+    }
+
+    /// Java: pushCurrentStepOnStack() + the per-ruleset Pass sequence (InitPassing first, so the
+    /// DUMP_OFF park can be answered), and the step re-runs afterwards to restore the turn mode.
+    #[test]
+    fn using_dump_off_pushes_itself_and_the_real_pass_sequence() {
+        let mut game = make_game(vec![SkillId::DumpOff]);
+        let mut step = StepDumpOff::new();
+        step.using_dump_off = Some(true);
+        let outcome = step.start(&mut game, &mut GameRng::new(0));
+        assert!(outcome.push_self, "Java pushCurrentStepOnStack()");
+        let first = outcome.pushes.first().and_then(|s| s.first()).map(|s| s.step_id);
+        assert_eq!(first, Some(StepId::InitPassing));
+    }
+
+    /// Java bb2025: a missing DEFENDER_POSITION parameter falls back to the defender's square.
+    #[test]
+    fn bb2025_missing_defender_position_falls_back_to_the_field() {
+        let mut game = make_game(vec![SkillId::DumpOff]);
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(6, 5));
+        let outcome = StepDumpOff::new().start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(outcome.prompt, Some(AgentPrompt::SkillUse { .. })));
+    }
+
+    #[test]
+    fn bb2016_missing_defender_position_never_offers() {
+        let mut game = make_game(vec![SkillId::DumpOff]);
+        game.rules = Rules::Bb2016;
+        game.field_model.ball_coordinate = Some(FieldCoordinate::new(6, 5));
+        let outcome = StepDumpOff::new().start(&mut game, &mut GameRng::new(0));
+        assert_eq!(outcome.action, StepAction::NextStep);
     }
 
     #[test]

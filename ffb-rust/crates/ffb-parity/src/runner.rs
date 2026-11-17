@@ -2578,6 +2578,17 @@ pub fn run_bench_game(
     t.games += 1;
     t.total_ns += game_t0.elapsed().as_nanos();
     tally_report_strings(&engine.game);
+    // `FFB_BENCH_GREP=<substring>`: name every seed whose report stream contains it, so a rare
+    // mechanic found by the Rust-only bench can be gated against Java on exactly those seeds.
+    if let Ok(needle) = std::env::var("FFB_BENCH_GREP") {
+        let hits = engine.game.report_list.get_reports().iter()
+            .filter_map(|r| r.to_json())
+            .filter(|v| v.to_string().contains(&needle))
+            .count();
+        if hits > 0 {
+            println!("BENCH hit seed={seed} count={hits}");
+        }
+    }
     (engine.game.game_result.home.score, engine.game.game_result.away.score)
 }
 

@@ -1547,6 +1547,10 @@ public class ParityRunner {
                 if (dialog instanceof com.fumbbl.ffb.dialog.DialogReRollParameter) {
                     com.fumbbl.ffb.dialog.DialogReRollParameter rr =
                         (com.fumbbl.ffb.dialog.DialogReRollParameter) dialog;
+                    if (System.getenv("FFB_DRAWS") != null) {
+                        System.err.println("JRR action=" + rr.getReRolledAction() + " pid=" + rr.getPlayerId()
+                            + " trr=" + rr.isTeamReRollOption());
+                    }
                     comm.sendUseReRoll(rr.getReRolledAction(),
                         reRollSourceFor(game, rr.getReRolledAction(), rr.isTeamReRollOption()));
                 } else if (dialog instanceof com.fumbbl.ffb.dialog.DialogReRollPropertiesParameter) {
@@ -1610,7 +1614,7 @@ public class ParityRunner {
                     // that is never offered a skill, and the first thing an amazon hits.
                     if (skillName != null && heuristic != null
                         && heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.SKILL_USE)) {
-                        useSkill = heuristic.useSkill(skillName);
+                        useSkill = heuristic.useSkill(skillName, game, su.getPlayerId());
                     }
                     comm.clearCaptured();
                     comm.sendUseSkill(su.getSkill(), useSkill, su.getPlayerId());
@@ -2083,6 +2087,24 @@ public class ParityRunner {
                 }
                 break;
             }
+
+            // ── Dump-Off pass window (BACKLOG §M) ────────────────────────────
+            // StepDumpOff (every edition) shows DialogDefenderActionParameter, pushes itself and
+            // the Pass sequence. StepInitPassing then either passes at once (the stale
+            // passCoordinate is in range) or PARKS until the DEFENDING coach sends CLIENT_PASS.
+            // Only the park is answered: the thrower's in-range team-mates, coordinate-sorted,
+            // ONE actionRng draw; none → CLIENT_ACTING_PLAYER(null) (fEndPlayerAction). Rust:
+            // AgentPrompt::DumpOffTarget, RandomAgent's arm. Anywhere else the dialog is a
+            // leftover display: clear it, zero draws.
+            case DEFENDER_ACTION:
+                game.setDialogParameter(null);
+                if (game.getTurnMode() == TurnMode.DUMP_OFF
+                    && gameState.getCurrentStep() != null
+                    && gameState.getCurrentStep().getId() == StepId.INIT_PASSING
+                    && game.getThrowerId() != null) {
+                    sendDumpOffPass(game, gameState, game.getThrowerId());
+                }
+                break;
 
             // ── Default: fall back to RandomStrategy for truly rare dialogs ────
             // DEBUG: print dialog IDs to diagnose any remaining loops
@@ -2754,6 +2776,52 @@ public class ParityRunner {
      * With no teammates on pitch: 2 decisionRng calls for a random coordinate
      * (AGENT_CONTRACT.md §2.6 quirk). Away-side coordinates are mirrored for the command.
      */
+    /**
+     * Dump-Off receivers (BACKLOG §M), mirror of Rust {@code legal_actions::dump_off_receivers}:
+     * the thrower's on-pitch team-mates that the edition's {@code PassMechanic.findPassingDistance}
+     * accepts from the thrower's square (StepInitPassing's own gate), sorted by x then y.
+     */
+    public static List<Player<?>> dumpOffReceivers(Game game, String throwerId) {
+        List<Player<?>> out = new ArrayList<>();
+        Player<?> thrower = game.getPlayerById(throwerId);
+        FieldModel fm = game.getFieldModel();
+        FieldCoordinate from = thrower == null ? null : fm.getPlayerCoordinate(thrower);
+        if (from == null) {
+            return out;
+        }
+        Team team = game.getTeamHome().hasPlayer(thrower) ? game.getTeamHome() : game.getTeamAway();
+        com.fumbbl.ffb.mechanics.PassMechanic mechanic = (com.fumbbl.ffb.mechanics.PassMechanic)
+            game.getFactory(com.fumbbl.ffb.FactoryType.Factory.MECHANIC)
+                .forName(com.fumbbl.ffb.mechanics.Mechanic.Type.PASS.name());
+        for (Player<?> tp : team.getPlayers()) {
+            if (tp.getId().equals(throwerId)) continue;
+            FieldCoordinate tc = fm.getPlayerCoordinate(tp);
+            if (tc != null && tc.getX() >= 0 && tc.getX() <= 25 && tc.getY() >= 0 && tc.getY() <= 14
+                && mechanic.findPassingDistance(game, from, tc, false) != null) {
+                out.add(tp);
+            }
+        }
+        out.sort(Comparator.comparingInt((Player<?> p) -> fm.getPlayerCoordinate(p).getX())
+            .thenComparingInt(p -> fm.getPlayerCoordinate(p).getY()));
+        return out;
+    }
+
+    /** The Dump-Off throw: see the DEFENDER_ACTION arm. Injected for the THROWER's team. */
+    private void sendDumpOffPass(Game game, GameState gameState, String throwerId) {
+        Player<?> thrower = game.getPlayerById(throwerId);
+        boolean throwerHome = game.getTeamHome().hasPlayer(thrower);
+        List<Player<?>> receivers = dumpOffReceivers(game, throwerId);
+        if (receivers.isEmpty()) {
+            MatchRunner.injectForTeam(gameState, new ClientCommandActingPlayer(null, null, false), throwerHome);
+            return;
+        }
+        int idx = (int) Long.remainderUnsigned(actionRng.nextLong(), receivers.size());
+        FieldCoordinate coord = game.getFieldModel().getPlayerCoordinate(receivers.get(idx));
+        if (DEBUG) System.err.println("JAVA_DUMPOFF pid=" + throwerId + " coord=(" + coord.getX() + "," + coord.getY() + ")");
+        FieldCoordinate cmdCoord = throwerHome ? coord : coord.transform();
+        MatchRunner.injectForTeam(gameState, new ClientCommandPass(throwerId, cmdCoord), throwerHome);
+    }
+
     private void sendPassAction(Game game, GameState gameState, String playerId) {
         FieldModel fm = game.getFieldModel();
         boolean isHome = game.isHomePlaying();

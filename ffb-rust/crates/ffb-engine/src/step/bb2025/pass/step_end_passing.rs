@@ -35,6 +35,8 @@ pub struct StepEndPassing {
     /// (its ResolvePass needs it in place of Java's shared PassState), so this flag carries the
     /// distinction instead.
     pub interception_successful: bool,
+    /// Java bb2020: `PassState.deflectionSuccessful` (published by StepIntercept).
+    pub deflection_successful: bool,
     /// Java: fCatcherId
     pub catcher_id: Option<String>,
     /// Java: ballSnatcherId (from PlayerId parameter)
@@ -64,6 +66,7 @@ impl StepEndPassing {
         Self {
             interceptor_id: None,
             interception_successful: false,
+            deflection_successful: false,
             catcher_id: None,
             ball_snatcher_id: None,
             pass_accurate: false,
@@ -102,6 +105,8 @@ impl Step for StepEndPassing {
                 true
             }
             StepParameter::InterceptorId(v) => { self.interceptor_id = v.clone(); true }
+            // Java bb2020: `PassState.isDeflectionSuccessful()` gates the interception block.
+            StepParameter::DeflectionSuccessful(v) => { self.deflection_successful = *v; true }
             StepParameter::CatcherId(v) => { self.catcher_id = v.clone(); true }
             StepParameter::PassAccurate(v) => { self.pass_accurate = *v; true }
             StepParameter::PassFumble(v) => { self.pass_fumble = *v; true }
@@ -338,16 +343,42 @@ impl StepEndPassing {
             // Java: if (!isBomb && state.isInterceptionSuccessful() && !ballWasSnatched)
             //           field.setBallCoordinate(interceptorCoordinate); field.setBallMoving(false)
             // Java: game.setDefenderAction(null) -- reset dump-off action
-            if let Some(ref interceptor_id) = self.interceptor_id.clone() {
-                // Java: catcherResult.setInterceptions(+1)
-                let is_home = game.team_home.player(interceptor_id).is_some();
-                game.game_result.team_result_mut(is_home)
-                    .player_result_mut(interceptor_id)
-                    .interceptions += 1;
-                if let Some(coord) = game.field_model.player_coordinate(interceptor_id) {
+            // Java (bb2020 + bb2025 else-branch), 1:1:
+            //   [bb2020 only: if (state.isDeflectionSuccessful())] {
+            //     catcher = interceptor;
+            //     if (!isBomb) {
+            //       if (state.isInterceptionSuccessful()) {
+            //         interceptions += 1;
+            //         if (!ballWasSnatched) ball = interceptorCoordinate;
+            //         ballMoving = false;
+            //       } else [bb2020 only] { deflections += 1; }
+            //     }
+            //   }
+            // Rust placed the ball on the interceptor whenever an id was published, so a bb2020
+            // DEFLECTION (interception NOT successful) of a dump-off still teleported the bounced
+            // ball onto the deflector (dark_elf bb2020 seed 4 i=63: Java's ball stays moving at
+            // 8,7, Rust's ended on home_01 at 8,9 and offered it a Pass).
+            let is_bb2020 = game.rules == ffb_model::enums::Rules::Bb2020;
+            let gate = !is_bb2020 || self.deflection_successful;
+            if gate {
+                if let Some(ref interceptor_id) = self.interceptor_id.clone() {
                     if !is_bomb {
-                        game.field_model.ball_coordinate = Some(coord);
-                        game.field_model.ball_moving = false;
+                        let is_home = game.team_home.player(interceptor_id).is_some();
+                        if self.interception_successful {
+                            game.game_result.team_result_mut(is_home)
+                                .player_result_mut(interceptor_id)
+                                .interceptions += 1;
+                            if self.ball_snatcher_id.is_none() {
+                                if let Some(coord) = game.field_model.player_coordinate(interceptor_id) {
+                                    game.field_model.ball_coordinate = Some(coord);
+                                }
+                            }
+                            game.field_model.ball_moving = false;
+                        } else if is_bb2020 {
+                            game.game_result.team_result_mut(is_home)
+                                .player_result_mut(interceptor_id)
+                                .deflections += 1;
+                        }
                     }
                 }
             }
@@ -854,8 +885,35 @@ mod tests {
         });
         let mut step = StepEndPassing::new();
         step.interceptor_id = Some(interceptor_id.clone());
+        // Java counts an interception only when `PassState.isInterceptionSuccessful()`.
+        step.interception_successful = true;
         step.start(&mut game, &mut GameRng::new(0));
         let pr = game.game_result.away.player_results.get(&interceptor_id).unwrap();
         assert_eq!(pr.interceptions, 1);
+    }
+
+    /// Java bb2020 else-branch: a DEFLECTION (deflectionSuccessful, interception not successful)
+    /// counts a deflection and leaves the ball where it is — it is NOT placed on the deflector.
+    #[test]
+    fn bb2020_dump_off_deflection_counts_a_deflection_and_leaves_the_ball() {
+        let mut game = make_game_with_home_thrower("thrower");
+        game.rules = ffb_model::enums::Rules::Bb2020;
+        game.home_playing = false;
+        game.acting_player.player_id = Some("other".into());
+        let mut ic = ffb_model::model::player::Player::default();
+        ic.id = "interceptor".into();
+        game.team_away.players.push(ic);
+        game.field_model.set_player_coordinate("interceptor", ffb_model::types::FieldCoordinate::new(8, 9));
+        game.field_model.ball_coordinate = Some(ffb_model::types::FieldCoordinate::new(8, 7));
+        game.field_model.ball_moving = true;
+        let mut step = StepEndPassing::new();
+        step.interceptor_id = Some("interceptor".into());
+        step.deflection_successful = true;
+        step.interception_successful = false;
+        step.start(&mut game, &mut GameRng::new(0));
+        let pr = game.game_result.away.player_results.get("interceptor").unwrap();
+        assert_eq!((pr.interceptions, pr.deflections), (0, 1));
+        assert_eq!(game.field_model.ball_coordinate, Some(ffb_model::types::FieldCoordinate::new(8, 7)));
+        assert!(game.field_model.ball_moving);
     }
 }

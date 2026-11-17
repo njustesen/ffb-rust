@@ -4243,9 +4243,20 @@ impl HeuristicAgent {
             // parity agent's `fold_gaze_target`, which kept it; answer from there, 0 draws.
             AgentPrompt::GazeTarget { .. } => self.parity.act(gs),
             // ── skill use (§6.16) ───────────────────────────────────────────
-            AgentPrompt::SkillUse { skill_name, .. } => {
+            AgentPrompt::SkillUse { skill_name, player_id, .. } => {
                 let skill_id = SkillId::from_class_name(&skill_name).unwrap_or(SkillId::Block);
                 let w_use = match skill_name.as_str() {
+                    // BACKLOG §M: Dump-Off is drivable now (StepInitPassing's DumpOffTarget park
+                    // / ParityRunner's DEFENDER_ACTION arm). Take it when the carrier has an
+                    // in-range team-mate to throw to; with none, keep the decline pin (an
+                    // accepted dump-off with no receiver would end the activation instead).
+                    "DumpOff" => {
+                        if crate::legal_actions::dump_off_receivers(g, &player_id).is_empty() {
+                            0.0
+                        } else {
+                            0.75
+                        }
+                    }
                     "Dodge" => 0.95,
                     "Juggernaut" => 0.80,
                     "HitAndRun" => 0.70,
@@ -4262,7 +4273,7 @@ impl HeuristicAgent {
                     // spending the sampler draws. Mirrored in HeuristicDriver.useSkill.
                     // Trickster left this list in BACKLOG §K item 6: both harnesses now answer
                     // its square wait (TricksterMove here, ParityRunner's TRICKSTER step arm).
-                    "DumpOff" | "PrimalSavagery" | "SafePairOfHands" | "Swoop" => 0.0,
+                    "PrimalSavagery" | "SafePairOfHands" | "Swoop" => 0.0,
                     _ => 0.50,
                 };
                 let w_use = coverage_biased(w_use);

@@ -86,6 +86,13 @@ pub struct Game {
     /// skipped the forced re-ROLL Java makes — one die short instead of one dialog too many.
     /// BB2016 keeps it on the step, like the flag.
     pub pass_interceptor_id: Option<PlayerId>,
+    /// Java: `PassState.oldTurnMode` (bb2020/bb2025; bb2016 keeps `fOldTurnMode` on the step):
+    /// StepIntercept saves the turn mode and switches to INTERCEPTION while the interceptor is
+    /// chosen and rolled, restoring it when the step finishes. The re-roll offer for a failed
+    /// interception is asked under INTERCEPTION, so a Dump-Off (DUMP_OFF forbids team re-rolls)
+    /// still offers the interceptor's team re-roll.
+    #[serde(default)]
+    pub pass_old_turn_mode: Option<crate::enums::TurnMode>,
     /// Java: PassState.throwTwoBombs — the All You Can Eat tri-state. Some(true) = committed
     /// to two Throw Bomb actions, first not yet thrown; Some(false) = second bomb thrown,
     /// the 4+ sent-off roll is pending; None = not in an All You Can Eat action.
@@ -181,6 +188,7 @@ impl Game {
             interceptor_chosen: false,
             defect_fixes: Default::default(),
             pass_interceptor_id: None,
+            pass_old_turn_mode: None,
             throw_two_bombs: None,
             waiting_for_opponent: false,
             timeout_possible: false,

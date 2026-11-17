@@ -1305,6 +1305,47 @@ pub fn legal_pass_receivers(game: &Game, player_id: &str, side: TeamSide) -> Vec
     targets
 }
 
+/// Dump-Off receivers (BACKLOG §M): the thrower's on-pitch team-mates the edition's
+/// `PassMechanic.findPassingDistance` accepts from the thrower's square (the same gate
+/// StepInitPassing applies, Blizzard included), coordinate-sorted (x, then y). Both agents pick
+/// from this list with ONE actionRng draw; ParityRunner's DEFENDER_ACTION arm
+/// (`dumpOffReceivers`) is the Java mirror.
+pub fn dump_off_receivers(game: &Game, thrower_id: &str) -> Vec<PlayerId> {
+    use ffb_mechanics::pass_mechanic::PassMechanic as _;
+    let from = match game.field_model.player_coordinate(thrower_id) {
+        Some(c) => c,
+        None => return vec![],
+    };
+    let team = if game.team_home.players.iter().any(|p| p.id == thrower_id) {
+        &game.team_home
+    } else {
+        &game.team_away
+    };
+    let in_range = |to: FieldCoordinate| match game.rules {
+        ffb_model::enums::Rules::Bb2016 => ffb_mechanics::bb2016::pass_mechanic::PassMechanic::new()
+            .find_passing_distance(game, Some(from), Some(to), false)
+            .is_some(),
+        ffb_model::enums::Rules::Bb2020 => ffb_mechanics::bb2020::pass_mechanic::PassMechanic::new()
+            .find_passing_distance(game, Some(from), Some(to), false)
+            .is_some(),
+        _ => ffb_mechanics::bb2025::pass_mechanic::PassMechanic::new()
+            .find_passing_distance(game, Some(from), Some(to), false)
+            .is_some(),
+    };
+    let mut out: Vec<(i32, i32, PlayerId)> = team
+        .players
+        .iter()
+        .filter(|p| p.id != thrower_id)
+        .filter_map(|p| {
+            let c = game.field_model.player_coordinate(&p.id)?;
+            (c.x >= 0 && c.x <= 25 && c.y >= 0 && c.y <= 14 && in_range(c))
+                .then(|| (c.x, c.y, p.id.clone()))
+        })
+        .collect();
+    out.sort_by_key(|(x, y, _)| (*x, *y));
+    out.into_iter().map(|(_, _, id)| id).collect()
+}
+
 /// Returns all prone/stunned opponent players adjacent to the given player (valid foul targets).
 pub fn legal_foul_targets(game: &Game, player_id: &str, side: TeamSide) -> Vec<PlayerId> {
     let coord = match game.field_model.player_coordinate(player_id) {

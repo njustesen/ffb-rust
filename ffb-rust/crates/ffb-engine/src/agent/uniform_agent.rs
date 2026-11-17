@@ -99,6 +99,21 @@ impl Agent for UniformAgent {
                 };
                 Action::Pass { coord }
             }
+            Some(AgentPrompt::DumpOffTarget { thrower_id }) => {
+                let receivers = crate::legal_actions::dump_off_receivers(&gs.game, thrower_id);
+                if receivers.is_empty() {
+                    Action::ActivatePlayer {
+                        player_id: String::new(),
+                        player_action: crate::action::PlayerActionChoice::Move,
+                        block_defender_id: None,
+                    }
+                } else {
+                    let idx = self.pick(receivers.len());
+                    let coord = gs.game.field_model.player_coordinate(&receivers[idx])
+                        .expect("dump_off_receivers returns on-pitch players");
+                    Action::Pass { coord }
+                }
+            }
             Some(AgentPrompt::CoinChoice { .. }) => Action::CoinChoice { heads: self.pick_bool() },
             Some(AgentPrompt::ReceiveChoice { .. }) => Action::ReceiveChoice { receive: self.pick_bool() },
             Some(AgentPrompt::KickBall) => {
