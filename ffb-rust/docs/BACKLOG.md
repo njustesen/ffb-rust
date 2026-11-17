@@ -9655,7 +9655,7 @@ the skill (Multiple Block, Kick 'em, Putrid Regurgitation, Chomp — stars only)
    Regurgitation (Bilerot) are star skills; the star tier fields every star on every squad that
    can hire it, so they are reached there instead of by an R6 exception.
 
-## §L — 2026-11-16: STAR-PLAYER PARITY TIER — one hired star per team, every squad pair (in progress)
+## §L — 2026-11-16: STAR-PLAYER PARITY TIER — one hired star per team, every squad pair (🏁 COMPLETE 2026-11-17)
 
 **Goal (user, 2026-11-16):** "test proper rosters with all star players on teams they can
 actually be hired from ... every team plays every team with every star player they can have",
@@ -9684,6 +9684,32 @@ reach check, wrong step logic); bb2016 Fend stall; bb2016 Jump Up minimum; bb202
 Blastin' (offer + step); bb2020 Zoat offer; bb2020 Wisdom (reversed rule + usage type); Blind
 Rage report/usage; Whirling Dervish dialog type.
 
-**Next:** clear the remaining pilot reds, then the full 4012-gate star sweep, then the mirror (330)
-+ cross (4012) re-certification on the same build (every fix above touches shared steps).
+**Pilot B** (180 gates, seed 777): 7 reds, all fixed (`964dae229`). **Full sweep** (4012 gates):
+every red fixed 1:1 in batches (`1fc4396d9` .. `4ac0e661a`, ~45 Rust bugs: Incorporeal / Strong
+Passing Game / Star of the Show / Swift As The Breeze ported; shared-square lookup = last arrival;
+injury-context modifier Set semantics; Breathe Fire pre-broken armour + Ball & Chain injury;
+foul guard needs sneakyGitAsFoulGuard; Right Stuff offer reads the thrown player; ...).
+
+**Report identity (the §J bar):** the first frozen cert (`4ac0e661a`) was 4012/4012 on steps but
+120 gates had REPORT diffs that only `games match` had hidden. Biggest find: every bb2025 Multiple
+Block and every multi-block Dauntless/FA re-roll offer was a VACUOUS green -- ParityRunner had no
+arm for RE_ROLL_FOR_TARGETS / RE_ROLL_BLOCK_FOR_TARGETS_PROPERTIES, so both sides ended the game
+early at the same step. Fixed in harness + Rust (`a0219f55e`, `a2dddf9e1`, `6c367ba3a`). Since
+then every worker records the REPORTS verdict next to PARITY.
+
+**Certification chain** (each frozen build in `D:/ffb_star/bin/`):
+- cert2 `6c367ba3a`: star 4012/4012 steps+reports; mirror 330/330 steps, 1 report diff (stalling
+  report for a carrier already in the endzone -- Java `ArrayTool.isProvided` is false for an EMPTY
+  path) -> `6d1ccae5f`.
+- cert3 `6d1ccae5f`: cross 4009/4012 -> raise dead must read the Decay roll
+  (`InjuryContext.getPlayerState()` = worse of injury/decay); bb2020 StepShadowing has no JUMPED
+  case, so a Leap out of a shadower's zone still rolls Shadowing (2 reds) -> `665c60abb`.
+- **cert4 `665c60abb` (FINAL, 2026-11-17): cross 4012/4012, star 4012/4012, mirror 330/330 (100
+  seeds each) -- every gate green on steps AND report-identical.** Logs: `cross_cert4/scratch`,
+  `starjobs_cert4/scratch`, `mirror_cert4/scratch` (sweep_w*.log).
+
+**Open (not a parity red):** bb2016 `removeUsedSecretWeapons`' updatePlayerStateDependentProperties
+call is not mirrored; the rng-less `drop_player` still has ~20 call sites that skip Ball & Chain's
+injury branch wherever Java calls the full dropPlayer -- latent, unreached by any gate.
+**Lesson:** a gate ending early on BOTH sides matches; count REPORTS and check game-end turn/half.
 
