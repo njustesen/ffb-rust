@@ -1918,8 +1918,12 @@ impl ClassMask {
 /// * only on the attacker's own choice, and only when EVERY die is a Skull or Both Down;
 /// * Brawler first, when offered and a Both Down is showing;
 /// * else Pro on the first Skull (else the first Both Down);
+/// * else the SINGLE_BLOCK_DIE skill (Unstoppable Momentum, Woodland Fury, Lord of Chaos,
+///   Working in Tandem) on that same die (BACKLOG §M);
+/// * else the MULTI_BLOCK_DICE skill (Savage Blow) on EVERY die — all of them are bad;
 /// * otherwise decline (`UseReRoll { use_reroll: false }`).
-pub fn block_skill_reroll_answer(dice: &[i32], own_choice: bool, brawler: bool, pro: bool) -> Action {
+pub fn block_skill_reroll_answer(dice: &[i32], own_choice: bool, brawler: bool, pro: bool,
+                                 single_block_die: Option<&str>, multi_block_dice: bool) -> Action {
     use ffb_model::enums::BlockResult;
     let results: Vec<BlockResult> = dice.iter()
         .map(|d| ffb_mechanics::mechanics::block_result_for_roll(*d)).collect();
@@ -1936,6 +1940,15 @@ pub fn block_skill_reroll_answer(dice: &[i32], own_choice: bool, brawler: bool, 
             .or_else(|| results.iter().position(|r| *r == BlockResult::BothDown))
             .unwrap_or(0);
         return Action::UseProReRollForBlock { die_index: idx };
+    }
+    if let Some(source) = single_block_die {
+        let idx = results.iter().position(|r| *r == BlockResult::Skull)
+            .or_else(|| results.iter().position(|r| *r == BlockResult::BothDown))
+            .unwrap_or(0);
+        return Action::UseSingleBlockDieReRoll { re_roll_source: source.to_string(), die_index: idx };
+    }
+    if multi_block_dice {
+        return Action::UseMultiBlockDiceReRoll { dice_indexes: (0..dice.len()).collect() };
     }
     Action::UseReRoll { use_reroll: false }
 }
@@ -4236,8 +4249,9 @@ impl HeuristicAgent {
     fn act_boardless(&mut self, gs: &GameState, g: &Game, prompt: AgentPrompt) -> Action {
         match prompt {
             // ── block skill re-roll (BACKLOG §K item 6): fixed rule, ZERO draws ─────────
-            AgentPrompt::BlockSkillReRoll { dice, own_choice, brawler, pro, .. } => {
-                block_skill_reroll_answer(&dice, own_choice, brawler, pro)
+            AgentPrompt::BlockSkillReRoll { dice, own_choice, brawler, pro, single_block_die, multi_block_dice, .. } => {
+                block_skill_reroll_answer(&dice, own_choice, brawler, pro,
+                    single_block_die.as_deref(), multi_block_dice)
             }
             // bb2020 gaze target (BACKLOG §K): the declaration folded the victim through the
             // parity agent's `fold_gaze_target`, which kept it; answer from there, 0 draws.

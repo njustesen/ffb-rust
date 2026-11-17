@@ -80,6 +80,7 @@ pub fn unused_injury_modification(
         }
         if let Some(mut m) = modification_for_skill(skill, game.rules) {
             if m.is_valid_type(injury_type_name) {
+                ffb_model::skill_touch::touch(skill);
                 m.set_skill_id(skill);
                 return Some(m);
             }

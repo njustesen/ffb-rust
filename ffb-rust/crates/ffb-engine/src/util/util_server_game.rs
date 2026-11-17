@@ -113,8 +113,10 @@ impl UtilServerGame {
         // Collect player data before mutating turn_data to avoid borrow conflict.
         let player_data: Vec<(String, bool)> = {
             let team = if home { &game.team_home } else { &game.team_away };
+            // Edition-aware: only bb2020 Lord of Chaos registers this property.
             team.players.iter()
-                .map(|p| (p.id.clone(), UtilCards::has_unused_skill_with_property(p, NamedProperties::GRANTS_SINGLE_USE_TEAM_REROLL_WHEN_ON_PITCH)))
+                .map(|p| (p.id.clone(), UtilCards::has_unused_skill_with_property_for(
+                    p, NamedProperties::GRANTS_SINGLE_USE_TEAM_REROLL_WHEN_ON_PITCH, game.rules)))
                 .collect()
         };
         let count = player_data.iter()
@@ -211,11 +213,15 @@ impl UtilServerGame {
         let Some(ps) = state else { return };
         if !ps.is_casualty() && ps.base() != PS_BANNED { return; }
 
-        // Java: Constant.CHECK_AFTER_PLAYER_REMOVAL = {grantsSingleUseTeamRerollWhenOnPitch}
+        // Java: Constant.CHECK_AFTER_PLAYER_REMOVAL = {grantsSingleUseTeamRerollWhenOnPitch}, read
+        // off the EDITION's skill class: bb2025 Lord of Chaos does not register it, so a bb2025
+        // Lord Borak leaving the pitch wastes nothing (star tier §M, orc vs chaos_ogre seed 25:
+        // Rust reported `skillWasted Lord of Chaos` where Java reports nothing).
+        let rules = game.rules;
         let wasted: Vec<_> = game.player(player_id)
             .map(|p| {
                 p.all_skill_ids()
-                    .filter(|id| id.properties().contains(&NamedProperties::GRANTS_SINGLE_USE_TEAM_REROLL_WHEN_ON_PITCH))
+                    .filter(|id| id.properties_for(rules).contains(&NamedProperties::GRANTS_SINGLE_USE_TEAM_REROLL_WHEN_ON_PITCH))
                     .filter(|id| !p.used_skills.contains(id))
                     .collect()
             })
@@ -305,6 +311,23 @@ mod tests {
             make_team("away", vec![]),
             Rules::Bb2025,
         )
+    }
+
+    /// Java registers `grantsSingleUseTeamRerollWhenOnPitch` only on bb2020 Lord of Chaos: a
+    /// bb2025 Lord Borak leaving the pitch as a casualty wastes nothing (§M, orc vs chaos_ogre
+    /// seed 25), while the bb2020 one reports his unused skill.
+    #[test]
+    fn lord_of_chaos_is_wasted_only_in_bb2020() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::{SkillId, PS_BADLY_HURT};
+        for (rules, expected) in [(Rules::Bb2020, 1usize), (Rules::Bb2025, 0usize)] {
+            let mut p = make_player("borak");
+            p.starting_skills.push(SkillWithValue { skill_id: SkillId::LordOfChaos, value: None });
+            let mut game = Game::new(make_team("home", vec![p]), make_team("away", vec![]), rules);
+            game.field_model.set_player_state("borak", PlayerState::new(PS_BADLY_HURT));
+            UtilServerGame::check_for_wasted_skills(&mut game, "borak");
+            assert_eq!(game.report_list.size(), expected, "{rules:?}");
+        }
     }
 
     // ── update_single_use_rerolls ───────────────────────────────────────────

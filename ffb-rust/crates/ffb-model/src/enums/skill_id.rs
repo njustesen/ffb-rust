@@ -1134,6 +1134,10 @@ impl SkillId {
             // ask `has_property_in`.
             (SkillId::ExcuseMeAreYouAZoat, Rules::Bb2020) => &["canGainGaze"],
             (SkillId::ExcuseMeAreYouAZoat, Rules::Bb2025 | Rules::Common) => &["canGazeAutomaticallyThreeSquaresAway"],
+            // Likewise Lord of Chaos: bb2020/special registers grantsSingleUseTeamRerollWhenOnPitch,
+            // bb2025/special canRerollSingleBlockDieOncePerPeriod (`properties()` is the union).
+            (SkillId::LordOfChaos, Rules::Bb2020) => &["grantsSingleUseTeamRerollWhenOnPitch"],
+            (SkillId::LordOfChaos, Rules::Bb2025 | Rules::Common) => &["canRerollSingleBlockDieOncePerPeriod"],
             _ => self.properties(),
         }
     }

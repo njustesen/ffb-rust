@@ -129,7 +129,10 @@ fn ask_for_reroll_if_available_inner(
             .filter(|id| !player.used_skills.contains(id))
             .find(|id| id.properties()
                 .contains(&ffb_model::model::property::named_properties::NamedProperties::CAN_REROLL_SINGLE_DIE_ONCE_PER_PERIOD))
-            .map(|id| ReRollSource::new(format!("{:?}", id)))
+            .map(|id| {
+                ffb_model::skill_touch::touch(id); // §M telemetry (observational only)
+                ReRollSource::new(format!("{:?}", id))
+            })
     });
     // Java shows ONE dialog carrying both the skill and `teamReRollOption`, and the parity coach
     // (`ParityRunner.reRollSourceFor`) answers it with `TEAM_RE_ROLL` or null — never with the

@@ -154,7 +154,9 @@ impl Step for StepBlockRoll {
                         p.all_skill_ids()
                             .find(|id| id.properties().contains(&NamedProperties::CAN_RE_ROLL_ANY_NUMBER_OF_BLOCK_DICE))
                     })
-                    .map(|id| id.class_name().to_string());
+                    // Java `anyRrSkill.getRerollSource(MULTI_BLOCK_DICE)` — the ReRollSource name
+                    // ("Savage Blow"), which ReportBlockReRoll carries.
+                    .map(|id| id.category_and_name_for(game.rules).1.to_string());
                 if let Some(name) = skill_name {
                     self.re_rolled_action = Some("BLOCK".into());
                     self.re_roll_source = Some(name);
@@ -180,6 +182,20 @@ impl Step for StepBlockRoll {
     fn consumes_parameter(&self, param: &StepParameter) -> bool {
         matches!(param,
             StepParameter::SuccessfulDauntless(_) | StepParameter::DoubleTargetStrength(_))
+    }
+}
+
+/// The block-die skill re-roll sources by class name. The agents answer with Java's
+/// `ReRollSource` name ("Unstoppable Momentum", which `ReportBlockReRoll` carries); older call
+/// sites and tests use the class name. Both mean the same source (Java compares by identity).
+fn canon_source(source: &str) -> &str {
+    match source {
+        "Unstoppable Momentum" => "UnstoppableMomentum",
+        "Savage Blow" => "SavageBlow",
+        "Lord of Chaos" => "LordOfChaos",
+        "Working in Tandem" => "WorkingInTandem",
+        "Woodland Fury" => "WoodlandFury",
+        other => other,
     }
 }
 
@@ -228,7 +244,7 @@ impl StepBlockRoll {
                 // UNSTOPPABLE_MOMENTUM or SAVAGE_BLOW -- those re-roll unconditionally.
                 let is_bb2020 = game.rules == ffb_model::enums::Rules::Bb2020;
                 let skips_use = is_bb2020
-                    && matches!(source_name.as_str(), "Brawler" | "UnstoppableMomentum" | "SavageBlow");
+                    && matches!(canon_source(source_name), "Brawler" | "UnstoppableMomentum" | "SavageBlow");
                 let source = ReRollSource::new(source_name.as_str());
                 let consumed = if skips_use {
                     true
@@ -362,7 +378,8 @@ impl StepBlockRoll {
     fn after_team_reroll_prompt(&mut self, game: &Game) -> ffb_model::prompts::AgentPrompt {
         if !self.skill_offer_asked {
             let (brawler, pro) = self.skill_reroll_options(game);
-            if brawler || pro {
+            let (single_block_die, multi_block_dice) = self.explicit_die_options(game);
+            if brawler || pro || single_block_die.is_some() || multi_block_dice {
                 self.skill_offer_asked = true;
                 return ffb_model::prompts::AgentPrompt::BlockSkillReRoll {
                     attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
@@ -370,6 +387,8 @@ impl StepBlockRoll {
                     own_choice: self.nr_of_dice >= 0,
                     brawler,
                     pro,
+                    single_block_die,
+                    multi_block_dice,
                 };
             }
         }
@@ -436,6 +455,74 @@ impl StepBlockRoll {
             .unwrap_or(false);
         let pro = source_for("SINGLE_DIE_PER_ACTIVATION") == Some(ffb_model::enums::SkillId::Pro);
         (brawler, pro)
+    }
+
+    /// The dialog's explicit-die skill re-rolls (BACKLOG §M): the SINGLE_BLOCK_DIE source, by
+    /// Java `ReRollSource` name, and whether a MULTI_BLOCK_DICE skill is listed.
+    ///
+    /// bb2025 `showBlockRollDialog` (only while `getReRollSource() == null`): the
+    /// `singleBlock` if/else chain (would-be-knocked-down → blitz → once-per-period → working in
+    /// tandem) into `actionToSource[SINGLE_BLOCK_DIE]`, and
+    /// `addReRollSourceMapping(MULTI_BLOCK_DICE)` = `UtilCards.getUnusedRerollSource`.
+    ///
+    /// bb2020 `showBlockRollDialog`: `singleBlockDieOption` (blitzing + unused
+    /// canRerollSingleBlockDieDuringBlitz) and `anyBlockDiceOption` (unused
+    /// canReRollAnyNumberOfBlockDice), both gated on `someDiceCanBeReRolled`; the dialog lists
+    /// the skills and the client takes `skill.getRerollSource(...)`.
+    fn explicit_die_options(&self, game: &Game) -> (Option<String>, bool) {
+        let Some(pid) = game.acting_player.player_id.as_deref() else { return (None, false) };
+        let Some(player) = game.player(pid) else { return (None, false) };
+        let blitzing = game.acting_player.player_action.map(|a| a.is_blitzing()).unwrap_or(false);
+        let unused_id = |id: ffb_model::enums::SkillId| !player.used_skills.contains(&id)
+            && !game.acting_player.used_skills.contains(&id);
+        let unused_with = |property: &str| player.all_skill_ids()
+            .find(|id| id.properties().contains(&property) && unused_id(*id));
+        let source_name = |id: ffb_model::enums::SkillId| {
+            ffb_model::skill_touch::touch(id); // §M telemetry (observational only)
+            id.category_and_name_for(game.rules).1.to_string()
+        };
+
+        if game.rules == ffb_model::enums::Rules::Bb2020 {
+            let some_dice = self.re_roll_source.as_deref() != Some("TRR")
+                && self.block_roll.len() > self.re_rolled_dice_indexes.len();
+            let single = if blitzing && some_dice {
+                unused_with(NamedProperties::CAN_REROLL_SINGLE_BLOCK_DIE_DURING_BLITZ)
+                    .and_then(|_| player.skill_id_with_property(NamedProperties::CAN_REROLL_SINGLE_BLOCK_DIE_DURING_BLITZ))
+                    .map(source_name)
+            } else {
+                None
+            };
+            let multi = some_dice && unused_with(NamedProperties::CAN_RE_ROLL_ANY_NUMBER_OF_BLOCK_DICE).is_some();
+            return (single, multi);
+        }
+
+        if self.re_roll_source.is_some() {
+            return (None, false);
+        }
+        let results: Vec<Option<BlockResult>> = {
+            let factory = ffb_model::factory::block_result_factory::BlockResultFactory;
+            self.block_roll.iter().map(|r| factory.for_roll(*r)).collect()
+        };
+        let single = if Self::block_would_knock_down_attacker(game, player, blitzing, &results, self.nr_of_dice < 0)
+            && unused_with(NamedProperties::CAN_REROLL_SINGLE_BLOCK_DIE_WHEN_WOULD_BE_KNOCKED_DOWN).is_some()
+        {
+            unused_with(NamedProperties::CAN_REROLL_SINGLE_BLOCK_DIE_WHEN_WOULD_BE_KNOCKED_DOWN)
+        } else if blitzing && unused_with(NamedProperties::CAN_REROLL_SINGLE_BLOCK_DIE_DURING_BLITZ).is_some() {
+            unused_with(NamedProperties::CAN_REROLL_SINGLE_BLOCK_DIE_DURING_BLITZ)
+        } else if unused_with(NamedProperties::CAN_REROLL_SINGLE_BLOCK_DIE_ONCE_PER_PERIOD).is_some() {
+            unused_with(NamedProperties::CAN_REROLL_SINGLE_BLOCK_DIE_ONCE_PER_PERIOD)
+        } else if Self::is_attacker_working_in_tandem(game, player) {
+            unused_with(NamedProperties::CAN_REROLL_SINGLE_BLOCK_DIE_WHEN_PARTNER_IS_MARKING)
+        } else {
+            None
+        }
+        .map(source_name);
+        let multi = player.all_skill_ids()
+            .filter(|id| unused_id(*id))
+            .find(|id| id.reroll_sources_for(game.rules).iter().any(|(a, _)| *a == "MULTI_BLOCK_DICE"))
+            .map(|id| { ffb_model::skill_touch::touch(id); })
+            .is_some();
+        (single, multi)
     }
 
     /// Java bb2020 `handleBrawler`: roll one die, report it, and replace the first BOTH_DOWN
@@ -797,23 +884,47 @@ impl StepBlockRoll {
                     self.re_rolled_dice_indexes.push(self.die_index);
                 }
             }
-        } else if matches!(source, "UnstoppableMomentum" | "LordOfChaos" | "WorkingInTandem" | "WoodlandFury") {
+        } else if matches!(canon_source(source), "UnstoppableMomentum" | "LordOfChaos" | "WorkingInTandem" | "WoodlandFury")
+            && (game.rules != ffb_model::enums::Rules::Bb2020 || canon_source(source) == "UnstoppableMomentum")
+        {
             // Java: these also replace a single die at dieIndex
             if self.die_index >= 0 {
                 let new_die = rng.d6();
                 report(game, vec![new_die]);
+                // bb2025 `actingPlayer.markSkillUsed(getReRollSource(), SINGLE_BLOCK_DIE)`;
+                // bb2020 `markSkillUsed(canRerollSingleBlockDieDuringBlitz)` (bb2020 never
+                // called useReRoll for Unstoppable Momentum, so nothing else marks it).
+                let pid = game.acting_player.player_id.clone().unwrap_or_default();
+                let skill = game.player(&pid).and_then(|p| p.all_skill_ids()
+                    .find(|id| id.class_name() == canon_source(source)));
+                if let Some(skill) = skill {
+                    crate::step::util_server_steps::mark_skill_used(game, &pid, skill);
+                }
                 if let Some(slot) = self.block_roll.get_mut(self.die_index as usize) {
                     *slot = new_die;
                 }
+                if game.rules == ffb_model::enums::Rules::Bb2020 {
+                    self.re_rolled_dice_indexes.push(self.die_index);
+                }
             }
-        } else if source == "SavageBlow" && !self.dice_indexes.is_empty() {
-            // Java: roll diceIndexes.length dice, replace each position
+        } else if canon_source(source) == "SavageBlow" && !self.dice_indexes.is_empty() {
+            // Java: markSkillUsed(canReRollAnyNumberOfBlockDice), roll diceIndexes.length dice,
+            // replace each position (bb2020 also records each in reRolledDiceIndexes).
+            let pid = game.acting_player.player_id.clone().unwrap_or_default();
+            let skill = game.player(&pid)
+                .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_RE_ROLL_ANY_NUMBER_OF_BLOCK_DICE));
+            if let Some(skill) = skill {
+                crate::step::util_server_steps::mark_skill_used(game, &pid, skill);
+            }
             let n = self.dice_indexes.len();
             let new_dice: Vec<i32> = (0..n).map(|_| rng.d6()).collect();
             report(game, new_dice.clone());
             for (pos, &idx) in self.dice_indexes.iter().enumerate() {
                 if let Some(slot) = self.block_roll.get_mut(idx) {
                     *slot = new_dice[pos];
+                }
+                if game.rules == ffb_model::enums::Rules::Bb2020 {
+                    self.re_rolled_dice_indexes.push(idx as i32);
                 }
             }
         } else {
@@ -1485,6 +1596,70 @@ mod tests {
         step
     }
 
+    /// BACKLOG §M: Java bb2025 `showBlockRollDialog` maps MULTI_BLOCK_DICE to Savage Blow and the
+    /// SINGLE_BLOCK_DIE chain to Unstoppable Momentum only on a blitz; bb2020's
+    /// `singleBlockDieOption` likewise needs the blitz. Sources carry Java's ReRollSource names.
+    #[test]
+    fn explicit_die_options_follow_the_java_dialog() {
+        use ffb_model::enums::PlayerAction;
+        let game = skill_game(Rules::Bb2025, &[SkillId::SavageBlow]);
+        let step = preset(vec![1, 1]);
+        assert_eq!(step.explicit_die_options(&game), (None, true));
+
+        for rules in [Rules::Bb2025, Rules::Bb2020] {
+            let mut game = skill_game(rules, &[SkillId::UnstoppableMomentum]);
+            let step = preset(vec![1, 2]);
+            assert_eq!(step.explicit_die_options(&game), (None, false), "{rules:?}: not blitzing");
+            game.acting_player.player_action = Some(PlayerAction::Blitz);
+            assert_eq!(step.explicit_die_options(&game),
+                (Some("Unstoppable Momentum".to_string()), false), "{rules:?}: blitzing");
+        }
+
+        // bb2025 builds nothing once a source is set; bb2020 keeps the multi-dice option while
+        // a die is left that no skill re-roll replaced.
+        let game = skill_game(Rules::Bb2025, &[SkillId::SavageBlow]);
+        let mut step = preset(vec![1, 1]);
+        step.re_roll_source = Some("TRR".into());
+        assert_eq!(step.explicit_die_options(&game), (None, false));
+        let game = skill_game(Rules::Bb2020, &[SkillId::SavageBlow]);
+        let mut step = preset(vec![1, 1]);
+        step.re_roll_source = Some("Pro".into());
+        step.re_rolled_dice_indexes = vec![0];
+        assert_eq!(step.explicit_die_options(&game), (None, true));
+        step.re_rolled_dice_indexes = vec![0, 1];
+        assert_eq!(step.explicit_die_options(&game), (None, false));
+    }
+
+    /// The heuristic's fixed skill-half rule (mirrored by `ParityRunner.answerBlockSkillReRoll`):
+    /// after Brawler and Pro, the single-block-die source on the first Skull, else Savage Blow on
+    /// every die; nothing on the defender's choice or with a good die showing.
+    #[test]
+    fn skill_half_answer_uses_explicit_die_skills() {
+        use crate::agent::block_skill_reroll_answer;
+        assert_eq!(block_skill_reroll_answer(&[2, 1], true, false, false, Some("Woodland Fury"), true),
+            Action::UseSingleBlockDieReRoll { re_roll_source: "Woodland Fury".into(), die_index: 1 });
+        assert_eq!(block_skill_reroll_answer(&[2, 1], true, false, false, None, true),
+            Action::UseMultiBlockDiceReRoll { dice_indexes: vec![0, 1] });
+        assert_eq!(block_skill_reroll_answer(&[2, 6], true, false, false, None, true),
+            Action::UseReRoll { use_reroll: false });
+        assert_eq!(block_skill_reroll_answer(&[2, 1], false, false, false, None, true),
+            Action::UseReRoll { use_reroll: false });
+    }
+
+    /// bb2020 Java executes Savage Blow without useReRoll, so the step itself marks the skill used
+    /// and records every replaced die; the report names Java's source ("Savage Blow").
+    #[test]
+    fn bb2020_savage_blow_marks_used_and_records_dice() {
+        let mut game = skill_game(Rules::Bb2020, &[SkillId::SavageBlow]);
+        let mut rng = GameRng::new(7);
+        let mut step = preset(vec![1, 1]);
+        step.handle_command(&Action::UseMultiBlockDiceReRoll { dice_indexes: vec![0, 1] }, &mut game, &mut rng);
+        assert_eq!(step.re_roll_source.as_deref(), Some("Savage Blow"));
+        assert_eq!(step.re_rolled_dice_indexes, vec![0, 1]);
+        assert!(game.player("atk").unwrap().used_skills.contains(&SkillId::SavageBlow)
+            || game.acting_player.used_skills.contains(&SkillId::SavageBlow));
+    }
+
     /// bb2025 `showBlockRollDialog` maps SINGLE_BOTH_DOWN to Brawler only while a Both Down
     /// shows, and SINGLE_DIE_PER_ACTIVATION to Pro; the skill half is asked once, then the die.
     #[test]
@@ -1559,10 +1734,10 @@ mod tests {
     #[test]
     fn block_skill_reroll_rule() {
         use crate::agent::block_skill_reroll_answer as answer;
-        assert!(matches!(answer(&[2, 1], true, true, true), Action::UseBrawler { .. }));
-        assert!(matches!(answer(&[2, 1], true, false, true), Action::UseProReRollForBlock { die_index: 1 }));
-        assert!(matches!(answer(&[2, 2], true, false, true), Action::UseProReRollForBlock { die_index: 0 }));
-        assert!(matches!(answer(&[2, 6], true, true, true), Action::UseReRoll { use_reroll: false }));
-        assert!(matches!(answer(&[1], false, true, true), Action::UseReRoll { use_reroll: false }));
+        assert!(matches!(answer(&[2, 1], true, true, true, None, false), Action::UseBrawler { .. }));
+        assert!(matches!(answer(&[2, 1], true, false, true, None, false), Action::UseProReRollForBlock { die_index: 1 }));
+        assert!(matches!(answer(&[2, 2], true, false, true, None, false), Action::UseProReRollForBlock { die_index: 0 }));
+        assert!(matches!(answer(&[2, 6], true, true, true, None, false), Action::UseReRoll { use_reroll: false }));
+        assert!(matches!(answer(&[1], false, true, true, None, false), Action::UseReRoll { use_reroll: false }));
     }
 }

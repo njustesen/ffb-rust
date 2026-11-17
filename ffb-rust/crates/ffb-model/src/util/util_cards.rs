@@ -35,8 +35,19 @@ impl UtilCards {
     /// Returns true if the player has at least one skill with the given named property
     /// that has not yet been marked as used this turn.
     pub fn has_unused_skill_with_property(player: &Player, property: &str) -> bool {
-        player.all_skill_ids()
-            .any(|id| id.properties().contains(&property) && !player.used_skills.contains(&id))
+        Self::get_unused_skill_with_property(player, property).is_some()
+    }
+
+    /// [`Self::has_unused_skill_with_property`] against the EDITION's skill classes
+    /// (`SkillId::properties_for`): Java registers some properties in only one edition's class
+    /// (bb2020 Lord of Chaos grants a single-use team re-roll, bb2025's does not).
+    pub fn has_unused_skill_with_property_for(player: &Player, property: &str, rules: crate::enums::Rules) -> bool {
+        let found = player.all_skill_ids()
+            .find(|id| id.properties_for(rules).contains(&property) && !player.used_skills.contains(id));
+        if let Some(id) = found {
+            crate::skill_touch::touch(id); // §M telemetry (observational only)
+        }
+        found.is_some()
     }
 
     /// Java: `hasSkillWithProperty(Player<?> player, ISkillProperty property)` — ignores used state.
@@ -48,8 +59,13 @@ impl UtilCards {
     ///
     /// Returns the first unused SkillId with the given property, or None.
     pub fn get_unused_skill_with_property(player: &Player, property: &str) -> Option<SkillId> {
-        player.all_skill_ids()
-            .find(|id| id.properties().contains(&property) && !player.used_skills.contains(id))
+        let found = player.all_skill_ids()
+            .find(|id| id.properties().contains(&property) && !player.used_skills.contains(id));
+        // §M skill-touch telemetry (observational only).
+        if let Some(id) = found {
+            crate::skill_touch::touch(id);
+        }
+        found
     }
 
     /// Java: `hasSkillToCancelProperty(Player<?> player, ISkillProperty property)`.

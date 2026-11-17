@@ -52,6 +52,16 @@ pub enum AgentPrompt {
         own_choice: bool,
         brawler: bool,
         pro: bool,
+        /// The dialog's SINGLE_BLOCK_DIE skill source, by Java `ReRollSource` name (bb2025
+        /// `actionToSource[SINGLE_BLOCK_DIE]`: Woodland Fury / Unstoppable Momentum / Lord of
+        /// Chaos / Working in Tandem; bb2020 `singleBlockDieOption`: Unstoppable Momentum).
+        /// Answered with `Action::UseSingleBlockDieReRoll` (BACKLOG §M).
+        #[serde(default)]
+        single_block_die: Option<String>,
+        /// The dialog lists a MULTI_BLOCK_DICE skill (Savage Blow; bb2020 `anyBlockDiceOption`).
+        /// Answered with `Action::UseMultiBlockDiceReRoll` (BACKLOG §M).
+        #[serde(default)]
+        multi_block_dice: bool,
     },
     /// bb2020 `StepSelectGazeTarget`'s DialogSelectGazeTarget (TurnMode SELECT_GAZE_TARGET):
     /// answered with `Action::SelectPlayer` naming the victim, or the attacker himself to cancel.

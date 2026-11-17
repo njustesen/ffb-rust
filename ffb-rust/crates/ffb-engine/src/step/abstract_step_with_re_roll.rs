@@ -72,7 +72,10 @@ pub fn find_skill_reroll_source(game: &Game, rerolled_action: &str) -> Option<Re
                 .map(|(_, priority)| (id, *priority))
         })
         .min_by_key(|(id, priority)| (*priority, *id as i32))
-        .map(|(skill_id, priority)| ReRollSource::with_priority(format!("{:?}", skill_id), priority))
+        .map(|(skill_id, priority)| {
+            ffb_model::skill_touch::touch(skill_id); // §M telemetry (observational only)
+            ReRollSource::with_priority(format!("{:?}", skill_id), priority)
+        })
 }
 
 /// Java: `UtilCards.getRerollSource(Player, ReRolledAction)`.
@@ -101,7 +104,10 @@ pub fn find_player_reroll_source(
         // Java takes `min(comparingInt(getPriority))`, which keeps the FIRST minimum in stream
         // order; the SkillId tie-break makes that deterministic here, as in the sibling.
         .min_by_key(|(id, priority)| (*priority, *id as i32))
-        .map(|(skill_id, priority)| ReRollSource::with_priority(format!("{:?}", skill_id), priority))
+        .map(|(skill_id, priority)| {
+            ffb_model::skill_touch::touch(skill_id); // §M telemetry (observational only)
+            ReRollSource::with_priority(format!("{:?}", skill_id), priority)
+        })
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

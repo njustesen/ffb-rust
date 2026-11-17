@@ -1339,9 +1339,28 @@ public class ParityRunner {
                 if (answerBlockReRoll(bpr.hasTeamReRollOption(), dialog, game, gameState)) {
                     break;
                 }
-                if (answerBlockSkillReRoll(bpr.getNrOfDice(), bpr.getBlockRoll(),
-                        bpr.hasBrawlerOption(), bpr.hasProReRollOption(), dialog, game, gameState)) {
-                    break;
+                {
+                    // BACKLOG §M: the dialog's explicit-die skills (bb2020 StepBlockRoll lists
+                    // singleBlockDieRrSkill / anyBlockDiceRrSkill); the client takes the source
+                    // from the skill (Rust `explicit_die_options`).
+                    String bprSingle = null;
+                    boolean bprMulti = false;
+                    if (bpr.getReRollExplicitDieSkills() != null) {
+                        for (com.fumbbl.ffb.model.skill.Skill s : bpr.getReRollExplicitDieSkills()) {
+                            if (s.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canRerollSingleBlockDieDuringBlitz)) {
+                                com.fumbbl.ffb.ReRollSource rs = s.getRerollSource(com.fumbbl.ffb.ReRolledActions.SINGLE_BLOCK_DIE);
+                                if (rs != null) bprSingle = rs.getName(game);
+                            }
+                            if (s.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canReRollAnyNumberOfBlockDice)) {
+                                bprMulti = true;
+                            }
+                        }
+                    }
+                    if (answerBlockSkillReRoll(bpr.getNrOfDice(), bpr.getBlockRoll(),
+                            bpr.hasBrawlerOption(), bpr.hasProReRollOption(), bprSingle, bprMulti,
+                            dialog, game, gameState)) {
+                        break;
+                    }
                 }
                 int bprIdx = heuristicBlockChoice(game, bpr.getNrOfDice(), bpr.getBlockRoll());
                 comm.clearCaptured();
@@ -1373,8 +1392,13 @@ public class ParityRunner {
                         && a2s.containsKey(com.fumbbl.ffb.ReRolledActions.SINGLE_BOTH_DOWN.getName());
                     boolean brpPro = a2s != null && com.fumbbl.ffb.ReRollSources.PRO.getName(game).equals(
                         a2s.get(com.fumbbl.ffb.ReRolledActions.SINGLE_DIE_PER_ACTIVATION.getName()));
+                    // BACKLOG §M: SINGLE_BLOCK_DIE -> its source name; MULTI_BLOCK_DICE listed.
+                    String brpSingle = a2s == null ? null
+                        : a2s.get(com.fumbbl.ffb.ReRolledActions.SINGLE_BLOCK_DIE.getName());
+                    boolean brpMulti = a2s != null
+                        && a2s.containsKey(com.fumbbl.ffb.ReRolledActions.MULTI_BLOCK_DICE.getName());
                     if (answerBlockSkillReRoll(brp.getNrOfDice(), brp.getBlockRoll(), brpBrawler, brpPro,
-                            dialog, game, gameState)) {
+                            brpSingle, brpMulti, dialog, game, gameState)) {
                         break;
                     }
                 }
@@ -3426,10 +3450,12 @@ public class ParityRunner {
      * @return true when a skill re-roll was sent; false to fall through to the die choice.
      */
     private boolean answerBlockSkillReRoll(int nrOfDice, int[] blockRoll, boolean brawler, boolean pro,
+            String singleBlockDie, boolean multiBlockDice,
             IDialogParameter dialog, Game game, GameState gameState) {
         if (heuristic == null
             || !heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.RE_ROLL_OFFER)
-            || (!brawler && !pro) || nrOfDice < 0 || blockRoll == null || blockRoll.length == 0) {
+            || (!brawler && !pro && singleBlockDie == null && !multiBlockDice)
+            || nrOfDice < 0 || blockRoll == null || blockRoll.length == 0) {
             return false;
         }
         com.fumbbl.ffb.factory.BlockResultFactory brf =
@@ -3450,6 +3476,18 @@ public class ParityRunner {
             comm.sendUseBrawler(null);
         } else if (pro) {
             comm.sendUseProReRollForBlock(firstSkull >= 0 ? firstSkull : (firstBothDown >= 0 ? firstBothDown : 0));
+        } else if (singleBlockDie != null) {
+            // BACKLOG §M: Unstoppable Momentum / Woodland Fury / Lord of Chaos / Working in Tandem.
+            com.fumbbl.ffb.factory.ReRollSourceFactory rsf =
+                game.getFactory(com.fumbbl.ffb.FactoryType.Factory.RE_ROLL_SOURCE);
+            comm.sendUseSingleBlockDieReRollForBlock(
+                firstSkull >= 0 ? firstSkull : (firstBothDown >= 0 ? firstBothDown : 0),
+                rsf.forName(singleBlockDie));
+        } else if (multiBlockDice) {
+            // BACKLOG §M: Savage Blow on every die (all of them are Skull / Both Down here).
+            int[] all = new int[blockRoll.length];
+            for (int i = 0; i < all.length; i++) all[i] = i;
+            comm.sendUseMultiBlockDiceReRoll(all);
         } else {
             return false;
         }
