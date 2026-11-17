@@ -89,6 +89,9 @@ pub enum Action {
     FuriousOutburstSquare { coord: FieldCoordinate },
     /// Move to one adjacent square before a block resolves (Trickster skill).
     TricksterMove { coord: FieldCoordinate },
+    /// Java `ClientCommandFieldCoordinate` answering StepPlaceBall's Safe Pair of Hands square
+    /// wait: place the dropped ball on this free adjacent square (real board coordinates).
+    PlaceBallSquare { coord: FieldCoordinate },
     /// Java `ClientCommandSwoop` — the square a BB2016/BB2020 swooping player is steered toward.
     Swoop { coord: FieldCoordinate },
 

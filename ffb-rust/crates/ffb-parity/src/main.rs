@@ -377,6 +377,10 @@ fn main() {
             t.decisions as f64 / g, t.steps as f64 / g, t.events as f64 / g, t.rng_calls as f64 / g,
             t.agent_ns as f64 / 1e3 / t.decisions.max(1) as f64,
             t.engine_ns as f64 / 1e3 / t.decisions.max(1) as f64);
+        // A seed search (FFB_BENCH_GREP) only wants the `BENCH hit` lines.
+        if std::env::var_os("FFB_BENCH_GREP").is_some() {
+            return;
+        }
         // Engine skill touches over every game of the run (BACKLOG §M skill ledger).
         let touches: serde_json::Map<String, serde_json::Value> = ffb_model::skill_touch::take()
             .into_iter()

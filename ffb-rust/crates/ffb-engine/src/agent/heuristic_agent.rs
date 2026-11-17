@@ -4273,7 +4273,12 @@ impl HeuristicAgent {
                     // spending the sampler draws. Mirrored in HeuristicDriver.useSkill.
                     // Trickster left this list in BACKLOG §K item 6: both harnesses now answer
                     // its square wait (TricksterMove here, ParityRunner's TRICKSTER step arm).
-                    "PrimalSavagery" | "SafePairOfHands" | "Swoop" => 0.0,
+                    // BACKLOG §M: accepting leads into the already-driven ANIMAL_SAVAGERY PlayerChoice.
+                    "PrimalSavagery" => 0.75,
+                    // BACKLOG §M: the SWOOP target wait is driven (SwoopTarget / sendSwoopTarget).
+                    "Swoop" => 0.75,
+                    // BACKLOG §M: drivable now (PlaceBallSquare / ParityRunner PLACE_BALL arm).
+                    "SafePairOfHands" => 0.75,
                     _ => 0.50,
                 };
                 let w_use = coverage_biased(w_use);

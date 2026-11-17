@@ -246,6 +246,10 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
         Action::TricksterMove { coord } => {
             Some(ClientCommand::ClientMove(ClientMove { move_squares: vec![coord] }))
         }
+        // Safe Pair of Hands square: Java CLIENT_FIELD_COORDINATE, carried as a 1-square move
+        // like Raiding Party.
+        Action::PlaceBallSquare { coord } =>
+            Some(ClientCommand::ClientMove(ClientMove { move_squares: vec![coord] })),
 
         // Block-specific re-roll actions: not yet encoded in the Java protocol.
         // Java uses dedicated command types (ClientCommandUseBrawler, etc.) but these

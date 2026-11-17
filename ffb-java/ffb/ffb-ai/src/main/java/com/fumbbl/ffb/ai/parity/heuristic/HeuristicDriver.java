@@ -194,12 +194,15 @@ public final class HeuristicDriver {
             wUse = 0.55f;
         } else if ("QuickBite".equals(skillName) || "AnimalSavagery".equals(skillName)) {
             wUse = 0.85f;
-        } else if ("PrimalSavagery".equals(skillName)
-            || "SafePairOfHands".equals(skillName) || "Swoop".equals(skillName)) {
-            // The skills whose USE path no harness can drive: pinned to DECLINE while still
-            // spending the sampler draws, mirroring the Rust agent's table (chaos_pact bb2020
-            // seed 8: the Renegade Thrower's Safe Pair of Hands offer).
-            wUse = 0.0f;
+        } else if ("SafePairOfHands".equals(skillName)) {
+            // BACKLOG §M: drivable now (ParityRunner's PLACE_BALL arm); mirror of the Rust 0.75.
+            wUse = 0.75f;
+        } else if ("Swoop".equals(skillName)) {
+            // BACKLOG §M: the SWOOP target wait is driven (sendSwoopTarget); mirror of Rust 0.75.
+            wUse = 0.75f;
+        } else if ("PrimalSavagery".equals(skillName)) {
+            // BACKLOG §M: accepting leads into the already-driven ANIMAL_SAVAGERY PlayerChoice.
+            wUse = 0.75f;
         } else {
             wUse = 0.50f;
         }

@@ -496,13 +496,18 @@ impl Step for StepAnimalSavagery {
                 self.state.attack_opponent = Some(*use_skill);
                 if *use_skill {
                     // Java: game.getPlayerById(commandUseSkill.getPlayerId()).markUsed(skill, game)
-                    if let Some(ref pid) = self.state.player_id {
+                    // — the COMMAND's player, i.e. the dialog's player: the acting (savage)
+                    // player. Rust read `state.player_id`, the lash-out TARGET, which is still
+                    // unset here, so the skill was never marked and the report had no player
+                    // (star tier: Glotl Stop, lizardman vs dark_elf bb2025 seed 2).
+                    let actor = game.acting_player.player_id.clone();
+                    if let Some(ref pid) = actor {
                         let is_home = game.team_home.player(pid).is_some();
                         if is_home { game.team_home.player_mut(pid).map(|p| p.used_skills.insert(SkillId::PrimalSavagery)); }
                         else { game.team_away.player_mut(pid).map(|p| p.used_skills.insert(SkillId::PrimalSavagery)); }
                     }
-                    // Java: addReport(new ReportSkillUse(playerId, skill, skillUsed, SkillUse.LASH_OUT_AGAINST_OPPONENT))
-                    let player_id_opt = self.state.player_id.clone();
+                    // Java: addReport(new ReportSkillUse(commandPlayerId, skill, true, LASH_OUT_AGAINST_OPPONENT))
+                    let player_id_opt = actor;
                     game.report_list.add(ReportSkillUse::new(
                         player_id_opt.clone(),
                         SkillId::PrimalSavagery,

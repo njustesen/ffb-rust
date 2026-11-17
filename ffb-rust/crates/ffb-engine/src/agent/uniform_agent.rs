@@ -99,6 +99,13 @@ impl Agent for UniformAgent {
                 };
                 Action::Pass { coord }
             }
+            Some(AgentPrompt::PlaceBallSquare { squares, .. }) => {
+                if squares.is_empty() {
+                    return Action::Acknowledge;
+                }
+                let idx = self.pick(squares.len());
+                Action::PlaceBallSquare { coord: squares[idx] }
+            }
             Some(AgentPrompt::DumpOffTarget { thrower_id }) => {
                 let receivers = crate::legal_actions::dump_off_receivers(&gs.game, thrower_id);
                 if receivers.is_empty() {

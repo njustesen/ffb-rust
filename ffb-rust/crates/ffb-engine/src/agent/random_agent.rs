@@ -1624,6 +1624,17 @@ impl Agent for RandomAgent {
                 };
                 Action::Pass { coord }
             }
+            // Safe Pair of Hands square (BACKLOG §M): StepPlaceBall's MoveSquares, coordinate-
+            // sorted, ONE actionRng draw — ParityRunner.sendPlaceBallSquare is the Java mirror.
+            Some(AgentPrompt::PlaceBallSquare { squares, .. }) => {
+                if squares.is_empty() {
+                    return Action::Acknowledge;
+                }
+                let mut sorted = squares.clone();
+                sorted.sort_by_key(|c| (c.x, c.y));
+                let idx = self.pick_action(sorted.len());
+                Action::PlaceBallSquare { coord: sorted[idx] }
+            }
             // Dump-Off pass window (BACKLOG §M). 1:1 with ParityRunner's DEFENDER_ACTION arm
             // (`sendDumpOffPass`): the thrower's in-range team-mates, coordinate-sorted, ONE
             // actionRng draw; none in range → CLIENT_ACTING_PLAYER(null), zero draws.

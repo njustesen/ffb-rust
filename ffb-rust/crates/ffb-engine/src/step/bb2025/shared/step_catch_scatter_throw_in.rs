@@ -213,6 +213,11 @@ impl Step for StepCatchScatterThrowIn {
             // (11,7) was then "caught" by the original target standing at (10,7) — the ball
             // teleported into a square it never visited (elf bb2025 seed 34 i=26).
             StepParameter::KickoffBounds(v) => { self.scatter_bounds = *v; true }
+            // Java: CATCH_SCATTER_THROW_IN_MODE published as null.
+            StepParameter::CatchScatterThrowInModeCleared => {
+                self.catch_scatter_throw_in_mode = None;
+                true
+            }
             StepParameter::CatchScatterThrowInMode(v) => {
                 self.catch_scatter_throw_in_mode = Some(*v);
                 true

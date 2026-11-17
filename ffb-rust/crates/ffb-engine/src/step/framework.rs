@@ -207,6 +207,10 @@ pub enum StepParameter {
     CrashLanding(bool),
     /// Scatter/throw-in mode: "scatterBall" etc. (string form until enum is ported).
     CatchScatterThrowInMode(ffb_model::model::catch_scatter_throw_in_mode::CatchScatterThrowInMode),
+    /// Java `publishParameter(CATCH_SCATTER_THROW_IN_MODE, null)` — the typed variant above cannot
+    /// carry null, so a step that clears the mode (StepPlaceBall after Safe Pair of Hands) sends
+    /// this and StepCatchScatterThrowIn resets its mode to None.
+    CatchScatterThrowInModeCleared,
     /// The ID of the kicked player (KTM sequence alias for ThrownPlayerId).
     KickedPlayerId(Option<String>),
     /// PlayerState of the kicked player at kick time.

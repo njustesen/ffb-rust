@@ -367,6 +367,9 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
         // Dump-Off pass window: the wire dialog is the DEFENDER_ACTION StepDumpOff already showed;
         // the park itself just waits for the defending coach's CLIENT_PASS.
         AgentPrompt::DumpOffTarget { .. } => None,
+        // Safe Pair of Hands square: Java publishes MoveSquares under TurnMode SAFE_PAIR_OF_HANDS
+        // and waits for CLIENT_FIELD_COORDINATE; no dialog.
+        AgentPrompt::PlaceBallSquare { .. } => None,
         AgentPrompt::BuyInducements { team_id, available, budget } =>
             Some(WireDialog::BuyInducements {
                 team_id: team_id.clone(),

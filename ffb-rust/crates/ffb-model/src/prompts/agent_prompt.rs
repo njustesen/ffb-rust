@@ -134,6 +134,14 @@ pub enum AgentPrompt {
         player_id: PlayerId,
         squares: Vec<FieldCoordinate>,
     },
+    /// Safe Pair of Hands square wait (BACKLOG §M; Java bb2020/bb2025 StepPlaceBall Phase.SELECT:
+    /// the free squares adjacent to the ball published as MoveSquares, TurnMode
+    /// SAFE_PAIR_OF_HANDS, waiting for CLIENT_FIELD_COORDINATE from the carrier's coach).
+    /// Answer: `Action::PlaceBallSquare`, coordinate-sorted, single actionRng pick.
+    PlaceBallSquare {
+        player_id: PlayerId,
+        squares: Vec<FieldCoordinate>,
+    },
     Pushback {
         attacker_id: PlayerId,
         defender_id: PlayerId,

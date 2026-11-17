@@ -1151,6 +1151,20 @@ public class ParityRunner {
                 }
                 break;
 
+            case PLACE_BALL:
+                // BACKLOG §M: an ACCEPTED Safe Pair of Hands (StepPlaceBall Phase.SELECT) switches
+                // to TurnMode SAFE_PAIR_OF_HANDS, publishes the free squares next to the ball as
+                // MoveSquares (homePlaying already flipped to the carrier) and waits for
+                // CLIENT_FIELD_COORDINATE. Same contract as TRICKSTER: coordinate-sorted, ONE
+                // actionRng draw -- random_agent.rs's PlaceBallSquare arm.
+                if (game.getTurnMode() == TurnMode.SAFE_PAIR_OF_HANDS) {
+                    sendTricksterTarget(game, gameState);
+                } else {
+                    System.err.println("UNHANDLED_STEP: " + stepId + " turnMode=" + game.getTurnMode());
+                    MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
+                }
+                break;
+
             default:
                 System.err.println("UNHANDLED_STEP: " + stepId + " turnMode=" + game.getTurnMode());
                 MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
