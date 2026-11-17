@@ -61,6 +61,28 @@ use super::{Agent, RandomAgent, UniformAgent};
 /// `mechanics/movement.rs: STAND_UP_COST`.
 const STAND_UP_COST: i32 = 3;
 const EPS: f32 = 0.02;
+
+/// `--coverage-bias B` (BACKLOG §M): 0 = the agent as tuned, 1 = always reach for the skill.
+/// Read once from `FFB_COVERAGE_BIAS` (the CLI flag sets it, and the Java child inherits it, so
+/// both engines see the same value; Java's `HeuristicDriver.COVERAGE_BIAS` mirrors this), clamped
+/// to [0, 1].
+pub fn coverage_bias() -> f32 {
+    static BIAS: std::sync::OnceLock<f32> = std::sync::OnceLock::new();
+    *BIAS.get_or_init(|| {
+        std::env::var("FFB_COVERAGE_BIAS")
+            .ok()
+            .and_then(|s| s.trim().parse::<f32>().ok())
+            .map(|b| b.clamp(0.0, 1.0))
+            .unwrap_or(0.0)
+    })
+}
+
+/// Pull a "use the skill" weight toward 1 by the coverage bias: `w + B * (1 - w)`. A 0.0 pin
+/// (a path no harness can drive) stays 0.0. Same f32 operation order as the Java mirror.
+pub fn coverage_biased(w_use: f32) -> f32 {
+    let b = coverage_bias();
+    if b > 0.0 && w_use > 0.0 { w_use + b * (1.0 - w_use) } else { w_use }
+}
 /// Residual worth of advancing a carrier who can no longer reach the endzone in time. Was read
 /// from FFB_HOPELESS_DAMP on every `value_at` call while it was being fitted; frozen because
 /// env-dependent POLICY cannot be mirrored by the Java agent, and the per-call `env::var` was a
@@ -4243,6 +4265,7 @@ impl HeuristicAgent {
                     "DumpOff" | "PrimalSavagery" | "SafePairOfHands" | "Swoop" => 0.0,
                     _ => 0.50,
                 };
+                let w_use = coverage_biased(w_use);
                 self.buf.push(
                     Action::UseSkill { skill_id, use_skill: true },
                     w_use,

@@ -560,6 +560,8 @@ impl Driver {
 
     fn act(&mut self, gs: &GameState) -> ffb_engine::action::Action {
         use ffb_engine::agent::Agent as _;
+        // The agents' own look-ahead asks skill questions too; only the ENGINE's count (§M).
+        let _quiet = ffb_model::skill_touch::suppress();
         match self {
             Driver::Random(a) => a.act(gs),
             Driver::Heuristic(a) => a.act(gs),
@@ -590,6 +592,9 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     let home = make_team(home_roster, "home", edition);
     let away = make_team(away_roster, "away", edition);
 
+    // Skill-touch telemetry (BACKLOG §M phase 0): count from a clean slate for this game.
+    ffb_model::skill_touch::set_enabled(true);
+    let _ = ffb_model::skill_touch::take();
     let mut engine = GameState::new_full_pregame(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
     // ONE shared agent for both teams, mirroring ParityRunner's single-object shape.
     // `new_parity` seeds both decision and action RNGs to match Java's decisionRng and actionRng
@@ -883,6 +888,14 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
             let _ = writeln!(f, "{}", line);
         }
     }
+
+    // Skill touches (§M): {"Block": n, ...} keyed by Java class name, beside the reports.
+    let touches: serde_json::Map<String, serde_json::Value> = ffb_model::skill_touch::take()
+        .into_iter()
+        .map(|(id, n)| (id.class_name().to_string(), serde_json::Value::from(n)))
+        .collect();
+    let skills_path = reports_path.replace("_rust_reports.jsonl", "_rust_skills.json");
+    let _ = std::fs::write(&skills_path, serde_json::Value::Object(touches).to_string());
 
     (lines, all_events, score_home, score_away)
 }
@@ -2415,6 +2428,11 @@ pub fn run_bench_game(
     let setup_t0 = std::time::Instant::now();
     let home = make_team(home_roster, "home", edition);
     let away = make_team(away_roster, "away", edition);
+    // Skill touches accumulate across the bench run; main prints them as `BENCH skills` (§M).
+    ffb_model::skill_touch::set_enabled(true);
+    for p in home.players.iter().chain(away.players.iter()) {
+        p.all_skill_ids().for_each(ffb_model::skill_touch::field);
+    }
     let mut engine = GameState::new_full_pregame(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
     let mut agent = Driver::new(agent_spec, seed);
     t.setup_ns += setup_t0.elapsed().as_nanos();
@@ -2559,5 +2577,45 @@ pub fn run_bench_game(
     t.rng_calls += engine.rng_call_count();
     t.games += 1;
     t.total_ns += game_t0.elapsed().as_nanos();
+    tally_report_strings(&engine.game);
     (engine.game.game_result.home.score, engine.game.game_result.away.score)
+}
+
+thread_local! {
+    static REPORT_STRINGS: std::cell::RefCell<std::collections::BTreeMap<String, u64>> =
+        const { std::cell::RefCell::new(std::collections::BTreeMap::new()) };
+}
+
+/// §M skill ledger: tally every reportId (as `id:<name>`) and every free-text string a report
+/// carries (modifier names, re-roll sources, skill names), skipping id-valued keys. The ledger
+/// matches these against the skill catalogue; the report stream is Java-identical, so a name
+/// here is a name Java wrote too.
+fn tally_report_strings(game: &ffb_model::model::game::Game) {
+    fn walk(key: &str, v: &serde_json::Value, out: &mut std::collections::BTreeMap<String, u64>) {
+        match v {
+            serde_json::Value::String(s) => {
+                if key == "reportId" {
+                    *out.entry(format!("id:{s}")).or_default() += 1;
+                } else if !key.ends_with("Id") && !key.ends_with("Ids") && !s.is_empty() {
+                    *out.entry(format!("{key}:{s}")).or_default() += 1;
+                }
+            }
+            serde_json::Value::Array(a) => a.iter().for_each(|x| walk(key, x, out)),
+            serde_json::Value::Object(o) => o.iter().for_each(|(k, x)| walk(k, x, out)),
+            _ => {}
+        }
+    }
+    REPORT_STRINGS.with(|m| {
+        let mut m = m.borrow_mut();
+        for r in game.report_list.get_reports() {
+            if let Some(v) = r.to_json() {
+                walk("", &v, &mut m);
+            }
+        }
+    });
+}
+
+/// Drain the bench run's report-string tally (see `tally_report_strings`).
+pub fn take_report_strings() -> std::collections::BTreeMap<String, u64> {
+    REPORT_STRINGS.with(|m| std::mem::take(&mut *m.borrow_mut()))
 }

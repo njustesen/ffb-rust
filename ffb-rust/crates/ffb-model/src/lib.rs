@@ -18,3 +18,4 @@ pub mod option;
 pub mod injury;
 pub mod report;
 pub mod xml;
+pub mod skill_touch;

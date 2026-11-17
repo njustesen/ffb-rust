@@ -9713,3 +9713,31 @@ call is not mirrored; the rng-less `drop_player` still has ~20 call sites that s
 injury branch wherever Java calls the full dropPlayer -- latent, unreached by any gate.
 **Lesson:** a gate ending early on BOTH sides matches; count REPORTS and check game-end turn/half.
 
+
+## §M — 2026-11-17: SKILL COVERAGE TIER — the agents use every skill (in progress)
+
+**Goal (user, 2026-11-17):** "make the agent use all skills in the game. Ideally to play better
+but most importantly to reach better coverage." User decisions: (1) drafted teams MAY carry
+rule-legal skill advancements; (2) a coverage-bias mode that plays worse is fine, and there must be
+a PARAMETER to control randomness/coverage (`--heur-scale` already scales temperature; add
+`--coverage-bias K`, 0 = off, mirrored in ParityRunner).
+
+**Phases** (order 0 -> 1 -> 3 -> 2 -> 4 -> 5):
+0. Skill ledger: every skill x edition -> not fielded / fielded-never-fires / thin (<1000) /
+   fires, over the cert4 mirror + cross + star roots. Rust-only skill-touch counters (a skill check
+   that returned true outside the agent) give the silent skills (Block, Guard, Tackle...) a count;
+   Java parity already proves equivalence, so Java needs no twin.
+1. Unblock: answer the four pinned-decline dialogs (DumpOff, Swoop, Safe Pair of Hands, Primal
+   Savagery) in both harnesses; offer the never-offered actions (StandUp, Swoop, DumpOff, Chomp,
+   Incorporeal, Forgo, Kick 'em, Putrid Regurgitation, Maximum Carnage, Flashing Blade, Vicious
+   Vines, Hail Mary Bomb...). Gate per batch, fix Rust 1:1.
+3. Per-skill policy table (milli-weights, both engines) replacing the 0.50 default; coverage bias
+   from a ledger-generated table, fed to both engines.
+2. Skill-advancement drafts: set-cover so every catalogue skill sits on a player whose category
+   access allows it; gen_java_parity_data.py; a skill sweep.
+4. Skill-aware value model (Block/Dodge in block odds, Guard assists, Tackle in dodge risk...),
+   A/B at >=12800 games, keep only wins.
+5. Re-cert mirror 330 + cross 4012 + star 4012 + skill sweep on one frozen build, steps + reports.
+
+**Done:** every Java-resolvable skill and every PlayerAction fires on a green gate (~100+) or is
+documented unreachable.

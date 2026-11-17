@@ -44,6 +44,32 @@ public final class HeuristicDriver {
     private final Sampler sampler;
     private final ClassMask classes;
 
+    /**
+     * {@code --coverage-bias B} (BACKLOG §M), mirror of Rust's {@code coverage_bias()}: read once
+     * from {@code FFB_COVERAGE_BIAS} (set by the Rust CLI, inherited by this JVM), clamped to
+     * [0, 1]; 0 = the agent as tuned, 1 = always reach for the skill.
+     */
+    public static final float COVERAGE_BIAS = readCoverageBias();
+
+    private static float readCoverageBias() {
+        String s = System.getenv("FFB_COVERAGE_BIAS");
+        if (s == null) {
+            return 0.0f;
+        }
+        try {
+            float b = Float.parseFloat(s.trim());
+            return Math.max(0.0f, Math.min(1.0f, b));
+        } catch (NumberFormatException e) {
+            return 0.0f;
+        }
+    }
+
+    /** Rust {@code coverage_biased}: {@code w + B * (1 - w)}; a 0.0 pin stays 0.0. */
+    public static float coverageBiased(float wUse) {
+        float b = COVERAGE_BIAS;
+        return (b > 0.0f && wUse > 0.0f) ? wUse + b * (1.0f - wUse) : wUse;
+    }
+
     public HeuristicDriver(long seed, float tempScale, ClassMask classes) {
         this.sampler = new Sampler(seed, tempScale);
         this.classes = classes;
@@ -164,6 +190,7 @@ public final class HeuristicDriver {
         } else {
             wUse = 0.50f;
         }
+        wUse = coverageBiased(wUse);
         sampler.clear();
         sampler.push(wUse);          // index 0: use it
         sampler.push(1.0f - wUse);   // index 1: decline

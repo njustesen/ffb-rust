@@ -337,14 +337,21 @@ impl Player {
     }
 
     pub fn has_skill(&self, id: SkillId) -> bool {
-        self.all_skill_ids().any(|s| s == id)
+        let has = self.all_skill_ids().any(|s| s == id);
+        if has {
+            crate::skill_touch::touch(id);
+        }
+        has
     }
 
     /// 1:1 translation of hasSkillProperty — checks if any of the player's skills has the given
     /// property. Java also unions Player.temporaryProperties (bare property grants).
     pub fn has_skill_property(&self, property: &str) -> bool {
-        self.all_skill_ids().any(|id| id.properties().contains(&property))
-            || self.temporary_properties.iter().any(|(_, p)| p == property)
+        let has_skill = self.all_skill_ids().any(|id| id.properties().contains(&property));
+        if has_skill {
+            crate::skill_touch::touch_all(self.all_skill_ids().filter(|id| id.properties().contains(&property)));
+        }
+        has_skill || self.temporary_properties.iter().any(|(_, p)| p == property)
     }
 
     /// Edition-aware `hasSkillProperty`. Java resolves a skill's properties through the per-edition
@@ -356,7 +363,13 @@ impl Player {
         if self.temporary_properties.iter().any(|(_, p)| p == property) {
             return true;
         }
-        self.all_skill_ids().any(|id| id.properties_for(rules).contains(&property))
+        let has = self.all_skill_ids().any(|id| id.properties_for(rules).contains(&property));
+        if has {
+            crate::skill_touch::touch_all(
+                self.all_skill_ids().filter(|id| id.properties_for(rules).contains(&property)),
+            );
+        }
+        has
     }
 
     /// 1:1 translation of `UtilCards.hasUncanceledSkillWithProperty(Player, ISkillProperty)`:
@@ -401,15 +414,24 @@ impl Player {
 
     /// Java: getSkillWithProperty — returns the first SkillId that has the given property.
     pub fn skill_id_with_property(&self, property: &str) -> Option<SkillId> {
-        self.all_skill_ids().find(|id| id.properties().contains(&property))
+        let found = self.all_skill_ids().find(|id| id.properties().contains(&property));
+        if let Some(id) = found {
+            crate::skill_touch::touch(id);
+        }
+        found
     }
 
     /// Java: UtilCards.hasUnusedSkillWithProperty — true if player has a skill with the given property
     /// AND that skill has not been used this drive (not in used_skills).
     pub fn has_unused_skill_with_property(&self, property: &str) -> bool {
-        self.all_skill_ids()
+        let found = self
+            .all_skill_ids()
             .filter(|id| id.properties().contains(&property))
-            .any(|id| !self.used_skills.contains(&id))
+            .find(|id| !self.used_skills.contains(id));
+        if let Some(id) = found {
+            crate::skill_touch::touch(id);
+        }
+        found.is_some()
     }
 
     /// Java: `Player.getSkillValueExcludingTemporaryOnes(Skill)` (`RosterPlayer` override) —

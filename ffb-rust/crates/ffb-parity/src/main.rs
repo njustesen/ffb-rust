@@ -192,6 +192,11 @@ impl ParityArgs {
                 "--home" if i + 1 < raw.len() => { home = raw[i + 1].clone(); i += 1; }
                 // Star tier (BACKLOG §L): one hired star per team, read by runner::make_team.
                 "--home-star" if i + 1 < raw.len() => { std::env::set_var("FFB_HOME_STAR", &raw[i + 1]); i += 1; }
+                // §M: 0 = tuned agent, 1 = always reach for the skill. Via the environment so the
+                // Java child (HeuristicDriver.COVERAGE_BIAS) reads the identical string.
+                "--coverage-bias" if i + 1 < raw.len() => {
+                    std::env::set_var("FFB_COVERAGE_BIAS", raw[i + 1].trim()); i += 1;
+                }
                 "--away-star" if i + 1 < raw.len() => { std::env::set_var("FFB_AWAY_STAR", &raw[i + 1]); i += 1; }
                 "--away" if i + 1 < raw.len() => { away = raw[i + 1].clone(); i += 1; }
                 "--edition" if i + 1 < raw.len() => { edition = raw[i + 1].clone(); i += 1; }
@@ -372,6 +377,22 @@ fn main() {
             t.decisions as f64 / g, t.steps as f64 / g, t.events as f64 / g, t.rng_calls as f64 / g,
             t.agent_ns as f64 / 1e3 / t.decisions.max(1) as f64,
             t.engine_ns as f64 / 1e3 / t.decisions.max(1) as f64);
+        // Engine skill touches over every game of the run (BACKLOG §M skill ledger).
+        let touches: serde_json::Map<String, serde_json::Value> = ffb_model::skill_touch::take()
+            .into_iter()
+            .map(|(id, n)| (id.class_name().to_string(), serde_json::Value::from(n)))
+            .collect();
+        println!("BENCH skills {}", serde_json::Value::Object(touches));
+        let fielded: Vec<serde_json::Value> = ffb_model::skill_touch::take_fielded()
+            .into_iter()
+            .map(|id| serde_json::Value::from(id.class_name()))
+            .collect();
+        println!("BENCH fielded {}", serde_json::Value::Array(fielded));
+        let named: serde_json::Map<String, serde_json::Value> = runner::take_report_strings()
+            .into_iter()
+            .map(|(k, n)| (k, serde_json::Value::from(n)))
+            .collect();
+        println!("BENCH reports {}", serde_json::Value::Object(named));
         return;
     }
 
