@@ -72,15 +72,16 @@ impl Step for StepKickoffScatterRoll {
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java CLIENT_USE_SKILL with canReduceKickDistance: set fUseKickChoice.
-        if let Action::UseSkill { use_skill, .. } = action {
-            if self.use_kick_choice.is_none() {
+        // Java CLIENT_USE_SKILL whose skill has canReduceKickDistance: set fUseKickChoice and,
+        // when used, report the COMMAND's skill (HALVE_KICKOFF_SCATTER).
+        if let Action::UseSkill { skill_id, use_skill } = action {
+            if skill_id.properties().contains(&NamedProperties::CAN_REDUCE_KICK_DISTANCE) {
                 self.use_kick_choice = Some(*use_skill);
                 if *use_skill {
                     let pid = self.kicking_player_id.clone();
                     game.report_list.add(ReportSkillUse::new(
                         pid,
-                        SkillId::Kick,
+                        *skill_id,
                         true,
                         SkillUse::HALVE_KICKOFF_SCATTER,
                     ));
@@ -157,16 +158,30 @@ impl StepKickoffScatterRoll {
         // ── Kick skill dialog ────────────────────────────────────────────────
         // Java: if kicking player has canReduceKickDistance and use_kick_choice is None → show dialog.
         if self.use_kick_choice.is_none() {
-            let has_kick = self.kicking_player_id.as_deref()
+            // Java: `skillReduceKickDistance = kickingPlayer.getSkillWithProperty(canReduceKickDistance)`.
+            let kick_skill = self.kicking_player_id.as_deref()
                 .and_then(|pid| game.player(pid))
-                .map(|p| p.has_skill_property(NamedProperties::CAN_REDUCE_KICK_DISTANCE))
-                .unwrap_or(false);
-            if has_kick {
-                // Java: showDialog(DialogKickSkillParameter) and wait for CLIENT_USE_SKILL. This was
-                // a bare cont() with NO prompt -- the stall shape -- reached as soon as a Kick
-                // kicker stands in the centre field (star tier: Dolfar Longstride).
+                .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_REDUCE_KICK_DISTANCE));
+            // BB2020 runs this shared file too (driver.rs has no bb2020 KickoffScatterRoll arm), but
+            // Java's bb2020.StepKickoffScatterRoll shows DialogKickSkillParameter: keep the KickSkill
+            // prompt there, unchanged.
+            if kick_skill.is_some() && game.rules != ffb_model::enums::Rules::Bb2025 {
                 return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::KickSkill {
                     player_id: self.kicking_player_id.clone().unwrap_or_default(),
+                });
+            }
+            if let Some(skill) = kick_skill {
+                // Java (bb2025 :124-126): showDialog(new DialogSkillUseParameter(kicker, skill, 0)) --
+                // a plain SKILL_USE dialog, NOT the DialogKickSkillParameter that bb2016 and this
+                // edition's StepKickoffScatterRollAskAfter show. It reaches the heuristic as a scored
+                // SkillUse (two sampler draws); the KickSkill prompt this used to raise was answered
+                // by a draw-free decline, so a Kick kicker desynced the agents' streams
+                // (BACKLOG §M phase 2 skill sweep: imperial_nobility_sk / chaos_ogre_sk /
+                // chaos_troll_sk bb2025 -- Java reported `skillUse Kick halveKickoffScatter`).
+                return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
+                    player_id: self.kicking_player_id.clone().unwrap_or_default(),
+                    skill_id: skill as u16,
+                    skill_name: format!("{:?}", skill),
                 });
             }
             self.use_kick_choice = Some(false);
@@ -445,5 +460,16 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         // Should wait for agent to choose whether to use Kick skill
         assert_eq!(out.action, StepAction::Continue, "player with Kick skill should wait for choice");
+        // Java bb2025 shows a plain DialogSkillUseParameter (not DialogKickSkillParameter), so the
+        // agents score it as a SkillUse -- BACKLOG §M phase 2 skill sweep.
+        assert!(matches!(&out.prompt, Some(ffb_model::prompts::AgentPrompt::SkillUse { skill_name, player_id, .. })
+            if skill_name == "Kick" && player_id == "kicker"), "got {:?}", out.prompt);
+
+        // Accepting: Java reports skillUse(Kick, HALVE_KICKOFF_SCATTER) and rolls the D3 distance.
+        let out = step.handle_command(&Action::UseSkill { skill_id: SkillId::Kick, use_skill: true },
+            &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
+        assert!((1..=3).contains(&step.scatter_distance.unwrap()), "Kick halves to a D3");
     }
 }
