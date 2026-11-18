@@ -9817,4 +9817,45 @@ Deferred, with the reason (each needs a design decision or a larger port):
 - Gates (20 seeds, steps + reports identical): gnome bb2025 cb0, high_elf bb2025 cb1.0, elf
   bb2020 cb0.5, halfling bb2016 cb0, orc bb2025 @1e6 -- all 20/20.
 - NOT measured: play strength of the new `use` weights (phase 4 does the >=12800-game A/B).
-- Next: phase 2 (skill-advancement drafts).
+- **CAUTION (found in phase 2):** the new `use` weights shift agent decisions enough to expose
+  latent engine bugs in BASE squads -- goblin bb2025 seed 16 went red with the identical hashes
+  as goblin_sk (fixed below). Phase 3 was gated on 5 cells only: the base mirror/cross/star
+  certifications are NOT valid for this policy until phase 5 re-certifies them.
+
+### Phase 2 status (2026-11-18) — skill-advancement squads + the skill sweep
+
+- **Squads:** `scripts/draft_skill_squads.py` -> `data/teams_skills/<ed>/team_<squad>_sk.json`
+  (110: 29 bb2016 / 40 bb2020 / 41 bb2025). Every advancement-category skill Java defines for the
+  edition (General/Agility/Strength/Passing/Mutation/Devious; 51/60/70) sits on a player whose
+  position may take it (3 placements for non-LIVE ledger skills, 1 for LIVE). Legality: BB2025
+  Matched Play at Tier 1 for every edition (6 SP, Primary 1 / Secondary 2, <=1 Secondary, one
+  skill per player, <=4 Elite, TV unchanged); skills whose Java class has `eligible()==false`
+  (bb2020 PilingOn) are never drafted. Kept OUT of data/teams so the certified sweeps never see
+  them. Test: `all_skilled_squads_load_and_obey_matched_play_limits`.
+- **Plumbing:** gen_java_parity_data.py emits the player `<skillList>` (FUMBBL format, `value`
+  attribute); the Rust loader reads `skills` into `extra_skills` and errors on an unresolvable
+  name. `FFB_SKILL_DUMP=1` prints every player's loaded skills on both sides (`RSKILLS`/`JSKILLS`)
+  -- the state hash carries NO skill lists. All 110 load identically (only naming differences:
+  Rust `Claw`/`BloodLust` vs Java `Claws`/`Bloodlust`).
+- **Not drafted:** STAT_INCREASE (+MA/ST/AG/PA/AV) -- a characteristic improvement Java applies via
+  PlayerModifier on load; the Rust loader would have to mirror that first.
+- **Skill sweep** (scratch sksweep.py, 20 seeds, scale 1.0, cb 0): sweep 1 87/110, sweep 2 102/110,
+  **sweep 3 110/110** (steps + reports identical, frozen D:/ffb_star/bin/ffb-parity-sk3.exe,
+  D:/ffb_sksweep/s3). Fixed (each Rust 1:1 or a harness answer, each re-gated 20/20):
+  1. bb2025 Kick is a plain SkillUse offer (DialogSkillUseParameter), not KickSkill.
+  2. Leader announced where Java does: StepKickoff's state update is BB2025-only; bb2016
+     StepBlitzTurn has it (half-fix measured worse until the companion landed).
+  3. Piling On: ParityRunner PILING_ON arm (was RandomStrategy decline vs Rust use); bb2020
+     PilingOn has no properties -> `has_unused_skill_with_property_in(rules, ..)`.
+  4. Pile Driver: both harnesses ACCEPT on the min-(x,y) knocked-down player (zero draws);
+     bb2020 refuses/spends the turn's foul (bb2025 does not).
+  5. bb2025 Hail Mary saved fumble: re-roll cascade + handleSafePass ported (was a stub).
+  6. Swooped thrown player: RightStuffCommand / DropPlayerCommand drop in THROWN_PLAYER mode (it
+     stays active); StepEndThrowTeamMate's old-state condition flattened 1:1. A BASE-squad bug.
+  7. Running Pass: StepPass never published PASSING_DISTANCE (Running Pass was dead in Rust);
+     PassState.allowMoveAfterBomb + StepEndBomb's move-after-bomb branch ported.
+- **Open follow-ups:** bb2020 Hail Mary saved fumble (Java bb2020 offers the Pass re-roll on a
+  SAVED_FUMBLE too; Rust skips the cascade for it -- untouched, not red); Java's mixed StepKickoff
+  does not set TurnMode.KICKOFF where the shared Rust step does (not observable so far).
+- Next: phase 4 (skill-aware value model, A/B), then phase 5 re-cert -- which now MUST include
+  the base matrices (see the phase 3 caution) plus this skill sweep.
