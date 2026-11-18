@@ -105,9 +105,15 @@ impl StepUnchannelledFury {
         if self.status == Some(SkillChoiceStatus::Yes) {
             // Java: actingPlayer.markSkillUsed(canPerformTwoBlocksAfterFailedFury)
             //       step.publishParameter(ALLOW_SECOND_BLOCK_ACTION, true) → NextStep
-            // Per-activation, like the Unchannelled Fury mark below (Java
-            // `UnchannelledFuryBehaviour.java:54` marks the ACTING player, not the persistent one).
-            game.acting_player.used_skills.insert(SkillId::FuryOfTheBloodGod);
+            // Java `actingPlayer.markSkillUsed(skill)` also marks the PLAYER when the usage type is
+            // tracked outside the activation -- and Fury of the Blood God is ONCE_PER_GAME. Marking
+            // only the acting player let it be offered (and drawn for) again on the next failed
+            // fury (bb2025 khemri vs chaos_pact seed 17, turn 3: Rust offered, Java did not).
+            if let Some(pid) = game.acting_player.player_id.clone() {
+                crate::step::util_server_steps::mark_skill_used(game, &pid, SkillId::FuryOfTheBloodGod);
+            } else {
+                game.acting_player.used_skills.insert(SkillId::FuryOfTheBloodGod);
+            }
             return StepOutcome::next()
                 .publish(StepParameter::AllowSecondBlockAction(true));
         }
@@ -264,8 +270,11 @@ impl StepUnchannelledFury {
     /// Java: `UtilCards.getUnusedSkillWithProperty(ACTING PLAYER, canPerformTwoBlocksAfterFailedFury)`
     /// — the per-activation used-skill set, matching the mark in `handle_command`.
     fn has_unused_fury_of_blood_god(&self, game: &Game, player_id: &str) -> bool {
+        // Java `UtilCards.getUnusedSkillWithProperty(actingPlayer, canPerformTwoBlocksAfterFailedFury)`:
+        // used this activation OR (tracked outside the activation, ONCE_PER_GAME) used earlier.
         game.player(player_id)
-            .map(|p| p.has_skill(SkillId::FuryOfTheBloodGod))
+            .map(|p| p.has_skill(SkillId::FuryOfTheBloodGod)
+                && !p.used_skills.contains(&SkillId::FuryOfTheBloodGod))
             .unwrap_or(false)
             && !game.acting_player.used_skills.contains(&SkillId::FuryOfTheBloodGod)
     }
@@ -546,10 +555,11 @@ mod tests {
         // AllowSecondBlockAction(true) should be published
         let published = out.published.iter().any(|p| matches!(p, StepParameter::AllowSecondBlockAction(true)));
         assert!(published);
-        // Marked used on the PER-ACTIVATION acting player (Java `actingPlayer.markSkillUsed`),
-        // not the persistent Player — the persistent set would keep it used for the whole game.
+        // Java `ActingPlayer.markSkillUsed(skill)` marks the acting player AND, because the usage
+        // type (ONCE_PER_GAME) is tracked outside the activation, the persistent Player -- it is
+        // never offered again this game (bb2025 khemri vs chaos_pact seed 17).
         assert!(game.acting_player.used_skills.contains(&SkillId::FuryOfTheBloodGod));
-        assert!(!game.team_home.players[0].used_skills.contains(&SkillId::FuryOfTheBloodGod));
+        assert!(game.team_home.players[0].used_skills.contains(&SkillId::FuryOfTheBloodGod));
     }
 
     #[test]

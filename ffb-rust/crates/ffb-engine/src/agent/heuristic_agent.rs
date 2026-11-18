@@ -205,6 +205,14 @@ fn with_special_declarations(g: &Game, action: Action) -> Action {
             let target = vicious_vines_target(g, &player_id);
             Action::ActivatePlayer { player_id, player_action: PlayerActionChoice::ViciousVines, block_defender_id: target }
         }
+        // Incorporeal (§M): a Move by a player with an unused canAvoidDodging skill who starts in an
+        // opponent's tackle zone (he would have to dodge) goes out as the client's MOVE +
+        // UseSkill(incorporeal) pair. Zero draws; mirrored by ParityRunner's MOVE case.
+        Action::ActivatePlayer { player_id, player_action: PlayerActionChoice::Move, block_defender_id: None }
+            if incorporeal_applies(g, &player_id) =>
+        {
+            Action::ActivatePlayer { player_id, player_action: PlayerActionChoice::IncorporealMove, block_defender_id: None }
+        }
         // Chomp (§M): a Block by a player the bb2025 client would offer CHOMP to
         // (isSpecialBlockActionAvailable && canChomp, Monstrous Mouth) on a target he has not
         // chomped yet goes out as CHOMP + CLIENT_BLOCK(usingChomp). Zero draws; mirrored by
@@ -225,6 +233,13 @@ fn with_special_declarations(g: &Game, action: Action) -> Action {
         }
         other => other,
     }
+}
+
+fn incorporeal_applies(g: &Game, player_id: &str) -> bool {
+    use ffb_model::model::property::named_properties::NamedProperties as NP;
+    let Some(p) = g.player(player_id) else { return false };
+    p.all_skill_ids().any(|id| id.has_property_in(g.rules, NP::CAN_AVOID_DODGING) && !p.used_skills.contains(&id))
+        && !ffb_model::util::util_player::UtilPlayer::find_tacklezone_players(g, player_id).is_empty()
 }
 
 fn flashing_blade_applies(g: &Game, player_id: &str) -> bool {

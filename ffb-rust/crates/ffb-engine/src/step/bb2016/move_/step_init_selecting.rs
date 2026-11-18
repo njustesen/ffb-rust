@@ -570,6 +570,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::ViciousVines => PlayerAction::ViciousVines,
         PlayerActionChoice::Chomp => PlayerAction::Chomp,
         PlayerActionChoice::TheFlashingBlade => PlayerAction::TheFlashingBlade,
+        PlayerActionChoice::IncorporealMove => PlayerAction::Move,
         PlayerActionChoice::HandOffMoveFired => PlayerAction::HandOver,
         PlayerActionChoice::StandUp => PlayerAction::StandUp,
         PlayerActionChoice::StandUpBlitz => PlayerAction::StandUpBlitz,

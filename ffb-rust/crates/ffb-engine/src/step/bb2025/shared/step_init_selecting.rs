@@ -238,6 +238,8 @@ impl Step for StepInitSelecting {
                 // Shot to Nothing rides on a plain PASS_MOVE declaration; its UseSkill is
                 // replayed right after the declaration below.
                 let (stn_pac, shot_to_nothing) = player_action.split_shot_to_nothing();
+                // Incorporeal rides on a plain MOVE declaration the same way.
+                let (stn_pac, incorporeal) = stn_pac.split_incorporeal();
                 let (normalized_pac, fired_declaration) = stn_pac.split_fired();
                 let player_action = &normalized_pac;
                 if std::env::var_os("FFB_TRACE").is_some() {
@@ -489,6 +491,16 @@ impl Step for StepInitSelecting {
                     // waiting for the move / pass that follows).
                     Self::use_gain_hail_mary_skill(game);
                 }
+                if incorporeal {
+                    // The pair's second command, CLIENT_USE_SKILL(Incorporeal): Java
+                    // StepInitSelecting's canAvoidDodging arm (no next action -- the move follows).
+                    let skill = game.player(player_id).and_then(|p| p.all_skill_ids().find(|s|
+                        s.has_property_in(game.rules, NamedProperties::CAN_AVOID_DODGING)
+                            && !p.used_skills.contains(s)));
+                    if let Some(skill) = skill {
+                        Self::apply_avoid_dodging(game, skill);
+                    }
+                }
                 if let Some(def_id) = block_defender_id {
                     game.defender_id = Some(def_id.clone());
                 } else {
@@ -708,13 +720,7 @@ impl Step for StepInitSelecting {
                 if gain_hail_mary {
                     Self::apply_gain_hail_mary(game, *skill_id);
                 } else if avoid_dodging {
-                    // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, AVOID_DODGING))
-                    game.report_list.add(ReportSkillUse::new(
-                        acting_player_id.clone(),
-                        *skill_id,
-                        true,
-                        SkillUse::AVOID_DODGING,
-                    ));
+                    Self::apply_avoid_dodging(game, *skill_id);
                 } else if add_block_die {
                     // Java: getResult().addReport(new ReportSkillUse(skill, true, ADD_BLOCK_DIE)) — no player_id
                     game.report_list.add(ReportSkillUse::new(
@@ -764,6 +770,29 @@ impl StepInitSelecting {
             true,
             SkillUse::GAIN_HAIL_MARY,
         ));
+    }
+
+    /// Java StepInitSelecting CLIENT_USE_SKILL, `canAvoidDodging` arm (bb2025 :411):
+    ///
+    /// ```java
+    /// game.getFieldModel().addSkillEnhancements(actingPlayer.getPlayer(), skill);
+    /// actingPlayer.markSkillUsed(skill);
+    /// UtilServerPlayerMove.updateMoveSquares(getGameState(), actingPlayer.isJumping());
+    /// getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, AVOID_DODGING));
+    /// ```
+    /// Incorporeal's enhancement is a PROPERTY (ignoreTacklezonesWhenMoving), sourced by name.
+    fn apply_avoid_dodging(game: &mut Game, skill_id: ffb_model::enums::SkillId) {
+        let Some(id) = game.acting_player.player_id.clone() else { return };
+        let name = skill_id.category_and_name_for(game.rules).1;
+        if let Some(p) = game.player_mut(&id) {
+            if !p.has_active_enhancement(name) {
+                p.add_temporary_properties(name, &[NamedProperties::IGNORE_TACKLEZONES_WHEN_MOVING]);
+            }
+        }
+        util_server_steps::mark_skill_used(game, &id, skill_id);
+        let jumping = game.acting_player.jumping;
+        crate::util::util_server_player_move::UtilServerPlayerMove::update_move_squares(game, jumping);
+        game.report_list.add(ReportSkillUse::new(Some(id), skill_id, true, SkillUse::AVOID_DODGING));
     }
 
     /// The Shot to Nothing pair's UseSkill: the client sends the acting player's unused
@@ -1154,6 +1183,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::ViciousVines => PlayerAction::ViciousVines,
         PlayerActionChoice::Chomp => PlayerAction::Chomp,
         PlayerActionChoice::TheFlashingBlade => PlayerAction::TheFlashingBlade,
+        PlayerActionChoice::IncorporealMove => PlayerAction::Move,
         PlayerActionChoice::HandOffMoveFired => PlayerAction::HandOver,
         PlayerActionChoice::StandUp => PlayerAction::StandUp,
         PlayerActionChoice::StandUpBlitz => PlayerAction::StandUpBlitz,

@@ -3964,14 +3964,29 @@ public class ParityRunner {
                 FieldModel vfm = game.getFieldModel();
                 PlayerState vps = vp == null ? null : vfm.getPlayerState(vp);
                 FieldCoordinate vpc = vp == null ? null : vfm.getPlayerCoordinate(vp);
-                if (vps == null || vpc == null || !vps.isActive() || vps.getBase() != PlayerState.STANDING
+                Player<?>[] vTargets = (vps == null || vpc == null || !vps.isActive()
+                    || vps.getBase() != PlayerState.STANDING
                     || game.getTurnMode() == com.fumbbl.ffb.TurnMode.BLITZ
-                    || !vp.hasUnusedSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canBlockOverDistance)) {
-                    return false;
-                }
-                Player<?>[] vTargets = com.fumbbl.ffb.util.UtilPlayer.findBlockablePlayersTwoSquaresAway(game,
-                    game.getOtherTeam(vp.getTeam()), vpc);
+                    || !vp.hasUnusedSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canBlockOverDistance))
+                    ? null
+                    : com.fumbbl.ffb.util.UtilPlayer.findBlockablePlayersTwoSquaresAway(game,
+                        game.getOtherTeam(vp.getTeam()), vpc);
                 if (vTargets == null || vTargets.length == 0) {
+                    // Incorporeal (§M): a Move by a player with an unused canAvoidDodging skill who
+                    // starts in an opponent's tackle zone goes out as the client's MOVE +
+                    // UseSkill(incorporeal) pair (MoveLogicModule). Zero draws; mirrors
+                    // heuristic_agent.rs incorporeal_applies.
+                    java.util.Optional<com.fumbbl.ffb.model.skill.Skill> inc = vp == null
+                        ? java.util.Optional.empty()
+                        : com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(vp,
+                            com.fumbbl.ffb.model.property.NamedProperties.canAvoidDodging);
+                    if (inc.isPresent()
+                        && com.fumbbl.ffb.util.UtilPlayer.findTacklezonePlayers(game, vp).length > 0) {
+                        MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId, PlayerAction.MOVE, false));
+                        MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+                            inc.get(), true, playerId, null, false));
+                        return true;
+                    }
                     return false;
                 }
                 List<Player<?>> vList = new ArrayList<>(java.util.Arrays.asList(vTargets));

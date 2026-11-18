@@ -312,6 +312,10 @@ pub enum PlayerActionChoice {
     /// + CLIENT_BLOCK(usingStab) on an adjacent opponent (client state STAB); StepEndBlocking then
     /// lets him move on. Rust folds the target in.
     TheFlashingBlade,
+    /// Incorporeal (bb2025 Gretchen, canAvoidDodging): the client's ActingPlayer(MOVE) +
+    /// UseSkill(incorporeal) at the start of the move (MoveLogicModule). Acts as `Move` once
+    /// StepInitSelecting's canAvoidDodging arm has granted ignoreTacklezonesWhenMoving.
+    IncorporealMove,
 }
 
 impl PlayerActionChoice {
@@ -321,6 +325,15 @@ impl PlayerActionChoice {
         match self {
             PlayerActionChoice::ShotToNothing => (PlayerActionChoice::PassMove, true),
             PlayerActionChoice::ShotToNothingFired => (PlayerActionChoice::PassMoveFired, true),
+            other => (other, false),
+        }
+    }
+
+    /// Split an Incorporeal move into the plain MOVE declaration and whether the
+    /// CLIENT_USE_SKILL(canAvoidDodging) follows it.
+    pub fn split_incorporeal(self) -> (PlayerActionChoice, bool) {
+        match self {
+            PlayerActionChoice::IncorporealMove => (PlayerActionChoice::Move, true),
             other => (other, false),
         }
     }
