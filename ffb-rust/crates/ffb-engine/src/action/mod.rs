@@ -308,6 +308,10 @@ pub enum PlayerActionChoice {
     /// Chomp (bb2025 Monstrous Mouth, canPinPlayers): Java PlayerAction.CHOMP + CLIENT_BLOCK(usingChomp)
     /// on an adjacent not-yet-chomped opponent (SelectLogicModule CHOMP). Rust folds the target in.
     Chomp,
+    /// The Flashing Blade (bb2020+ Jeremiah Kool, canStabAndMoveAfterwards): Java THE_FLASHING_BLADE
+    /// + CLIENT_BLOCK(usingStab) on an adjacent opponent (client state STAB); StepEndBlocking then
+    /// lets him move on. Rust folds the target in.
+    TheFlashingBlade,
 }
 
 impl PlayerActionChoice {

@@ -3924,22 +3924,36 @@ public class ParityRunner {
                 // (isSpecialBlockActionAvailable && canChomp, Monstrous Mouth) on a target he has
                 // not chomped yet goes out as CHOMP + CLIENT_BLOCK(usingChomp). Zero draws;
                 // mirrors heuristic_agent.rs chomp_applies.
-                if (!isBb2025(game) || heuristicTarget == null) {
+                if (isBb2016(game) || heuristicTarget == null) {
                     return false;
                 }
                 Player<?> cp = game.getPlayerById(playerId);
                 Player<?> ct = game.getPlayerById(heuristicTarget);
                 PlayerState cps = cp == null ? null : game.getFieldModel().getPlayerState(cp);
                 if (cp == null || ct == null || cps == null || cps.getBase() == PlayerState.PRONE
-                    || game.getTurnMode() == com.fumbbl.ffb.TurnMode.BLITZ
-                    || !cp.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canPinPlayers)
-                    || !game.getFieldModel().notChomped(cp, ct)) {
+                    || game.getTurnMode() == com.fumbbl.ffb.TurnMode.BLITZ) {
                     return false;
                 }
-                MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId, PlayerAction.CHOMP, false));
-                MatchRunner.inject(gameState, new ClientCommandBlock(
-                    playerId, heuristicTarget, false, false, false, false, true));
-                return true;
+                if (isBb2025(game)
+                    && cp.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canPinPlayers)
+                    && game.getFieldModel().notChomped(cp, ct)) {
+                    MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId, PlayerAction.CHOMP, false));
+                    MatchRunner.inject(gameState, new ClientCommandBlock(
+                        playerId, heuristicTarget, false, false, false, false, true));
+                    return true;
+                }
+                // The Flashing Blade (§M): isFlashingBladeAvailable (active, block allowed, not
+                // prone, unused canStabAndMoveAfterwards) -> THE_FLASHING_BLADE + CLIENT_BLOCK with
+                // usingStab (its client state is STAB). Mirrors heuristic_agent.rs flashing_blade_applies.
+                if (cps.isActive()
+                    && cp.hasUnusedSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canStabAndMoveAfterwards)) {
+                    MatchRunner.inject(gameState,
+                        new ClientCommandActingPlayer(playerId, PlayerAction.THE_FLASHING_BLADE, false));
+                    MatchRunner.inject(gameState, new ClientCommandBlock(
+                        playerId, heuristicTarget, true, false, false, false, false));
+                    return true;
+                }
+                return false;
             }
             case MOVE: {
                 // Vicious Vines (§M): a Move by a player the client would offer VICIOUS_VINES to

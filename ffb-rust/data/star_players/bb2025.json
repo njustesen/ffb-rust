@@ -1522,6 +1522,55 @@
    ]
   },
   {
+   "id": "star.jeremiah_kool",
+   "name": "Jeremiah Kool",
+   "cost": 300000,
+   "players": [
+    {
+     "position": {
+      "id": "star.jeremiah_kool",
+      "name": "Jeremiah Kool",
+      "type": "Star",
+      "quantity": 1,
+      "cost": 300000,
+      "ma": 8,
+      "st": 3,
+      "ag": 1,
+      "pa": 2,
+      "av": 9,
+      "skills": [
+       "Block",
+       "Dodge",
+       "Diving Catch",
+       "Dump-Off",
+       {
+        "name": "Loner",
+        "value": 4
+       },
+       "Nerves of Steel",
+       "On The Ball",
+       "Pass",
+       "Sidestep",
+       "The Flashing Blade"
+      ],
+      "keywords": [
+       "Elf",
+       "Runner"
+      ]
+     },
+     "position_xml": "\t<position id=\"star.jeremiah_kool\">\n\t\t<quantity>1</quantity>\n\t\t<name>Jeremiah Kool</name>\n\t\t<type>Star</type>\n\t\t<cost>300000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>1</agility>\n\t\t<passing>2</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Diving Catch</skill>\n\t\t\t<skill>Dump-Off</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>On The Ball</skill>\n\t\t\t<skill>Pass</skill>\n\t\t\t<skill>Sidestep</skill>\n\t\t\t<skill>The Flashing Blade</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t\t<keywords>\n\t\t\t<keyword>Elf</keyword>\n\t\t\t<keyword>Runner</keyword>\n\t\t</keywords>\n\t</position>\n"
+    }
+   ],
+   "dropped_skills": [],
+   "eligible": [
+    "dark_elf",
+    "dark_elf_league_fumbbl",
+    "elf",
+    "high_elf",
+    "wood_elf"
+   ]
+  },
+  {
    "id": "star.jordell_freshbreeze",
    "name": "Jordell Freshbreeze",
    "cost": 280000,

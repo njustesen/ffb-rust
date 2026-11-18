@@ -218,7 +218,8 @@ def parse_md(path: Path, edition: str, canon: dict):
             "ma": stat(row[0]), "st": stat(row[1]), "ag": stat(row[2]), "pa": stat(row[3]),
             "av": stat(row[4]), "skills": skills, "keywords": keywords,
         })
-    acc_idx = text.find("### Accept to play for")
+    acc_m = re.search(r"^### Accepts? to play for", text, re.M)
+    acc_idx = acc_m.start() if acc_m else -1
     accepts = re.findall(r"\[([^\]]+)\]\(\.\./\.\./teams/", text[acc_idx:]) if acc_idx >= 0 else []
     return {"id": f"star.{slug(name)}", "name": name, "cost": cost, "players": players,
             "accepts": accepts, "dropped_skills": sorted(set(dropped))}

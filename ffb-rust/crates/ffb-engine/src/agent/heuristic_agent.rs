@@ -214,8 +214,29 @@ fn with_special_declarations(g: &Game, action: Action) -> Action {
         {
             Action::ActivatePlayer { player_id, player_action: PlayerActionChoice::Chomp, block_defender_id: Some(target) }
         }
+        // The Flashing Blade (§M): a Block by a player the client would offer it to
+        // (LogicModule.isFlashingBladeAvailable: active, block actions allowed, not prone, unused
+        // canStabAndMoveAfterwards) goes out as THE_FLASHING_BLADE + CLIENT_BLOCK(usingStab) on the
+        // same target. Zero draws; mirrored by ParityRunner.sendStarSpecialDeclaration's BLOCK case.
+        Action::ActivatePlayer { player_id, player_action: PlayerActionChoice::Block, block_defender_id: Some(target) }
+            if flashing_blade_applies(g, &player_id) =>
+        {
+            Action::ActivatePlayer { player_id, player_action: PlayerActionChoice::TheFlashingBlade, block_defender_id: Some(target) }
+        }
         other => other,
     }
+}
+
+fn flashing_blade_applies(g: &Game, player_id: &str) -> bool {
+    use ffb_model::model::property::named_properties::NamedProperties as NP;
+    let Some(p) = g.player(player_id) else { return false };
+    let Some(state) = g.field_model.player_state(player_id) else { return false };
+    g.rules != ffb_model::enums::Rules::Bb2016
+        && state.is_active()
+        && g.turn_mode != ffb_model::enums::TurnMode::Blitz
+        && state.base() != ffb_model::enums::PS_PRONE
+        && p.all_skill_ids().any(|id| id.has_property_in(g.rules, NP::CAN_STAB_AND_MOVE_AFTERWARDS)
+            && !p.used_skills.contains(&id))
 }
 
 fn chomp_applies(g: &Game, player_id: &str, target: &str) -> bool {

@@ -509,6 +509,8 @@ impl Step for StepInitSelecting {
                     | PlayerActionChoice::ViciousVines
                     // CHOMP + CLIENT_BLOCK(usingChomp): BLOCK dispatch.
                     | PlayerActionChoice::Chomp
+                    // THE_FLASHING_BLADE + CLIENT_BLOCK(usingStab): BLOCK dispatch.
+                    | PlayerActionChoice::TheFlashingBlade
                 );
                 self.force_goto_on_dispatch = special_block || matches!(
                     player_action,
@@ -995,7 +997,8 @@ impl StepInitSelecting {
                             // `BlockLogicModule.block`), so a declared STAB/CHAINSAW/VOMIT/FIRE
                             // block carries it into the Block sequence.
                             match game.acting_player.player_action {
-                                Some(PlayerAction::Stab) =>
+                                // The Flashing Blade's client state is STAB (ClientStateFactory).
+                                Some(PlayerAction::Stab) | Some(PlayerAction::TheFlashingBlade) =>
                                     target_params.push(StepParameter::UsingStab(true)),
                                 // KickEmBlockLogicModule: extension.block(.., usingChainsaw=true, ..)
                                 Some(PlayerAction::Chainsaw) | Some(PlayerAction::KickEmBlock) =>
@@ -1150,6 +1153,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::KickEmBlock => PlayerAction::KickEmBlock,
         PlayerActionChoice::ViciousVines => PlayerAction::ViciousVines,
         PlayerActionChoice::Chomp => PlayerAction::Chomp,
+        PlayerActionChoice::TheFlashingBlade => PlayerAction::TheFlashingBlade,
         PlayerActionChoice::HandOffMoveFired => PlayerAction::HandOver,
         PlayerActionChoice::StandUp => PlayerAction::StandUp,
         PlayerActionChoice::StandUpBlitz => PlayerAction::StandUpBlitz,
