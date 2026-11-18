@@ -9749,7 +9749,19 @@ Driven, gated green (20-seed gates, steps + reports identical), pushed:
   really resolves since fe50d7251); block-die re-rolls UM / Savage Blow / Lord of Chaos / Woodland
   Fury (8128b282a); Frenzied Rush + Slashing Nails (99a8f2d06); Shot to Nothing (7c63e2906);
   Kick 'em While They're Down, block form (fe50d7251); Vicious Vines (3157da665); bb2020 Zoat
-  gaze (d5499a563); Working in Tandem, both halves (31757c144, data + PASS_TO_PARTNER port).
+  gaze (d5499a563); Working in Tandem, both halves (31757c144, data + PASS_TO_PARTNER port);
+  Chomp + ChompRemovalObserver wired (see its commit); The Flashing Blade + Jeremiah Kool added
+  to the catalog; Incorporeal + Fury of the Blood God once-per-game fix.
+- Already firing without new agent rules (verified): Putrid Regurgitation (putridRegurgitationBlock
+  in the Bilerot gates), Maximum Carnage (engine-automatic after a declared chainsaw block with a
+  second adjacent opponent; it shares the CHAINSAW action type so it writes no playerAction
+  report -- probed live on the khorne/Max gate seeds, all green).
+- Unreachable with the current data: Hail Mary Bomb (no fielded player has Bombardier + Hail Mary
+  Pass; Barik's bb2025 profile has no Bombardier).
+- LESSON (audit 2026-11-18): Java `ActingPlayer.markSkillUsed` ALSO marks the Player for every
+  non-REGULAR usage type. A Rust site that inserts only into `acting_player.used_skills` is a bug
+  for tracked skills (Fury of the Blood God was offered twice). Audited all such sites: the rest
+  are REGULAR skills or already write both.
 - Pattern: a zero-draw "command pair" rule in BOTH agents (Rust `heuristic_agent.rs`
   `with_special_declarations`, Java `ParityRunner.sendStarSpecialDeclaration`), or a prompt field
   (`BlitzTarget.gain_skill`, `GazeTarget.gain_skill`) that makes the agent send the UseSkill first.
@@ -9779,5 +9791,6 @@ Deferred, with the reason (each needs a design decision or a larger port):
   returns TEAM_RE_ROLL); using the skill is a cross-cutting harness-policy change.
 - **Bounding Leap** (canIgnoreJumpModifiers): Rust's StepInitSelecting UseSkill arm lacks Java
   :403 (setJumpsWithoutModifiers + updateMoveSquares); driving it needs a jump decision.
-- Never-offered actions still open: Chomp, Forgo, Incorporeal, Hail Mary Bomb, Flashing Blade,
-  Putrid Regurgitation, Maximum Carnage.
+- **Forgo** (stalling check on): the client offers it to any standing player; there is no zero-draw
+  trigger that maps onto an existing heuristic decision (the activation declaration carries no
+  path, so "a Move that stays put" is not visible at declaration time in either agent).
