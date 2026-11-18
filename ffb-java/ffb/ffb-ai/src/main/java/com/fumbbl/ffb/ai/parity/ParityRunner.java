@@ -3881,6 +3881,25 @@ public class ParityRunner {
                 }
                 return true;
             }
+            case PASS_MOVE: {
+                // Shot to Nothing (§M): a pass declared by a player holding an unused
+                // canGainHailMary skill goes out as the client's SHOT_TO_NOTHING pair
+                // (SelectLogicModule): ActingPlayer(PASS_MOVE) + UseSkill(skill). The step
+                // answers SKIP_STEP and keeps waiting, so phase 2 runs the pass exactly as for a
+                // plain PASS_MOVE. Zero draws; mirrors heuristic_agent.rs with_shot_to_nothing.
+                Player<?> sp = game.getPlayerById(playerId);
+                java.util.Optional<com.fumbbl.ffb.model.skill.Skill> stn =
+                    com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(sp,
+                        com.fumbbl.ffb.model.property.NamedProperties.canGainHailMary);
+                if (!stn.isPresent()) {
+                    return false;
+                }
+                MatchRunner.inject(gameState,
+                    new ClientCommandActingPlayer(playerId, PlayerAction.PASS_MOVE, false));
+                MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+                    stn.get(), true, playerId, null, false));
+                return true;
+            }
             default:
                 return false;
         }

@@ -564,6 +564,8 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::PassMove => PlayerAction::PassMove,
         // Normalised by `split_fired` before this is reached; the immediate form is what acts.
         PlayerActionChoice::PassMoveFired => PlayerAction::Pass,
+        PlayerActionChoice::ShotToNothing => PlayerAction::PassMove,
+        PlayerActionChoice::ShotToNothingFired => PlayerAction::Pass,
         PlayerActionChoice::HandOffMoveFired => PlayerAction::HandOver,
         PlayerActionChoice::StandUp => PlayerAction::StandUp,
         PlayerActionChoice::StandUpBlitz => PlayerAction::StandUpBlitz,

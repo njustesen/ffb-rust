@@ -235,7 +235,10 @@ impl Step for StepInitSelecting {
             Action::ActivatePlayer { player_id, player_action, block_defender_id } => {
                 // A fired MOVE-form ball declaration acts as the immediate Pass / HandOff; only the
                 // declaration report below differs (see `PlayerActionChoice::split_fired`).
-                let (normalized_pac, fired_declaration) = player_action.split_fired();
+                // Shot to Nothing rides on a plain PASS_MOVE declaration; its UseSkill is
+                // replayed right after the declaration below.
+                let (stn_pac, shot_to_nothing) = player_action.split_shot_to_nothing();
+                let (normalized_pac, fired_declaration) = stn_pac.split_fired();
                 let player_action = &normalized_pac;
                 if std::env::var_os("FFB_TRACE").is_some() {
                     eprintln!("RACT pid={player_id} pac={player_action:?} bdef={block_defender_id:?} game_def={:?}",
@@ -480,6 +483,12 @@ impl Step for StepInitSelecting {
                     }
                 }
                 util_server_steps::change_player_action(game, player_id, pa, false);
+                if shot_to_nothing {
+                    // The pair's second command, CLIENT_USE_SKILL(Shot to Nothing): Java
+                    // StepInitSelecting's canGainHailMary arm (SKIP_STEP — the step keeps
+                    // waiting for the move / pass that follows).
+                    Self::use_gain_hail_mary_skill(game);
+                }
                 if let Some(def_id) = block_defender_id {
                     game.defender_id = Some(def_id.clone());
                 } else {
@@ -689,13 +698,7 @@ impl Step for StepInitSelecting {
                     )).unwrap_or((false, false, false))
                 };
                 if gain_hail_mary {
-                    // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, GAIN_HAIL_MARY))
-                    game.report_list.add(ReportSkillUse::new(
-                        acting_player_id.clone(),
-                        *skill_id,
-                        true,
-                        SkillUse::GAIN_HAIL_MARY,
-                    ));
+                    Self::apply_gain_hail_mary(game, *skill_id);
                 } else if avoid_dodging {
                     // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, AVOID_DODGING))
                     game.report_list.add(ReportSkillUse::new(
@@ -733,6 +736,41 @@ impl Step for StepInitSelecting {
 }
 
 impl StepInitSelecting {
+    /// Java StepInitSelecting CLIENT_USE_SKILL, `canGainHailMary` arm (bb2025 :351, bb2020 :331):
+    ///
+    /// ```java
+    /// game.getFieldModel().addSkillEnhancements(actingPlayer.getPlayer(), skill);
+    /// getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, GAIN_HAIL_MARY));
+    /// ```
+    fn apply_gain_hail_mary(game: &mut Game, skill_id: ffb_model::enums::SkillId) {
+        let acting_player_id = game.acting_player.player_id.clone();
+        if let (Some(id), Some(granted)) = (acting_player_id.as_deref(), skill_id.enhancement_skills()) {
+            let name = skill_id.category_and_name_for(game.rules).1;
+            if let Some(p) = game.player_mut(id) {
+                p.add_skill_enhancement(name, granted);
+            }
+        }
+        game.report_list.add(ReportSkillUse::new(
+            acting_player_id,
+            skill_id,
+            true,
+            SkillUse::GAIN_HAIL_MARY,
+        ));
+    }
+
+    /// The Shot to Nothing pair's UseSkill: the client sends the acting player's unused
+    /// `canGainHailMary` skill (`UtilCards.getUnusedSkillWithProperty`, as ParityRunner does).
+    fn use_gain_hail_mary_skill(game: &mut Game) {
+        let skill = game.acting_player.player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .and_then(|p| p.all_skill_ids().find(|s|
+                s.properties().contains(&NamedProperties::CAN_GAIN_HAIL_MARY)
+                    && !p.used_skills.contains(s)));
+        if let Some(skill) = skill {
+            Self::apply_gain_hail_mary(game, skill);
+        }
+    }
+
     /// Java `checkForStaller()`:
     ///
     /// ```java
@@ -1098,6 +1136,8 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::PassMove => PlayerAction::PassMove,
         // Normalised by `split_fired` before this is reached; the immediate form is what acts.
         PlayerActionChoice::PassMoveFired => PlayerAction::Pass,
+        PlayerActionChoice::ShotToNothing => PlayerAction::PassMove,
+        PlayerActionChoice::ShotToNothingFired => PlayerAction::Pass,
         PlayerActionChoice::HandOffMoveFired => PlayerAction::HandOver,
         PlayerActionChoice::StandUp => PlayerAction::StandUp,
         PlayerActionChoice::StandUpBlitz => PlayerAction::StandUpBlitz,
@@ -1709,6 +1749,45 @@ mod tests {
         );
         assert!(game.report_list.has_report(ReportId::SKILL_USE),
             "expected SKILL_USE report for ShotToNothing (GAIN_HAIL_MARY)");
+        // Java: addSkillEnhancements(actingPlayer, skill) — Hail Mary Pass, sourced "Shot to Nothing".
+        let p = game.player("hm1").unwrap();
+        assert!(p.has_skill(ffb_model::enums::SkillId::HailMaryPass), "Shot to Nothing grants Hail Mary Pass");
+        assert!(p.has_active_enhancement("Shot to Nothing"));
+    }
+
+    /// The SHOT_TO_NOTHING declaration is the client's ActingPlayer(PASS_MOVE) +
+    /// UseSkill(canGainHailMary) pair: the acting action stays PASS_MOVE and the player gains
+    /// Hail Mary Pass with the GAIN_HAIL_MARY report.
+    #[test]
+    fn shot_to_nothing_declaration_is_pass_move_plus_use_skill() {
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_STANDING, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "g1".into(), name: "G".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Star, gender: PlayerGender::Female,
+            movement: 7, strength: 2, agility: 2, passing: 2, armour: 8,
+            starting_skills: vec![SkillWithValue::new(SkillId::ShotToNothing)],
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("g1", FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state("g1", PlayerState::new(PS_STANDING));
+        game.home_playing = true;
+        let mut step = StepInitSelecting::new("end".into());
+        step.handle_command(&Action::ActivatePlayer {
+            player_id: "g1".into(),
+            player_action: PlayerActionChoice::ShotToNothing,
+            block_defender_id: None,
+        }, &mut game, &mut GameRng::new(0));
+        assert_eq!(game.acting_player.player_action, Some(PlayerAction::PassMove));
+        let p = game.player("g1").unwrap();
+        assert!(p.has_skill(SkillId::HailMaryPass));
+        let gains = game.report_list.get_reports().iter().filter(|r| {
+            r.get_id() == ffb_model::report::report_id::ReportId::SKILL_USE
+        }).count();
+        assert_eq!(gains, 1, "one GAIN_HAIL_MARY skill-use report");
     }
 
     /// `checkForStaller` DETECTS a staller and raises the flag; it does not react to a flag that

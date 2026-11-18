@@ -163,6 +163,28 @@ fn folds_terminal(pac: PlayerActionChoice, run_up_empty: bool, has_target: bool)
         && matches!(pac, PlayerActionChoice::Pass | PlayerActionChoice::HandOff)
 }
 
+/// Shot to Nothing (§M): a pass declared by a player holding an unused `canGainHailMary` skill
+/// goes out as the client's ActingPlayer(PASS_MOVE) + UseSkill pair. Zero draws; mirrored by
+/// ParityRunner.sendStarSpecialDeclaration's PASS_MOVE case.
+fn with_shot_to_nothing(g: &Game, action: Action) -> Action {
+    use ffb_model::model::property::named_properties::NamedProperties as NP;
+    match action {
+        Action::ActivatePlayer { player_id, player_action, block_defender_id }
+            if matches!(player_action, PlayerActionChoice::PassMove | PlayerActionChoice::PassMoveFired) =>
+        {
+            let unused_stn = g.player(&player_id).is_some_and(|p| p.all_skill_ids().any(|s|
+                s.properties().contains(&NP::CAN_GAIN_HAIL_MARY) && !p.used_skills.contains(&s)));
+            let player_action = match (unused_stn, player_action) {
+                (true, PlayerActionChoice::PassMove) => PlayerActionChoice::ShotToNothing,
+                (true, _) => PlayerActionChoice::ShotToNothingFired,
+                (false, pac) => pac,
+            };
+            Action::ActivatePlayer { player_id, player_action, block_defender_id }
+        }
+        other => other,
+    }
+}
+
 /// Run-up squares a PassMove considers throwing from, besides standing still.
 const THROW_SPOTS: usize = 6;
 /// Squares next to a receiver a HandOverMove considers giving from.
@@ -3999,10 +4021,13 @@ impl HeuristicAgent {
                 }
             }
 
-            AgentPrompt::ActivatePlayer { eligible_players } => match self.mode {
-                Mode::Wide | Mode::WideNoBall | Mode::WideNoPass | Mode::WideNoHandOff => self.handle_activate(g, f, eligible_players),
-                Mode::Deep => self.handle_activate_deep(g, f, eligible_players),
-            },
+            AgentPrompt::ActivatePlayer { eligible_players } => {
+                let action = match self.mode {
+                    Mode::Wide | Mode::WideNoBall | Mode::WideNoPass | Mode::WideNoHandOff => self.handle_activate(g, f, eligible_players),
+                    Mode::Deep => self.handle_activate_deep(g, f, eligible_players),
+                };
+                with_shot_to_nothing(g, action)
+            }
 
             // §19.2 defect 1 — the declaration and this prompt must agree.
             //

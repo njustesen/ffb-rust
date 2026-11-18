@@ -292,9 +292,25 @@ pub enum PlayerActionChoice {
     BreatheFire,
     ProjectileVomit,
     SecureTheBall,
+    /// Shot to Nothing (bb2020+ star skill): the client's ActingPlayer(PASS_MOVE) +
+    /// UseSkill(canGainHailMary) pair (SelectLogicModule SHOT_TO_NOTHING). Acts exactly like
+    /// `PassMove` once StepInitSelecting's CLIENT_USE_SKILL arm has granted Hail Mary Pass.
+    ShotToNothing,
+    /// `ShotToNothing` whose throw fires at once — the `PassMoveFired` counterpart.
+    ShotToNothingFired,
 }
 
 impl PlayerActionChoice {
+    /// Split a Shot to Nothing declaration into the plain pass declaration it rides on and
+    /// whether the CLIENT_USE_SKILL(canGainHailMary) follows it.
+    pub fn split_shot_to_nothing(self) -> (PlayerActionChoice, bool) {
+        match self {
+            PlayerActionChoice::ShotToNothing => (PlayerActionChoice::PassMove, true),
+            PlayerActionChoice::ShotToNothingFired => (PlayerActionChoice::PassMoveFired, true),
+            other => (other, false),
+        }
+    }
+
     /// Split a fired MOVE-form ball declaration into the choice the select step acts on and the
     /// declaration Java sent first. `PassMoveFired` → (`Pass`, PASS_MOVE), `HandOffMoveFired` →
     /// (`HandOff`, HAND_OVER_MOVE); every other choice is returned unchanged with nothing to replay.

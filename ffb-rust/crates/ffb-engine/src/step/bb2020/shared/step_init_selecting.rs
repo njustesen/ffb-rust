@@ -189,6 +189,8 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::HandOffMove => PlayerAction::HandOverMove,
         PlayerActionChoice::PassMove => PlayerAction::PassMove,
         PlayerActionChoice::PassMoveFired => PlayerAction::Pass,
+        PlayerActionChoice::ShotToNothing => PlayerAction::PassMove,
+        PlayerActionChoice::ShotToNothingFired => PlayerAction::Pass,
         PlayerActionChoice::HandOffMoveFired => PlayerAction::HandOver,
         PlayerActionChoice::StandUp => PlayerAction::StandUp,
         PlayerActionChoice::StandUpBlitz => PlayerAction::StandUpBlitz,

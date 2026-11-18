@@ -206,7 +206,7 @@ impl StepSelectBlitzTarget {
                     ts.add_used_skill(skill);
                     // Java: if (usedSkill.getEnhancements() != null) {
                     //   fieldModel.addSkillEnhancements(actingPlayer, usedSkill); <reports> }
-                    if let Some(granted) = skill.blitz_enhancement_skills() {
+                    if let Some(granted) = skill.enhancement_skills() {
                         let rules = game.rules;
                         if let Some(p) = game.player_mut(&acting_id) {
                             p.add_skill_enhancement(skill.category_and_name_for(rules).1, granted);

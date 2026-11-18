@@ -234,12 +234,15 @@ impl SkillId {
     /// `TemporaryEnhancements` grant a skill, applied by `StepSelectBlitzTarget` through
     /// `FieldModel.addSkillEnhancements` (source = `getName()`). Only the skills that reach that
     /// `usedSkill` branch are listed; `None` means `getEnhancements() == null` there.
-    pub fn blitz_enhancement_skills(self) -> Option<&'static [SkillId]> {
+    pub fn enhancement_skills(self) -> Option<&'static [SkillId]> {
         match self {
             // Java: FrenziedRush.postConstruct (bb2020 + bb2025) withSkills(Frenzy)
             SkillId::FrenziedRush => Some(&[SkillId::Frenzy]),
             // Java: SlashingNails.postConstruct (bb2025) withSkills(Claws)
             SkillId::SlashingNails => Some(&[SkillId::Claw]),
+            // Java: ShotToNothing.postConstruct (mixed) withSkills(HailMaryPass); applied by
+            // StepInitSelecting's CLIENT_USE_SKILL canGainHailMary branch.
+            SkillId::ShotToNothing => Some(&[SkillId::HailMaryPass]),
             _ => None,
         }
     }
