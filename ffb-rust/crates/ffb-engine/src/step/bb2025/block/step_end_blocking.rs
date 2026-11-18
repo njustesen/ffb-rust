@@ -461,7 +461,18 @@ impl StepEndBlocking {
             }
         };
 
+        // Java bb2020.StepEndBlocking:317-319 ALSO refuses when the turn's foul is spent and the
+        // attacker has no allowsAdditionalFoul; bb2025's class has no such term. BB2020 runs this
+        // shared file (only BB2016 routes to its own), so it offered a second foul Java never
+        // shows (BACKLOG §M phase 2: slann_sk bb2020 seed 15).
+        let foul_spent = game.rules == ffb_model::enums::Rules::Bb2020
+            && game.turn_data().foul_used
+            && !attacker_id.as_deref()
+                .and_then(|id| game.player(id))
+                .map(|p| p.has_skill_property(NamedProperties::ALLOWS_ADDITIONAL_FOUL))
+                .unwrap_or(false);
         if !can_foul_after_block || self.knocked_down_players.is_empty()
+            || foul_spent
             || game.turn_mode == TurnMode::Blitz
         {
             self.use_pile_driver = Some(false);
@@ -600,6 +611,15 @@ impl StepEndBlocking {
                 let is_home = game.team_home.has_player(pid);
                 let result = if is_home { &mut game.game_result.home } else { &mut game.game_result.away };
                 result.player_results.entry(pid.to_string()).or_default().fouls += 1;
+                // Java bb2020.StepEndBlocking:377-379 (absent in bb2025): the Pile Driver foul
+                // spends the turn's foul unless the attacker has allowsAdditionalFoul.
+                if game.rules == ffb_model::enums::Rules::Bb2020
+                    && !game.player(pid)
+                        .map(|p| p.has_skill_property(NamedProperties::ALLOWS_ADDITIONAL_FOUL))
+                        .unwrap_or(false)
+                {
+                    game.turn_data_mut().foul_used = true;
+                }
             }
             // Java: pileDriver.pushSequence(new PileDriver.SequenceParams(getGameState(), targetPlayerId))
             let seq = PileDriver::build_sequence(&PileDriverParams {
