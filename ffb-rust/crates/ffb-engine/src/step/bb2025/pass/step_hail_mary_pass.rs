@@ -314,7 +314,17 @@ impl StepHailMaryPass {
         // it (HeuristicDriver.useSkill "Pass" w=0.50, two sampler draws) and can DECLINE —
         // elf bb2025 seed 51: Java declines the fumbled HMP's Pass re-roll (JSKILL idx=1)
         // while Rust silently re-rolled. Prompt like StepPass.pass_skill_offer instead.
-        if (is_fumble || wildly) && !self.saved_fumble && self.re_rolled_action.is_none() {
+        // BB2025 (PassBehaviour :159-176) runs this cascade for FUMBLE **and SAVED_FUMBLE** -- a
+        // Pass-skill / team re-roll can roll a saved fumble away before Safe Pass is consulted --
+        // and sets reRolledAction = PASS on entry even when nothing is offered, so the re-entry
+        // after the Safe Pass dialog neither re-rolls nor re-reports. Rust skipped it for a saved
+        // fumble (BACKLOG §M phase 2: elf_sk bb2025 seed 5, Java re-rolled with Pass).
+        let bb2025 = game.rules == ffb_model::enums::Rules::Bb2025;
+        let raw_saved = raw_result == ffb_mechanics::pass_result::PassResult::SAVED_FUMBLE;
+        if (is_fumble || wildly) && (!self.saved_fumble || bb2025) && self.re_rolled_action.is_none() {
+            if bb2025 {
+                self.re_rolled_action = Some(REROLLED_ACTION_PASS.into());
+            }
             if !self.pass_skill_used {
                 if let Some(source) = crate::step::abstract_step_with_re_roll::find_skill_reroll_source(game, REROLLED_ACTION_PASS) {
                     // Java: state.passSkillUsed = true; showDialog(DialogSkillUseParameter(
@@ -336,6 +346,47 @@ impl StepHailMaryPass {
                 self.re_rolled_action = Some(REROLLED_ACTION_PASS.into());
                 self.re_roll_source = Some("TRR".into());
                 return StepOutcome::cont().with_prompt(prompt);
+            }
+        }
+
+        // Java bb2025 PassBehaviour.handleSafePass (the StepHailMaryPass hook), ported -- it was a
+        // "headless: Safe Pass dialog" stub that saved every SAVED_FUMBLE silently:
+        //   usingSafePass == null -> DialogSkillUseParameter(thrower, safePass, 0, false), wait;
+        //   !usingSafePass        -> result = FUMBLE (scatter, turnover);
+        //   usingSafePass         -> markSkillUsed(safePass), report SAVED_FUMBLE_BALL/BOMB,
+        //                            publish DONT_DROP_FUMBLE true.
+        // A FUMBLE publishes DONT_DROP_FUMBLE false.
+        let mut dont_drop_fumble: Option<bool> = None;
+        if bb2025 && is_fumble {
+            if raw_saved {
+                let thrower_id = game.thrower_id.clone().unwrap_or_default();
+                let safe_pass = game.player(&thrower_id)
+                    .and_then(|p| p.skill_id_with_property(NamedProperties::DONT_DROP_FUMBLES))
+                    .unwrap_or(SkillId::SafePass);
+                match self.using_safe_pass {
+                    None => {
+                        return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
+                            player_id: thrower_id,
+                            skill_id: safe_pass as u16,
+                            skill_name: format!("{:?}", safe_pass),
+                        });
+                    }
+                    Some(false) => self.saved_fumble = false,
+                    Some(true) => {
+                        crate::step::util_server_steps::mark_skill_used(game, &thrower_id, safe_pass);
+                        let is_bomb = game.thrower_action == Some(ffb_model::enums::PlayerAction::HailMaryBomb);
+                        game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                            Some(thrower_id.clone()), safe_pass, true,
+                            if is_bomb { ffb_model::model::skill_use::SkillUse::SAVED_FUMBLE_BOMB }
+                            else { ffb_model::model::skill_use::SkillUse::SAVED_FUMBLE_BALL },
+                        ));
+                        self.saved_fumble = true;
+                        dont_drop_fumble = Some(true);
+                    }
+                }
+            }
+            if !self.saved_fumble {
+                dont_drop_fumble = Some(false);
             }
         }
 
@@ -376,7 +427,7 @@ impl StepHailMaryPass {
             .and_then(|id| game.field_model.player_coordinate(id));
         let is_bomb = game.thrower_action == Some(ffb_model::enums::PlayerAction::HailMaryBomb);
         let label = self.goto_label_on_failure.clone();
-        if is_fumble && self.saved_fumble {
+        let out = if is_fumble && self.saved_fumble {
             if is_bomb {
                 game.field_model.bomb_coordinate = None;
                 game.field_model.bomb_moving = false;
@@ -414,6 +465,10 @@ impl StepHailMaryPass {
             } else {
                 out
             }
+        };
+        match dont_drop_fumble {
+            Some(d) => out.publish(StepParameter::DontDropFumble(d)),
+            None => out,
         }
     }
 }
@@ -812,7 +867,46 @@ mod tests {
         step.roll = 1;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
-        assert!(step.re_rolled_action.is_none());
+        // Java bb2025 PassBehaviour sets reRolledAction = PASS on entering the fumble cascade even
+        // when nothing is offered (it is what stops a re-entry from rolling again); no source.
+        assert_eq!(step.re_rolled_action.as_deref(), Some(REROLLED_ACTION_PASS));
+        assert!(step.re_roll_source.is_none());
+    }
+
+    /// BACKLOG §M phase 2 (elf_sk bb2025 seed 5): a Safe Pass thrower's natural-1 Hail Mary is a
+    /// SAVED_FUMBLE that Java (bb2025) first offers the Pass-skill re-roll for, and only then asks
+    /// whether to use Safe Pass; declining Safe Pass makes it a real FUMBLE.
+    #[test]
+    fn saved_fumble_offers_the_pass_reroll_then_asks_safe_pass() {
+        let mut game = make_game_with_thrower(2);
+        game.home_playing = true;
+        game.turn_data_mut().rerolls = 0;
+        let tid = game.thrower_id.clone().unwrap();
+        let p = game.team_home.players.iter_mut().find(|p| p.id == tid).unwrap();
+        p.extra_skills.push(ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::SafePass, value: None });
+        p.extra_skills.push(ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::Pass, value: None });
+        // find_skill_reroll_source reads the ACTING player in a regular turn.
+        game.acting_player.player_id = Some(tid.clone());
+        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+
+        let mut step = StepHailMaryPass::new("fail".into());
+        step.roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(&out.prompt, Some(ffb_model::prompts::AgentPrompt::SkillUse { skill_name, .. }) if skill_name == "Pass"),
+            "saved fumble must offer the Pass re-roll first, got {:?}", out.prompt);
+
+        // Decline the re-roll -> the Safe Pass question.
+        let out = step.handle_command(&Action::UseSkill { skill_id: SkillId::Pass, use_skill: false },
+            &mut game, &mut GameRng::new(0));
+        assert!(matches!(&out.prompt, Some(ffb_model::prompts::AgentPrompt::SkillUse { skill_name, .. }) if skill_name == "SafePass"),
+            "then Safe Pass is asked, got {:?}", out.prompt);
+
+        // Decline Safe Pass -> a real fumble (PassFumble true, DontDropFumble false).
+        let out = step.handle_command(&Action::UseSkill { skill_id: SkillId::SafePass, use_skill: false },
+            &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::PassFumble(true))));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::DontDropFumble(false))));
     }
 
     #[test]
@@ -825,6 +919,8 @@ mod tests {
             &mut game, &mut GameRng::new(0),
         );
         assert_eq!(step.using_modifying_skill, Some(true));
-        assert!(step.re_rolled_action.is_none());
+        // A modifying skill must not arm a re-roll (the fumble cascade may still mark the
+        // action PASS, as Java does, but with no source).
+        assert!(step.re_roll_source.is_none());
     }
 }
