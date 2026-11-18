@@ -9741,3 +9741,43 @@ a PARAMETER to control randomness/coverage (`--heur-scale` already scales temper
 
 **Done:** every Java-resolvable skill and every PlayerAction fires on a green gate (~100+) or is
 documented unreachable.
+
+### Phase 1 status (2026-11-18)
+
+Driven, gated green (20-seed gates, steps + reports identical), pushed:
+- Dump-Off (1c1108257); Safe Pair of Hands, Primal Savagery, Swoop (7afb09ca9; bb2025 Swoop only
+  really resolves since fe50d7251); block-die re-rolls UM / Savage Blow / Lord of Chaos / Woodland
+  Fury (8128b282a); Frenzied Rush + Slashing Nails (99a8f2d06); Shot to Nothing (7c63e2906);
+  Kick 'em While They're Down, block form (fe50d7251); Vicious Vines (3157da665); bb2020 Zoat
+  gaze (d5499a563); Working in Tandem, both halves (31757c144, data + PASS_TO_PARTNER port).
+- Pattern: a zero-draw "command pair" rule in BOTH agents (Rust `heuristic_agent.rs`
+  `with_special_declarations`, Java `ParityRunner.sendStarSpecialDeclaration`), or a prompt field
+  (`BlitzTarget.gain_skill`, `GazeTarget.gain_skill`) that makes the agent send the UseSkill first.
+- Rare skills: find seeds with the Rust-only bench (`FFB_BENCH_GREP=<report substring>`, on a
+  frozen exe copy), then gate those windows against Java.
+- LESSON: unpinning a skill needs a gate on EVERY edition's path (bb2020 Swoop was green while
+  bb2025 Swoop stalled the game). LESSON: a skill can be dead in BOTH engines through data (the
+  twins had no variant value) -- parity green says nothing about reachability.
+
+Deferred, with the reason (each needs a design decision or a larger port):
+- **Gored by the Bull** (bb2025 Grashnak, canAddBlockDie during a blitz): the client sends
+  UseSkill instead of CLIENT_BLOCK at the blitz block. Rust folds the blitz block into an automatic
+  continuation (`StepInitSelecting` start(), BlitzMove + USE_ALTERNATE_LABEL) with no agent prompt,
+  so the choice would have to live in the engine; also Rust's UseSkill canAddBlockDie arm only
+  writes the report (Java :378-398 adds the used skill, updates dice decorations, publishes the
+  block params, dispatches BLITZ) -- port that 1:1 together with a prompt.
+- **KICK_EM_BLITZ**: same blitz-continuation shape as Gored.
+- **Two for One** (bb2020 Grak & Crumbleberry): unreachable in BOTH engines -- the parity star
+  positions carry no `teamWithPositionId`, so Java's `checkForMissingPartners` finds no partner
+  (Rust has it as a documented no-op). Needs the data field in both, the Rust port, and Java's
+  per-skill value evaluator (Loner's picks the best of the base 4+ and the granted 2+; Rust's
+  `get_skill_int_value` takes the first value).
+- **Blast It** (Barik, grantsCatchBonusToReceiver): Hail Mary passes only, through the catch
+  step's dialog/re-roll interplay (`StepCatchScatterThrowIn` :560-600); the agents rarely throw HMP.
+- **Halfling Luck / Thinking Man's Troll** (re-roll-source skills): both harnesses answer every
+  re-roll offer with the team re-roll (Rust steps hard-code "TRR", ParityRunner.reRollSourceFor
+  returns TEAM_RE_ROLL); using the skill is a cross-cutting harness-policy change.
+- **Bounding Leap** (canIgnoreJumpModifiers): Rust's StepInitSelecting UseSkill arm lacks Java
+  :403 (setJumpsWithoutModifiers + updateMoveSquares); driving it needs a jump decision.
+- Never-offered actions still open: Chomp, Forgo, Incorporeal, Hail Mary Bomb, Flashing Blade,
+  Putrid Regurgitation, Maximum Carnage.
