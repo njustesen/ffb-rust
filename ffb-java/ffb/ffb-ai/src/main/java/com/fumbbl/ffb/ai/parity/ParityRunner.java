@@ -1658,6 +1658,30 @@ public class ParityRunner {
                 break;
             }
 
+            case PILE_DRIVER: {
+                // BACKLOG §M phase 2: no arm until Pile Driver was fielded -- the `default:`
+                // RandomStrategy accepted knockedDown.get(0) while Rust's parity agent declined.
+                // Both now ACCEPT on the min-(x,y) knocked-down player, ZERO draws (Rust
+                // random_agent `PlayerChoice { reason: "pileDriver" }`).
+                com.fumbbl.ffb.dialog.DialogPileDriverParameter pd =
+                    (com.fumbbl.ffb.dialog.DialogPileDriverParameter) dialog;
+                List<Player<?>> pdCands = new ArrayList<>();
+                if (pd.getKnockedDownPlayers() != null) {
+                    for (String pid : pd.getKnockedDownPlayers()) {
+                        Player<?> cand = game.getPlayerById(pid);
+                        if (cand != null) pdCands.add(cand);
+                    }
+                }
+                sortPlayersByCoordinate(pdCands, game.getFieldModel());
+                comm.clearCaptured();
+                comm.sendPileDriver(pdCands.isEmpty() ? null : pdCands.get(0).getId());
+                injectCaptured(dialog, game, gameState);
+                if (game.getDialogParameter() == dialog) {
+                    game.setDialogParameter(null);
+                }
+                break;
+            }
+
             case SKILL_USE: {
                 // Always USE the skill — matches Rust engine which auto-uses Sure Hands/Catch
                 // during catch/pickup attempts without emitting a SkillUse prompt.

@@ -1420,6 +1420,21 @@ impl Agent for RandomAgent {
             // (x,y), ZERO draws. Both engines roll in SELECTION order (`playerIdsSelected`), while
             // the dialog's own list order is a HashSet's in both (Java `Collectors.toSet()`, Rust
             // `HashSet`) — so the list must never be taken as given. ParityRunner sorts the same.
+            // PILE_DRIVER (BACKLOG §M phase 2): Pile Driver was never fielded until the skilled
+            // squads. Java's ParityRunner had no arm (RandomStrategy accepted `knockedDown.get(0)`)
+            // while this fell to the decline below -- Java fouled, Rust moved on. ACCEPT on the
+            // min-(x,y) knocked-down player, ZERO draws; ParityRunner's PILE_DRIVER arm sorts the
+            // same way (the list is in knock-down order, not a contract across engines).
+            Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
+                if reason == "pileDriver" =>
+            {
+                let best = eligible_players.iter().min_by_key(|pid| {
+                    gs.game.field_model.player_coordinate(pid)
+                        .map(|c| (c.x, c.y))
+                        .unwrap_or((i32::MAX, i32::MAX))
+                });
+                Action::SelectPlayer { player_id: best.cloned().unwrap_or_default() }
+            }
             Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
                 if reason == "PICK_ME_UP" =>
             {
