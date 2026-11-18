@@ -1,0 +1,84 @@
+{
+  "edition": "bb2020",
+  "race": "imperial_nobility",
+  "roster_id": "imperialnobility.lrb6",
+  "rerolls": 2,
+  "reroll_cost": 70000,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 0,
+  "fan_factor": 0,
+  "treasury": 5000,
+  "spent": 1095000,
+  "team_value": 1095000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "imperialnobility.imperial_retainer_lineman"
+    },
+    {
+      "nr": 2,
+      "position_id": "imperialnobility.imperial_thrower",
+      "skills": [
+        "Hail Mary Pass"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 3,
+      "position_id": "imperialnobility.noble_blitzer"
+    },
+    {
+      "nr": 4,
+      "position_id": "imperialnobility.bodyguard",
+      "skills": [
+        "Brawler"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 5,
+      "position_id": "imperialnobility.ogre"
+    },
+    {
+      "nr": 6,
+      "position_id": "imperialnobility.imperial_retainer_lineman"
+    },
+    {
+      "nr": 7,
+      "position_id": "imperialnobility.imperial_thrower",
+      "skills": [
+        "Cloud Burster"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 8,
+      "position_id": "imperialnobility.noble_blitzer"
+    },
+    {
+      "nr": 9,
+      "position_id": "imperialnobility.bodyguard"
+    },
+    {
+      "nr": 10,
+      "position_id": "imperialnobility.imperial_retainer_lineman"
+    },
+    {
+      "nr": 11,
+      "position_id": "imperialnobility.imperial_retainer_lineman"
+    },
+    {
+      "nr": 12,
+      "position_id": "imperialnobility.imperial_retainer_lineman"
+    }
+  ],
+  "special_rules": [],
+  "skilled_from": "imperial_nobility",
+  "skill_points": {
+    "tier_assumed": 1,
+    "spent": 3,
+    "secondary": 0
+  }
+}

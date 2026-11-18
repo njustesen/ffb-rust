@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamWoodElfSkParity20Away">
+
+	<coach>Away</coach>
+	<name>Wood Elf Parity20 Away</name>
+	<race>Wood Elf</race>
+	<rosterId>wood_elf_sk.bb2020</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1095000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>5000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamWoodElfSkParity20Away1">
+		<name>Wood Elf Lineman 1</name>
+		<gender>male</gender>
+		<positionId>woodelf.lineman</positionId>
+		<skillList>
+			<skill value="1">Dirty Player</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamWoodElfSkParity20Away2">
+		<name>Thrower 2</name>
+		<gender>male</gender>
+		<positionId>woodelf.thrower</positionId>
+		<skillList>
+			<skill>Block</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamWoodElfSkParity20Away3">
+		<name>Catcher 3</name>
+		<gender>male</gender>
+		<positionId>woodelf.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamWoodElfSkParity20Away4">
+		<name>Wardancer 4</name>
+		<gender>male</gender>
+		<positionId>woodelf.wardancer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamWoodElfSkParity20Away5">
+		<name>Loren Forest Treeman 5</name>
+		<gender>male</gender>
+		<positionId>woodelf.treeman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamWoodElfSkParity20Away6">
+		<name>Wood Elf Lineman 6</name>
+		<gender>male</gender>
+		<positionId>woodelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamWoodElfSkParity20Away7">
+		<name>Thrower 7</name>
+		<gender>male</gender>
+		<positionId>woodelf.thrower</positionId>
+		<skillList>
+			<skill>Leader</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamWoodElfSkParity20Away8">
+		<name>Wood Elf Lineman 8</name>
+		<gender>male</gender>
+		<positionId>woodelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamWoodElfSkParity20Away9">
+		<name>Wood Elf Lineman 9</name>
+		<gender>male</gender>
+		<positionId>woodelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamWoodElfSkParity20Away10">
+		<name>Wood Elf Lineman 10</name>
+		<gender>male</gender>
+		<positionId>woodelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamWoodElfSkParity20Away11">
+		<name>Wood Elf Lineman 11</name>
+		<gender>male</gender>
+		<positionId>woodelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

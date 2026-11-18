@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamChaosDwarfSkParity20Away">
+
+	<coach>Away</coach>
+	<name>Chaos Dwarf Parity20 Away</name>
+	<race>Chaos Dwarf</race>
+	<rosterId>chaos_dwarf_sk.bb2020</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamChaosDwarfSkParity20Away1">
+		<name>Hobgoblin Lineman 1</name>
+		<gender>male</gender>
+		<positionId>chaosdwarf.hobgoblin</positionId>
+		<skillList>
+			<skill>Kick</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamChaosDwarfSkParity20Away2">
+		<name>Hobgoblin Sneaky Stabba 2</name>
+		<gender>male</gender>
+		<positionId>chaosdwarf.hobgoblinsneakystabba</positionId>
+		<skillList>
+			<skill>Strip Ball</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamChaosDwarfSkParity20Away3">
+		<name>Chaos Dwarf Blocker 3</name>
+		<gender>male</gender>
+		<positionId>chaosdwarf.blocker</positionId>
+		<skillList>
+			<skill>Stand Firm</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamChaosDwarfSkParity20Away4">
+		<name>Chaos Dwarf Flamesmith 4</name>
+		<gender>male</gender>
+		<positionId>chaosdwarf.chaosdwarfflamesmith</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamChaosDwarfSkParity20Away5">
+		<name>Bull Centaur Blitzer 5</name>
+		<gender>male</gender>
+		<positionId>chaosdwarf.bullcentaur</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamChaosDwarfSkParity20Away6">
+		<name>Minotaur 6</name>
+		<gender>male</gender>
+		<positionId>chaosdwarf.minotaur</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamChaosDwarfSkParity20Away7">
+		<name>Hobgoblin Lineman 7</name>
+		<gender>male</gender>
+		<positionId>chaosdwarf.hobgoblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamChaosDwarfSkParity20Away8">
+		<name>Bull Centaur Blitzer 8</name>
+		<gender>male</gender>
+		<positionId>chaosdwarf.bullcentaur</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamChaosDwarfSkParity20Away9">
+		<name>Hobgoblin Lineman 9</name>
+		<gender>male</gender>
+		<positionId>chaosdwarf.hobgoblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamChaosDwarfSkParity20Away10">
+		<name>Hobgoblin Lineman 10</name>
+		<gender>male</gender>
+		<positionId>chaosdwarf.hobgoblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamChaosDwarfSkParity20Away11">
+		<name>Hobgoblin Lineman 11</name>
+		<gender>male</gender>
+		<positionId>chaosdwarf.hobgoblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamChaosDwarfSkParity20Away12">
+		<name>Hobgoblin Lineman 12</name>
+		<gender>male</gender>
+		<positionId>chaosdwarf.hobgoblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamChaosDwarfSkParity20Away13">
+		<name>Hobgoblin Lineman 13</name>
+		<gender>male</gender>
+		<positionId>chaosdwarf.hobgoblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

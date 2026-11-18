@@ -1,0 +1,87 @@
+{
+  "edition": "bb2025",
+  "race": "dwarf",
+  "roster_id": "dwarf.lrb6",
+  "rerolls": 2,
+  "reroll_cost": 60000,
+  "apothecaries": 0,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 2,
+  "fan_factor": 0,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1095000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "dwarf.blocker",
+      "skills": [
+        "Shadowing"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 2,
+      "position_id": "dwarf.runner",
+      "skills": [
+        "Dauntless"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 3,
+      "position_id": "dwarf.blitzer"
+    },
+    {
+      "nr": 4,
+      "position_id": "dwarf.trollslayer"
+    },
+    {
+      "nr": 5,
+      "position_id": "dwarf.deathroller"
+    },
+    {
+      "nr": 6,
+      "position_id": "dwarf.blocker",
+      "skills": [
+        "Sneaky Git"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 7,
+      "position_id": "dwarf.runner"
+    },
+    {
+      "nr": 8,
+      "position_id": "dwarf.blitzer"
+    },
+    {
+      "nr": 9,
+      "position_id": "dwarf.blocker",
+      "skills": [
+        "Violent Innovator"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 10,
+      "position_id": "dwarf.blocker"
+    },
+    {
+      "nr": 11,
+      "position_id": "dwarf.blocker"
+    }
+  ],
+  "special_rules": [
+    "Brawlin' Brutes",
+    "Bribery and Corruption"
+  ],
+  "skilled_from": "dwarf",
+  "skill_points": {
+    "tier_assumed": 1,
+    "spent": 4,
+    "secondary": 0
+  }
+}

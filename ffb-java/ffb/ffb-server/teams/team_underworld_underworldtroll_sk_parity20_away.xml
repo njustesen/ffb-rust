@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamUnderworldUnderworldtrollSkParity20Away">
+
+	<coach>Away</coach>
+	<name>Underworld Parity20 Away</name>
+	<race>Underworld</race>
+	<rosterId>underworld_underworldtroll_sk.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1095000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>5000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamUnderworldUnderworldtrollSkParity20Away1">
+		<name>Underworld Goblin Lineman 1</name>
+		<gender>male</gender>
+		<positionId>underworld.goblin</positionId>
+		<skillList>
+			<skill>Monstrous Mouth</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamUnderworldUnderworldtrollSkParity20Away2">
+		<name>Underworld Snotling 2</name>
+		<gender>male</gender>
+		<positionId>37844.underworldsnotling</positionId>
+		<skillList>
+			<skill>Extra Arms</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamUnderworldUnderworldtrollSkParity20Away3">
+		<name>Skaven Clanrat 3</name>
+		<gender>male</gender>
+		<positionId>37844.skavenclanrat</positionId>
+		<skillList>
+			<skill>Prehensile Tail</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamUnderworldUnderworldtrollSkParity20Away4">
+		<name>Skaven Thrower 4</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamUnderworldUnderworldtrollSkParity20Away5">
+		<name>Gutter Runner 5</name>
+		<gender>male</gender>
+		<positionId>37844.gutterrunner</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamUnderworldUnderworldtrollSkParity20Away6">
+		<name>Skaven Blitzer 6</name>
+		<gender>male</gender>
+		<positionId>underworld.skaven.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamUnderworldUnderworldtrollSkParity20Away7">
+		<name>Underworld Troll 7</name>
+		<gender>male</gender>
+		<positionId>37844.underworldtroll</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamUnderworldUnderworldtrollSkParity20Away8">
+		<name>Underworld Goblin Lineman 8</name>
+		<gender>male</gender>
+		<positionId>underworld.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamUnderworldUnderworldtrollSkParity20Away9">
+		<name>Underworld Snotling 9</name>
+		<gender>male</gender>
+		<positionId>37844.underworldsnotling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamUnderworldUnderworldtrollSkParity20Away10">
+		<name>Skaven Clanrat 10</name>
+		<gender>male</gender>
+		<positionId>37844.skavenclanrat</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamUnderworldUnderworldtrollSkParity20Away11">
+		<name>Underworld Goblin Lineman 11</name>
+		<gender>male</gender>
+		<positionId>underworld.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamUnderworldUnderworldtrollSkParity20Away12">
+		<name>Skaven Clanrat 12</name>
+		<gender>male</gender>
+		<positionId>37844.skavenclanrat</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamUnderworldUnderworldtrollSkParity20Away13">
+		<name>Underworld Goblin Lineman 13</name>
+		<gender>male</gender>
+		<positionId>underworld.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="14" id="teamUnderworldUnderworldtrollSkParity20Away14">
+		<name>Underworld Goblin Lineman 14</name>
+		<gender>male</gender>
+		<positionId>underworld.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="15" id="teamUnderworldUnderworldtrollSkParity20Away15">
+		<name>Underworld Goblin Lineman 15</name>
+		<gender>male</gender>
+		<positionId>underworld.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="16" id="teamUnderworldUnderworldtrollSkParity20Away16">
+		<name>Underworld Goblin Lineman 16</name>
+		<gender>male</gender>
+		<positionId>underworld.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamChaosPactSkParity16Home">
+
+	<coach>Home</coach>
+	<name>Chaos Pact Parity16 Home</name>
+	<race>Chaos Pact</race>
+	<rosterId>chaos_pact_sk.bb2016</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamChaosPactSkParity16Home1">
+		<name>Marauder 1</name>
+		<gender>male</gender>
+		<positionId>chaospact.marauder</positionId>
+		<skillList>
+			<skill>Claw</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamChaosPactSkParity16Home2">
+		<name>Goblin Renegade 2</name>
+		<gender>male</gender>
+		<positionId>chaospact.goblin.renegade</positionId>
+		<skillList>
+			<skill>Horns</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamChaosPactSkParity16Home3">
+		<name>Skaven Renegade 3</name>
+		<gender>male</gender>
+		<positionId>chaospact.skaven.renegade</positionId>
+		<skillList>
+			<skill>Two Heads</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamChaosPactSkParity16Home4">
+		<name>Dark Elf Renegade 4</name>
+		<gender>male</gender>
+		<positionId>chaospact.darkelf.renegade</positionId>
+		<skillList>
+			<skill>Extra Arms</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamChaosPactSkParity16Home5">
+		<name>Chaos Troll 5</name>
+		<gender>male</gender>
+		<positionId>chaospact.troll.chaos</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamChaosPactSkParity16Home6">
+		<name>Chaos Ogre 6</name>
+		<gender>male</gender>
+		<positionId>chaospact.ogre.chaos</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamChaosPactSkParity16Home7">
+		<name>Minotaur 7</name>
+		<gender>male</gender>
+		<positionId>chaospact.minotaur</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamChaosPactSkParity16Home8">
+		<name>Marauder 8</name>
+		<gender>male</gender>
+		<positionId>chaospact.marauder</positionId>
+		<skillList>
+			<skill>Big Hand</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamChaosPactSkParity16Home9">
+		<name>Marauder 9</name>
+		<gender>male</gender>
+		<positionId>chaospact.marauder</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamChaosPactSkParity16Home10">
+		<name>Marauder 10</name>
+		<gender>male</gender>
+		<positionId>chaospact.marauder</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamChaosPactSkParity16Home11">
+		<name>Marauder 11</name>
+		<gender>male</gender>
+		<positionId>chaospact.marauder</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamChaosPactSkParity16Home12">
+		<name>Marauder 12</name>
+		<gender>male</gender>
+		<positionId>chaospact.marauder</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamChaosPactSkParity16Home13">
+		<name>Marauder 13</name>
+		<gender>male</gender>
+		<positionId>chaospact.marauder</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

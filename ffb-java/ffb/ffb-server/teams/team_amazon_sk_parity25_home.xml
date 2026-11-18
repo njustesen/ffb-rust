@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamAmazonSkParity25Home">
+
+	<coach>Home</coach>
+	<name>Amazon Parity25 Home</name>
+	<race>Amazon</race>
+	<rosterId>amazon_sk.bb2025</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1090000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamAmazonSkParity25Home1">
+		<name>Eagle Warrior 1</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList>
+			<skill>Block</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamAmazonSkParity25Home2">
+		<name>Python Warrior 2</name>
+		<gender>male</gender>
+		<positionId>amazon.thrower</positionId>
+		<skillList>
+			<skill>Dump-Off</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamAmazonSkParity25Home3">
+		<name>Piranha Warrior 3</name>
+		<gender>male</gender>
+		<positionId>amazon.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamAmazonSkParity25Home4">
+		<name>Jaguar Warrior 4</name>
+		<gender>male</gender>
+		<positionId>amazon.catcher</positionId>
+		<skillList>
+			<skill>Thick Skull</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamAmazonSkParity25Home5">
+		<name>Eagle Warrior 5</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamAmazonSkParity25Home6">
+		<name>Python Warrior 6</name>
+		<gender>male</gender>
+		<positionId>amazon.thrower</positionId>
+		<skillList>
+			<skill>Give and Go</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamAmazonSkParity25Home7">
+		<name>Piranha Warrior 7</name>
+		<gender>male</gender>
+		<positionId>amazon.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamAmazonSkParity25Home8">
+		<name>Jaguar Warrior 8</name>
+		<gender>male</gender>
+		<positionId>amazon.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamAmazonSkParity25Home9">
+		<name>Eagle Warrior 9</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamAmazonSkParity25Home10">
+		<name>Eagle Warrior 10</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamAmazonSkParity25Home11">
+		<name>Eagle Warrior 11</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamAmazonSkParity25Home12">
+		<name>Eagle Warrior 12</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

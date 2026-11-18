@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamAmazonSkParity20Away">
+
+	<coach>Away</coach>
+	<name>Amazon Parity20 Away</name>
+	<race>Amazon</race>
+	<rosterId>amazon_sk.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>1</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1090000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamAmazonSkParity20Away1">
+		<name>Eagle Warrior Linewoman 1</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList>
+			<skill>Fend</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamAmazonSkParity20Away2">
+		<name>Python Warrior Thrower 2</name>
+		<gender>male</gender>
+		<positionId>amazon.thrower</positionId>
+		<skillList>
+			<skill>Dump-Off</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamAmazonSkParity20Away3">
+		<name>Piranha Warrior Blitzer 3</name>
+		<gender>male</gender>
+		<positionId>amazon.blitzer</positionId>
+		<skillList>
+			<skill>Frenzy</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamAmazonSkParity20Away4">
+		<name>Jaguar Warrior Blocker 4</name>
+		<gender>male</gender>
+		<positionId>amazon.jaguarwarriorblocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamAmazonSkParity20Away5">
+		<name>Eagle Warrior Linewoman 5</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamAmazonSkParity20Away6">
+		<name>Python Warrior Thrower 6</name>
+		<gender>male</gender>
+		<positionId>amazon.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamAmazonSkParity20Away7">
+		<name>Piranha Warrior Blitzer 7</name>
+		<gender>male</gender>
+		<positionId>amazon.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamAmazonSkParity20Away8">
+		<name>Jaguar Warrior Blocker 8</name>
+		<gender>male</gender>
+		<positionId>amazon.jaguarwarriorblocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamAmazonSkParity20Away9">
+		<name>Eagle Warrior Linewoman 9</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamAmazonSkParity20Away10">
+		<name>Eagle Warrior Linewoman 10</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamAmazonSkParity20Away11">
+		<name>Eagle Warrior Linewoman 11</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamAmazonSkParity20Away12">
+		<name>Eagle Warrior Linewoman 12</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

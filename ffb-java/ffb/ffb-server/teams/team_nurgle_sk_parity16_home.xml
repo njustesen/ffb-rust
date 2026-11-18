@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamNurgleSkParity16Home">
+
+	<coach>Home</coach>
+	<name>Nurgle Parity16 Home</name>
+	<race>Nurgle</race>
+	<rosterId>nurgle_sk.bb2016</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>2</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamNurgleSkParity16Home1">
+		<name>Rotter 1</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList>
+			<skill>Disturbing Presence</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamNurgleSkParity16Home2">
+		<name>Pestigor 2</name>
+		<gender>male</gender>
+		<positionId>nurgle.pestigor</positionId>
+		<skillList>
+			<skill>Prehensile Tail</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamNurgleSkParity16Home3">
+		<name>Nurgle Warrior 3</name>
+		<gender>male</gender>
+		<positionId>nurgle.warrior</positionId>
+		<skillList>
+			<skill>Very Long Legs</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamNurgleSkParity16Home4">
+		<name>Beast of Nurgle 4</name>
+		<gender>male</gender>
+		<positionId>nurgle.beast</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamNurgleSkParity16Home5">
+		<name>Rotter 5</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList>
+			<skill>Two Heads</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamNurgleSkParity16Home6">
+		<name>Nurgle Warrior 6</name>
+		<gender>male</gender>
+		<positionId>nurgle.warrior</positionId>
+		<skillList>
+			<skill>Claw</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamNurgleSkParity16Home7">
+		<name>Rotter 7</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamNurgleSkParity16Home8">
+		<name>Nurgle Warrior 8</name>
+		<gender>male</gender>
+		<positionId>nurgle.warrior</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamNurgleSkParity16Home9">
+		<name>Rotter 9</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamNurgleSkParity16Home10">
+		<name>Nurgle Warrior 10</name>
+		<gender>male</gender>
+		<positionId>nurgle.warrior</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamNurgleSkParity16Home11">
+		<name>Rotter 11</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamNurgleSkParity16Home12">
+		<name>Rotter 12</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamNurgleSkParity16Home13">
+		<name>Rotter 13</name>
+		<gender>male</gender>
+		<positionId>nurgle.rotter</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

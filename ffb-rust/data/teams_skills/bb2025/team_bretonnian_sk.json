@@ -1,0 +1,92 @@
+{
+  "edition": "bb2025",
+  "race": "bretonnian",
+  "roster_id": "bretonnian.lrb6",
+  "rerolls": 3,
+  "reroll_cost": 60000,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 1,
+  "fan_factor": 0,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "bretonnian.squire"
+    },
+    {
+      "nr": 2,
+      "position_id": "bretonnian.knight_catcher",
+      "skills": [
+        "Dodge"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 3,
+      "position_id": "bretonnian.knight_thrower",
+      "skills": [
+        "Hail Mary Pass"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 4,
+      "position_id": "bretonnian.grail_knight"
+    },
+    {
+      "nr": 5,
+      "position_id": "bretonnian.squire"
+    },
+    {
+      "nr": 6,
+      "position_id": "bretonnian.knight_catcher",
+      "skills": [
+        "Diving Catch"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 7,
+      "position_id": "bretonnian.knight_thrower",
+      "skills": [
+        "Cannoneer"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 8,
+      "position_id": "bretonnian.grail_knight"
+    },
+    {
+      "nr": 9,
+      "position_id": "bretonnian.squire"
+    },
+    {
+      "nr": 10,
+      "position_id": "bretonnian.squire"
+    },
+    {
+      "nr": 11,
+      "position_id": "bretonnian.squire"
+    },
+    {
+      "nr": 12,
+      "position_id": "bretonnian.squire"
+    },
+    {
+      "nr": 13,
+      "position_id": "bretonnian.squire"
+    }
+  ],
+  "special_rules": [],
+  "skilled_from": "bretonnian",
+  "skill_points": {
+    "tier_assumed": 1,
+    "spent": 4,
+    "secondary": 0
+  }
+}

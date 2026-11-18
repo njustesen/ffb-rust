@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamKhemriSkParity16Home">
+
+	<coach>Home</coach>
+	<name>Khemri Parity16 Home</name>
+	<race>Khemri</race>
+	<rosterId>khemri_sk.bb2016</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>1</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamKhemriSkParity16Home1">
+		<name>Tomb Guardian 1</name>
+		<gender>male</gender>
+		<positionId>khemri.tombguardian</positionId>
+		<skillList>
+			<skill>Multiple Block</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamKhemriSkParity16Home2">
+		<name>Blitz-Ra 2</name>
+		<gender>male</gender>
+		<positionId>khemri.blitzra</positionId>
+		<skillList>
+			<skill>Kick-Off Return</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamKhemriSkParity16Home3">
+		<name>Thro-Ra 3</name>
+		<gender>male</gender>
+		<positionId>khemri.throra</positionId>
+		<skillList>
+			<skill>Nerves of Steel</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamKhemriSkParity16Home4">
+		<name>Skeleton 4</name>
+		<gender>male</gender>
+		<positionId>khemri.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamKhemriSkParity16Home5">
+		<name>Tomb Guardian 5</name>
+		<gender>male</gender>
+		<positionId>khemri.tombguardian</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamKhemriSkParity16Home6">
+		<name>Blitz-Ra 6</name>
+		<gender>male</gender>
+		<positionId>khemri.blitzra</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamKhemriSkParity16Home7">
+		<name>Thro-Ra 7</name>
+		<gender>male</gender>
+		<positionId>khemri.throra</positionId>
+		<skillList>
+			<skill>Safe Throw</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamKhemriSkParity16Home8">
+		<name>Skeleton 8</name>
+		<gender>male</gender>
+		<positionId>khemri.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamKhemriSkParity16Home9">
+		<name>Tomb Guardian 9</name>
+		<gender>male</gender>
+		<positionId>khemri.tombguardian</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamKhemriSkParity16Home10">
+		<name>Skeleton 10</name>
+		<gender>male</gender>
+		<positionId>khemri.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamKhemriSkParity16Home11">
+		<name>Tomb Guardian 11</name>
+		<gender>male</gender>
+		<positionId>khemri.tombguardian</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamKhemriSkParity16Home12">
+		<name>Skeleton 12</name>
+		<gender>male</gender>
+		<positionId>khemri.skeleton</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

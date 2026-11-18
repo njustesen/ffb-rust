@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamChaosTrollSkParity25Home">
+
+	<coach>Home</coach>
+	<name>Chaos Parity25 Home</name>
+	<race>Chaos</race>
+	<rosterId>chaos_troll_sk.bb2025</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>1</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules>
+		<rule>Favoured of Chaos Undivided</rule>
+	</specialRules>
+
+	<player nr="1" id="teamChaosTrollSkParity25Home1">
+		<name>Beastman Lineman 1</name>
+		<gender>male</gender>
+		<positionId>chaos.beastman</positionId>
+		<skillList>
+			<skill>Disturbing Presence</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamChaosTrollSkParity25Home2">
+		<name>Chaos Chosen 2</name>
+		<gender>male</gender>
+		<positionId>chaos.warrior</positionId>
+		<skillList>
+			<skill>Block</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamChaosTrollSkParity25Home3">
+		<name>Troll 3</name>
+		<gender>male</gender>
+		<positionId>chaos.troll</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamChaosTrollSkParity25Home4">
+		<name>Beastman Lineman 4</name>
+		<gender>male</gender>
+		<positionId>chaos.beastman</positionId>
+		<skillList>
+			<skill>Kick</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamChaosTrollSkParity25Home5">
+		<name>Chaos Chosen 5</name>
+		<gender>male</gender>
+		<positionId>chaos.warrior</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamChaosTrollSkParity25Home6">
+		<name>Beastman Lineman 6</name>
+		<gender>male</gender>
+		<positionId>chaos.beastman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamChaosTrollSkParity25Home7">
+		<name>Chaos Chosen 7</name>
+		<gender>male</gender>
+		<positionId>chaos.warrior</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamChaosTrollSkParity25Home8">
+		<name>Beastman Lineman 8</name>
+		<gender>male</gender>
+		<positionId>chaos.beastman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamChaosTrollSkParity25Home9">
+		<name>Chaos Chosen 9</name>
+		<gender>male</gender>
+		<positionId>chaos.warrior</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamChaosTrollSkParity25Home10">
+		<name>Beastman Lineman 10</name>
+		<gender>male</gender>
+		<positionId>chaos.beastman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamChaosTrollSkParity25Home11">
+		<name>Beastman Lineman 11</name>
+		<gender>male</gender>
+		<positionId>chaos.beastman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamChaosTrollSkParity25Home12">
+		<name>Beastman Lineman 12</name>
+		<gender>male</gender>
+		<positionId>chaos.beastman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

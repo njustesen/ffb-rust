@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamElfSkParity20Home">
+
+	<coach>Home</coach>
+	<name>Elf Parity20 Home</name>
+	<race>Elf</race>
+	<rosterId>elf_sk.bb2020</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>1</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1090000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamElfSkParity20Home1">
+		<name>Lineman 1</name>
+		<gender>male</gender>
+		<positionId>elf.lineman</positionId>
+		<skillList>
+			<skill>Sure Hands</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamElfSkParity20Home2">
+		<name>Thrower 2</name>
+		<gender>male</gender>
+		<positionId>elf.thrower</positionId>
+		<skillList>
+			<skill>Cloud Burster</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamElfSkParity20Home3">
+		<name>Catcher 3</name>
+		<gender>male</gender>
+		<positionId>elf.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamElfSkParity20Home4">
+		<name>Blitzer 4</name>
+		<gender>male</gender>
+		<positionId>elf.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamElfSkParity20Home5">
+		<name>Lineman 5</name>
+		<gender>male</gender>
+		<positionId>elf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamElfSkParity20Home6">
+		<name>Thrower 6</name>
+		<gender>male</gender>
+		<positionId>elf.thrower</positionId>
+		<skillList>
+			<skill>Dump-Off</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamElfSkParity20Home7">
+		<name>Catcher 7</name>
+		<gender>male</gender>
+		<positionId>elf.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamElfSkParity20Home8">
+		<name>Blitzer 8</name>
+		<gender>male</gender>
+		<positionId>elf.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamElfSkParity20Home9">
+		<name>Lineman 9</name>
+		<gender>male</gender>
+		<positionId>elf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamElfSkParity20Home10">
+		<name>Lineman 10</name>
+		<gender>male</gender>
+		<positionId>elf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamElfSkParity20Home11">
+		<name>Lineman 11</name>
+		<gender>male</gender>
+		<positionId>elf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamElfSkParity20Home12">
+		<name>Lineman 12</name>
+		<gender>male</gender>
+		<positionId>elf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamOgreSkParity16Away">
+
+	<coach>Away</coach>
+	<name>Ogre Parity16 Away</name>
+	<race>Ogre</race>
+	<rosterId>ogre_sk.bb2016</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamOgreSkParity16Away1">
+		<name>Snotling 1</name>
+		<gender>male</gender>
+		<positionId>ogre.snotling</positionId>
+		<skillList>
+			<skill>Sneaky Git</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamOgreSkParity16Away2">
+		<name>Ogre 2</name>
+		<gender>male</gender>
+		<positionId>ogre.ogre</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamOgreSkParity16Away3">
+		<name>Snotling 3</name>
+		<gender>male</gender>
+		<positionId>ogre.snotling</positionId>
+		<skillList>
+			<skill>Diving Catch</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamOgreSkParity16Away4">
+		<name>Ogre 4</name>
+		<gender>male</gender>
+		<positionId>ogre.ogre</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamOgreSkParity16Away5">
+		<name>Snotling 5</name>
+		<gender>male</gender>
+		<positionId>ogre.snotling</positionId>
+		<skillList>
+			<skill>Leap</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamOgreSkParity16Away6">
+		<name>Ogre 6</name>
+		<gender>male</gender>
+		<positionId>ogre.ogre</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamOgreSkParity16Away7">
+		<name>Snotling 7</name>
+		<gender>male</gender>
+		<positionId>ogre.snotling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamOgreSkParity16Away8">
+		<name>Ogre 8</name>
+		<gender>male</gender>
+		<positionId>ogre.ogre</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamOgreSkParity16Away9">
+		<name>Snotling 9</name>
+		<gender>male</gender>
+		<positionId>ogre.snotling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamOgreSkParity16Away10">
+		<name>Ogre 10</name>
+		<gender>male</gender>
+		<positionId>ogre.ogre</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamOgreSkParity16Away11">
+		<name>Snotling 11</name>
+		<gender>male</gender>
+		<positionId>ogre.snotling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamOgreSkParity16Away12">
+		<name>Snotling 12</name>
+		<gender>male</gender>
+		<positionId>ogre.snotling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

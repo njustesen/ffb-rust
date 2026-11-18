@@ -1,0 +1,100 @@
+{
+  "edition": "bb2020",
+  "race": "underworld",
+  "roster_id": "underworld.lrb6",
+  "rerolls": 3,
+  "reroll_cost": 70000,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 0,
+  "fan_factor": 0,
+  "treasury": 5000,
+  "spent": 1095000,
+  "team_value": 1095000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "underworld.goblin",
+      "skills": [
+        "Monstrous Mouth"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 2,
+      "position_id": "37844.underworldsnotling",
+      "skills": [
+        "Extra Arms"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 3,
+      "position_id": "37844.skavenclanrat",
+      "skills": [
+        "Prehensile Tail"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 4,
+      "position_id": "underworld.skaven.thrower"
+    },
+    {
+      "nr": 5,
+      "position_id": "37844.gutterrunner"
+    },
+    {
+      "nr": 6,
+      "position_id": "underworld.skaven.blitzer"
+    },
+    {
+      "nr": 7,
+      "position_id": "37844.underworldtroll"
+    },
+    {
+      "nr": 8,
+      "position_id": "underworld.goblin"
+    },
+    {
+      "nr": 9,
+      "position_id": "37844.underworldsnotling"
+    },
+    {
+      "nr": 10,
+      "position_id": "37844.skavenclanrat"
+    },
+    {
+      "nr": 11,
+      "position_id": "underworld.goblin"
+    },
+    {
+      "nr": 12,
+      "position_id": "37844.skavenclanrat"
+    },
+    {
+      "nr": 13,
+      "position_id": "underworld.goblin"
+    },
+    {
+      "nr": 14,
+      "position_id": "underworld.goblin"
+    },
+    {
+      "nr": 15,
+      "position_id": "underworld.goblin"
+    },
+    {
+      "nr": 16,
+      "position_id": "underworld.goblin"
+    }
+  ],
+  "special_rules": [],
+  "skilled_from": "underworld_underworldtroll",
+  "skill_points": {
+    "tier_assumed": 1,
+    "spent": 3,
+    "secondary": 0
+  }
+}

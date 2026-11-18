@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamLizardmanSkParity16Home">
+
+	<coach>Home</coach>
+	<name>Lizardman Parity16 Home</name>
+	<race>Lizardman</race>
+	<rosterId>lizardman_sk.bb2016</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>1</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamLizardmanSkParity16Home1">
+		<name>Kroxigor 1</name>
+		<gender>male</gender>
+		<positionId>lizardman.kroxigor</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamLizardmanSkParity16Home2">
+		<name>Saurus 2</name>
+		<gender>male</gender>
+		<positionId>lizardman.saurus</positionId>
+		<skillList>
+			<skill>Pro</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamLizardmanSkParity16Home3">
+		<name>Skink 3</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList>
+			<skill>Side Step</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamLizardmanSkParity16Home4">
+		<name>Saurus 4</name>
+		<gender>male</gender>
+		<positionId>lizardman.saurus</positionId>
+		<skillList>
+			<skill>Kick-Off Return</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamLizardmanSkParity16Home5">
+		<name>Skink 5</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamLizardmanSkParity16Home6">
+		<name>Saurus 6</name>
+		<gender>male</gender>
+		<positionId>lizardman.saurus</positionId>
+		<skillList>
+			<skill>Strip Ball</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamLizardmanSkParity16Home7">
+		<name>Skink 7</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamLizardmanSkParity16Home8">
+		<name>Saurus 8</name>
+		<gender>male</gender>
+		<positionId>lizardman.saurus</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamLizardmanSkParity16Home9">
+		<name>Skink 9</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamLizardmanSkParity16Home10">
+		<name>Saurus 10</name>
+		<gender>male</gender>
+		<positionId>lizardman.saurus</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamLizardmanSkParity16Home11">
+		<name>Skink 11</name>
+		<gender>male</gender>
+		<positionId>lizardman.skink</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamLizardmanSkParity16Home12">
+		<name>Saurus 12</name>
+		<gender>male</gender>
+		<positionId>lizardman.saurus</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

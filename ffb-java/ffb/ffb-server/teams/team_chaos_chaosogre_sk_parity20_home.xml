@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamChaosChaosogreSkParity20Home">
+
+	<coach>Home</coach>
+	<name>Chaos Parity20 Home</name>
+	<race>Chaos</race>
+	<rosterId>chaos_chaosogre_sk.bb2020</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>1</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1090000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamChaosChaosogreSkParity20Home1">
+		<name>Beastman Runner Lineman 1</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList>
+			<skill>Claws</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamChaosChaosogreSkParity20Home2">
+		<name>Chosen Blocker 2</name>
+		<gender>male</gender>
+		<positionId>chaos.chosenblocker</positionId>
+		<skillList>
+			<skill>Tentacles</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamChaosChaosogreSkParity20Home3">
+		<name>Chaos Ogre 3</name>
+		<gender>male</gender>
+		<positionId>chaos.chaosogre</positionId>
+		<skillList>
+			<skill>Monstrous Mouth</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamChaosChaosogreSkParity20Home4">
+		<name>Beastman Runner Lineman 4</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList>
+			<skill>Extra Arms</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamChaosChaosogreSkParity20Home5">
+		<name>Chosen Blocker 5</name>
+		<gender>male</gender>
+		<positionId>chaos.chosenblocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamChaosChaosogreSkParity20Home6">
+		<name>Beastman Runner Lineman 6</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamChaosChaosogreSkParity20Home7">
+		<name>Chosen Blocker 7</name>
+		<gender>male</gender>
+		<positionId>chaos.chosenblocker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamChaosChaosogreSkParity20Home8">
+		<name>Beastman Runner Lineman 8</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamChaosChaosogreSkParity20Home9">
+		<name>Beastman Runner Lineman 9</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamChaosChaosogreSkParity20Home10">
+		<name>Beastman Runner Lineman 10</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamChaosChaosogreSkParity20Home11">
+		<name>Beastman Runner Lineman 11</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamChaosChaosogreSkParity20Home12">
+		<name>Beastman Runner Lineman 12</name>
+		<gender>male</gender>
+		<positionId>chaos.beastmanrunnerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

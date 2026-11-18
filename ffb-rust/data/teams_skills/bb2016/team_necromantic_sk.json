@@ -1,0 +1,92 @@
+{
+  "edition": "bb2016",
+  "race": "necromantic",
+  "roster_id": "necromantic.lrb6",
+  "rerolls": 2,
+  "reroll_cost": 70000,
+  "apothecaries": 0,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 0,
+  "fan_factor": 1,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "necromantic.werewolf",
+      "skills": [
+        "Diving Catch"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 2,
+      "position_id": "necromantic.fleshgolem",
+      "skills": [
+        "Shadowing"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 3,
+      "position_id": "necromantic.wight",
+      "skills": [
+        "Pass Block"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 4,
+      "position_id": "necromantic.ghoul",
+      "skills": [
+        "Pro"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 5,
+      "position_id": "necromantic.zombie"
+    },
+    {
+      "nr": 6,
+      "position_id": "necromantic.werewolf"
+    },
+    {
+      "nr": 7,
+      "position_id": "necromantic.fleshgolem"
+    },
+    {
+      "nr": 8,
+      "position_id": "necromantic.wight"
+    },
+    {
+      "nr": 9,
+      "position_id": "necromantic.zombie"
+    },
+    {
+      "nr": 10,
+      "position_id": "necromantic.zombie"
+    },
+    {
+      "nr": 11,
+      "position_id": "necromantic.zombie"
+    },
+    {
+      "nr": 12,
+      "position_id": "necromantic.zombie"
+    },
+    {
+      "nr": 13,
+      "position_id": "necromantic.zombie"
+    }
+  ],
+  "special_rules": [],
+  "skilled_from": "necromantic",
+  "skill_points": {
+    "tier_assumed": 1,
+    "spent": 4,
+    "secondary": 0
+  }
+}

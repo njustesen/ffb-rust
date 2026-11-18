@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamGoblinSkParity20Home">
+
+	<coach>Home</coach>
+	<name>Goblin Parity20 Home</name>
+	<race>Goblin</race>
+	<rosterId>goblin_sk.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1095000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>5000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamGoblinSkParity20Home1">
+		<name>Goblin Lineman 1</name>
+		<gender>male</gender>
+		<positionId>goblin.goblin</positionId>
+		<skillList>
+			<skill>Side Step</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamGoblinSkParity20Home2">
+		<name>Bomma 2</name>
+		<gender>male</gender>
+		<positionId>goblin.bomma</positionId>
+		<skillList>
+			<skill>Running Pass</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamGoblinSkParity20Home3">
+		<name>Looney 3</name>
+		<gender>male</gender>
+		<positionId>goblin.looney</positionId>
+		<skillList>
+			<skill>Diving Catch</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamGoblinSkParity20Home4">
+		<name>Fanatic 4</name>
+		<gender>male</gender>
+		<positionId>goblin.fanatic</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamGoblinSkParity20Home5">
+		<name>Pogoer 5</name>
+		<gender>male</gender>
+		<positionId>goblin.pogoer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamGoblinSkParity20Home6">
+		<name>'Ooligan 6</name>
+		<gender>male</gender>
+		<positionId>goblin.ooligan</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamGoblinSkParity20Home7">
+		<name>Doom Diver 7</name>
+		<gender>male</gender>
+		<positionId>goblin.doomdiver</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamGoblinSkParity20Home8">
+		<name>Trained Troll 8</name>
+		<gender>male</gender>
+		<positionId>goblin.troll</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamGoblinSkParity20Home9">
+		<name>Goblin Lineman 9</name>
+		<gender>male</gender>
+		<positionId>goblin.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamGoblinSkParity20Home10">
+		<name>Trained Troll 10</name>
+		<gender>male</gender>
+		<positionId>goblin.troll</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamGoblinSkParity20Home11">
+		<name>Goblin Lineman 11</name>
+		<gender>male</gender>
+		<positionId>goblin.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamGoblinSkParity20Home12">
+		<name>Goblin Lineman 12</name>
+		<gender>male</gender>
+		<positionId>goblin.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamGoblinSkParity20Home13">
+		<name>Goblin Lineman 13</name>
+		<gender>male</gender>
+		<positionId>goblin.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="14" id="teamGoblinSkParity20Home14">
+		<name>Goblin Lineman 14</name>
+		<gender>male</gender>
+		<positionId>goblin.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="15" id="teamGoblinSkParity20Home15">
+		<name>Goblin Lineman 15</name>
+		<gender>male</gender>
+		<positionId>goblin.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamBretonnianSkParity25Away">
+
+	<coach>Away</coach>
+	<name>Bretonnian Parity25 Away</name>
+	<race>Bretonnian</race>
+	<rosterId>bretonnian_sk.bb2025</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>1</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamBretonnianSkParity25Away1">
+		<name>Bretonnian Squire 1</name>
+		<gender>male</gender>
+		<positionId>bretonnian.squire</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamBretonnianSkParity25Away2">
+		<name>Bretonnian Knight Catcher 2</name>
+		<gender>male</gender>
+		<positionId>bretonnian.knight_catcher</positionId>
+		<skillList>
+			<skill>Dodge</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamBretonnianSkParity25Away3">
+		<name>Bretonnian Knight Thrower 3</name>
+		<gender>male</gender>
+		<positionId>bretonnian.knight_thrower</positionId>
+		<skillList>
+			<skill>Hail Mary Pass</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamBretonnianSkParity25Away4">
+		<name>Grail Knight 4</name>
+		<gender>male</gender>
+		<positionId>bretonnian.grail_knight</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamBretonnianSkParity25Away5">
+		<name>Bretonnian Squire 5</name>
+		<gender>male</gender>
+		<positionId>bretonnian.squire</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamBretonnianSkParity25Away6">
+		<name>Bretonnian Knight Catcher 6</name>
+		<gender>male</gender>
+		<positionId>bretonnian.knight_catcher</positionId>
+		<skillList>
+			<skill>Diving Catch</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamBretonnianSkParity25Away7">
+		<name>Bretonnian Knight Thrower 7</name>
+		<gender>male</gender>
+		<positionId>bretonnian.knight_thrower</positionId>
+		<skillList>
+			<skill>Cannoneer</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamBretonnianSkParity25Away8">
+		<name>Grail Knight 8</name>
+		<gender>male</gender>
+		<positionId>bretonnian.grail_knight</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamBretonnianSkParity25Away9">
+		<name>Bretonnian Squire 9</name>
+		<gender>male</gender>
+		<positionId>bretonnian.squire</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamBretonnianSkParity25Away10">
+		<name>Bretonnian Squire 10</name>
+		<gender>male</gender>
+		<positionId>bretonnian.squire</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamBretonnianSkParity25Away11">
+		<name>Bretonnian Squire 11</name>
+		<gender>male</gender>
+		<positionId>bretonnian.squire</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamBretonnianSkParity25Away12">
+		<name>Bretonnian Squire 12</name>
+		<gender>male</gender>
+		<positionId>bretonnian.squire</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamBretonnianSkParity25Away13">
+		<name>Bretonnian Squire 13</name>
+		<gender>male</gender>
+		<positionId>bretonnian.squire</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

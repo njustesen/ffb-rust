@@ -163,7 +163,16 @@ def team_xml(team: dict, roster: dict, roster_id: str, side: str, suffix: str,
         L.append(f"\t\t<name>{escape(pname)} {pl['nr']}</name>")
         L.append("\t\t<gender>male</gender>")
         L.append(f"\t\t<positionId>{escape(pl['position_id'])}</positionId>")
-        L.append("\t\t<skillList/>")
+        # BACKLOG §M phase 2: a skilled squad (data/teams_skills) carries advancement skills per
+        # player. Java's RosterPlayer reads them into its skill list (with the `value`
+        # attribute), then adds the position's own skills; Rust loads them as `extra_skills`.
+        if pl.get("skills"):
+            L.append("\t\t<skillList>")
+            for s in pl["skills"]:
+                L.append(f"\t\t\t{skill_xml(s)}")
+            L.append("\t\t</skillList>")
+        else:
+            L.append("\t\t<skillList/>")
         L.append('\t\t<playerStatistics currentSpps="0"/>')
         L.append("\t</player>")
     L.append("</team>")
@@ -186,8 +195,12 @@ def main() -> int:
         path.write_text(content, encoding="utf-8")
         wrote += 1
 
+    # data/teams_skills holds the §M phase-2 SKILLED variants (scripts/draft_skill_squads.py),
+    # kept out of data/teams so the certified mirror/cross/star sweeps never pick them up.
     for edition, suffix in EDITIONS.items():
-        for tf in sorted((ROOT / "data" / "teams" / edition).glob("team_*.json")):
+        team_files = sorted((ROOT / "data" / "teams" / edition).glob("team_*.json")) \
+            + sorted((ROOT / "data" / "teams_skills" / edition).glob("team_*.json"))
+        for tf in team_files:
             race = tf.stem.replace("team_", "")
             team = json.loads(tf.read_text(encoding="utf-8"))
             # A squad normally shares its name with its roster file. R3 VARIANTS

@@ -370,6 +370,23 @@ public class ParityRunner {
         out.println(String.format(
             "{\"i\":0,\"type\":\"game_start\",\"home\":\"%s\",\"away\":\"%s\",\"seed\":%d,\"state_hash\":\"%s\"}",
             escJson(homeTeamId), escJson(awayTeamId), seed, initialHash));
+        // BACKLOG §M phase 2: the state hash carries no skill lists, so a skill one engine failed
+        // to load would stay invisible until it mattered. FFB_SKILL_DUMP prints every player's
+        // skills (side, shirt nr, sorted class names); Rust's RSKILLS line is the twin to diff.
+        if (System.getenv("FFB_SKILL_DUMP") != null) {
+            for (boolean home : new boolean[] {true, false}) {
+                com.fumbbl.ffb.model.Team t = home ? game.getTeamHome() : game.getTeamAway();
+                for (com.fumbbl.ffb.model.Player<?> p : t.getPlayers()) {
+                    java.util.List<String> names = new java.util.ArrayList<>();
+                    for (com.fumbbl.ffb.model.skill.Skill s : p.getSkills()) {
+                        names.add(s.getClass().getSimpleName());
+                    }
+                    java.util.Collections.sort(names);
+                    System.err.println("JSKILLS " + (home ? "home" : "away") + " " + p.getNr() + " "
+                        + String.join(",", names));
+                }
+            }
+        }
 
         MatchRunner.injectForTeam(gameState, new ClientCommandStartGame(), true);
         MatchRunner.injectForTeam(gameState, new ClientCommandStartGame(), false);

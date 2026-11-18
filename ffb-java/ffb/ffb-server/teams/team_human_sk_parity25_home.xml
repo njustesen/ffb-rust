@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamHumanSkParity25Home">
+
+	<coach>Home</coach>
+	<name>Human Parity25 Home</name>
+	<race>Human</race>
+	<rosterId>human_sk.bb2025</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1090000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamHumanSkParity25Home1">
+		<name>Human Lineman 1</name>
+		<gender>male</gender>
+		<positionId>human.lineman</positionId>
+		<skillList>
+			<skill>Frenzy</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamHumanSkParity25Home2">
+		<name>Halfling Hopeful 2</name>
+		<gender>male</gender>
+		<positionId>human.halfling_hopeful</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamHumanSkParity25Home3">
+		<name>Human Catcher 3</name>
+		<gender>male</gender>
+		<positionId>human.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamHumanSkParity25Home4">
+		<name>Human Thrower 4</name>
+		<gender>male</gender>
+		<positionId>human.thrower</positionId>
+		<skillList>
+			<skill>Nerves of Steel</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamHumanSkParity25Home5">
+		<name>Human Blitzer 5</name>
+		<gender>male</gender>
+		<positionId>human.blitzer</positionId>
+		<skillList>
+			<skill>Grab</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamHumanSkParity25Home6">
+		<name>Ogre 6</name>
+		<gender>male</gender>
+		<positionId>human.ogre</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamHumanSkParity25Home7">
+		<name>Human Lineman 7</name>
+		<gender>male</gender>
+		<positionId>human.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamHumanSkParity25Home8">
+		<name>Human Catcher 8</name>
+		<gender>male</gender>
+		<positionId>human.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamHumanSkParity25Home9">
+		<name>Human Thrower 9</name>
+		<gender>male</gender>
+		<positionId>human.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamHumanSkParity25Home10">
+		<name>Human Blitzer 10</name>
+		<gender>male</gender>
+		<positionId>human.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamHumanSkParity25Home11">
+		<name>Human Lineman 11</name>
+		<gender>male</gender>
+		<positionId>human.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamHumanSkParity25Home12">
+		<name>Human Lineman 12</name>
+		<gender>male</gender>
+		<positionId>human.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamHumanSkParity25Home13">
+		<name>Human Lineman 13</name>
+		<gender>male</gender>
+		<positionId>human.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

@@ -1,0 +1,80 @@
+{
+  "edition": "bb2016",
+  "race": "slann_fumbbl",
+  "roster_id": "744258",
+  "rerolls": 3,
+  "reroll_cost": 50000,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 0,
+  "fan_factor": 0,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "2995",
+      "skills": [
+        "Strong Arm"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 2,
+      "position_id": "2994",
+      "skills": [
+        "Sprint"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 3,
+      "position_id": "2996",
+      "skills": [
+        "Juggernaut"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 4,
+      "position_id": "2993"
+    },
+    {
+      "nr": 5,
+      "position_id": "2995"
+    },
+    {
+      "nr": 6,
+      "position_id": "2994"
+    },
+    {
+      "nr": 7,
+      "position_id": "2993"
+    },
+    {
+      "nr": 8,
+      "position_id": "2994"
+    },
+    {
+      "nr": 9,
+      "position_id": "2993"
+    },
+    {
+      "nr": 10,
+      "position_id": "2993"
+    },
+    {
+      "nr": 11,
+      "position_id": "2993"
+    }
+  ],
+  "special_rules": [],
+  "skilled_from": "slann_fumbbl",
+  "skill_points": {
+    "tier_assumed": 1,
+    "spent": 3,
+    "secondary": 0
+  }
+}

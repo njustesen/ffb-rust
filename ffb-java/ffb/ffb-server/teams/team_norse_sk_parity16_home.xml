@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamNorseSkParity16Home">
+
+	<coach>Home</coach>
+	<name>Norse Parity16 Home</name>
+	<race>Norse</race>
+	<rosterId>norse_sk.bb2016</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamNorseSkParity16Home1">
+		<name>Lineman 1</name>
+		<gender>male</gender>
+		<positionId>norse.lineman</positionId>
+		<skillList>
+			<skill>Sure Hands</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamNorseSkParity16Home2">
+		<name>Thrower 2</name>
+		<gender>male</gender>
+		<positionId>norse.thrower</positionId>
+		<skillList>
+			<skill>Strip Ball</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamNorseSkParity16Home3">
+		<name>Runner 3</name>
+		<gender>male</gender>
+		<positionId>norse.runner</positionId>
+		<skillList>
+			<skill>Jump Up</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamNorseSkParity16Home4">
+		<name>Berserker 4</name>
+		<gender>male</gender>
+		<positionId>norse.berserker</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamNorseSkParity16Home5">
+		<name>Ulfwerener 5</name>
+		<gender>male</gender>
+		<positionId>norse.ulfwerener</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamNorseSkParity16Home6">
+		<name>Snow Troll 6</name>
+		<gender>male</gender>
+		<positionId>norse.troll.snow</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamNorseSkParity16Home7">
+		<name>Lineman 7</name>
+		<gender>male</gender>
+		<positionId>norse.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamNorseSkParity16Home8">
+		<name>Thrower 8</name>
+		<gender>male</gender>
+		<positionId>norse.thrower</positionId>
+		<skillList>
+			<skill>Leader</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamNorseSkParity16Home9">
+		<name>Ulfwerener 9</name>
+		<gender>male</gender>
+		<positionId>norse.ulfwerener</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamNorseSkParity16Home10">
+		<name>Lineman 10</name>
+		<gender>male</gender>
+		<positionId>norse.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamNorseSkParity16Home11">
+		<name>Lineman 11</name>
+		<gender>male</gender>
+		<positionId>norse.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamNorseSkParity16Home12">
+		<name>Lineman 12</name>
+		<gender>male</gender>
+		<positionId>norse.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

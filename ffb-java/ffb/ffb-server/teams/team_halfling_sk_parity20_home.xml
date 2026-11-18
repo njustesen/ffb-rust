@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamHalflingSkParity20Home">
+
+	<coach>Home</coach>
+	<name>Halfling Parity20 Home</name>
+	<race>Halfling</race>
+	<rosterId>halfling_sk.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>6</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>6</assistantCoaches>
+	<currentTeamValue>1040000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamHalflingSkParity20Home1">
+		<name>Halfling Hopeful Lineman 1</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList>
+			<skill>Safe Pair Of Hands</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamHalflingSkParity20Home2">
+		<name>Halfling Hefty 2</name>
+		<gender>male</gender>
+		<positionId>halfling.halflinghefty</positionId>
+		<skillList>
+			<skill>Accurate</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamHalflingSkParity20Home3">
+		<name>Halfling Catcher 3</name>
+		<gender>male</gender>
+		<positionId>halfling.halflingcatcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamHalflingSkParity20Home4">
+		<name>Altern Forest Treeman 4</name>
+		<gender>male</gender>
+		<positionId>halfling.treeman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamHalflingSkParity20Home5">
+		<name>Halfling Hopeful Lineman 5</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamHalflingSkParity20Home6">
+		<name>Halfling Hefty 6</name>
+		<gender>male</gender>
+		<positionId>halfling.halflinghefty</positionId>
+		<skillList>
+			<skill>Safe Pass</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamHalflingSkParity20Home7">
+		<name>Halfling Catcher 7</name>
+		<gender>male</gender>
+		<positionId>halfling.halflingcatcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamHalflingSkParity20Home8">
+		<name>Altern Forest Treeman 8</name>
+		<gender>male</gender>
+		<positionId>halfling.treeman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamHalflingSkParity20Home9">
+		<name>Halfling Hopeful Lineman 9</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamHalflingSkParity20Home10">
+		<name>Halfling Hopeful Lineman 10</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamHalflingSkParity20Home11">
+		<name>Halfling Hopeful Lineman 11</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamHalflingSkParity20Home12">
+		<name>Halfling Hopeful Lineman 12</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamHalflingSkParity20Home13">
+		<name>Halfling Hopeful Lineman 13</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="14" id="teamHalflingSkParity20Home14">
+		<name>Halfling Hopeful Lineman 14</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="15" id="teamHalflingSkParity20Home15">
+		<name>Halfling Hopeful Lineman 15</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="16" id="teamHalflingSkParity20Home16">
+		<name>Halfling Hopeful Lineman 16</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamAmazonSkParity16Home">
+
+	<coach>Home</coach>
+	<name>Amazon Parity16 Home</name>
+	<race>Amazon</race>
+	<rosterId>amazon_sk.bb2016</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>1</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamAmazonSkParity16Home1">
+		<name>Blitzer 1</name>
+		<gender>male</gender>
+		<positionId>amazon.blitzer</positionId>
+		<skillList>
+			<skill>Multiple Block</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamAmazonSkParity16Home2">
+		<name>Catcher 2</name>
+		<gender>male</gender>
+		<positionId>amazon.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamAmazonSkParity16Home3">
+		<name>Thrower 3</name>
+		<gender>male</gender>
+		<positionId>amazon.thrower</positionId>
+		<skillList>
+			<skill>Dump-Off</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamAmazonSkParity16Home4">
+		<name>Linewoman 4</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamAmazonSkParity16Home5">
+		<name>Blitzer 5</name>
+		<gender>male</gender>
+		<positionId>amazon.blitzer</positionId>
+		<skillList>
+			<skill>Piling On</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamAmazonSkParity16Home6">
+		<name>Catcher 6</name>
+		<gender>male</gender>
+		<positionId>amazon.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamAmazonSkParity16Home7">
+		<name>Thrower 7</name>
+		<gender>male</gender>
+		<positionId>amazon.thrower</positionId>
+		<skillList>
+			<skill>Hail Mary Pass</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamAmazonSkParity16Home8">
+		<name>Linewoman 8</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamAmazonSkParity16Home9">
+		<name>Blitzer 9</name>
+		<gender>male</gender>
+		<positionId>amazon.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamAmazonSkParity16Home10">
+		<name>Linewoman 10</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamAmazonSkParity16Home11">
+		<name>Blitzer 11</name>
+		<gender>male</gender>
+		<positionId>amazon.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamAmazonSkParity16Home12">
+		<name>Linewoman 12</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamAmazonSkParity16Home13">
+		<name>Linewoman 13</name>
+		<gender>male</gender>
+		<positionId>amazon.linewoman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

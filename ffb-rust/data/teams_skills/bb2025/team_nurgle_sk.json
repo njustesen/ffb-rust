@@ -1,0 +1,87 @@
+{
+  "edition": "bb2025",
+  "race": "nurgle",
+  "roster_id": "nurgle.lrb6",
+  "rerolls": 3,
+  "reroll_cost": 60000,
+  "apothecaries": 0,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 1,
+  "fan_factor": 0,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "nurgle.rotter",
+      "skills": [
+        "Foul Appearance"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 2,
+      "position_id": "nurgle.pestigor",
+      "skills": [
+        "Brawler"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 3,
+      "position_id": "nurgle.warrior",
+      "skills": [
+        "Big Hand"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 4,
+      "position_id": "nurgle.beast"
+    },
+    {
+      "nr": 5,
+      "position_id": "nurgle.rotter"
+    },
+    {
+      "nr": 6,
+      "position_id": "nurgle.pestigor"
+    },
+    {
+      "nr": 7,
+      "position_id": "nurgle.warrior"
+    },
+    {
+      "nr": 8,
+      "position_id": "nurgle.rotter"
+    },
+    {
+      "nr": 9,
+      "position_id": "nurgle.warrior"
+    },
+    {
+      "nr": 10,
+      "position_id": "nurgle.rotter"
+    },
+    {
+      "nr": 11,
+      "position_id": "nurgle.warrior"
+    },
+    {
+      "nr": 12,
+      "position_id": "nurgle.rotter"
+    }
+  ],
+  "special_rules": [
+    "Favoured of Nurgle",
+    "Brawlin' Brutes"
+  ],
+  "skilled_from": "nurgle",
+  "skill_points": {
+    "tier_assumed": 1,
+    "spent": 3,
+    "secondary": 0
+  }
+}

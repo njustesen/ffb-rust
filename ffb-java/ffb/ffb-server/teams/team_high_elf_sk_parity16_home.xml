@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamHighElfSkParity16Home">
+
+	<coach>Home</coach>
+	<name>High Elf Parity16 Home</name>
+	<race>High Elf</race>
+	<rosterId>high_elf_sk.bb2016</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>1</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamHighElfSkParity16Home1">
+		<name>Lineman 1</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList>
+			<skill>Frenzy</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamHighElfSkParity16Home2">
+		<name>Thrower 2</name>
+		<gender>male</gender>
+		<positionId>highelf.thrower</positionId>
+		<skillList>
+			<skill>Hail Mary Pass</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamHighElfSkParity16Home3">
+		<name>Blitzer 3</name>
+		<gender>male</gender>
+		<positionId>highelf.blitzer</positionId>
+		<skillList>
+			<skill>Kick</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamHighElfSkParity16Home4">
+		<name>Catcher 4</name>
+		<gender>male</gender>
+		<positionId>highelf.catcher</positionId>
+		<skillList>
+			<skill>Kick-Off Return</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamHighElfSkParity16Home5">
+		<name>Lineman 5</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamHighElfSkParity16Home6">
+		<name>Blitzer 6</name>
+		<gender>male</gender>
+		<positionId>highelf.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamHighElfSkParity16Home7">
+		<name>Catcher 7</name>
+		<gender>male</gender>
+		<positionId>highelf.catcher</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamHighElfSkParity16Home8">
+		<name>Lineman 8</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamHighElfSkParity16Home9">
+		<name>Lineman 9</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamHighElfSkParity16Home10">
+		<name>Lineman 10</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamHighElfSkParity16Home11">
+		<name>Lineman 11</name>
+		<gender>male</gender>
+		<positionId>highelf.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

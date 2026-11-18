@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamChaosPactSkParity20Away">
+
+	<coach>Away</coach>
+	<name>Chaos Pact Parity20 Away</name>
+	<race>Chaos Pact</race>
+	<rosterId>chaos_pact_sk.bb2020</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>1</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1085000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>5000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamChaosPactSkParity20Away1">
+		<name>Renegade Human Lineman 1</name>
+		<gender>male</gender>
+		<positionId>chaospact.renegadehumanlineman</positionId>
+		<skillList>
+			<skill>Extra Arms</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamChaosPactSkParity20Away2">
+		<name>Renegade Human Thrower 2</name>
+		<gender>male</gender>
+		<positionId>chaospact.renegadehumanthrower</positionId>
+		<skillList>
+			<skill>Very Long Legs</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamChaosPactSkParity20Away3">
+		<name>Renegade Goblin 3</name>
+		<gender>male</gender>
+		<positionId>chaospact.renegadegoblin</positionId>
+		<skillList>
+			<skill>Two Heads</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamChaosPactSkParity20Away4">
+		<name>Renegade Orc 4</name>
+		<gender>male</gender>
+		<positionId>chaospact.renegadeorc</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamChaosPactSkParity20Away5">
+		<name>Renegade Skaven 5</name>
+		<gender>male</gender>
+		<positionId>chaospact.renegadeskaven</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamChaosPactSkParity20Away6">
+		<name>Renegade Dark Elf 6</name>
+		<gender>male</gender>
+		<positionId>chaospact.renegadedarkelf</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamChaosPactSkParity20Away7">
+		<name>Renegade Troll 7</name>
+		<gender>male</gender>
+		<positionId>chaospact.renegadetroll</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamChaosPactSkParity20Away8">
+		<name>Renegade Ogre 8</name>
+		<gender>male</gender>
+		<positionId>chaospact.renegadeogre</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamChaosPactSkParity20Away9">
+		<name>Renegade Minotaur 9</name>
+		<gender>male</gender>
+		<positionId>chaospact.minotaur</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamChaosPactSkParity20Away10">
+		<name>Renegade Rat Ogre 10</name>
+		<gender>male</gender>
+		<positionId>chaospact.renegaderatogre</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamChaosPactSkParity20Away11">
+		<name>Renegade Human Lineman 11</name>
+		<gender>male</gender>
+		<positionId>chaospact.renegadehumanlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

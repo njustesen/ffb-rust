@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamNecromanticSkParity25Away">
+
+	<coach>Away</coach>
+	<name>Necromantic Parity25 Away</name>
+	<race>Necromantic</race>
+	<rosterId>necromantic_sk.bb2025</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>0</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1085000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>5000</treasury>
+	<specialRules>
+		<rule>Masters of Undeath</rule>
+	</specialRules>
+
+	<player nr="1" id="teamNecromanticSkParity25Away1">
+		<name>Zombie Lineman 1</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList>
+			<skill>Fumblerooski</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamNecromanticSkParity25Away2">
+		<name>Ghoul Runner 2</name>
+		<gender>male</gender>
+		<positionId>necromantic.ghoul</positionId>
+		<skillList>
+			<skill>Taunt</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamNecromanticSkParity25Away3">
+		<name>Wraith 3</name>
+		<gender>male</gender>
+		<positionId>necromantic.wraith</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamNecromanticSkParity25Away4">
+		<name>Flesh Golem 4</name>
+		<gender>male</gender>
+		<positionId>necromantic.fleshgolem</positionId>
+		<skillList>
+			<skill>Guard</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamNecromanticSkParity25Away5">
+		<name>Werewolf 5</name>
+		<gender>male</gender>
+		<positionId>necromantic.werewolf</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamNecromanticSkParity25Away6">
+		<name>Zombie Lineman 6</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList>
+			<skill>Lethal Flight</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamNecromanticSkParity25Away7">
+		<name>Wraith 7</name>
+		<gender>male</gender>
+		<positionId>necromantic.wraith</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamNecromanticSkParity25Away8">
+		<name>Flesh Golem 8</name>
+		<gender>male</gender>
+		<positionId>necromantic.fleshgolem</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamNecromanticSkParity25Away9">
+		<name>Werewolf 9</name>
+		<gender>male</gender>
+		<positionId>necromantic.werewolf</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamNecromanticSkParity25Away10">
+		<name>Zombie Lineman 10</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamNecromanticSkParity25Away11">
+		<name>Zombie Lineman 11</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamNecromanticSkParity25Away12">
+		<name>Zombie Lineman 12</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamNecromanticSkParity25Away13">
+		<name>Zombie Lineman 13</name>
+		<gender>male</gender>
+		<positionId>necromantic.zombie</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

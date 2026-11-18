@@ -1,0 +1,88 @@
+{
+  "edition": "bb2020",
+  "race": "chaos",
+  "roster_id": "chaos.lrb6",
+  "rerolls": 2,
+  "reroll_cost": 60000,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 1,
+  "fan_factor": 0,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1090000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "chaos.beastmanrunnerlineman",
+      "skills": [
+        "Claws"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 2,
+      "position_id": "chaos.chosenblocker",
+      "skills": [
+        "Tentacles"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 3,
+      "position_id": "chaos.chaosogre",
+      "skills": [
+        "Monstrous Mouth"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 4,
+      "position_id": "chaos.beastmanrunnerlineman",
+      "skills": [
+        "Extra Arms"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 5,
+      "position_id": "chaos.chosenblocker"
+    },
+    {
+      "nr": 6,
+      "position_id": "chaos.beastmanrunnerlineman"
+    },
+    {
+      "nr": 7,
+      "position_id": "chaos.chosenblocker"
+    },
+    {
+      "nr": 8,
+      "position_id": "chaos.beastmanrunnerlineman"
+    },
+    {
+      "nr": 9,
+      "position_id": "chaos.beastmanrunnerlineman"
+    },
+    {
+      "nr": 10,
+      "position_id": "chaos.beastmanrunnerlineman"
+    },
+    {
+      "nr": 11,
+      "position_id": "chaos.beastmanrunnerlineman"
+    },
+    {
+      "nr": 12,
+      "position_id": "chaos.beastmanrunnerlineman"
+    }
+  ],
+  "special_rules": [],
+  "skilled_from": "chaos_chaosogre",
+  "skill_points": {
+    "tier_assumed": 1,
+    "spent": 4,
+    "secondary": 0
+  }
+}

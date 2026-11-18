@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamHalflingSkParity16Away">
+
+	<coach>Away</coach>
+	<name>Halfling Parity16 Away</name>
+	<race>Halfling</race>
+	<rosterId>halfling_sk.bb2016</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>9</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>6</cheerleaders>
+	<assistantCoaches>6</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamHalflingSkParity16Away1">
+		<name>Treeman 1</name>
+		<gender>male</gender>
+		<positionId>halfling.treeman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamHalflingSkParity16Away2">
+		<name>Halfling 2</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList>
+			<skill>Leap</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamHalflingSkParity16Away3">
+		<name>Treeman 3</name>
+		<gender>male</gender>
+		<positionId>halfling.treeman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamHalflingSkParity16Away4">
+		<name>Halfling 4</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList>
+			<skill>Side Step</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamHalflingSkParity16Away5">
+		<name>Halfling 5</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList>
+			<skill>Diving Catch</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamHalflingSkParity16Away6">
+		<name>Halfling 6</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamHalflingSkParity16Away7">
+		<name>Halfling 7</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamHalflingSkParity16Away8">
+		<name>Halfling 8</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamHalflingSkParity16Away9">
+		<name>Halfling 9</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamHalflingSkParity16Away10">
+		<name>Halfling 10</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamHalflingSkParity16Away11">
+		<name>Halfling 11</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamHalflingSkParity16Away12">
+		<name>Halfling 12</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamHalflingSkParity16Away13">
+		<name>Halfling 13</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="14" id="teamHalflingSkParity16Away14">
+		<name>Halfling 14</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="15" id="teamHalflingSkParity16Away15">
+		<name>Halfling 15</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="16" id="teamHalflingSkParity16Away16">
+		<name>Halfling 16</name>
+		<gender>male</gender>
+		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

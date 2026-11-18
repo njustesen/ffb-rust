@@ -1,0 +1,84 @@
+{
+  "edition": "bb2016",
+  "race": "dwarf",
+  "roster_id": "dwarf.lrb6",
+  "rerolls": 3,
+  "reroll_cost": 50000,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 0,
+  "fan_factor": 0,
+  "treasury": 0,
+  "spent": 1100000,
+  "team_value": 1100000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "dwarf.blocker",
+      "skills": [
+        "Dirty Player"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 2,
+      "position_id": "dwarf.blitzer",
+      "skills": [
+        "Grab"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 3,
+      "position_id": "dwarf.runner",
+      "skills": [
+        "Safe Throw"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 4,
+      "position_id": "dwarf.trollslayer",
+      "skills": [
+        "Multiple Block"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 5,
+      "position_id": "dwarf.deathroller"
+    },
+    {
+      "nr": 6,
+      "position_id": "dwarf.blocker"
+    },
+    {
+      "nr": 7,
+      "position_id": "dwarf.blocker"
+    },
+    {
+      "nr": 8,
+      "position_id": "dwarf.blocker"
+    },
+    {
+      "nr": 9,
+      "position_id": "dwarf.blocker"
+    },
+    {
+      "nr": 10,
+      "position_id": "dwarf.blocker"
+    },
+    {
+      "nr": 11,
+      "position_id": "dwarf.blocker"
+    }
+  ],
+  "special_rules": [],
+  "skilled_from": "dwarf",
+  "skill_points": {
+    "tier_assumed": 1,
+    "spent": 4,
+    "secondary": 0
+  }
+}

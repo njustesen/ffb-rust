@@ -343,7 +343,7 @@ pub fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_
     }
 }
 
-fn skill_entry_to_skill_with_value(entry: &SkillEntry) -> Option<SkillWithValue> {
+pub fn skill_entry_to_skill_with_value(entry: &SkillEntry) -> Option<SkillWithValue> {
     let skill_id = SkillId::from_class_name(entry.name())?;
     let value = match entry {
         // A JSON string value must be unwrapped to its inner text — `serde_json::Value::to_string()`

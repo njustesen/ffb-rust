@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamOrcSkParity16Home">
+
+	<coach>Home</coach>
+	<name>Orc Parity16 Home</name>
+	<race>Orc</race>
+	<rosterId>orc_sk.bb2016</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamOrcSkParity16Home1">
+		<name>Troll 1</name>
+		<gender>male</gender>
+		<positionId>orc.troll</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamOrcSkParity16Home2">
+		<name>Orc Blitzer 2</name>
+		<gender>male</gender>
+		<positionId>orc.blitzer</positionId>
+		<skillList>
+			<skill>Tackle</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamOrcSkParity16Home3">
+		<name>Black Orc Blocker 3</name>
+		<gender>male</gender>
+		<positionId>orc.blackorc</positionId>
+		<skillList>
+			<skill>Wrestle</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamOrcSkParity16Home4">
+		<name>Orc Thrower 4</name>
+		<gender>male</gender>
+		<positionId>orc.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamOrcSkParity16Home5">
+		<name>Goblin 5</name>
+		<gender>male</gender>
+		<positionId>orc.goblin</positionId>
+		<skillList>
+			<skill>Sprint</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamOrcSkParity16Home6">
+		<name>Orc Lineman 6</name>
+		<gender>male</gender>
+		<positionId>orc.lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamOrcSkParity16Home7">
+		<name>Orc Blitzer 7</name>
+		<gender>male</gender>
+		<positionId>orc.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamOrcSkParity16Home8">
+		<name>Black Orc Blocker 8</name>
+		<gender>male</gender>
+		<positionId>orc.blackorc</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamOrcSkParity16Home9">
+		<name>Goblin 9</name>
+		<gender>male</gender>
+		<positionId>orc.goblin</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamOrcSkParity16Home10">
+		<name>Orc Blitzer 10</name>
+		<gender>male</gender>
+		<positionId>orc.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamOrcSkParity16Home11">
+		<name>Black Orc Blocker 11</name>
+		<gender>male</gender>
+		<positionId>orc.blackorc</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamOrcSkParity16Home12">
+		<name>Black Orc Blocker 12</name>
+		<gender>male</gender>
+		<positionId>orc.blackorc</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamGnomeSkParity25Home">
+
+	<coach>Home</coach>
+	<name>Gnome Parity25 Home</name>
+	<race>Gnome</race>
+	<rosterId>gnome_sk.bb2025</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>3</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>2</assistantCoaches>
+	<currentTeamValue>1090000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamGnomeSkParity25Home1">
+		<name>Gnome Lineman 1</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList>
+			<skill>Safe Pair Of Hands</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamGnomeSkParity25Home2">
+		<name>Woodland Fox 2</name>
+		<gender>male</gender>
+		<positionId>gnome.woodland_fox</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamGnomeSkParity25Home3">
+		<name>Gnome Illusionist 3</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_illusionist</positionId>
+		<skillList>
+			<skill>Cloud Burster</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamGnomeSkParity25Home4">
+		<name>Gnome Beastmaster 4</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_beastmaster</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamGnomeSkParity25Home5">
+		<name>Altern Forest Treeman 5</name>
+		<gender>male</gender>
+		<positionId>gnome.altern_forest_treeman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamGnomeSkParity25Home6">
+		<name>Gnome Lineman 6</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamGnomeSkParity25Home7">
+		<name>Woodland Fox 7</name>
+		<gender>male</gender>
+		<positionId>gnome.woodland_fox</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamGnomeSkParity25Home8">
+		<name>Gnome Illusionist 8</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_illusionist</positionId>
+		<skillList>
+			<skill>Dump-Off</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamGnomeSkParity25Home9">
+		<name>Gnome Beastmaster 9</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_beastmaster</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamGnomeSkParity25Home10">
+		<name>Altern Forest Treeman 10</name>
+		<gender>male</gender>
+		<positionId>gnome.altern_forest_treeman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamGnomeSkParity25Home11">
+		<name>Gnome Lineman 11</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamGnomeSkParity25Home12">
+		<name>Gnome Lineman 12</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="13" id="teamGnomeSkParity25Home13">
+		<name>Gnome Lineman 13</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="14" id="teamGnomeSkParity25Home14">
+		<name>Gnome Lineman 14</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="15" id="teamGnomeSkParity25Home15">
+		<name>Gnome Lineman 15</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="16" id="teamGnomeSkParity25Home16">
+		<name>Gnome Lineman 16</name>
+		<gender>male</gender>
+		<positionId>gnome.gnome_lineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

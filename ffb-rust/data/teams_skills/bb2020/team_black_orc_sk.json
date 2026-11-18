@@ -1,0 +1,91 @@
+{
+  "edition": "bb2020",
+  "race": "black_orc",
+  "roster_id": "blackorc.lrb6",
+  "rerolls": 2,
+  "reroll_cost": 60000,
+  "apothecaries": 1,
+  "assistant_coaches": 0,
+  "cheerleaders": 0,
+  "dedicated_fans": 0,
+  "fan_factor": 0,
+  "treasury": 5000,
+  "spent": 1095000,
+  "team_value": 1095000,
+  "players": [
+    {
+      "nr": 1,
+      "position_id": "blackorc.goblin_bruiser_lineman"
+    },
+    {
+      "nr": 2,
+      "position_id": "blackorc.black_orc",
+      "skills": [
+        {
+          "name": "Mighty Blow",
+          "value": 1
+        }
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 3,
+      "position_id": "blackorc.trained_troll"
+    },
+    {
+      "nr": 4,
+      "position_id": "blackorc.goblin_bruiser_lineman"
+    },
+    {
+      "nr": 5,
+      "position_id": "blackorc.black_orc",
+      "skills": [
+        "Frenzy"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 6,
+      "position_id": "blackorc.goblin_bruiser_lineman"
+    },
+    {
+      "nr": 7,
+      "position_id": "blackorc.black_orc",
+      "skills": [
+        "Kick"
+      ],
+      "advancement": "primary"
+    },
+    {
+      "nr": 8,
+      "position_id": "blackorc.goblin_bruiser_lineman"
+    },
+    {
+      "nr": 9,
+      "position_id": "blackorc.black_orc"
+    },
+    {
+      "nr": 10,
+      "position_id": "blackorc.goblin_bruiser_lineman"
+    },
+    {
+      "nr": 11,
+      "position_id": "blackorc.black_orc"
+    },
+    {
+      "nr": 12,
+      "position_id": "blackorc.goblin_bruiser_lineman"
+    },
+    {
+      "nr": 13,
+      "position_id": "blackorc.black_orc"
+    }
+  ],
+  "special_rules": [],
+  "skilled_from": "black_orc",
+  "skill_points": {
+    "tier_assumed": 1,
+    "spent": 3,
+    "secondary": 0
+  }
+}

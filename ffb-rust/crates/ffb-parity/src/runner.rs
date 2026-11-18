@@ -974,6 +974,10 @@ pub(crate) struct TeamFileJson {
 pub(crate) struct TeamFilePlayer {
     pub nr: i32,
     pub position_id: String,
+    /// BACKLOG §M phase 2: advancement skills of a SKILLED squad (data/teams_skills), loaded as
+    /// `extra_skills`. Java reads the same list from the team XML's player `<skillList>`.
+    #[serde(default)]
+    pub skills: Vec<ffb_model::data::roster_json::SkillEntry>,
 }
 
 /// Locate `data/teams/<edition>/team_<race>.json` (env `FFB_TEAMS_DIR` overrides the root).
@@ -988,6 +992,12 @@ fn team_file_path(roster_name: &str, edition: &str) -> Option<std::path::PathBuf
         "../data/teams",
         "../../data/teams",
         r"C:\Users\Admin\niels\ffb-rust\ffb-rust\data\teams",
+        // §M phase 2 skilled squads (`<squad>_sk`), kept apart so the certified sweeps,
+        // which glob data/teams, never pick them up.
+        "data/teams_skills",
+        "../data/teams_skills",
+        "../../data/teams_skills",
+        r"C:\Users\Admin\niels\ffb-rust\ffb-rust\data\teams_skills",
     ];
     candidates.iter()
         .map(|c| std::path::Path::new(c).join(&file))
@@ -1019,12 +1029,22 @@ pub fn make_team_from_file(roster_name: &str, side: &str, edition: &str) -> Resu
             .find(|p| p.id == pl.position_id)
             .ok_or_else(|| format!("position '{}' not in roster '{}'", pl.position_id, spec.roster_id))?;
         let rp = position_json_to_roster_position(pos_json, &roster_json.id, roster_json.undead, edition_to_rules(edition));
-        players.push(Player::from_position(
+        let mut player = Player::from_position(
             format!("{side}_{:02}", pl.nr),
             format!("{} {} {}", side, rp.name, pl.nr),
             pl.nr,
             &rp,
-        ));
+        );
+        // Advancements are strict: a name Rust cannot resolve is an error, never a silent drop
+        // (Java would resolve it through SkillFactory.forName and the engines would disagree).
+        for entry in &pl.skills {
+            let sw = ffb_model::data::loader::skill_entry_to_skill_with_value(entry)
+                .ok_or_else(|| format!("{}: player {} skill {:?} does not resolve", path.display(), pl.nr, entry.name()))?;
+            if !player.all_skill_ids().any(|s| s == sw.skill_id) {
+                player.extra_skills.push(sw);
+            }
+        }
+        players.push(player);
     }
 
     // There is deliberately NO star-player path here. A star on a Team Draft List is an
@@ -1042,6 +1062,17 @@ pub fn make_team_from_file(roster_name: &str, side: &str, edition: &str) -> Resu
     // pilot, seed 1 half 2: pick=8 N=10 gave Java nr 12 and Rust nr 13). gen_java_parity_data.py
     // applies the same sort to the emitted team XML.
     players.sort_by_key(|p| p.nr);
+
+    // §M phase 2: twin of ParityRunner's `JSKILLS` (FFB_SKILL_DUMP); the state hash carries no
+    // skill lists, so this is how a skill one engine failed to load is caught. `{:?}` of a SkillId
+    // is Java's class simple name.
+    if std::env::var_os("FFB_SKILL_DUMP").is_some() {
+        for p in &players {
+            let mut names: Vec<String> = p.all_skill_ids().map(|s| format!("{s:?}")).collect();
+            names.sort();
+            eprintln!("RSKILLS {side} {} {}", p.nr, names.join(","));
+        }
+    }
 
     Ok(Team {
         id: format!("{side}_{}", roster_json.id),
@@ -1967,6 +1998,43 @@ mod team_file_tests {
     /// heuristics documented in docs/TEAM_DRAFTS_*.md: 11-16 players within position quantity
     /// caps, >=2 rerolls <= roster max, spend <= 1,100,000, team_value per UtilTeamValue, and
     /// both sides materialize through make_team_from_file.
+    /// BACKLOG §M phase 2: every SKILLED squad (data/teams_skills, scripts/draft_skill_squads.py)
+    /// loads strictly (an unresolved advancement is an error), keeps its base squad's players,
+    /// and obeys Tier-1 Matched Play: <= 1 advancement per player, <= 6 skill points (Primary 1,
+    /// Secondary 2), <= 1 Secondary, <= 4 Elite skills; each advancement lands in extra_skills.
+    #[test]
+    fn all_skilled_squads_load_and_obey_matched_play_limits() {
+        let mut n = 0;
+        for ed in ["bb2016", "bb2020", "bb2025"] {
+            let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/teams_skills").join(ed);
+            let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+            for e in rd.flatten() {
+                let name = e.file_name().to_string_lossy().to_string();
+                let Some(squad) = name.strip_prefix("team_").and_then(|s| s.strip_suffix(".json")) else { continue };
+                let spec: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(e.path()).unwrap()).unwrap();
+                let base = spec["skilled_from"].as_str().unwrap_or_else(|| panic!("{ed}/{squad}: no skilled_from"));
+                assert_eq!(format!("{base}_sk"), squad, "{ed}/{squad}: name must be <base>_sk");
+                let (mut points, mut secondary, mut elite) = (0, 0, 0);
+                for pl in spec["players"].as_array().unwrap() {
+                    let Some(sk) = pl.get("skills").and_then(|s| s.as_array()) else { continue };
+                    assert_eq!(sk.len(), 1, "{ed}/{squad} nr {}: one advancement per player", pl["nr"]);
+                    let primary = pl["advancement"] == "primary";
+                    points += if primary { 1 } else { 2 };
+                    secondary += (!primary) as i32;
+                    let nm = sk[0].get("name").and_then(|v| v.as_str()).or(sk[0].as_str()).unwrap();
+                    elite += ["Block", "Dodge", "Guard", "Mighty Blow"].contains(&nm) as i32;
+                }
+                assert!(points <= 6 && secondary <= 1 && elite <= 4,
+                    "{ed}/{squad}: points {points}, secondary {secondary}, elite {elite}");
+                let team = make_team_from_file(squad, "home", ed).unwrap_or_else(|e| panic!("{ed}/{squad}: {e}"));
+                let extras: usize = team.players.iter().map(|p| p.extra_skills.len()).sum();
+                assert!(extras > 0, "{ed}/{squad}: no advancement reached extra_skills");
+                n += 1;
+            }
+        }
+        assert!(n >= 100, "expected the ~110 skilled squads, found {n}");
+    }
+
     #[test]
     fn all_hand_drafted_team_files_are_legal() {
         // All THREE editions. This used to iterate ["bb2016", "bb2025"], leaving every one of

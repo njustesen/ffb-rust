@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamDwarfSkParity20Away">
+
+	<coach>Away</coach>
+	<name>Dwarf Parity20 Away</name>
+	<race>Dwarf</race>
+	<rosterId>dwarf_sk.bb2020</rosterId>
+	<reRolls>2</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1095000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>5000</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamDwarfSkParity20Away1">
+		<name>Dwarf Blocker Lineman 1</name>
+		<gender>male</gender>
+		<positionId>dwarf.dwarfblockerlineman</positionId>
+		<skillList>
+			<skill>Strip Ball</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamDwarfSkParity20Away2">
+		<name>Runner 2</name>
+		<gender>male</gender>
+		<positionId>dwarf.runner</positionId>
+		<skillList>
+			<skill>Safe Pass</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamDwarfSkParity20Away3">
+		<name>Blitzer 3</name>
+		<gender>male</gender>
+		<positionId>dwarf.blitzer</positionId>
+		<skillList>
+			<skill>Grab</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamDwarfSkParity20Away4">
+		<name>Troll Slayer 4</name>
+		<gender>male</gender>
+		<positionId>dwarf.trollslayer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamDwarfSkParity20Away5">
+		<name>Deathroller 5</name>
+		<gender>male</gender>
+		<positionId>dwarf.deathroller</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamDwarfSkParity20Away6">
+		<name>Dwarf Blocker Lineman 6</name>
+		<gender>male</gender>
+		<positionId>dwarf.dwarfblockerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamDwarfSkParity20Away7">
+		<name>Troll Slayer 7</name>
+		<gender>male</gender>
+		<positionId>dwarf.trollslayer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamDwarfSkParity20Away8">
+		<name>Dwarf Blocker Lineman 8</name>
+		<gender>male</gender>
+		<positionId>dwarf.dwarfblockerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamDwarfSkParity20Away9">
+		<name>Dwarf Blocker Lineman 9</name>
+		<gender>male</gender>
+		<positionId>dwarf.dwarfblockerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamDwarfSkParity20Away10">
+		<name>Dwarf Blocker Lineman 10</name>
+		<gender>male</gender>
+		<positionId>dwarf.dwarfblockerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamDwarfSkParity20Away11">
+		<name>Dwarf Blocker Lineman 11</name>
+		<gender>male</gender>
+		<positionId>dwarf.dwarfblockerlineman</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>
