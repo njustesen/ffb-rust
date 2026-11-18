@@ -328,6 +328,25 @@ impl Player {
         self.remove_prayer_skills(source);
     }
 
+    /// Java: Player.hasActiveEnhancement(name) — `getEnhancementSources().contains(name)`, the
+    /// union of the temporary modifier, skill and property source keys.
+    pub fn has_active_enhancement(&self, name: &str) -> bool {
+        self.temporary_stat_mods.iter().any(|(s, ..)| s == name)
+            || self.temporary_skill_sources.iter().any(|(s, _)| s == name)
+            || self.temporary_properties.iter().any(|(s, _)| s == name)
+    }
+
+    /// Java: Player.addEnhancement(name, enhancements, factory) for an enhancement that grants
+    /// SKILLS only (`TemporaryEnhancements.withSkills`): a no-op while `name` is already active.
+    pub fn add_skill_enhancement(&mut self, name: &str, skills: &[SkillId]) {
+        if self.has_active_enhancement(name) {
+            return;
+        }
+        for skill_id in skills {
+            self.add_prayer_skill(name, *skill_id, None);
+        }
+    }
+
     pub fn all_skill_ids(&self) -> impl Iterator<Item = SkillId> + '_ {
         self.starting_skills
             .iter()

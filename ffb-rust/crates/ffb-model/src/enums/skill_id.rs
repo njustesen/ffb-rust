@@ -230,6 +230,20 @@ impl SkillId {
         self.category_and_name_for(crate::enums::Rules::Bb2025).1
     }
 
+    /// Java `Skill.getEnhancements().getSkills()` for the blitz-declaration skills whose
+    /// `TemporaryEnhancements` grant a skill, applied by `StepSelectBlitzTarget` through
+    /// `FieldModel.addSkillEnhancements` (source = `getName()`). Only the skills that reach that
+    /// `usedSkill` branch are listed; `None` means `getEnhancements() == null` there.
+    pub fn blitz_enhancement_skills(self) -> Option<&'static [SkillId]> {
+        match self {
+            // Java: FrenziedRush.postConstruct (bb2020 + bb2025) withSkills(Frenzy)
+            SkillId::FrenziedRush => Some(&[SkillId::Frenzy]),
+            // Java: SlashingNails.postConstruct (bb2025) withSkills(Claws)
+            SkillId::SlashingNails => Some(&[SkillId::Claw]),
+            _ => None,
+        }
+    }
+
     pub fn class_name(self) -> &'static str {
         match self {
             SkillId::Block => "Block",

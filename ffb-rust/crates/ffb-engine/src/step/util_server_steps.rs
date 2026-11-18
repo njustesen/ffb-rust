@@ -362,6 +362,33 @@ pub fn mark_skill_used(game: &mut Game, player_id: &str, skill_id: ffb_model::en
     }
 }
 
+/// Java `AbstractStep.markSkillsTrackedOutsideOfActivationAndRemoveEffects(game)`: every skill of
+/// the acting player (temporary ones included) whose usage type is tracked outside the activation
+/// AND removes its effects at end of turn, and whose enhancement (source = `getName()`) is active,
+/// is marked used on the PLAYER (`Player.markUsed`, only when the acting player has acted) and its
+/// enhancement removed. Called by `StepRemoveTargetSelectionState` and `StepEndFeeding`; this is
+/// what spends Frenzied Rush / Slashing Nails and takes the granted Frenzy / Claws away again.
+pub fn mark_skills_tracked_outside_of_activation_and_remove_effects(game: &mut Game) {
+    let Some(pid) = game.acting_player.player_id.clone() else { return };
+    let rules = game.rules;
+    let has_acted = game.acting_player.acted();
+    let Some(player) = game.player_mut(&pid) else { return };
+    let skills: Vec<ffb_model::enums::SkillId> = player.all_skill_ids()
+        .filter(|s| {
+            let usage = s.usage_type_for(rules);
+            usage.track_outside_activation()
+                && usage.remove_effects_at_end_of_turn()
+                && player.has_active_enhancement(s.category_and_name_for(rules).1)
+        })
+        .collect();
+    for skill in skills {
+        if has_acted {
+            player.used_skills.insert(skill);
+        }
+        player.remove_enhancements(skill.category_and_name_for(rules).1);
+    }
+}
+
 /// Java `UtilServerSteps.changePlayerAction(step, null, null, false)` — clear the acting
 /// player. Mirrors `UtilActingPlayer.changeActingPlayer(game, null, null, false)`:
 /// the OLD acting player (if any) leaves its transient MOVING base — a player who has

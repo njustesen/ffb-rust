@@ -31,6 +31,11 @@ pub enum AgentPrompt {
     BlitzTarget {
         attacker_id: PlayerId,
         eligible_players: Vec<PlayerId>,
+        /// The attacker's unused blitz-declaration skill (Frenzied Rush `canGainFrenzyForBlitz`,
+        /// Slashing Nails `canGainClawsForBlitz`) while the step has no `usedSkill` yet: the
+        /// client offers it from this dialog as a CLIENT_USE_SKILL sent before the target.
+        #[serde(default)]
+        gain_skill: Option<crate::enums::SkillId>,
     },
     // ── Block ──────────────────────────────────────────────────────────────────
     BlockChoice {

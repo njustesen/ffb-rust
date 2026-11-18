@@ -66,8 +66,24 @@ impl StepSelectBlitzTargetEnd {
             if ts.is_canceled() {
                 // Java: if (actingPlayer.hasActed()) mark skills used; else resetStalling()
                 // Java: removeSkillEnhancements, changePlayerAction(null), setTargetSelectionState(null), push Select
-                if !game.acting_player.acted() {
+                let used: Vec<ffb_model::enums::SkillId> = ts.get_used_skills().iter().copied().collect();
+                let acting_id = game.acting_player.player_id.clone();
+                if game.acting_player.acted() {
+                    // Java: targetSelectionState.getUsedSkills().forEach(actingPlayer::markSkillUsed)
+                    if let Some(pid) = acting_id.as_deref() {
+                        for skill in &used {
+                            crate::step::util_server_steps::mark_skill_used(game, pid, *skill);
+                        }
+                    }
+                } else {
                     game.stalling = false; // Java: getGameState().resetStalling()
+                }
+                // Java: getUsedSkills().forEach(s -> removeSkillEnhancements(player, s.getName()))
+                let rules = game.rules;
+                if let Some(p) = acting_id.as_deref().and_then(|pid| game.player_mut(pid)) {
+                    for skill in &used {
+                        p.remove_enhancements(skill.category_and_name_for(rules).1);
+                    }
                 }
                 game.field_model.target_selection_state = None;
                 return StepOutcome::next();

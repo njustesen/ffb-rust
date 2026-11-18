@@ -4012,7 +4012,11 @@ impl HeuristicAgent {
             // `legal_blitz_move_targets`, so naming the planned victim is correct even when it is
             // not on the list. Deferring to the list instead was what left 42% of blitzes
             // walking toward a victim they had never selected.
-            AgentPrompt::BlitzTarget { attacker_id, eligible_players } => {
+            // BACKLOG §M — Frenzied Rush / Slashing Nails. Whenever a target WILL be selected and
+            // the step offers an unused blitz-declaration skill, declare it first (zero draws;
+            // `ParityRunner.sendBlitzGainSkill` is the same rule): the step keeps waiting and
+            // re-emits this prompt with `gain_skill: None`, and the target goes on that call.
+            AgentPrompt::BlitzTarget { attacker_id, eligible_players, gain_skill } => {
                 if let Some(pl) = &self.plan {
                     if pl.player == attacker_id {
                         if let PlanKind::Blitz { victim } = &pl.kind {
@@ -4022,9 +4026,17 @@ impl HeuristicAgent {
                                 .map(|c| on_pitch(c.x, c.y))
                                 .unwrap_or(false);
                             if alive {
+                                if let Some(skill_id) = gain_skill {
+                                    return Action::UseSkill { skill_id, use_skill: true };
+                                }
                                 return Action::SelectPlayer { player_id: victim.clone() };
                             }
                         }
+                    }
+                }
+                if !eligible_players.is_empty() {
+                    if let Some(skill_id) = gain_skill {
+                        return Action::UseSkill { skill_id, use_skill: true };
                     }
                 }
                 if eligible_players.is_empty() {
@@ -8163,6 +8175,7 @@ mod tests {
         let prompt = || AgentPrompt::BlitzTarget {
             attacker_id: "home_01".into(),
             eligible_players: Vec::new(),
+            gain_skill: None,
         };
         let mut gs = new_game(3);
         gs.pending_prompt = Some(prompt());

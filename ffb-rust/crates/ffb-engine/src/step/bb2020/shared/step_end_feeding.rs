@@ -61,6 +61,8 @@ impl StepEndFeeding {
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         self.end_turn |= check_touchdown(game);
         game.defender_id = None;
+        // Java: markSkillsTrackedOutsideOfActivationAndRemoveEffects(game)
+        crate::step::util_server_steps::mark_skills_tracked_outside_of_activation_and_remove_effects(game);
 
         if self.end_turn {
             if game.turn_mode == TurnMode::PassBlock {

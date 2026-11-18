@@ -64,7 +64,8 @@ impl StepEndFeeding {
         // Java: game.setDefenderId(null)
         game.defender_id = None;
 
-        // Java: markSkillsTrackedOutsideOfActivationAndRemoveEffects(game) — not yet ported.
+        // Java: markSkillsTrackedOutsideOfActivationAndRemoveEffects(game)
+        crate::step::util_server_steps::mark_skills_tracked_outside_of_activation_and_remove_effects(game);
 
         if self.end_turn {
             match game.turn_mode {

@@ -1775,6 +1775,7 @@ mod tests {
         gs.pending_prompt = Some(AgentPrompt::BlitzTarget {
             attacker_id: "home_01".into(),
             eligible_players: Vec::new(),
+            gain_skill: None,
         });
         assert_eq!(agent.act(&gs), Action::EndTurn);
     }
@@ -1788,6 +1789,7 @@ mod tests {
         gs.pending_prompt = Some(AgentPrompt::BlitzTarget {
             attacker_id: "home_01".into(),
             eligible_players: vec!["away_01".into(), "away_02".into()],
+            gain_skill: None,
         });
         let before = agent.action_rng_count;
         match agent.act(&gs) {

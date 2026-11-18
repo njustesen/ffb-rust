@@ -40,7 +40,8 @@ impl StepRemoveTargetSelectionState {
                 // Java: keeping empty block — do nothing, leave target selection state intact
                 // (before Frenzied Rush fix, we removed player id here — see Java comment)
             } else {
-                // Java: markSkillsTrackedOutsideOfActivationAndRemoveEffects(game) — not yet ported
+                // Java: markSkillsTrackedOutsideOfActivationAndRemoveEffects(game)
+                crate::step::util_server_steps::mark_skills_tracked_outside_of_activation_and_remove_effects(game);
                 // Java: if (targetSelectionState.isCommitted()) actingPlayer.setHasTriggeredEffect(true)
                 if tss.is_committed() {
                     game.acting_player.has_triggered_effect = true;

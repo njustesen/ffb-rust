@@ -2531,6 +2531,46 @@ public class ParityRunner {
      * BLOCK_PICK call maps to. Injects CLIENT_TARGET_SELECTED, which makes
      * StepSelectBlitzTargetEnd consume the team blitz (setBlitzUsed).
      */
+    /**
+     * BACKLOG §M — Frenzied Rush / Slashing Nails. The client offers FRENZIED_RUSH /
+     * SLASHING_NAILS from the blitz-target dialog as a CLIENT_USE_SKILL sent BEFORE the target;
+     * StepSelectBlitzTarget stores it as usedSkill (SKIP_STEP, the dialog stays up) and applies it
+     * on the selection. Mirrors Rust's `AgentPrompt::BlitzTarget.gain_skill` rule exactly: when a
+     * target is about to be selected, the waiting step has no usedSkill yet, and the acting player
+     * has an unused canGainFrenzyForBlitz (else canGainClawsForBlitz) skill, send it and return.
+     * Zero draws; the harness comes straight back to this dialog and sends the target.
+     */
+    private boolean sendBlitzGainSkill(Game game, GameState gameState, String pid) {
+        IStep cur = gameState.getCurrentStep();
+        if (!(cur instanceof com.fumbbl.ffb.server.step.AbstractStep)) {
+            return false;
+        }
+        com.eclipsesource.json.JsonValue used =
+            ((com.fumbbl.ffb.server.step.AbstractStep) cur).toJsonValue().get("skill");
+        if (used != null && !used.isNull()) {
+            return false;
+        }
+        Player<?> p = game.getPlayerById(pid);
+        if (p == null) {
+            return false;
+        }
+        java.util.Optional<com.fumbbl.ffb.model.skill.Skill> skill =
+            com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(p,
+                com.fumbbl.ffb.model.property.NamedProperties.canGainFrenzyForBlitz);
+        if (!skill.isPresent()) {
+            skill = com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(p,
+                com.fumbbl.ffb.model.property.NamedProperties.canGainClawsForBlitz);
+        }
+        if (!skill.isPresent()) {
+            return false;
+        }
+        if (DEBUG) System.err.println("JAVA_BLITZ_GAIN_SKILL pid=" + pid + " skill="
+            + skill.get().getName());
+        MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+            skill.get(), true, pid, null, false));
+        return true;
+    }
+
     private void sendBlitzTargetSelection(Game game, GameState gameState) {
         ActingPlayer ap = game.getActingPlayer();
         String pid = (ap != null) ? ap.getPlayerId() : null;
@@ -2550,6 +2590,9 @@ public class ParityRunner {
             // arm falls through to its scored enumeration.
             if (vc != null && com.fumbbl.ffb.ai.parity.heuristic.Features.onPitch(vc.getX(),
                     vc.getY())) {
+                if (sendBlitzGainSkill(game, gameState, pid)) {
+                    return;
+                }
                 MatchRunner.inject(gameState,
                     new com.fumbbl.ffb.net.commands.ClientCommandTargetSelected(
                         activation.plan().target));
@@ -2564,6 +2607,9 @@ public class ParityRunner {
             java.util.List<String> candidates = new ArrayList<>();
             for (Player<?> op : blockTargetCandidates(game, pid)) {
                 candidates.add(op.getId());
+            }
+            if (!candidates.isEmpty() && sendBlitzGainSkill(game, gameState, pid)) {
+                return;
             }
             String chosen = heuristic.blitzTarget(game, pid, candidates);
             if (chosen == null) {
