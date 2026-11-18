@@ -243,6 +243,10 @@ impl SkillId {
             // Java: ShotToNothing.postConstruct (mixed) withSkills(HailMaryPass); applied by
             // StepInitSelecting's CLIENT_USE_SKILL canGainHailMary branch.
             SkillId::ShotToNothing => Some(&[SkillId::HailMaryPass]),
+            // Java: bb2020/special/ExcuseMeAreYouAZoat.postConstruct withSkills(HypnoticGaze);
+            // applied by bb2020 StepSelectGazeTarget only (the bb2025 Zoat has no enhancements
+            // and never reaches that step).
+            SkillId::ExcuseMeAreYouAZoat => Some(&[SkillId::HypnoticGaze]),
             _ => None,
         }
     }

@@ -41,7 +41,7 @@ pub struct StepSelectGazeTarget {
     pub end_player_action: bool,
     pub end_turn: bool,
     /// Skill name used (from a UseSkill action that triggered a skill sub-sequence).
-    pub used_skill: Option<String>,
+    pub used_skill: Option<ffb_model::enums::SkillId>,
 }
 
 impl StepSelectGazeTarget {
@@ -127,7 +127,7 @@ impl Step for StepSelectGazeTarget {
                     }))
                 } else {
                     // Unknown skill property — store name for debugging, no sub-sequence
-                    self.used_skill = Some(format!("{skill_id:?}"));
+                    self.used_skill = Some(*skill_id);
                     None
                 };
 
@@ -203,8 +203,17 @@ impl StepSelectGazeTarget {
             }
             // Java: showDialog(DialogSelectGazeTargetParameter) -- the agent's question. A bare
             // cont() here parked the step with nothing asked (BACKLOG §K bb2020 gaze).
+            let attacker_id = game.acting_player.player_id.clone().unwrap_or_default();
+            let gain_skill = if self.used_skill.is_none() {
+                game.player(&attacker_id).and_then(|p| p.all_skill_ids().find(|id|
+                    id.has_property_in(game.rules, NamedProperties::CAN_GAIN_GAZE)
+                        && !p.used_skills.contains(id)))
+            } else {
+                None
+            };
             return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::GazeTarget {
-                attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
+                attacker_id,
+                gain_skill,
             });
         }
 
@@ -252,10 +261,26 @@ impl StepSelectGazeTarget {
                 ts.commit();
             }
             ts.select();
+            let attacker_id = game.acting_player.player_id.clone().unwrap_or_default();
+            // Java: if (usedSkill != null) { targetSelectionState.addUsedSkill(usedSkill);
+            //   if (usedSkill.getEnhancements() != null) { addSkillEnhancements(actingPlayer, usedSkill);
+            //     addReport(new ReportSkillUse(actingPlayerId, usedSkill, true, GAIN_FRENZY_FOR_BLITZ)); } }
+            // (the bb2020 Zoat's canGainGaze declaration: GAZE_MOVE + UseSkill grants Hypnotic Gaze)
+            if let Some(skill) = self.used_skill {
+                ts.add_used_skill(skill);
+                if let Some(granted) = skill.enhancement_skills() {
+                    let name = skill.category_and_name_for(game.rules).1;
+                    if let Some(p) = game.player_mut(&attacker_id) {
+                        p.add_skill_enhancement(name, granted);
+                    }
+                    game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                        Some(attacker_id.clone()), skill, true,
+                        ffb_model::model::skill_use::SkillUse::GAIN_FRENZY_FOR_BLITZ));
+                }
+            }
             game.field_model.target_selection_state = Some(ts);
 
             // Java: getResult().addReport(new ReportSelectGazeTarget(actingPlayer.getId(), selectedId))
-            let attacker_id = game.acting_player.player_id.clone().unwrap_or_default();
             game.report_list.add(ReportSelectGazeTarget::new(
                 Some(attacker_id.clone()),
                 Some(selected_id.clone()),

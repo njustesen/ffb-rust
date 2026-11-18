@@ -408,8 +408,14 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
         if matches!(game.rules, Rules::Bb2020 | Rules::Bb2025)
             && game.turn_mode != ffb_model::enums::TurnMode::Blitz
             && state.is_active()
-            && player.has_unused_skill_with_property(
+            && (player.has_unused_skill_with_property(
                 ffb_model::model::property::named_properties::NamedProperties::INFLICTS_CONFUSION)
+                // §M: GAZE_ZOAT -- `isHypnoticGazeActionAvailable(true, player, canGainGaze)`, the
+                // bb2020 Zoat (edition-aware: only bb2020's ExcuseMeAreYouAZoat registers it). Also
+                // declared GAZE_MOVE; the agent sends the UseSkill at the gaze-target prompt.
+                || player.all_skill_ids().any(|id| id.has_property_in(game.rules,
+                    ffb_model::model::property::named_properties::NamedProperties::CAN_GAIN_GAZE)
+                    && !player.used_skills.contains(&id)))
         {
             actions.push(Action::ActivatePlayer {
                 player_id: pid.clone(),

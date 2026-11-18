@@ -995,7 +995,11 @@ impl Agent for RandomAgent {
             // bb2020 StepSelectGazeTarget (BACKLOG §K): the victim drawn at the GAZE declaration
             // -- Java's sendGazeTargetSelection spends that pick here -- or, with none, the gazer
             // himself, which cancels the gaze. 0 rng.
-            Some(AgentPrompt::GazeTarget { attacker_id }) => Action::SelectPlayer {
+            // §M GAZE_ZOAT: the bb2020 Zoat's UseSkill goes first (ParityRunner.sendGazeTargetSelection
+            // injects it before the target, 0 rng); the step re-asks with no skill pending.
+            Some(AgentPrompt::GazeTarget { gain_skill: Some(skill_id), .. }) =>
+                Action::UseSkill { skill_id: *skill_id, use_skill: true },
+            Some(AgentPrompt::GazeTarget { attacker_id, .. }) => Action::SelectPlayer {
                 player_id: self.pending_gaze_target.take().unwrap_or_else(|| attacker_id.clone()),
             },
             // Re-roll offer: AGENT_CONTRACT §7 — ALWAYS DECLINE, deterministically, 0 rng. Java

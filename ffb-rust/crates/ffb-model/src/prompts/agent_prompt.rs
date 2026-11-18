@@ -74,6 +74,10 @@ pub enum AgentPrompt {
     /// actionRng pick `ParityRunner.sendGazeTargetSelection` spends here (BACKLOG §K).
     GazeTarget {
         attacker_id: PlayerId,
+        /// §M: the acting player's unused bb2020 Zoat skill (canGainGaze) when the step has none
+        /// yet -- the GAZE_ZOAT client sends UseSkill(it) before naming the victim.
+        #[serde(default)]
+        gain_skill: Option<crate::enums::SkillId>,
     },
     BlockChoiceProperties {
         attacker_id: PlayerId,

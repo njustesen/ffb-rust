@@ -2744,6 +2744,25 @@ public class ParityRunner {
             MatchRunner.inject(gameState, new ClientCommandEndTurn(game.getTurnMode(), null));
             return;
         }
+        // §M GAZE_ZOAT: the bb2020 Zoat client sends UseSkill(canGainGaze skill) right after the
+        // GAZE_MOVE declaration; StepSelectGazeTarget stores it and grants Hypnotic Gaze when the
+        // victim is picked. Sent once (the step's "skill" JSON), 0 rng -- mirrors the Rust agents'
+        // GazeTarget.gain_skill answer.
+        IStep gazeStep = gameState.getCurrentStep();
+        if (gazeStep instanceof com.fumbbl.ffb.server.step.AbstractStep) {
+            com.eclipsesource.json.JsonValue gazeUsed =
+                ((com.fumbbl.ffb.server.step.AbstractStep) gazeStep).toJsonValue().get("skill");
+            Player<?> gazer = game.getPlayerById(pid);
+            if ((gazeUsed == null || gazeUsed.isNull()) && gazer != null) {
+                java.util.Optional<com.fumbbl.ffb.model.skill.Skill> zoat =
+                    com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(gazer,
+                        com.fumbbl.ffb.model.property.NamedProperties.canGainGaze);
+                if (zoat.isPresent()) {
+                    MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+                        zoat.get(), true, pid, null, false));
+                }
+            }
+        }
         FieldModel fm = game.getFieldModel();
         FieldCoordinate coord = playerCoordinate(game, pid);
         Team opponent = game.isHomePlaying() ? game.getTeamAway() : game.getTeamHome();
@@ -4529,7 +4548,11 @@ public class ParityRunner {
                 if (!isBb2016(game) && game.getTurnMode() != TurnMode.BLITZ && ps.isActive()) {
                     com.fumbbl.ffb.model.skill.Skill gazeSkill =
                         p.getSkillWithProperty(com.fumbbl.ffb.model.property.NamedProperties.inflictsConfusion);
-                    if (gazeSkill != null && !p.isUsed(gazeSkill)) {
+                    // §M: GAZE_ZOAT -- isHypnoticGazeActionAvailable(true, player, canGainGaze), the
+                    // bb2020 Zoat; also declared GAZE_MOVE (UseSkill sent at SELECT_GAZE_TARGET).
+                    com.fumbbl.ffb.model.skill.Skill zoatSkill =
+                        p.getSkillWithProperty(com.fumbbl.ffb.model.property.NamedProperties.canGainGaze);
+                    if ((gazeSkill != null && !p.isUsed(gazeSkill)) || (zoatSkill != null && !p.isUsed(zoatSkill))) {
                         actions.add(PlayerAction.GAZE_MOVE);
                     }
                 }
