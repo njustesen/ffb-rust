@@ -1,6 +1,7 @@
 use ffb_model::model::game::Game;
 use crate::step::framework::{DeferredCommand, DeferredCommandId, StepParameter};
-use crate::step::util_server_injury::drop_player_no_sph;
+use ffb_model::enums::ApothecaryMode;
+use crate::step::util_server_injury::drop_player_rng;
 
 /// Handles a thrown player landing: runs injury, conditionally triggers a turnover (if carrying
 /// the ball), and clears ThrownPlayerCoordinate to prevent an end-step reset.
@@ -19,10 +20,15 @@ impl RightStuffCommand {
 impl DeferredCommand for RightStuffCommand {
     fn id(&self) -> DeferredCommandId { DeferredCommandId::RightStuff }
 
-    fn execute(&self, game: &mut Game, _rng: &mut ffb_model::util::rng::GameRng) -> Vec<StepParameter> {
+    fn execute(&self, game: &mut Game, rng: &mut ffb_model::util::rng::GameRng) -> Vec<StepParameter> {
         // Java: UtilServerInjury.dropPlayer(step, thrownPlayer, ApothecaryMode.THROWN_PLAYER)
+        //   (= dropPlayer(.., PRONE, THROWN_PLAYER, eligibleForSafePairOfHands=false))
         // Then: remove END_TURN from the result set; re-add it only if has_ball.
-        let mut params = drop_player_no_sph(game, &self.player_id);
+        // The mode MATTERS: dropPlayer deactivates the acting player unless the mode is
+        // THROWN_PLAYER, and a swooped thrown player IS the acting player. `drop_player_no_sph`
+        // assumed DEFENDER, so a swooped Doom Diver's failed landing left it inactive where Java
+        // leaves it free to stand up and act (BACKLOG §M: goblin / goblin_sk bb2025 seed 16).
+        let mut params = drop_player_rng(game, rng, &self.player_id, false, ApothecaryMode::ThrownPlayer);
         params.retain(|p| !matches!(p, StepParameter::EndTurn(_)));
         if self.has_ball {
             params.push(StepParameter::EndTurn(true));

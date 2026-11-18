@@ -123,17 +123,16 @@ impl StepEndThrowTeamMate {
 
         // Java: reset thrown player position/state
         if let (Some(ref thrown_id), Some(thrown_coord)) = (&self.thrown_player_id, self.thrown_player_coordinate) {
-            // Restore state
-            if self.end_player_action || move_due_to_bloodlust {
-                if let Some(old_state) = self.old_player_state {
-                    if old_state.0 > 0 {
-                        game.field_model.set_player_state(thrown_id, old_state);
-                    }
-                }
-            } else if let Some(thrown_state) = self.thrown_player_state {
-                if thrown_state.0 > 0 {
-                    game.field_model.set_player_state(thrown_id, thrown_state);
-                }
+            // Restore state. Java: `if ((fEndPlayerAction || moveDueToBloodlust) && oldPlayerState
+            // != null && oldPlayerState.getId() > 0) {..} else if (fThrownPlayerState != null &&
+            // fThrownPlayerState.getId() > 0) {..}` -- the old-state test is PART of the first
+            // condition, so an ending action without an old state falls through to the thrown
+            // state. Rust nested it, skipping the else-branch in exactly that case.
+            let old_valid = self.old_player_state.filter(|s| s.0 > 0);
+            if (self.end_player_action || move_due_to_bloodlust) && old_valid.is_some() {
+                game.field_model.set_player_state(thrown_id, old_valid.unwrap());
+            } else if let Some(thrown_state) = self.thrown_player_state.filter(|s| s.0 > 0) {
+                game.field_model.set_player_state(thrown_id, thrown_state);
             }
             game.field_model.set_player_coordinate(thrown_id, thrown_coord);
             if self.thrown_player_has_ball {

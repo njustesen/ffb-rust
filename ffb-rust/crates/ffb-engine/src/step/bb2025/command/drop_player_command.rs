@@ -5,7 +5,7 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use crate::injury::injuryType::injury_type_ball_and_chain::InjuryTypeBallAndChain;
 use crate::step::framework::{DeferredCommand, DeferredCommandId, StepParameter};
-use crate::step::util_server_injury::{drop_player, handle_injury};
+use crate::step::util_server_injury::{drop_player_rng, handle_injury};
 
 /// Drops a player from play: runs the full injury sequence and publishes the resulting parameters.
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.command.DropPlayerCommand`.
@@ -44,7 +44,12 @@ impl DeferredCommand for DropPlayerCommand {
             vec![StepParameter::InjuryResult(Box::new(res))]
         } else {
             // Java: UtilServerInjury.dropPlayer(step, player, apothecaryMode, eligibleForSafePairOfHands)
-            drop_player(game, &self.player_id, self.eligible_for_safe_pair_of_hands)
+            // -- WITH the command's apothecaryMode. The rng-less `drop_player` assumed DEFENDER,
+            // which deactivates the acting player; a swooped thrown player IS the acting player and
+            // its failed landing is dropped in THROWN_PLAYER mode, which Java leaves active (it can
+            // still stand up and act). BACKLOG §M phase 2: goblin_sk bb2025 seed 16.
+            drop_player_rng(game, rng, &self.player_id, self.eligible_for_safe_pair_of_hands,
+                self.apothecary_mode)
         }
     }
 }
