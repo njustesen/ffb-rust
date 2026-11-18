@@ -77,11 +77,79 @@ pub fn coverage_bias() -> f32 {
     })
 }
 
-/// Pull a "use the skill" weight toward 1 by the coverage bias: `w + B * (1 - w)`. A 0.0 pin
-/// (a path no harness can drive) stays 0.0. Same f32 operation order as the Java mirror.
-pub fn coverage_biased(w_use: f32) -> f32 {
-    let b = coverage_bias();
+/// Pull a "use the skill" weight toward 1 by the coverage bias, scaled per skill by the policy
+/// table's `coverage` milli-weight: `w + (B * c) * (1 - w)`, `c = coverage / 1000`. A 0.0 pin
+/// (a path no harness can drive) stays 0.0. `c = 1.0` is exactly the old `w + B * (1 - w)`.
+/// Same f32 operation order as the Java mirror (`HeuristicDriver.coverageBiased`).
+pub fn coverage_biased(w_use: f32, coverage_milli: i32) -> f32 {
+    let b = coverage_bias() * (coverage_milli as f32 / 1000.0);
     if b > 0.0 && w_use > 0.0 { w_use + b * (1.0 - w_use) } else { w_use }
+}
+
+/// One row of the §M skill-use policy table (`data/agent/skill_policy.json`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SkillPolicyRow {
+    /// Base probability weight of USING the skill when offered, in thousandths.
+    pub use_milli: i32,
+    /// How strongly `--coverage-bias` pulls this skill toward "use", in thousandths.
+    pub coverage_milli: i32,
+}
+
+/// The §M skill-use policy table, shared VERBATIM with the Java agent: the CLI exports the
+/// file's path as `FFB_SKILL_POLICY` and both engines parse that same file (Java:
+/// `SkillPolicy.java`). The compiled-in copy is only the fallback for runs without the CLI
+/// (unit tests, other binaries). Integer milli-weights so both sides compute identical f32s.
+pub struct SkillPolicy {
+    default: SkillPolicyRow,
+    rows: std::collections::BTreeMap<String, SkillPolicyRow>,
+}
+
+impl SkillPolicy {
+    pub const EMBEDDED: &'static str = include_str!("../../../../data/agent/skill_policy.json");
+
+    pub fn parse(text: &str) -> Result<Self, String> {
+        let v: serde_json::Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
+        let row = |o: &serde_json::Value, d: SkillPolicyRow| -> Result<SkillPolicyRow, String> {
+            let get = |k: &str, dv: i32| -> Result<i32, String> {
+                match o.get(k) {
+                    None => Ok(dv),
+                    Some(x) => x.as_i64().filter(|n| (0..=1000).contains(n)).map(|n| n as i32)
+                        .ok_or_else(|| format!("skill_policy: {k} must be an integer in 0..=1000")),
+                }
+            };
+            Ok(SkillPolicyRow { use_milli: get("use", d.use_milli)?, coverage_milli: get("coverage", d.coverage_milli)? })
+        };
+        let base = SkillPolicyRow { use_milli: 500, coverage_milli: 1000 };
+        let default = match v.get("default") { Some(o) => row(o, base)?, None => base };
+        let mut rows = std::collections::BTreeMap::new();
+        if let Some(obj) = v.get("skills").and_then(|s| s.as_object()) {
+            for (name, o) in obj {
+                if SkillId::from_class_name(name).is_none() {
+                    return Err(format!("skill_policy: unknown skill {name:?}"));
+                }
+                rows.insert(name.clone(), row(o, default)?);
+            }
+        }
+        Ok(SkillPolicy { default, rows })
+    }
+
+    /// The process-wide table: `FFB_SKILL_POLICY` when set, else the embedded copy. A malformed
+    /// file is fatal -- a silently different table would desync the engines' draw streams.
+    pub fn get() -> &'static SkillPolicy {
+        static P: std::sync::OnceLock<SkillPolicy> = std::sync::OnceLock::new();
+        P.get_or_init(|| {
+            let text = match std::env::var("FFB_SKILL_POLICY") {
+                Ok(path) => std::fs::read_to_string(&path)
+                    .unwrap_or_else(|e| panic!("FFB_SKILL_POLICY={path}: {e}")),
+                Err(_) => Self::EMBEDDED.to_string(),
+            };
+            Self::parse(&text).unwrap_or_else(|e| panic!("{e}"))
+        })
+    }
+
+    pub fn row(&self, skill_name: &str) -> SkillPolicyRow {
+        self.rows.get(skill_name).copied().unwrap_or(self.default)
+    }
 }
 /// Residual worth of advancing a carrier who can no longer reach the endzone in time. Was read
 /// from FFB_HOPELESS_DAMP on every `value_at` call while it was being fitted; frozen because
@@ -4413,43 +4481,20 @@ impl HeuristicAgent {
             // ── skill use (§6.16) ───────────────────────────────────────────
             AgentPrompt::SkillUse { skill_name, player_id, .. } => {
                 let skill_id = SkillId::from_class_name(&skill_name).unwrap_or(SkillId::Block);
-                let w_use = match skill_name.as_str() {
-                    // BACKLOG §M: Dump-Off is drivable now (StepInitPassing's DumpOffTarget park
-                    // / ParityRunner's DEFENDER_ACTION arm). Take it when the carrier has an
-                    // in-range team-mate to throw to; with none, keep the decline pin (an
-                    // accepted dump-off with no receiver would end the activation instead).
-                    "DumpOff" => {
-                        if crate::legal_actions::dump_off_receivers(g, &player_id).is_empty() {
-                            0.0
-                        } else {
-                            0.75
-                        }
-                    }
-                    "Dodge" => 0.95,
-                    "Juggernaut" => 0.80,
-                    "HitAndRun" => 0.70,
-                    "Fend" => 0.85,
-                    "Wrestle" => 0.55,
-                    "QuickBite" | "AnimalSavagery" => 0.85,
-                    // The skills whose USE path no harness can drive (DumpOff enters an
-                    // undriveable INIT_PASSING, PrimalSavagery/Swoop open target dialogs,
-                    // SafePairOfHands a PLACE_BALL coach dialog, and TRICKSTER needs a follow-up
-                    // CLIENT_MOVE naming one of `StepTrickster.eligibleSquares` that ParityRunner
-                    // never sends -- so an ACCEPT leaves the step parked and Java re-shows the
-                    // dialog forever: gnome bb2020 seed 2 asked Trickster at draws 233/235/237/239
-                    // and ran 1965 agent events against Rust's 536): pinned to DECLINE, still
-                    // spending the sampler draws. Mirrored in HeuristicDriver.useSkill.
-                    // Trickster left this list in BACKLOG §K item 6: both harnesses now answer
-                    // its square wait (TricksterMove here, ParityRunner's TRICKSTER step arm).
-                    // BACKLOG §M: accepting leads into the already-driven ANIMAL_SAVAGERY PlayerChoice.
-                    "PrimalSavagery" => 0.75,
-                    // BACKLOG §M: the SWOOP target wait is driven (SwoopTarget / sendSwoopTarget).
-                    "Swoop" => 0.75,
-                    // BACKLOG §M: drivable now (PlaceBallSquare / ParityRunner PLACE_BALL arm).
-                    "SafePairOfHands" => 0.75,
-                    _ => 0.50,
-                };
-                let w_use = coverage_biased(w_use);
+                // BACKLOG §M phase 3: one lookup in the shared policy table
+                // (data/agent/skill_policy.json, read verbatim by Java's SkillPolicy).
+                let row = SkillPolicy::get().row(&skill_name);
+                let mut w_use = row.use_milli as f32 / 1000.0;
+                // Dump-Off is drivable (StepInitPassing's DumpOffTarget park / ParityRunner's
+                // DEFENDER_ACTION arm), but only with an in-range team-mate to throw to; with
+                // none it keeps the decline pin (an accepted dump-off with no receiver would end
+                // the activation instead). The one board-dependent row, in code in both agents.
+                if skill_name == "DumpOff"
+                    && crate::legal_actions::dump_off_receivers(g, &player_id).is_empty()
+                {
+                    w_use = 0.0;
+                }
+                let w_use = coverage_biased(w_use, row.coverage_milli);
                 self.buf.push(
                     Action::UseSkill { skill_id, use_skill: true },
                     w_use,
@@ -5148,6 +5193,26 @@ fn handoff_weight(f: &Features, g: &Game, tc: FieldCoordinate, rcv: &str, m: &Mo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// §M phase 3: the shipped table parses, and its rows give the f32 weights the hand-written
+    /// match used to (milli / 1000 is correctly rounded, so 950/1000 IS the literal 0.95f32).
+    #[test]
+    fn skill_policy_embedded_table_parses_and_keeps_the_old_weights() {
+        let p = SkillPolicy::parse(SkillPolicy::EMBEDDED).expect("embedded table parses");
+        assert_eq!(p.row("Dodge").use_milli as f32 / 1000.0, 0.95f32);
+        assert_eq!(p.row("Wrestle").use_milli as f32 / 1000.0, 0.55f32);
+        assert_eq!(p.row("NobodyTabulatedThis").use_milli, 500, "unlisted -> default");
+        assert_eq!(p.row("NobodyTabulatedThis").coverage_milli, 1000);
+    }
+
+    #[test]
+    fn skill_policy_rejects_unknown_names_and_out_of_range_weights() {
+        assert!(SkillPolicy::parse(r#"{"skills":{"NotASkill":{"use":500}}}"#).is_err());
+        assert!(SkillPolicy::parse(r#"{"skills":{"Dodge":{"use":1001}}}"#).is_err());
+        assert!(SkillPolicy::parse(r#"{"skills":{"Dodge":{"use":0.5}}}"#).is_err());
+        let p = SkillPolicy::parse(r#"{"default":{"use":300,"coverage":0},"skills":{"Dodge":{"use":900}}}"#).unwrap();
+        assert_eq!(p.row("Dodge"), SkillPolicyRow { use_milli: 900, coverage_milli: 0 }, "row inherits the default's coverage");
+    }
 
     /// The feature-cache stamp must change when a chain push moves two players one
     /// square each. The old stamp summed weakly-mixed per-player terms, and this

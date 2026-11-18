@@ -1,0 +1,17 @@
+{
+  "_doc": "BACKLOG §M phase 3: the heuristic agents' answer to a SkillUse offer, read VERBATIM by both engines (Rust SkillPolicy, Java SkillPolicy; the CLI exports FFB_SKILL_POLICY). use = weight of USING the skill when offered, in thousandths (softmax T=0.20 over use vs 1000-use). coverage = how strongly --coverage-bias B pulls it toward use: w + (B*coverage/1000)*(1-w). Keys are SkillId / Java class simple names. DumpOff with no in-range receiver is pinned to 0 in code in both agents.",
+  "default": { "use": 500, "coverage": 1000 },
+  "skills": {
+    "Dodge":           { "use": 950 },
+    "Juggernaut":      { "use": 800 },
+    "HitAndRun":       { "use": 700 },
+    "Fend":            { "use": 850 },
+    "Wrestle":         { "use": 550 },
+    "QuickBite":       { "use": 850 },
+    "AnimalSavagery":  { "use": 850 },
+    "DumpOff":         { "use": 750 },
+    "PrimalSavagery":  { "use": 750 },
+    "Swoop":           { "use": 750 },
+    "SafePairOfHands": { "use": 750 }
+  }
+}

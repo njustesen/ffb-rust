@@ -236,6 +236,27 @@ fn main() {
 
     let args = ParityArgs::parse();
 
+    // BACKLOG §M phase 3: both agents must score skill offers from the SAME policy table. Export
+    // its absolute path once; this process (SkillPolicy::get) and the Java child (SkillPolicy.java)
+    // both read FFB_SKILL_POLICY. Without the data file (a binary run elsewhere), materialise the
+    // compiled-in copy so Java still sees exactly what Rust uses.
+    if std::env::var_os("FFB_SKILL_POLICY").is_none() {
+        let on_disk = ["data/agent/skill_policy.json", "ffb-rust/data/agent/skill_policy.json"]
+            .iter().map(std::path::PathBuf::from).find(|p| p.exists());
+        let path = match on_disk {
+            Some(p) => std::fs::canonicalize(&p).unwrap_or(p),
+            None => {
+                let p = std::env::temp_dir().join(format!("ffb_skill_policy_{}.json", std::process::id()));
+                std::fs::write(&p, ffb_engine::agent::SkillPolicy::EMBEDDED)
+                    .unwrap_or_else(|e| { eprintln!("skill policy: {e}"); std::process::exit(2) });
+                p
+            }
+        };
+        std::env::set_var("FFB_SKILL_POLICY", path.to_string_lossy().trim_start_matches(r"\\?\").to_string());
+    }
+    // Fail fast on a malformed table, before any JVM starts.
+    let _ = ffb_engine::agent::SkillPolicy::get();
+
     // Star tier: give Java a private server dir holding the two squads with their stars, so the
     // shared ffb-server/teams tree never grows a variant per (squad, star).
     if stars::star_for("home").is_some() || stars::star_for("away").is_some() {

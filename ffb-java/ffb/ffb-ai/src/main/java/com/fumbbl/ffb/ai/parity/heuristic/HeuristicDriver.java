@@ -64,9 +64,12 @@ public final class HeuristicDriver {
         }
     }
 
-    /** Rust {@code coverage_biased}: {@code w + B * (1 - w)}; a 0.0 pin stays 0.0. */
-    public static float coverageBiased(float wUse) {
-        float b = COVERAGE_BIAS;
+    /**
+     * Rust {@code coverage_biased}: {@code w + (B * c) * (1 - w)} with {@code c = coverage / 1000}
+     * from the policy row; a 0.0 pin stays 0.0. Same f32 operation order as Rust.
+     */
+    public static float coverageBiased(float wUse, int coverageMilli) {
+        float b = COVERAGE_BIAS * ((float) coverageMilli / 1000.0f);
         return (b > 0.0f && wUse > 0.0f) ? wUse + b * (1.0f - wUse) : wUse;
     }
 
@@ -177,36 +180,17 @@ public final class HeuristicDriver {
      * team-mate ({@code ParityRunner.dumpOffReceivers}), else the 0.0 decline pin.
      */
     public boolean useSkill(String skillName, Game game, String playerId) {
-        float wUse;
-        if ("DumpOff".equals(skillName)) {
-            wUse = (game != null && playerId != null
-                && !com.fumbbl.ffb.ai.parity.ParityRunner.dumpOffReceivers(game, playerId).isEmpty())
-                ? 0.75f : 0.0f;
-        } else if ("Dodge".equals(skillName)) {
-            wUse = 0.95f;
-        } else if ("Juggernaut".equals(skillName)) {
-            wUse = 0.80f;
-        } else if ("HitAndRun".equals(skillName)) {
-            wUse = 0.70f;
-        } else if ("Fend".equals(skillName)) {
-            wUse = 0.85f;
-        } else if ("Wrestle".equals(skillName)) {
-            wUse = 0.55f;
-        } else if ("QuickBite".equals(skillName) || "AnimalSavagery".equals(skillName)) {
-            wUse = 0.85f;
-        } else if ("SafePairOfHands".equals(skillName)) {
-            // BACKLOG §M: drivable now (ParityRunner's PLACE_BALL arm); mirror of the Rust 0.75.
-            wUse = 0.75f;
-        } else if ("Swoop".equals(skillName)) {
-            // BACKLOG §M: the SWOOP target wait is driven (sendSwoopTarget); mirror of Rust 0.75.
-            wUse = 0.75f;
-        } else if ("PrimalSavagery".equals(skillName)) {
-            // BACKLOG §M: accepting leads into the already-driven ANIMAL_SAVAGERY PlayerChoice.
-            wUse = 0.75f;
-        } else {
-            wUse = 0.50f;
+        // BACKLOG §M phase 3: one lookup in the shared policy table, mirror of the Rust arm.
+        SkillPolicy.Row row = SkillPolicy.get().row(skillName);
+        float wUse = (float) row.useMilli / 1000.0f;
+        // DumpOff needs an in-range receiver (ParityRunner.dumpOffReceivers); with none it keeps
+        // the decline pin. The one board-dependent row, in code in both agents.
+        if ("DumpOff".equals(skillName)
+            && (game == null || playerId == null
+                || com.fumbbl.ffb.ai.parity.ParityRunner.dumpOffReceivers(game, playerId).isEmpty())) {
+            wUse = 0.0f;
         }
-        wUse = coverageBiased(wUse);
+        wUse = coverageBiased(wUse, row.coverageMilli);
         sampler.clear();
         sampler.push(wUse);          // index 0: use it
         sampler.push(1.0f - wUse);   // index 1: decline
