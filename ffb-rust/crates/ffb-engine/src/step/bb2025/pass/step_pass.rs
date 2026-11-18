@@ -58,6 +58,9 @@ pub struct StepPass {
     // AbstractStepWithReRoll fields
     pub re_rolled_action: Option<String>,
     pub re_roll_source: Option<String>,
+    /// The passing distance this execution computed (`None` = out of range). Published as
+    /// Java's PASSING_DISTANCE -- see `with_passing_distance`.
+    pub computed_passing_distance: Option<PassingDistance>,
 }
 
 impl StepPass {
@@ -80,6 +83,23 @@ impl StepPass {
             pass_skill_source: None,
             re_rolled_action: None,
             re_roll_source: None,
+            computed_passing_distance: None,
+        }
+    }
+
+    /// Java bb2020/bb2025 StepPass: `publishParameter(from(PASSING_DISTANCE, passingDistance))`
+    /// at the fresh accuracy roll. StepEndPassing reads it for Running Pass
+    /// (`allowMoverAfterPass = QUICK_PASS == passingDistance && canMoveAfterQuickPass`). Rust
+    /// never published it, so StepEndPassing always saw `None` and Running Pass could never
+    /// continue the thrower's move (BACKLOG §M phase 2: goblin_sk bb2020). The distance is fixed
+    /// for the whole pass, so publishing it on every outcome is equivalent; an out-of-range pass
+    /// (Java publishes null) publishes nothing, leaving the receiver's `None`. bb2016's Java
+    /// StepPass publishes no distance (and has no Running Pass), so it is skipped there.
+    fn with_passing_distance(&self, game: &Game, out: StepOutcome) -> StepOutcome {
+        match self.computed_passing_distance {
+            Some(d) if game.rules != ffb_model::enums::Rules::Bb2016 =>
+                out.publish(StepParameter::PassingDistance(d)),
+            _ => out,
         }
     }
 }
@@ -125,7 +145,8 @@ impl Step for StepPass {
         game.interceptor_chosen = false;
         game.pass_interceptor_id = None;
         game.pass_old_turn_mode = None;
-        self.execute_step(game, rng)
+        let out = self.execute_step(game, rng);
+        self.with_passing_distance(game, out)
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
@@ -162,7 +183,8 @@ impl Step for StepPass {
             }
             _ => {}
         }
-        self.execute_step(game, rng)
+        let out = self.execute_step(game, rng);
+        self.with_passing_distance(game, out)
     }
 
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
@@ -450,6 +472,7 @@ impl StepPass {
         let passing_dist: Option<PassingDistance> =
             crate::mechanic::pass_mechanic_for(game.rules)
                 .find_passing_distance(game, thrower_coord, game.pass_coordinate, false);
+        self.computed_passing_distance = passing_dist;
 
         // Java: PassModifierFactory.findModifiers(new PassContext(game, thrower, passingDistance, false))
         //

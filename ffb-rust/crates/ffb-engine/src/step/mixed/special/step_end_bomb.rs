@@ -97,6 +97,11 @@ impl StepEndBomb {
             // Rust's engine rejected him as inactive and the activation streams forked).
             // (`game.original_bombardier` is the Rust home of Java's PassState.originalBombardier;
             // the older comment claiming PassState is an all-None stub predates it.)
+            // Java `PlayerState playerState = fieldModel.getPlayerState(originalBomber)` -- captured
+            // BEFORE the acting-player hand-back below; the allowMoveAfterBomb branch re-activates
+            // the bomber from THIS state.
+            let bomber_state_before = game.original_bombardier.clone()
+                .and_then(|o| game.field_model.player_state(&o));
             if let Some(orig) = game.original_bombardier.clone() {
                 if game.acting_player.player_id.as_deref() != Some(orig.as_str()) {
                     // Java captures the bomber's PlayerState BEFORE changePlayerAction — the
@@ -180,6 +185,32 @@ impl StepEndBomb {
                 }
                 // throw_two_bombs == Some(true) but conditions above failed (end_turn / no
                 // tacklezones): Java pushes EndPlayerAction like the default path.
+            } else if !self.end_turn && game.allow_move_after_bomb {
+                // Java StepEndBomb :135-142 `else if (!fEndTurn && state.isAllowMoveAfterBomb())`
+                // -- the Running Pass bombardier keeps moving (never ported; BACKLOG §M phase 2):
+                //   changePlayerAction(null)  (so the player base is set correctly)
+                //   setPlayerState(originalBomber, playerState.changeActive(true))
+                //   changePlayerAction(originalBomber, MOVE); Move.pushSequence
+                //   actingPlayer.markSkillUsed(enableThrowBombAction)
+                crate::step::util_server_steps::change_player_action_to_none(game);
+                if let Some(ps) = bomber_state_before {
+                    game.field_model.set_player_state(&bomber_id, ps.change_active(true));
+                }
+                change_player_action(game, &bomber_id, PlayerAction::Move, false);
+                let bomb_skill = game.player(&bomber_id).and_then(|p| p.skill_id_with_property(
+                    ffb_model::model::property::named_properties::NamedProperties::ENABLE_THROW_BOMB_ACTION));
+                if let Some(skill) = bomb_skill {
+                    crate::step::util_server_steps::mark_skill_used(game, &bomber_id, skill);
+                }
+                let seq = crate::step::generator::bb2025::move_::Move::build_sequence(
+                    &crate::step::generator::bb2025::move_::MoveParams {
+                        rules: game.rules,
+                        ..Default::default()
+                    });
+                game.pass_coordinate = None;
+                game.thrower_id = None;
+                game.thrower_action = None;
+                return StepOutcome::next().push_seq(seq);
             }
             let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
                 feeding_allowed: false,

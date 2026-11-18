@@ -827,8 +827,12 @@ mod tests {
         }
     }
 
+    /// Java bb2020's `PilingOn` registers NO properties (`eligible() == false`; only bb2016's
+    /// PilingOn and every edition's BallAndChain register canPileOnOpponent), so a bb2020 player
+    /// whose only source is Piling On is NEVER offered the pile-on (BACKLOG §M phase 2 sweep:
+    /// khorne_sk bb2020 -- Rust offered it from the edition-blind property union).
     #[test]
-    fn bb2020_defender_falling_piling_on_eligible_returns_continue() {
+    fn bb2020_piling_on_skill_alone_is_not_offered() {
         let mut game = make_game_with_rules(Rules::Bb2020);
         // PILING_ON_USES_A_TEAM_REROLL factory default is `true` (reroll variant); disable it to
         // exercise the classic bb2020 piling-on where the attacker is dropped prone.
@@ -841,9 +845,9 @@ mod tests {
 
         let mut step = StepDropFallingPlayers::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
-        assert_eq!(out.action, StepAction::Continue);
-        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::SteadyFootingContext(_))),
-            "should wait for the PilingOn dialog response, not publish yet");
+        assert_ne!(out.action, StepAction::Continue, "bb2020 Piling On grants no canPileOnOpponent");
+        assert!(!matches!(out.prompt, Some(AgentPrompt::PilingOn { .. })),
+            "no PilingOn dialog under bb2020, got {:?}", out.prompt);
     }
 
     #[test]

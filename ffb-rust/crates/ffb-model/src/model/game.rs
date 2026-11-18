@@ -98,6 +98,11 @@ pub struct Game {
     /// the 4+ sent-off roll is pending; None = not in an All You Can Eat action.
     #[serde(default)]
     pub throw_two_bombs: Option<bool>,
+    /// Java: PassState.allowMoveAfterBomb — set by StepEndPassing for a Running Pass bombardier
+    /// (Quick Pass bomb, no fumble), read by StepEndBomb to hand the bomber a MOVE afterwards.
+    /// Cleared with the rest of the bomb state (Java PassState.reset at end of turn).
+    #[serde(default)]
+    pub allow_move_after_bomb: bool,
     pub waiting_for_opponent: bool,
     pub timeout_possible: bool,
     pub timeout_enforced: bool,
@@ -190,6 +195,7 @@ impl Game {
             pass_interceptor_id: None,
             pass_old_turn_mode: None,
             throw_two_bombs: None,
+            allow_move_after_bomb: false,
             waiting_for_opponent: false,
             timeout_possible: false,
             timeout_enforced: false,
@@ -378,6 +384,7 @@ impl Game {
         self.pass_coordinate = None;
         self.original_bombardier = None;
         self.throw_two_bombs = None;
+        self.allow_move_after_bomb = false;
         self.acting_player.clear();
         self.turn_data_home.reset_for_turn();
         self.turn_data_away.reset_for_turn();

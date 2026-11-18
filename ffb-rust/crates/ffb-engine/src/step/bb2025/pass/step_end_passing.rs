@@ -193,6 +193,27 @@ impl StepEndPassing {
             game.thrower_action == Some(PlayerAction::HandOver)
             && thrower_has_hand_off_skill;
 
+        // Java PassState.setAllowMoveAfterBomb -- the Running Pass bombardier keeps moving after
+        // a Quick Pass bomb (StepEndBomb reads it). The two editions write it differently:
+        //   bb2020 :175-177  allowMoveAfterBomb = allowMoverAfterPass && !dontDropFumble
+        //                      && actingPlayer == originalBombardier;   (always assigned)
+        //   bb2025 :178-180  if (actingPlayer == originalBombardier)
+        //                      setAllowMoveAfterBomb(allowMoverAfterPass && !dontDropFumble);
+        // Never ported: a Running Pass bomb ended the bomber's activation in Rust where Java hands
+        // it a MOVE (BACKLOG §M phase 2: goblin_sk bb2020 -- Java reported `playerAction move`).
+        let acting_is_bombardier = game.acting_player.player_id.is_some()
+            && game.acting_player.player_id == game.original_bombardier;
+        match game.rules {
+            ffb_model::enums::Rules::Bb2020 => {
+                game.allow_move_after_bomb =
+                    allow_move_after_pass && !self.dont_drop_fumble && acting_is_bombardier;
+            }
+            ffb_model::enums::Rules::Bb2025 if acting_is_bombardier => {
+                game.allow_move_after_bomb = allow_move_after_pass && !self.dont_drop_fumble;
+            }
+            _ => {}
+        }
+
         // Java path 3: bomb turn → Bomb generator
         // Java: if (StringTool.isProvided(fInterceptorId))
         //         bombGenerator.pushSequence(new Bomb.SequenceParams(gs, fInterceptorId, fPassFumble, dontDropFumble))
