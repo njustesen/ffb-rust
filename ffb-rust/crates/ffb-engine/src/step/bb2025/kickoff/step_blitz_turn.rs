@@ -8,6 +8,7 @@ use crate::step::framework::{Step, StepOutcome, SequenceStep};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::generator::bb2025::Select;
 use crate::step::generator::bb2025::select::SelectParams;
+use crate::util::util_server_game::UtilServerGame;
 
 /// Executes the Charge/Blitz! kickoff result turn.
 ///
@@ -78,6 +79,15 @@ impl StepBlitzTurn {
             SetupMechanic::new().pin_players_in_tacklezones_chain(game, &blitzing_team_id, true);
             // no-op: headless engine has no turn timer; stopTurnTimer/startTurnTimer are server-only
             game.start_turn();
+            // Java bb2016.StepBlitzTurn:106 `UtilServerGame.updatePlayerStateDependentProperties(this)`
+            // right after startTurn(); bb2025's class has no such call. BB2016 Blitz! kick-offs run
+            // this shared body (only BB2020 delegates to its twin above), so without the call a
+            // Leader on the pitch was announced one turn late -- hidden until the companion fix in
+            // StepKickoff stopped announcing it (wrongly) at the kick-off for BB2016/BB2020
+            // (BACKLOG §M phase 2: human_sk bb2016 seeds 4/7/13/18/19).
+            if game.rules == ffb_model::enums::Rules::Bb2016 {
+                UtilServerGame::update_player_state_dependent_properties(game);
+            }
             game.turn_mode = TurnMode::Blitz;
             // Java: pushCurrentStepOnStack(); Select.pushSequence(gameState, true)
             let self_seq = vec![SequenceStep::new(StepId::BlitzTurn)];

@@ -55,8 +55,16 @@ impl StepKickoff {
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         match self.kickoff_start_coordinate {
             Some(coord) => {
-                // Java: UtilServerGame.updatePlayerStateDependentProperties(this)
-                UtilServerGame::update_player_state_dependent_properties(game);
+                // Java bb2025.StepKickoff:78 `UtilServerGame.updatePlayerStateDependentProperties(this)`.
+                // BB2016/BB2020 run this shared file too, but their Java class is
+                // mixed.kickoff.StepKickoff, which has NO such call: under those editions a Leader
+                // on the pitch was announced (ReportLeader + its re-roll) at the kick-off, where
+                // Java first announces it at the end of the kicking turn (BACKLOG §M phase 2 skill
+                // sweep: human_sk / norse_sk / dark_elf_league_fumbbl_sk bb2016, khemri_sk /
+                // skaven_sk / wood_elf_sk bb2020 -- reports 0/20 with steps 20/20).
+                if game.rules == ffb_model::enums::Rules::Bb2025 {
+                    UtilServerGame::update_player_state_dependent_properties(game);
+                }
                 // Java: pushSequence(InducementPhase.BEFORE_KICKOFF_SCATTER, home_playing)
                 // Java: pushSequence(InducementPhase.BEFORE_KICKOFF_SCATTER, !home_playing)
                 let seq_home = Inducement::build_sequence(&InducementParams {
