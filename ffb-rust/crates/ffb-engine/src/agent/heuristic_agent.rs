@@ -195,8 +195,40 @@ fn with_special_declarations(g: &Game, action: Action) -> Action {
                 block_defender_id: Some(target),
             }
         }
+        // Vicious Vines (§M): a Move by a player the client would offer VICIOUS_VINES to
+        // (LogicModule.isViciousVinesAvailable) goes out as VICIOUS_VINES + CLIENT_BLOCK on the
+        // first coordinate-sorted opponent two squares away. Zero draws; mirrored by
+        // ParityRunner.sendStarSpecialDeclaration's MOVE case.
+        Action::ActivatePlayer { player_id, player_action: PlayerActionChoice::Move, block_defender_id: None }
+            if vicious_vines_target(g, &player_id).is_some() =>
+        {
+            let target = vicious_vines_target(g, &player_id);
+            Action::ActivatePlayer { player_id, player_action: PlayerActionChoice::ViciousVines, block_defender_id: target }
+        }
         other => other,
     }
+}
+
+fn vicious_vines_target(g: &Game, player_id: &str) -> Option<String> {
+    use ffb_model::model::property::named_properties::NamedProperties as NP;
+    use ffb_model::util::util_cards::UtilCards;
+    use ffb_model::util::util_player::UtilPlayer;
+    let p = g.player(player_id)?;
+    let state = g.field_model.player_state(player_id)?;
+    if !state.is_active() || state.base() != ffb_model::enums::PS_STANDING
+        || g.turn_mode == ffb_model::enums::TurnMode::Blitz
+        || UtilCards::get_unused_skill_with_property(p, NP::CAN_BLOCK_OVER_DISTANCE).is_none()
+    {
+        return None;
+    }
+    let coord = g.field_model.player_coordinate(player_id)?;
+    let opponents = if g.team_home.has_player(player_id) { &g.team_away } else { &g.team_home };
+    let mut targets: Vec<(i32, i32, String)> = UtilPlayer::find_blockable_players_two_squares_away(g, opponents, coord)
+        .into_iter()
+        .filter_map(|id| g.field_model.player_coordinate(id).map(|c| (c.x, c.y, id.clone())))
+        .collect();
+    targets.sort();
+    targets.into_iter().next().map(|(_, _, id)| id)
 }
 
 fn kick_em_applies(g: &Game, player_id: &str, target: &str) -> bool {

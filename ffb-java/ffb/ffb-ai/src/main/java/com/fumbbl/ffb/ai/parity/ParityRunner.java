@@ -3900,6 +3900,33 @@ public class ParityRunner {
                     stn.get(), true, playerId, null, false));
                 return true;
             }
+            case MOVE: {
+                // Vicious Vines (§M): a Move by a player the client would offer VICIOUS_VINES to
+                // (LogicModule.isViciousVinesAvailable) goes out as VICIOUS_VINES + CLIENT_BLOCK on
+                // the first coordinate-sorted opponent two squares away. Zero draws; mirrors
+                // heuristic_agent.rs vicious_vines_target.
+                Player<?> vp = game.getPlayerById(playerId);
+                FieldModel vfm = game.getFieldModel();
+                PlayerState vps = vp == null ? null : vfm.getPlayerState(vp);
+                FieldCoordinate vpc = vp == null ? null : vfm.getPlayerCoordinate(vp);
+                if (vps == null || vpc == null || !vps.isActive() || vps.getBase() != PlayerState.STANDING
+                    || game.getTurnMode() == com.fumbbl.ffb.TurnMode.BLITZ
+                    || !vp.hasUnusedSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canBlockOverDistance)) {
+                    return false;
+                }
+                Player<?>[] vTargets = com.fumbbl.ffb.util.UtilPlayer.findBlockablePlayersTwoSquaresAway(game,
+                    game.getOtherTeam(vp.getTeam()), vpc);
+                if (vTargets == null || vTargets.length == 0) {
+                    return false;
+                }
+                List<Player<?>> vList = new ArrayList<>(java.util.Arrays.asList(vTargets));
+                sortPlayersByCoordinate(vList, vfm);
+                MatchRunner.inject(gameState,
+                    new ClientCommandActingPlayer(playerId, PlayerAction.VICIOUS_VINES, false));
+                MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandBlock(
+                    playerId, vList.get(0).getId(), false, false, false, false, false));
+                return true;
+            }
             case FOUL_MOVE: {
                 // Kick 'em while they're down! (§M): a foul on an opponent ALREADY adjacent, by a
                 // standing player whose Kick 'em is unused and who blocks like a chainsaw, goes

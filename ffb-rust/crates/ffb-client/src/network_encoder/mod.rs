@@ -447,6 +447,7 @@ fn choice_to_player_action(choice: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::PassMoveFired => PlayerAction::PassMove,
         PlayerActionChoice::ShotToNothing | PlayerActionChoice::ShotToNothingFired => PlayerAction::PassMove,
         PlayerActionChoice::KickEmBlock => PlayerAction::KickEmBlock,
+        PlayerActionChoice::ViciousVines => PlayerAction::ViciousVines,
         PlayerActionChoice::HandOffMoveFired => PlayerAction::HandOverMove,
         PlayerActionChoice::ThrowTeamMate => PlayerAction::ThrowTeamMate,
         PlayerActionChoice::KickTeamMate => PlayerAction::KickTeamMate,

@@ -505,6 +505,8 @@ impl Step for StepInitSelecting {
                     | PlayerActionChoice::ProjectileVomit | PlayerActionChoice::BreatheFire
                     // KICK_EM_BLOCK + CLIENT_BLOCK(usingChainsaw): the same BLOCK dispatch.
                     | PlayerActionChoice::KickEmBlock
+                    // VICIOUS_VINES + CLIENT_BLOCK on a target two squares away: BLOCK dispatch.
+                    | PlayerActionChoice::ViciousVines
                 );
                 self.force_goto_on_dispatch = special_block || matches!(
                     player_action,
@@ -1142,6 +1144,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::ShotToNothing => PlayerAction::PassMove,
         PlayerActionChoice::ShotToNothingFired => PlayerAction::Pass,
         PlayerActionChoice::KickEmBlock => PlayerAction::KickEmBlock,
+        PlayerActionChoice::ViciousVines => PlayerAction::ViciousVines,
         PlayerActionChoice::HandOffMoveFired => PlayerAction::HandOver,
         PlayerActionChoice::StandUp => PlayerAction::StandUp,
         PlayerActionChoice::StandUpBlitz => PlayerAction::StandUpBlitz,

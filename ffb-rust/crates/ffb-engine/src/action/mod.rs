@@ -302,6 +302,9 @@ pub enum PlayerActionChoice {
     /// declared then answered with CLIENT_BLOCK(usingChainsaw) on an adjacent DOWNED opponent
     /// (KickEmBlockLogicModule). Rust folds the target into the declaration.
     KickEmBlock,
+    /// Vicious Vines (bb2020+ star skill): Java PlayerAction.VICIOUS_VINES + CLIENT_BLOCK on an
+    /// opponent TWO squares away (BlockLogicExtension). Rust folds the target in.
+    ViciousVines,
 }
 
 impl PlayerActionChoice {
