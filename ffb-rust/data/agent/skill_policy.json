@@ -1,17 +1,26 @@
 {
-  "_doc": "BACKLOG §M phase 3: the heuristic agents' answer to a SkillUse offer, read VERBATIM by both engines (Rust SkillPolicy, Java SkillPolicy; the CLI exports FFB_SKILL_POLICY). use = weight of USING the skill when offered, in thousandths (softmax T=0.20 over use vs 1000-use). coverage = how strongly --coverage-bias B pulls it toward use: w + (B*coverage/1000)*(1-w). Keys are SkillId / Java class simple names. DumpOff with no in-range receiver is pinned to 0 in code in both agents.",
-  "default": { "use": 500, "coverage": 1000 },
+  "_doc": "BACKLOG §M phase 3: the heuristic agents' answer to a SkillUse offer, read VERBATIM by both engines (Rust SkillPolicy, Java SkillPolicy; the CLI exports FFB_SKILL_POLICY). use = weight of USING the skill when offered, in thousandths (softmax T=0.20 over use vs 1000-use); hand-set by game value. coverage = how strongly --coverage-bias B pulls it toward use: w + (B*coverage/1000)*(1-w); GENERATED from an offer census by scripts/skill_policy_coverage.py. Keys are Java class simple names (edition spellings differ: SideStep/Sidestep). DumpOff with no in-range receiver is pinned to 0 in code in both agents.",
+  "default": {"use": 500, "coverage": 1000},
   "skills": {
-    "Dodge":           { "use": 950 },
-    "Juggernaut":      { "use": 800 },
-    "HitAndRun":       { "use": 700 },
-    "Fend":            { "use": 850 },
-    "Wrestle":         { "use": 550 },
-    "QuickBite":       { "use": 850 },
     "AnimalSavagery":  { "use": 850 },
-    "DumpOff":         { "use": 750 },
+    "Dodge":           { "use": 950, "coverage": 1000 },
+    "DumpOff":         { "use": 750, "coverage": 1000 },
+    "Fend":            { "use": 850, "coverage": 1000 },
+    "Grab":            { "use": 750, "coverage": 1000 },
+    "HitAndRun":       { "use": 700, "coverage": 1000 },
+    "Juggernaut":      { "use": 800, "coverage": 1000 },
+    "Pass":            { "use": 950, "coverage": 1000 },
     "PrimalSavagery":  { "use": 750 },
-    "Swoop":           { "use": 750 },
-    "SafePairOfHands": { "use": 750 }
+    "QuickBite":       { "use": 850 },
+    "SafePairOfHands": { "use": 750, "coverage": 1000 },
+    "SafePass":        { "use": 900, "coverage": 1000 },
+    "SideStep":        { "use": 850, "coverage": 500 },
+    "Sidestep":        { "use": 850, "coverage": 500 },
+    "StandFirm":       { "use": 750, "coverage": 1000 },
+    "SteadyFooting":   { "use": 950, "coverage": 500 },
+    "Swoop":           { "use": 750, "coverage": 1000 },
+    "Taunt":           { "use": 600, "coverage": 1000 },
+    "Trickster":       { "use": 600, "coverage": 1000 },
+    "Wrestle":         { "use": 550, "coverage": 1000 }
   }
 }

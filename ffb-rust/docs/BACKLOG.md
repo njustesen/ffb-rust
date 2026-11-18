@@ -9794,3 +9794,27 @@ Deferred, with the reason (each needs a design decision or a larger port):
 - **Forgo** (stalling check on): the client offers it to any standing player; there is no zero-draw
   trigger that maps onto an existing heuristic decision (the activation declaration carries no
   path, so "a Move that stays put" is not visible at declaration time in either agent).
+
+### Phase 3 status (2026-11-18) — skill-use policy table
+
+- **One shared table**, `data/agent/skill_policy.json`: per skill `use` (base weight of accepting
+  a SkillUse offer) and `coverage` (how strongly `--coverage-bias B` applies:
+  `w + (B*coverage/1000)*(1-w)`), integer milli-weights. Both agents read the SAME file at
+  runtime -- the CLI exports `FFB_SKILL_POLICY` (Rust `SkillPolicy`, Java `SkillPolicy.java`);
+  Rust embeds a compile-time fallback, Java's fallback walks up to `ffb-rust/data/agent/`. A
+  malformed table or an unknown skill name is fatal. DumpOff's no-receiver pin stays in code.
+- **Refactor commit is behaviour-identical** (milli/1000 is the literal f32). Proof both engines
+  read the file: an overridden table (Dodge use=100) stayed 20/20 with 3/20 games changed = the 3
+  Dodge offers in that window.
+- **Offer census** (Rust-only bench, 30 seeds x every race mirror x 3 editions, FFB_DRAWS RSKILL):
+  the big 0.50 coin flips were SideStep/Sidestep (~700 offers/edition), StandFirm (190-760),
+  bb2025 SteadyFooting (336), the Pass skill re-roll, Taunt, Trickster. Rare (<=6 offers):
+  DumpOff, Swoop, Grab, SafePass, SafePairOfHands. Re-run the census with the scratch
+  `offers.sh` loop; `scripts/skill_policy_coverage.py <census> <seeds> --write` regenerates the
+  `coverage` column (>=1 offer/game -> 0, >=0.25 -> 500, else 1000; lowest rate over editions).
+- **Tuned `use`** by game value: Pass re-roll 950, SteadyFooting 950, SafePass 900, Side Step 850,
+  Stand Firm 750, Grab 750, Taunt 600, Trickster 600 (others unchanged).
+- Gates (20 seeds, steps + reports identical): gnome bb2025 cb0, high_elf bb2025 cb1.0, elf
+  bb2020 cb0.5, halfling bb2016 cb0, orc bb2025 @1e6 -- all 20/20.
+- NOT measured: play strength of the new `use` weights (phase 4 does the >=12800-game A/B).
+- Next: phase 2 (skill-advancement drafts).
