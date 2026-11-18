@@ -142,7 +142,20 @@ impl Step for StepSwoop {
                     .unwrap_or(game.home_playing);
                 let to = if is_home_player { *coord } else { coord.transform() };
                 self.coordinate_to = Some(to);
+                if game.rules == Rules::Bb2025 {
+                    // Java bb2025 StepSwoop: executeSwoop() → bb2025 SwoopBehaviour hook.
+                    return self.execute_swoop_bb2025(game, rng);
+                }
                 return self.execute_swoop(game, rng, to);
+            }
+            // Java bb2025 StepSwoop CLIENT_USE_RE_ROLL: reRollSource / reRolledAction from the
+            // command, then executeSwoop(). A declined offer carries no source.
+            Action::UseReRoll { use_reroll } if game.rules == Rules::Bb2025 => {
+                self.re_rolled_action = Some("SWOOP_DIRECTION".into());
+                if !*use_reroll {
+                    self.re_roll_source = None;
+                }
+                return self.execute_swoop_bb2025(game, rng);
             }
             Action::Pass { coord } => {
                 // Java: CLIENT_SWOOP -> coordinateTo = swoopCommand.getTargetCoordinate()
@@ -185,6 +198,41 @@ impl Step for StepSwoop {
 }
 
 impl StepSwoop {
+    /// Java bb2025 `executeSwoop()` = `executeStepHooks(this, state)`, which runs
+    /// `skillbehaviour/bb2025/SwoopBehaviour` (ported as `SwoopStepModifier`): roll the throw-in
+    /// direction against the chosen square's template, report `swoopDirectionRoll`, offer a
+    /// SWOOP_DIRECTION re-roll, then publish DIRECTION + USING_SWOOP. The swooping player is the
+    /// ACTING player (`changeActingPlayer(thrownPlayerId, SWOOP)` above).
+    fn execute_swoop_bb2025(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        use crate::model::step_modifier::StepModifierTrait;
+        use crate::skill_behaviour::bb2025::swoop_behaviour::{SwoopStepHookState, SwoopStepModifier};
+        let mut state = SwoopStepHookState {
+            using_swoop: self.using_swoop.unwrap_or(false),
+            coordinate_from: self.coordinate_from,
+            coordinate_to: self.coordinate_to,
+            swoop_direction: self.swoop_direction,
+            re_rolled_action: self.re_rolled_action.clone(),
+            re_roll_source: self.re_roll_source.clone(),
+            player_id: game.acting_player.player_id.clone(),
+            outcome: None,
+        };
+        SwoopStepModifier.handle_execute_step(game, rng, &mut state);
+        self.coordinate_from = state.coordinate_from;
+        self.swoop_direction = state.swoop_direction;
+        match state.outcome {
+            Some(out) => {
+                if out.prompt.is_some() {
+                    // The offered re-roll: the agent's accept spends the team re-roll (the
+                    // StepPuntDirection / StepGoForIt convention).
+                    self.re_roll_source = Some("TRR".into());
+                }
+                out
+            }
+            // Java: the hook set no next action — the step keeps waiting.
+            None => StepOutcome::cont(),
+        }
+    }
+
     /// Java `bb2020/SwoopBehaviour.handleExecuteStepHook` (the bb2016 twin is the same shape): the
     /// chosen square only picks the TEMPLATE direction — the actual deflection is a throw-in
     /// direction roll interpreted against it, so a swoop still spreads over three directions.
@@ -337,21 +385,16 @@ impl StepSwoop {
             // BB2016/BB2020: Java WAITS here for CLIENT_SWOOP, so the agent must be asked. Surface
             // the offered squares (a bare `cont()` with no prompt reads as a stall to the headless
             // driver and abandons the throw).
-            if legacy_swoop {
-                let squares: Vec<ffb_model::types::FieldCoordinate> =
-                    game.field_model.move_squares.keys().copied().collect();
-                return outcome
-                    .publish(StepParameter::UsingSwoop(true))
-                    .with_prompt(AgentPrompt::SwoopTarget {
-                        player_id: player_id.clone(),
-                        squares,
-                    });
-            }
-            // Java: publishParameter(USING_SWOOP, true) then waits for CLIENT_SWOOP (a client
-            // coordinate dialog). Unreachable in the parity harness — both agents DECLINE Swoop
-            // above (usingSwoop=false → NEXT_STEP), so the throw_scatter/deflection path never
-            // runs. Kept 1:1 with Java for a real client; headless has no swoop-target dialog.
-            return outcome.publish(StepParameter::UsingSwoop(true));
+            // BB2025 waits the same way once Swoop is accepted (both agents accept it since §M,
+            // and ParityRunner answers the SWOOP wait with sendSwoopTarget in every edition).
+            let squares: Vec<ffb_model::types::FieldCoordinate> =
+                game.field_model.move_squares.keys().copied().collect();
+            return outcome
+                .publish(StepParameter::UsingSwoop(true))
+                .with_prompt(AgentPrompt::SwoopTarget {
+                    player_id: player_id.clone(),
+                    squares,
+                });
         }
 
         // coordinateTo is known -> executeSwoop hook handles the rest
@@ -369,6 +412,44 @@ mod tests {
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025)
+    }
+
+    /// bb2025: an accepted Swoop WAITS for the target square (SwoopTarget prompt), and the
+    /// CLIENT_SWOOP that answers it runs the bb2025 SwoopBehaviour hook — throw-in direction
+    /// roll, `swoopDirectionRoll` report, DIRECTION + USING_SWOOP published (no re-roll here:
+    /// the team has none). The hook was ported but never called, so the swoop stalled.
+    #[test]
+    fn bb2025_swoop_waits_for_target_then_rolls_direction() {
+        use ffb_model::enums::{PS_STANDING, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game();
+        add_player(&mut game, "thrower");
+        add_player(&mut game, "thrown");
+        game.team_home.players[1].starting_skills = vec![SkillWithValue::new(SkillId::Swoop)];
+        game.home_playing = true;
+        game.field_model.set_player_coordinate("thrown", FieldCoordinate { x: 4, y: 3 });
+        game.field_model.set_player_state("thrown", PlayerState::new(PS_STANDING).change_active(true));
+        game.acting_player.set_player("thrower".into(), PlayerAction::ThrowTeamMate);
+        game.pass_coordinate = Some(FieldCoordinate { x: 8, y: 6 });
+
+        let mut step = StepSwoop::new("fall".into());
+        step.thrown_player_id = Some("thrown".into());
+        step.thrown_player_coordinate = Some(FieldCoordinate { x: 4, y: 3 });
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        step.throw_scatter = true;
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::Swoop, use_skill: true }, &mut game, &mut rng);
+        assert!(matches!(out.prompt, Some(AgentPrompt::SwoopTarget { .. })),
+            "bb2025 waits for CLIENT_SWOOP, got {:?}", out.prompt);
+        let out = step.handle_command(
+            &Action::Swoop { coord: FieldCoordinate { x: 9, y: 6 } }, &mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::Direction(_))));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::UsingSwoop(true))));
+        assert!(game.report_list.has_report(ReportId::SWOOP_DIRECTION_ROLL));
     }
 
     #[test]

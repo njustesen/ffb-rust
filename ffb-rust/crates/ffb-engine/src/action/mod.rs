@@ -298,6 +298,10 @@ pub enum PlayerActionChoice {
     ShotToNothing,
     /// `ShotToNothing` whose throw fires at once — the `PassMoveFired` counterpart.
     ShotToNothingFired,
+    /// Kick 'em while they're down! (bb2020+ star skill): Java PlayerAction.KICK_EM_BLOCK,
+    /// declared then answered with CLIENT_BLOCK(usingChainsaw) on an adjacent DOWNED opponent
+    /// (KickEmBlockLogicModule). Rust folds the target into the declaration.
+    KickEmBlock,
 }
 
 impl PlayerActionChoice {

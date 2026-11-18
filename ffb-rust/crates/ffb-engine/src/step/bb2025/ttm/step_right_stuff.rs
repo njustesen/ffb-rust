@@ -142,7 +142,7 @@ impl Step for StepRightStuff {
                 if game.rules == Rules::Bb2025
                     && skill_id.properties().contains(&NamedProperties::TTM_SCATTERS_IN_SINGLE_DIRECTION) {
                     self.re_roll_state.set_re_rolled_action(ReRolledAction::new("RIGHT_STUFF"));
-                    self.re_roll_state.set_re_roll_source(ReRollSource::new("SWOOP"));
+                    self.re_roll_state.set_re_roll_source(ReRollSource::new("Swoop"));
                 }
             }
             Action::UseReRoll { use_reroll: true } => {
@@ -379,7 +379,7 @@ impl StepRightStuff {
                 // (goblin bb2020 seed 88: Java `RIGHT_STUFF dialog=RE_ROLL`, Rust no prompt;
                 // `FFB_CANDSUM` draws 260 vs 258 with identical candidate sets either side).
                 if self.using_swoop && game.rules == Rules::Bb2025 {
-                    self.re_roll_state.set_re_roll_source(ReRollSource::new("SWOOP"));
+                    self.re_roll_state.set_re_roll_source(ReRollSource::new("Swoop"));
                     self.roll = 0;
                     return self.execute_step(game, rng);
                 }
@@ -535,7 +535,7 @@ mod tests {
         use ffb_mechanics::skills::SkillId;
         step.handle_command(&Action::UseSkill { skill_id: SkillId::Swoop, use_skill: true }, &mut game, &mut GameRng::new(0));
         assert_eq!(step.re_roll_state.re_rolled_action.as_ref().map(|a| a.name.as_str()), Some("RIGHT_STUFF"));
-        assert_eq!(step.re_roll_state.re_roll_source.as_ref().map(|s| s.name.as_str()), Some("SWOOP"));
+        assert_eq!(step.re_roll_state.re_roll_source.as_ref().map(|s| s.name.as_str()), Some("Swoop"));
     }
 
     /// `bb2020/ttm/StepRightStuff.java` declares `private boolean fDropThrownPlayer, kickedPlayer;`
@@ -561,7 +561,7 @@ mod tests {
         let mut s25 = StepRightStuff::new("ok".into());
         s25.handle_command(&Action::UseSkill { skill_id: SkillId::Swoop, use_skill: true },
             &mut g25, &mut GameRng::new(0));
-        assert_eq!(s25.re_roll_state.re_roll_source.as_ref().map(|s| s.name.as_str()), Some("SWOOP"),
+        assert_eq!(s25.re_roll_state.re_roll_source.as_ref().map(|s| s.name.as_str()), Some("Swoop"),
             "bb2025 StepRightStuff.handleCommand sets ReRollSources.SWOOP");
 
         // BB2020: the same command must leave the re-roll state untouched, so the failure branch

@@ -166,7 +166,7 @@ fn folds_terminal(pac: PlayerActionChoice, run_up_empty: bool, has_target: bool)
 /// Shot to Nothing (§M): a pass declared by a player holding an unused `canGainHailMary` skill
 /// goes out as the client's ActingPlayer(PASS_MOVE) + UseSkill pair. Zero draws; mirrored by
 /// ParityRunner.sendStarSpecialDeclaration's PASS_MOVE case.
-fn with_shot_to_nothing(g: &Game, action: Action) -> Action {
+fn with_special_declarations(g: &Game, action: Action) -> Action {
     use ffb_model::model::property::named_properties::NamedProperties as NP;
     match action {
         Action::ActivatePlayer { player_id, player_action, block_defender_id }
@@ -181,8 +181,37 @@ fn with_shot_to_nothing(g: &Game, action: Action) -> Action {
             };
             Action::ActivatePlayer { player_id, player_action, block_defender_id }
         }
+        // Kick 'em while they're down! (§M): a foul on an opponent ALREADY adjacent, by a standing
+        // player whose Kick 'em is unused and who blocks like a chainsaw, goes out as the client's
+        // KICK_EM_BLOCK + CLIENT_BLOCK(usingChainsaw) on that opponent (LogicModule.isKickEmAvailable,
+        // KickEmBlockLogicModule). Zero draws; mirrored by ParityRunner.sendStarSpecialDeclaration's
+        // FOUL_MOVE case.
+        Action::ActivatePlayer { player_id, player_action: PlayerActionChoice::Foul, block_defender_id: Some(target) }
+            if kick_em_applies(g, &player_id, &target) =>
+        {
+            Action::ActivatePlayer {
+                player_id,
+                player_action: PlayerActionChoice::KickEmBlock,
+                block_defender_id: Some(target),
+            }
+        }
         other => other,
     }
+}
+
+fn kick_em_applies(g: &Game, player_id: &str, target: &str) -> bool {
+    use ffb_model::model::property::named_properties::NamedProperties as NP;
+    use ffb_model::util::util_cards::UtilCards;
+    let Some(p) = g.player(player_id) else { return false };
+    let (Some(pc), Some(tc)) = (g.field_model.player_coordinate(player_id), g.field_model.player_coordinate(target))
+        else { return false };
+    let standing = g.field_model.player_state(player_id).is_some_and(|s| s.base() == ffb_model::enums::PS_STANDING);
+    let downed = g.field_model.player_state(target).is_some_and(|s| s.can_be_fouled());
+    standing
+        && downed
+        && pc.is_adjacent(tc)
+        && UtilCards::get_unused_skill_with_property(p, NP::CAN_USE_CHAINSAW_ON_DOWNED_OPPONENTS).is_some()
+        && p.has_skill_property_in(g.rules, NP::BLOCKS_LIKE_CHAINSAW)
 }
 
 /// Run-up squares a PassMove considers throwing from, besides standing still.
@@ -4026,7 +4055,7 @@ impl HeuristicAgent {
                     Mode::Wide | Mode::WideNoBall | Mode::WideNoPass | Mode::WideNoHandOff => self.handle_activate(g, f, eligible_players),
                     Mode::Deep => self.handle_activate_deep(g, f, eligible_players),
                 };
-                with_shot_to_nothing(g, action)
+                with_special_declarations(g, action)
             }
 
             // §19.2 defect 1 — the declaration and this prompt must agree.

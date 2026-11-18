@@ -66,8 +66,12 @@ pub struct StepInitScatterPlayer {
     /// Java (bb2020 only): `PASS_DEVIATES`. Set for a WILDLY_INACCURATE throw — a pass result the
     /// BB2025 rules never produce, so this stays false under BB2025.
     pub deviate: bool,
-    // AbstractStepWithReRoll stubs
+    // AbstractStepWithReRoll: fReRolledAction / fReRollSource (SWOOP_DISTANCE, bb2025).
     re_rolled_action: Option<String>,
+    re_roll_source: Option<String>,
+    /// Java: the `scatterResult` FIELD — kept across the SWOOP_DISTANCE re-roll wait, so a
+    /// declined offer lands on the first roll.
+    swoop_result: Option<ScatterResult>,
 }
 
 impl StepInitScatterPlayer {
@@ -86,6 +90,8 @@ impl StepInitScatterPlayer {
             crash_landing: false,
             deviate: false,
             re_rolled_action: None,
+            re_roll_source: None,
+            swoop_result: None,
         }
     }
 
@@ -143,8 +149,37 @@ impl StepInitScatterPlayer {
             scatter_result = self.deviate_scatter(game, rng, thrown_player_coord);
         } else if swooping {
             // Java: doRoll = reRolledAction != SWOOP_DISTANCE || (reRollSource != null && useReRoll)
-            // client-only: re-roll availability check requires dialog; headless proceeds without re-roll offer
-            scatter_result = self.swoop_scatter(game, rng, start_coord);
+            let do_roll = self.re_rolled_action.as_deref() != Some("SWOOP_DISTANCE")
+                || match self.re_roll_source.clone() {
+                    Some(source) => crate::step::util_server_re_roll::use_reroll(
+                        game, &ffb_model::enums::ReRollSource::new(source.as_str()), &thrown_player_id, rng),
+                    None => false,
+                };
+            if do_roll || self.swoop_result.is_none() {
+                let result = self.swoop_scatter(game, rng, start_coord);
+                // Java: clearMoveSquares(); if inBounds: add(MoveSquare(lastValid, 0, 0))
+                game.field_model.clear_move_squares();
+                if result.in_bounds {
+                    game.field_model.add_move_square(
+                        ffb_model::types::MoveSquare::new(result.last_valid_coordinate, 0, 0));
+                }
+                let rolled_distance = get_int_option(game, SWOOP_DISTANCE) == 0;
+                self.swoop_result = Some(result);
+                // Java (bb2025 only): if distance == 0 && reRolledAction == null &&
+                //   askForReRollIfAvailable(gameState, thrownPlayer, SWOOP_DISTANCE, 0, false) → CONTINUE
+                if game.rules == Rules::Bb2025 && rolled_distance && self.re_rolled_action.is_none() {
+                    if let Some(prompt) = crate::step::util_server_re_roll::ask_for_reroll_if_available_for(
+                        game, Some(&thrown_player_id), "SWOOP_DISTANCE", 0, false)
+                    {
+                        // The client's answer names the action; an accept spends the team re-roll
+                        // (StepPuntDirection / StepGoForIt convention).
+                        self.re_rolled_action = Some("SWOOP_DISTANCE".into());
+                        self.re_roll_source = Some("TRR".into());
+                        return StepOutcome::cont().with_prompt(prompt);
+                    }
+                }
+            }
+            scatter_result = self.swoop_result.clone().expect("swoop result rolled above");
             // Java: addReport(new ReportSwoopPlayer(thrownPlayer, thrownPlayerCoordinate))
             if let Some(coord) = self.thrown_player_coordinate {
                 swoop_event = Some(GameEvent::SwoopPlayer {
@@ -513,9 +548,12 @@ impl Step for StepInitScatterPlayer {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // AbstractStepWithReRoll: EXECUTE_STEP → executeStep()
-        // client-only: re-roll command arrives from dialog; headless always executes immediately
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // AbstractStepWithReRoll: CLIENT_USE_RE_ROLL sets the source (null = declined), then
+        // EXECUTE_STEP → executeStep().
+        if let Action::UseReRoll { use_reroll: false } = action {
+            self.re_roll_source = None;
+        }
         self.execute_step(game, rng)
     }
 

@@ -446,6 +446,7 @@ fn choice_to_player_action(choice: PlayerActionChoice) -> PlayerAction {
         // A client declares the MOVE form; the throw / give follows as its own command.
         PlayerActionChoice::PassMoveFired => PlayerAction::PassMove,
         PlayerActionChoice::ShotToNothing | PlayerActionChoice::ShotToNothingFired => PlayerAction::PassMove,
+        PlayerActionChoice::KickEmBlock => PlayerAction::KickEmBlock,
         PlayerActionChoice::HandOffMoveFired => PlayerAction::HandOverMove,
         PlayerActionChoice::ThrowTeamMate => PlayerAction::ThrowTeamMate,
         PlayerActionChoice::KickTeamMate => PlayerAction::KickTeamMate,

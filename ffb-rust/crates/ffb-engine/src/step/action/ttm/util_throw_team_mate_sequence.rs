@@ -12,6 +12,7 @@ use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 
 /// Java: UtilThrowTeamMateSequence.ScatterResult
+#[derive(Clone, Copy, Debug)]
 pub struct ScatterResult {
     /// Java: fLastValidCoordinate
     pub last_valid_coordinate: FieldCoordinate,

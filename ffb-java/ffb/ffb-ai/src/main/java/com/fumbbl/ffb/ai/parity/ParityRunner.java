@@ -3900,6 +3900,41 @@ public class ParityRunner {
                     stn.get(), true, playerId, null, false));
                 return true;
             }
+            case FOUL_MOVE: {
+                // Kick 'em while they're down! (§M): a foul on an opponent ALREADY adjacent, by a
+                // standing player whose Kick 'em is unused and who blocks like a chainsaw, goes
+                // out as the client's KICK_EM_BLOCK declaration + CLIENT_BLOCK(usingChainsaw) on
+                // that opponent (LogicModule.isKickEmAvailable, KickEmBlockLogicModule). Zero
+                // draws; mirrors heuristic_agent.rs kick_em_applies.
+                if (heuristicTarget == null) {
+                    return false;
+                }
+                Player<?> kp = game.getPlayerById(playerId);
+                Player<?> kt = game.getPlayerById(heuristicTarget);
+                if (kp == null || kt == null) {
+                    return false;
+                }
+                FieldModel kfm = game.getFieldModel();
+                FieldCoordinate kpc = kfm.getPlayerCoordinate(kp);
+                FieldCoordinate ktc = kfm.getPlayerCoordinate(kt);
+                PlayerState kps = kfm.getPlayerState(kp);
+                PlayerState kts = kfm.getPlayerState(kt);
+                boolean kickEm = kpc != null && ktc != null && kps != null && kts != null
+                    && kps.getBase() == PlayerState.STANDING
+                    && kts.canBeFouled()
+                    && kpc.isAdjacent(ktc)
+                    && com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(kp,
+                        com.fumbbl.ffb.model.property.NamedProperties.canUseChainsawOnDownedOpponents).isPresent()
+                    && kp.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.blocksLikeChainsaw);
+                if (!kickEm) {
+                    return false;
+                }
+                MatchRunner.inject(gameState,
+                    new ClientCommandActingPlayer(playerId, PlayerAction.KICK_EM_BLOCK, false));
+                MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandBlock(
+                    playerId, heuristicTarget, false, true, false, false, false));
+                return true;
+            }
             default:
                 return false;
         }

@@ -503,6 +503,8 @@ impl Step for StepInitSelecting {
                     player_action,
                     PlayerActionChoice::Stab | PlayerActionChoice::Chainsaw
                     | PlayerActionChoice::ProjectileVomit | PlayerActionChoice::BreatheFire
+                    // KICK_EM_BLOCK + CLIENT_BLOCK(usingChainsaw): the same BLOCK dispatch.
+                    | PlayerActionChoice::KickEmBlock
                 );
                 self.force_goto_on_dispatch = special_block || matches!(
                     player_action,
@@ -991,7 +993,8 @@ impl StepInitSelecting {
                             match game.acting_player.player_action {
                                 Some(PlayerAction::Stab) =>
                                     target_params.push(StepParameter::UsingStab(true)),
-                                Some(PlayerAction::Chainsaw) =>
+                                // KickEmBlockLogicModule: extension.block(.., usingChainsaw=true, ..)
+                                Some(PlayerAction::Chainsaw) | Some(PlayerAction::KickEmBlock) =>
                                     target_params.push(StepParameter::UsingChainsaw(true)),
                                 Some(PlayerAction::ProjectileVomit) =>
                                     target_params.push(StepParameter::UsingVomit(true)),
@@ -1138,6 +1141,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::PassMoveFired => PlayerAction::Pass,
         PlayerActionChoice::ShotToNothing => PlayerAction::PassMove,
         PlayerActionChoice::ShotToNothingFired => PlayerAction::Pass,
+        PlayerActionChoice::KickEmBlock => PlayerAction::KickEmBlock,
         PlayerActionChoice::HandOffMoveFired => PlayerAction::HandOver,
         PlayerActionChoice::StandUp => PlayerAction::StandUp,
         PlayerActionChoice::StandUpBlitz => PlayerAction::StandUpBlitz,
@@ -1753,6 +1757,48 @@ mod tests {
         let p = game.player("hm1").unwrap();
         assert!(p.has_skill(ffb_model::enums::SkillId::HailMaryPass), "Shot to Nothing grants Hail Mary Pass");
         assert!(p.has_active_enhancement("Shot to Nothing"));
+    }
+
+    /// KICK_EM_BLOCK + CLIENT_BLOCK(usingChainsaw) on a downed opponent: the acting action is
+    /// KICK_EM_BLOCK (StepInitBlocking marks the skill used off `isKickingDowned`), the dispatch
+    /// is BLOCK and the block carries USING_CHAINSAW (KickEmBlockLogicModule).
+    #[test]
+    fn kick_em_block_declaration_dispatches_a_chainsaw_block() {
+        use ffb_model::enums::{PlayerType, PlayerGender, PlayerState, PS_STANDING, PS_PRONE, SkillId};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        game.team_home.players.push(Player {
+            id: "n1".into(), name: "N".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Star, gender: PlayerGender::Male,
+            movement: 6, strength: 2, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![SkillWithValue::new(SkillId::Chainsaw),
+                SkillWithValue::new(SkillId::KickEmWhileTheyReDown)],
+            ..Default::default()
+        });
+        game.team_away.players.push(Player {
+            id: "a1".into(), name: "A".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 8,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("n1", FieldCoordinate::new(10, 7));
+        game.field_model.set_player_state("n1", PlayerState::new(PS_STANDING).change_active(true));
+        game.field_model.set_player_coordinate("a1", FieldCoordinate::new(11, 7));
+        game.field_model.set_player_state("a1", PlayerState::new(PS_PRONE));
+        game.home_playing = true;
+        let mut step = StepInitSelecting::new("end".into());
+        let out = step.handle_command(&Action::ActivatePlayer {
+            player_id: "n1".into(),
+            player_action: PlayerActionChoice::KickEmBlock,
+            block_defender_id: Some("a1".into()),
+        }, &mut game, &mut GameRng::new(0));
+        assert_eq!(game.acting_player.player_action, Some(PlayerAction::KickEmBlock));
+        assert_eq!(step.dispatch_player_action, Some(PlayerAction::Block));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::UsingChainsaw(true))),
+            "the CLIENT_BLOCK carries usingChainsaw, got {:?}", out.published);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::BlockDefenderId(d) if d == "a1")));
     }
 
     /// The SHOT_TO_NOTHING declaration is the client's ActingPlayer(PASS_MOVE) +
