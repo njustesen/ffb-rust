@@ -23,15 +23,15 @@
     },
     {
       "nr": 2,
-      "position_id": "2994"
+      "position_id": "2994",
+      "skills": [
+        "Safe Pair Of Hands"
+      ],
+      "advancement": "primary"
     },
     {
       "nr": 3,
-      "position_id": "2996",
-      "skills": [
-        "Piling On"
-      ],
-      "advancement": "primary"
+      "position_id": "2996"
     },
     {
       "nr": 4,
@@ -39,11 +39,7 @@
     },
     {
       "nr": 5,
-      "position_id": "2995",
-      "skills": [
-        "Diving Catch"
-      ],
-      "advancement": "primary"
+      "position_id": "2995"
     },
     {
       "nr": 6,
@@ -74,7 +70,7 @@
   "skilled_from": "slann_fumbbl",
   "skill_points": {
     "tier_assumed": 1,
-    "spent": 3,
+    "spent": 2,
     "secondary": 0
   }
 }

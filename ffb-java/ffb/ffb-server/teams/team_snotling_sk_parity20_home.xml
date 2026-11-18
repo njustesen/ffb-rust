@@ -22,7 +22,7 @@
 		<gender>male</gender>
 		<positionId>snotling.snotling_lineman</positionId>
 		<skillList>
-			<skill>Safe Pair Of Hands</skill>
+			<skill>Sneaky Git</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -31,7 +31,7 @@
 		<gender>male</gender>
 		<positionId>snotling.fungus_flinga</positionId>
 		<skillList>
-			<skill>Fumblerooskie</skill>
+			<skill>Hail Mary Pass</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>

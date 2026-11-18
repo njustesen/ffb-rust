@@ -453,6 +453,21 @@ impl Player {
         found.is_some()
     }
 
+    /// Edition-aware `has_unused_skill_with_property` (see `has_skill_property_in`): Java resolves
+    /// the property through the per-edition skill class. bb2020's `PilingOn` registers NO
+    /// properties (it is not a BB2020 skill, `eligible() == false`), so a bb2020 Piling On player
+    /// must never be offered the pile-on that the edition-blind union grants (§M phase 2 sweep).
+    pub fn has_unused_skill_with_property_in(&self, rules: crate::enums::Rules, property: &str) -> bool {
+        let found = self
+            .all_skill_ids()
+            .filter(|id| id.properties_for(rules).contains(&property))
+            .find(|id| !self.used_skills.contains(id));
+        if let Some(id) = found {
+            crate::skill_touch::touch(id);
+        }
+        found.is_some()
+    }
+
     /// Java: `Player.getSkillValueExcludingTemporaryOnes(Skill)` (`RosterPlayer` override) —
     /// the configured value for a non-temporary skill instance (starting or extra), e.g. the
     /// `value="goblin"` attribute on an Animosity skill entry.
@@ -1088,6 +1103,19 @@ mod tests {
         p.temporary_skills.push(SkillWithValue { skill_id: SkillId::Sprint, value: None });
         assert!(p.has_skill(SkillId::Sprint));
         assert!(!p.has_skill(SkillId::Block));
+    }
+
+    #[test]
+    fn has_unused_skill_with_property_in_follows_the_edition_skill_class() {
+        use crate::enums::Rules;
+        use crate::model::skill_def::SkillWithValue;
+        let mut p = test_player();
+        p.extra_skills.push(SkillWithValue { skill_id: SkillId::PilingOn, value: None });
+        // Java bb2016.PilingOn registers canPileOnOpponent; bb2020.PilingOn registers nothing.
+        assert!(p.has_unused_skill_with_property_in(Rules::Bb2016, "canPileOnOpponent"));
+        assert!(!p.has_unused_skill_with_property_in(Rules::Bb2020, "canPileOnOpponent"));
+        p.used_skills.insert(SkillId::PilingOn);
+        assert!(!p.has_unused_skill_with_property_in(Rules::Bb2016, "canPileOnOpponent"), "used -> false");
     }
 
     #[test]

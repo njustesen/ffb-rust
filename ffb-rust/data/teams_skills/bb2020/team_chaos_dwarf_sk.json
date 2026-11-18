@@ -23,11 +23,7 @@
     },
     {
       "nr": 2,
-      "position_id": "chaosdwarf.hobgoblinsneakystabba",
-      "skills": [
-        "Strip Ball"
-      ],
-      "advancement": "primary"
+      "position_id": "chaosdwarf.hobgoblinsneakystabba"
     },
     {
       "nr": 3,
@@ -39,7 +35,11 @@
     },
     {
       "nr": 4,
-      "position_id": "chaosdwarf.chaosdwarfflamesmith"
+      "position_id": "chaosdwarf.chaosdwarfflamesmith",
+      "skills": [
+        "Grab"
+      ],
+      "advancement": "primary"
     },
     {
       "nr": 5,

@@ -1632,6 +1632,32 @@ public class ParityRunner {
                 break;
             }
 
+            case PILING_ON: {
+                // BACKLOG §M phase 2: Piling On was never fielded until the skill-advancement
+                // squads, so this dialog fell to the `default:` RandomStrategy arm, which DECLINES
+                // -- while Rust's parity agent (random_agent `AgentPrompt::PilingOn`) has always
+                // USED it, draw-free, and the heuristic defers to that. Answer it here the same
+                // way: use the attacker's canPileOnOpponent skill, no decisionRng / sampler draw.
+                // (skill sweep: khorne_sk / norse_sk / slann_fumbbl_sk bb2020, chaos_dwarf_sk /
+                // amazon_sk / khemri_fumbbl_sk bb2016 -- Rust reported pilingOn used, Java moved on.)
+                com.fumbbl.ffb.dialog.DialogPilingOnParameter pilingOn =
+                    (com.fumbbl.ffb.dialog.DialogPilingOnParameter) dialog;
+                com.fumbbl.ffb.model.Player<?> piler = game.getPlayerById(pilingOn.getPlayerId());
+                java.util.Optional<com.fumbbl.ffb.model.skill.Skill> pileSkill = piler == null
+                    ? java.util.Optional.empty()
+                    : com.fumbbl.ffb.util.UtilCards.getSkillWithProperty(piler,
+                        com.fumbbl.ffb.model.property.NamedProperties.canPileOnOpponent);
+                if (pileSkill.isPresent()) {
+                    comm.clearCaptured();
+                    comm.sendUseSkill(pileSkill.get(), true, pilingOn.getPlayerId());
+                    injectCaptured(dialog, game, gameState);
+                }
+                if (game.getDialogParameter() == dialog) {
+                    game.setDialogParameter(null);
+                }
+                break;
+            }
+
             case SKILL_USE: {
                 // Always USE the skill — matches Rust engine which auto-uses Sure Hands/Catch
                 // during catch/pickup attempts without emitting a SkillUse prompt.

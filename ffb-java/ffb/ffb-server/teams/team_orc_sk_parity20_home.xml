@@ -22,7 +22,7 @@
 		<gender>male</gender>
 		<positionId>orc.lineman</positionId>
 		<skillList>
-			<skill>Kick</skill>
+			<skill>Pro</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -31,7 +31,7 @@
 		<gender>male</gender>
 		<positionId>orc.thrower</positionId>
 		<skillList>
-			<skill>Cannoneer</skill>
+			<skill>Fumblerooskie</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>

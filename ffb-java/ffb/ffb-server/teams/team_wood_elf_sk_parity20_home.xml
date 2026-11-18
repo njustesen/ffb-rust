@@ -31,7 +31,7 @@
 		<gender>male</gender>
 		<positionId>woodelf.thrower</positionId>
 		<skillList>
-			<skill>Block</skill>
+			<skill>Frenzy</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -67,9 +67,7 @@
 		<name>Thrower 7</name>
 		<gender>male</gender>
 		<positionId>woodelf.thrower</positionId>
-		<skillList>
-			<skill>Leader</skill>
-		</skillList>
+		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamWoodElfSkParity20Home8">

@@ -28,7 +28,7 @@
       "nr": 2,
       "position_id": "woodelf.thrower",
       "skills": [
-        "Block"
+        "Frenzy"
       ],
       "advancement": "primary"
     },
@@ -50,11 +50,7 @@
     },
     {
       "nr": 7,
-      "position_id": "woodelf.thrower",
-      "skills": [
-        "Leader"
-      ],
-      "advancement": "primary"
+      "position_id": "woodelf.thrower"
     },
     {
       "nr": 8,
@@ -77,7 +73,7 @@
   "skilled_from": "wood_elf",
   "skill_points": {
     "tier_assumed": 1,
-    "spent": 3,
+    "spent": 2,
     "secondary": 0
   }
 }

@@ -21,7 +21,7 @@
       "nr": 2,
       "position_id": "oldworldalliance.human_thrower",
       "skills": [
-        "On The Ball"
+        "Running Pass"
       ],
       "advancement": "primary"
     },
@@ -41,7 +41,7 @@
       "nr": 6,
       "position_id": "oldworldalliance.dwarf_runner",
       "skills": [
-        "Running Pass"
+        "Cannoneer"
       ],
       "advancement": "primary"
     },

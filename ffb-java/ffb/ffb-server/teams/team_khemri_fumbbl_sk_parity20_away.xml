@@ -46,16 +46,16 @@
 		<name>Anointed Blitzer 4</name>
 		<gender>male</gender>
 		<positionId>2894</positionId>
-		<skillList>
-			<skill>Pile Driver</skill>
-		</skillList>
+		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamKhemriFumbblSkParity20Away5">
 		<name>Anointed Thrower 5</name>
 		<gender>male</gender>
 		<positionId>2893</positionId>
-		<skillList/>
+		<skillList>
+			<skill>On The Ball</skill>
+		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamKhemriFumbblSkParity20Away6">

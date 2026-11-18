@@ -17,7 +17,7 @@
       "nr": 1,
       "position_id": "orc.lineman",
       "skills": [
-        "Kick"
+        "Pro"
       ],
       "advancement": "primary"
     },
@@ -25,7 +25,7 @@
       "nr": 2,
       "position_id": "orc.thrower",
       "skills": [
-        "Cannoneer"
+        "Fumblerooskie"
       ],
       "advancement": "primary"
     },

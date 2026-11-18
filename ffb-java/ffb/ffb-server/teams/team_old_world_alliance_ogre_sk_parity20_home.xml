@@ -29,7 +29,7 @@
 		<gender>male</gender>
 		<positionId>oldworldalliance.human_thrower</positionId>
 		<skillList>
-			<skill>On The Ball</skill>
+			<skill>Running Pass</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -59,7 +59,7 @@
 		<gender>male</gender>
 		<positionId>oldworldalliance.dwarf_runner</positionId>
 		<skillList>
-			<skill>Running Pass</skill>
+			<skill>Cannoneer</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>

@@ -35,15 +35,15 @@
     },
     {
       "nr": 4,
-      "position_id": "2894",
-      "skills": [
-        "Pile Driver"
-      ],
-      "advancement": "primary"
+      "position_id": "2894"
     },
     {
       "nr": 5,
-      "position_id": "2893"
+      "position_id": "2893",
+      "skills": [
+        "On The Ball"
+      ],
+      "advancement": "primary"
     },
     {
       "nr": 6,

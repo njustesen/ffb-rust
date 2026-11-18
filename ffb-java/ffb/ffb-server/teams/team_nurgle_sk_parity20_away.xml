@@ -39,9 +39,7 @@
 		<name>Bloater 3</name>
 		<gender>male</gender>
 		<positionId>nurgle.bloater</positionId>
-		<skillList>
-			<skill>Two Heads</skill>
-		</skillList>
+		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamNurgleSkParity20Away4">

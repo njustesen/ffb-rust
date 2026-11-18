@@ -15,7 +15,11 @@
   "players": [
     {
       "nr": 1,
-      "position_id": "norse.lineman"
+      "position_id": "norse.lineman",
+      "skills": [
+        "Kick"
+      ],
+      "advancement": "primary"
     },
     {
       "nr": 2,
@@ -23,11 +27,7 @@
     },
     {
       "nr": 3,
-      "position_id": "norse.norseberzerker",
-      "skills": [
-        "Piling On"
-      ],
-      "advancement": "primary"
+      "position_id": "norse.norseberzerker"
     },
     {
       "nr": 4,
@@ -61,7 +61,7 @@
       "nr": 10,
       "position_id": "norse.valkyrie",
       "skills": [
-        "On The Ball"
+        "Cloud Burster"
       ],
       "advancement": "primary"
     },

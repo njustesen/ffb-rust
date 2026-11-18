@@ -30,16 +30,16 @@
 		<name>Catcher 2</name>
 		<gender>male</gender>
 		<positionId>2994</positionId>
-		<skillList/>
+		<skillList>
+			<skill>Safe Pair Of Hands</skill>
+		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamSlannFumbblSkParity20Home3">
 		<name>Kroxigor 3</name>
 		<gender>male</gender>
 		<positionId>2996</positionId>
-		<skillList>
-			<skill>Piling On</skill>
-		</skillList>
+		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="4" id="teamSlannFumbblSkParity20Home4">
@@ -53,9 +53,7 @@
 		<name>Blitzer 5</name>
 		<gender>male</gender>
 		<positionId>2995</positionId>
-		<skillList>
-			<skill>Diving Catch</skill>
-		</skillList>
+		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="6" id="teamSlannFumbblSkParity20Home6">

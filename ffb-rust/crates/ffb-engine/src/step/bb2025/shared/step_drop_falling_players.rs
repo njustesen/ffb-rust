@@ -357,8 +357,10 @@ impl StepDropFallingPlayers {
                 let attacker_also_falling = game.field_model.player_state(&attacker_id)
                     .map(|s| s.base() == PS_FALLING).unwrap_or(false);
                 let piling_on_eligible = !attacker_also_falling
+                    // Java resolves canPileOnOpponent through the edition's PilingOn class; bb2020's
+                    // has none, so the edition-blind union offered a pile-on Java never shows.
                     && game.player(&attacker_id)
-                        .map(|p| p.has_unused_skill_with_property(NamedProperties::CAN_PILE_ON_OPPONENT))
+                        .map(|p| p.has_unused_skill_with_property_in(game.rules, NamedProperties::CAN_PILE_ON_OPPONENT))
                         .unwrap_or(false)
                     && (!uses_a_team_reroll
                         || game.player(&attacker_id)

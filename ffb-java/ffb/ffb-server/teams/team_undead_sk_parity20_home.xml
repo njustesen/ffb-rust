@@ -38,7 +38,7 @@
 		<gender>male</gender>
 		<positionId>undead.ghoul</positionId>
 		<skillList>
-			<skill>Sneaky Git</skill>
+			<skill>Sprint</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -47,7 +47,7 @@
 		<gender>male</gender>
 		<positionId>undead.wight</positionId>
 		<skillList>
-			<skill>Multiple Block</skill>
+			<skill>Guard</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>

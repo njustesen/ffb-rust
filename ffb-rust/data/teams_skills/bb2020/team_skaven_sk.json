@@ -21,7 +21,7 @@
       "nr": 2,
       "position_id": "skaven.thrower",
       "skills": [
-        "Leader"
+        "Fumblerooskie"
       ],
       "advancement": "primary"
     },
@@ -35,11 +35,7 @@
     },
     {
       "nr": 4,
-      "position_id": "skaven.blitzer",
-      "skills": [
-        "Guard"
-      ],
-      "advancement": "primary"
+      "position_id": "skaven.blitzer"
     },
     {
       "nr": 5,
@@ -51,7 +47,11 @@
     },
     {
       "nr": 7,
-      "position_id": "skaven.gutterrunner"
+      "position_id": "skaven.gutterrunner",
+      "skills": [
+        "Defensive"
+      ],
+      "advancement": "primary"
     },
     {
       "nr": 8,

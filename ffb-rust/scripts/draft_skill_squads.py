@@ -12,6 +12,8 @@ edition, at the STRICTEST tier so it holds whatever a squad's real tier is (no l
   * one additional skill per player; never a skill the player already has; Elite skills (Block,
     Dodge, Guard, Mighty Blow) at most 4 per roster;
   * Team Value does NOT increase in Matched Play, so team_value is copied unchanged.
+Skills whose Java class for the edition has `eligible() == false` are not skills of that edition
+(bb2020 PilingOn) and are never drafted.
 Players who cannot use ball/skill advancements are skipped outright: No Hands (bb2016/bb2020),
 No Ball (bb2025). Star / Infamous Staff positions are never skilled (the squads field none).
 
@@ -46,6 +48,25 @@ VALUED = {("bb2020", "MightyBlow"): 1, ("bb2025", "MightyBlow"): 1,
 UNSKILLABLE = {"bb2016": {"no hands"}, "bb2020": {"no hands"}, "bb2025": {"no ball"}}
 SKILL_POINTS, MAX_SECONDARY, MAX_ELITE = 6, 1, 4
 NEED_RARE, NEED_LIVE = 3, 1
+
+
+def non_eligible():
+    """{(edition, class)} whose Java class overrides `eligible()` to return false -- a class kept
+    for engine plumbing that is NOT a skill of that edition (bb2020 PilingOn: "PilingOnBehavior
+    is used to handle block knockdowns"). A player can never legally take one."""
+    import re
+    from skill_ledger import JAVA_SKILLS
+    out = set()
+    for path in glob.glob(os.path.join(JAVA_SKILLS, "**", "*.java"), recursive=True):
+        src = open(path, encoding="utf-8", errors="replace").read()
+        if not re.search(r"boolean\s+eligible\(\)\s*\{\s*return\s+false", src):
+            continue
+        cls = os.path.splitext(os.path.basename(path))[0]
+        pkg = os.path.basename(os.path.dirname(path))
+        eds = EDITIONS if pkg == "common" else (
+            [r.lower() for r in re.findall(r"Rules\.(BB20\d\d)", src)] if pkg == "mixed" else [pkg])
+        out.update((ed, cls) for ed in eds)
+    return out
 
 
 def norm(s):
@@ -92,7 +113,9 @@ def draft_edition(ed, catalogue, status):
             rows.append((pl["nr"], pos, held))
         slots[sq] = rows
 
-    skills = sorted((cls, cat, disp) for cls, (cat, disp) in catalogue[ed].items() if cat in CATEGORY)
+    banned = non_eligible()
+    skills = sorted((cls, cat, disp) for cls, (cat, disp) in catalogue[ed].items()
+                    if cat in CATEGORY and (ed, cls) not in banned)
 
     def eligible(sq, cls, cat, disp):
         """(primary, nr) candidates on squad sq that may take the skill."""

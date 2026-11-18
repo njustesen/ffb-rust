@@ -30,9 +30,7 @@
 		<name>Hobgoblin Sneaky Stabba 2</name>
 		<gender>male</gender>
 		<positionId>chaosdwarf.hobgoblinsneakystabba</positionId>
-		<skillList>
-			<skill>Strip Ball</skill>
-		</skillList>
+		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamChaosDwarfSkParity20Home3">
@@ -48,7 +46,9 @@
 		<name>Chaos Dwarf Flamesmith 4</name>
 		<gender>male</gender>
 		<positionId>chaosdwarf.chaosdwarfflamesmith</positionId>
-		<skillList/>
+		<skillList>
+			<skill>Grab</skill>
+		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamChaosDwarfSkParity20Home5">

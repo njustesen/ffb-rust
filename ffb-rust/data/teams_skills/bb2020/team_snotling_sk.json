@@ -17,7 +17,7 @@
       "nr": 1,
       "position_id": "snotling.snotling_lineman",
       "skills": [
-        "Safe Pair Of Hands"
+        "Sneaky Git"
       ],
       "advancement": "primary"
     },
@@ -25,7 +25,7 @@
       "nr": 2,
       "position_id": "snotling.fungus_flinga",
       "skills": [
-        "Fumblerooskie"
+        "Hail Mary Pass"
       ],
       "advancement": "primary"
     },

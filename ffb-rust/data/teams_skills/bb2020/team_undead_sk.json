@@ -29,7 +29,7 @@
       "nr": 3,
       "position_id": "undead.ghoul",
       "skills": [
-        "Sneaky Git"
+        "Sprint"
       ],
       "advancement": "primary"
     },
@@ -37,7 +37,7 @@
       "nr": 4,
       "position_id": "undead.wight",
       "skills": [
-        "Multiple Block"
+        "Guard"
       ],
       "advancement": "primary"
     },

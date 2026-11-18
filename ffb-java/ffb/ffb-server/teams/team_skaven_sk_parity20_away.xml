@@ -29,7 +29,7 @@
 		<gender>male</gender>
 		<positionId>skaven.thrower</positionId>
 		<skillList>
-			<skill>Leader</skill>
+			<skill>Fumblerooskie</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -46,9 +46,7 @@
 		<name>Blitzer 4</name>
 		<gender>male</gender>
 		<positionId>skaven.blitzer</positionId>
-		<skillList>
-			<skill>Guard</skill>
-		</skillList>
+		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamSkavenSkParity20Away5">
@@ -69,7 +67,9 @@
 		<name>Gutter Runner 7</name>
 		<gender>male</gender>
 		<positionId>skaven.gutterrunner</positionId>
-		<skillList/>
+		<skillList>
+			<skill>Defensive</skill>
+		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamSkavenSkParity20Away8">

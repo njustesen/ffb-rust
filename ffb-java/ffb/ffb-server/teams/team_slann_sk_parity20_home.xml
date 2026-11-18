@@ -38,7 +38,7 @@
 		<gender>male</gender>
 		<positionId>slann.blitzer</positionId>
 		<skillList>
-			<skill>Defensive</skill>
+			<skill>Diving Catch</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>

@@ -47,7 +47,7 @@
 		<gender>male</gender>
 		<positionId>human.blitzer</positionId>
 		<skillList>
-			<skill>Guard</skill>
+			<skill>Multiple Block</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>

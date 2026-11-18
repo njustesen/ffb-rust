@@ -40,7 +40,7 @@
 		<gender>male</gender>
 		<positionId>dwarf.blitzer</positionId>
 		<skillList>
-			<skill>Grab</skill>
+			<skill>Guard</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>

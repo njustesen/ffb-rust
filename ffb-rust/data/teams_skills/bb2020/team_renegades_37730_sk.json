@@ -15,7 +15,11 @@
   "players": [
     {
       "nr": 1,
-      "position_id": "37733"
+      "position_id": "37733",
+      "skills": [
+        "Multiple Block"
+      ],
+      "advancement": "primary"
     },
     {
       "nr": 2,
@@ -37,17 +41,13 @@
       "nr": 5,
       "position_id": "37725",
       "skills": [
-        "Hail Mary Pass"
+        "Leader"
       ],
       "advancement": "primary"
     },
     {
       "nr": 6,
-      "position_id": "37727",
-      "skills": [
-        "Strip Ball"
-      ],
-      "advancement": "primary"
+      "position_id": "37727"
     },
     {
       "nr": 7,
