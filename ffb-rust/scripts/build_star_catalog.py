@@ -130,6 +130,15 @@ def position_xml(p: dict) -> str:
     return "\n".join(L) + "\n"
 
 
+# (position id, canonical skill name) -> skill value the rules give in prose.
+# The Swift Twins (rules/star_players/The_Swift_Twins.md): Lucien re-rolls a block die (block
+# variant), Valen passes to Lucien without range modifiers (pass variant).
+SKILL_VARIANTS = {
+    ("star.lucien_swift", "Working in Tandem"): "block",
+    ("star.valen_swift", "Working in Tandem"): "pass",
+}
+
+
 def resolve_skill(raw: str, arg: str | None, canon: dict, edition: str, dropped: list):
     c = canon.get(norm(raw)) or canon.get(SKILL_ALIASES.get(norm(raw), ""))
     if c is None:
@@ -194,6 +203,13 @@ def parse_md(path: Path, edition: str, canon: dict):
             if im and arg is None:
                 raw, arg = im.group(1), im.group(2)
             s = resolve_skill(raw, arg, canon, edition, dropped)
+            # A variant the rules text states in prose, not as "(arg)": Java reads it as the
+            # skill value (WorkingInTandem.VARIANT_BLOCK / VARIANT_PASS); without it neither
+            # engine can ever trigger the skill.
+            if isinstance(s, str) and arg is None:
+                v = SKILL_VARIANTS.get((f"star.{slug(pname)}", s))
+                if v is not None:
+                    s = {"name": s, "value": v}
             if s is not None:
                 skills.append(s)
         players.append({

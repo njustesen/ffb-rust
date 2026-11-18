@@ -26,6 +26,14 @@ pub trait PassMechanic: Mechanic {
 
     /// 1:1 translation of findPassingDistance (concrete method in Java abstract class).
     fn find_passing_distance(&self, game: &Game, from_coordinate: Option<FieldCoordinate>, to_coordinate: Option<FieldCoordinate>, throw_team_mate: bool) -> Option<PassingDistance> {
+        base_find_passing_distance(self, game, from_coordinate, to_coordinate, throw_team_mate)
+    }
+}
+
+/// The abstract class's `findPassingDistance` body, callable as `super.findPassingDistance`
+/// from an edition override (bb2025's PASS_TO_PARTNER).
+pub fn base_find_passing_distance<M: PassMechanic + ?Sized>(m: &M, game: &Game, from_coordinate: Option<FieldCoordinate>, to_coordinate: Option<FieldCoordinate>, throw_team_mate: bool) -> Option<PassingDistance> {
+    {
         let (from, to) = match (from_coordinate, to_coordinate) {
             (Some(f), Some(t)) => (f, t),
             _ => return None,
@@ -35,7 +43,7 @@ pub trait PassMechanic: Mechanic {
         if delta_y >= 14 || delta_x >= 14 {
             return None;
         }
-        let table = self.throwing_range_table();
+        let table = m.throwing_range_table();
         if delta_y >= table.len() { return None; }
         let row = table[delta_y].as_bytes();
         let char_idx = delta_x * 2;

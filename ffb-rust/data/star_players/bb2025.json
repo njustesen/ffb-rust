@@ -2780,14 +2780,17 @@
        },
        "Mighty Blow",
        "Tackle",
-       "Working in Tandem"
+       {
+        "name": "Working in Tandem",
+        "value": "block"
+       }
       ],
       "keywords": [
        "Blitzer",
        "Elf"
       ]
      },
-     "position_xml": "\t<position id=\"star.lucien_swift\">\n\t\t<quantity>1</quantity>\n\t\t<name>Lucien Swift</name>\n\t\t<type>Star</type>\n\t\t<cost>300000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>3</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Tackle</skill>\n\t\t\t<skill>Working in Tandem</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t\t<keywords>\n\t\t\t<keyword>Blitzer</keyword>\n\t\t\t<keyword>Elf</keyword>\n\t\t</keywords>\n\t</position>\n"
+     "position_xml": "\t<position id=\"star.lucien_swift\">\n\t\t<quantity>1</quantity>\n\t\t<name>Lucien Swift</name>\n\t\t<type>Star</type>\n\t\t<cost>300000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>3</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill>Mighty Blow</skill>\n\t\t\t<skill>Tackle</skill>\n\t\t\t<skill value=\"block\">Working in Tandem</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t\t<keywords>\n\t\t\t<keyword>Blitzer</keyword>\n\t\t\t<keyword>Elf</keyword>\n\t\t</keywords>\n\t</position>\n"
     },
     {
      "position": {
@@ -2811,14 +2814,17 @@
        "Pass",
        "Safe Pass",
        "Sure Hands",
-       "Working in Tandem"
+       {
+        "name": "Working in Tandem",
+        "value": "pass"
+       }
       ],
       "keywords": [
        "Elf",
        "Thrower"
       ]
      },
-     "position_xml": "\t<position id=\"star.valen_swift\">\n\t\t<quantity>1</quantity>\n\t\t<name>Valen Swift</name>\n\t\t<type>Star</type>\n\t\t<cost>0</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>2</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Pass</skill>\n\t\t\t<skill>Safe Pass</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t\t<skill>Working in Tandem</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t\t<keywords>\n\t\t\t<keyword>Elf</keyword>\n\t\t\t<keyword>Thrower</keyword>\n\t\t</keywords>\n\t</position>\n"
+     "position_xml": "\t<position id=\"star.valen_swift\">\n\t\t<quantity>1</quantity>\n\t\t<name>Valen Swift</name>\n\t\t<type>Star</type>\n\t\t<cost>0</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>2</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Pass</skill>\n\t\t\t<skill>Safe Pass</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t\t<skill value=\"pass\">Working in Tandem</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t\t<keywords>\n\t\t\t<keyword>Elf</keyword>\n\t\t\t<keyword>Thrower</keyword>\n\t\t</keywords>\n\t</position>\n"
     }
    ],
    "dropped_skills": [],

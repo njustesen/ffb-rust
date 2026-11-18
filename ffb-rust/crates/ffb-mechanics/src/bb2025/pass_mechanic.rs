@@ -149,6 +149,37 @@ impl PassMechanicTrait for PassMechanic {
         }
         zones
     }
+
+    /// Java bb2025 `PassMechanic.findPassingDistance`: a non-TTM, non-bomb pass from the
+    /// Working in Tandem PASS twin to the BLOCK twin is `PASS_TO_PARTNER` (no range modifier).
+    fn find_passing_distance(
+        &self, game: &Game, from_coordinate: Option<ffb_model::types::FieldCoordinate>,
+        to_coordinate: Option<ffb_model::types::FieldCoordinate>, throw_team_mate: bool,
+    ) -> Option<PassingDistance> {
+        let distance = crate::pass_mechanic::base_find_passing_distance(
+            self, game, from_coordinate, to_coordinate, throw_team_mate);
+        let is_bomb = game.acting_player.player_action.map(|a| a.is_bomb()).unwrap_or(false);
+        if distance.is_some() && !throw_team_mate && !is_bomb {
+            let at = |c: Option<ffb_model::types::FieldCoordinate>| c
+                .and_then(|c| game.field_model.player_at(c).cloned())
+                .and_then(|id| game.player(&id).cloned());
+            if let (Some(thrower), target) = (at(from_coordinate), at(to_coordinate)) {
+                if is_passing_to_partner(&thrower, target.as_ref()) {
+                    return Some(PassingDistance::PassToPartner);
+                }
+            }
+        }
+        distance
+    }
+}
+
+/// Java `UtilPlayer.isPassingToPartner(thrower, target)`.
+fn is_passing_to_partner(thrower: &Player, target: Option<&Player>) -> bool {
+    let Some(target) = target else { return false };
+    let Some(tandem) = thrower.skill_id_with_property(NamedProperties::CAN_PASS_TO_PARTNER_WITH_NO_MODIFIERS)
+        else { return false };
+    thrower.skill_value_excluding_temporary_ones(tandem).is_some_and(|v| v.eq_ignore_ascii_case("pass"))
+        && target.skill_value_excluding_temporary_ones(tandem).is_some_and(|v| v.eq_ignore_ascii_case("block"))
 }
 
 impl PassMechanic {
@@ -173,6 +204,41 @@ mod tests {
             is_big_guy: false,
             ..Default::default()
         }
+    }
+
+    /// Java bb2025 `findPassingDistance` + `UtilPlayer.isPassingToPartner`: Valen (Working in
+    /// Tandem "pass") throwing to Lucien ("block") is PASS_TO_PARTNER whatever the range; the
+    /// reverse direction, or a bomb, keeps the ruler's distance.
+    #[test]
+    fn pass_twin_to_block_twin_is_pass_to_partner() {
+        use ffb_model::enums::{PlayerAction, Rules};
+        use ffb_model::types::FieldCoordinate;
+        let tandem = |id: &str, v: &str| {
+            let mut p = make_thrower();
+            p.id = id.into();
+            p.starting_skills = vec![SkillWithValue { skill_id: SkillId::WorkingInTandem, value: Some(v.into()) }];
+            p
+        };
+        let bare = |id: &str| ffb_model::model::Team {
+            id: id.into(), name: id.into(), race: "elf".into(), roster_id: "elf".into(), coach: "c".into(),
+            rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0, prayers_to_nuffle: 0,
+            bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
+            fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
+            special_rules: vec![], players: vec![], vampire_lord: false, necromancer: false,
+        };
+        let mut game = Game::new(bare("home"), bare("away"), Rules::Bb2025);
+        game.team_home.players.push(tandem("valen", "pass"));
+        game.team_home.players.push(tandem("lucien", "block"));
+        let (v, l) = (FieldCoordinate::new(5, 5), FieldCoordinate::new(15, 5));
+        game.field_model.set_player_coordinate("valen", v);
+        game.field_model.set_player_coordinate("lucien", l);
+        game.acting_player.player_action = Some(PlayerAction::Pass);
+        let m = PassMechanic::new();
+        assert_eq!(m.find_passing_distance(&game, Some(v), Some(l), false), Some(PassingDistance::PassToPartner));
+        assert_ne!(m.find_passing_distance(&game, Some(l), Some(v), false), Some(PassingDistance::PassToPartner),
+            "only the pass twin throwing to the block twin");
+        game.acting_player.player_action = Some(PlayerAction::ThrowBomb);
+        assert_ne!(m.find_passing_distance(&game, Some(v), Some(l), false), Some(PassingDistance::PassToPartner));
     }
 
     #[test]
