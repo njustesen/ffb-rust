@@ -205,8 +205,28 @@ fn with_special_declarations(g: &Game, action: Action) -> Action {
             let target = vicious_vines_target(g, &player_id);
             Action::ActivatePlayer { player_id, player_action: PlayerActionChoice::ViciousVines, block_defender_id: target }
         }
+        // Chomp (§M): a Block by a player the bb2025 client would offer CHOMP to
+        // (isSpecialBlockActionAvailable && canChomp, Monstrous Mouth) on a target he has not
+        // chomped yet goes out as CHOMP + CLIENT_BLOCK(usingChomp). Zero draws; mirrored by
+        // ParityRunner.sendStarSpecialDeclaration's BLOCK case.
+        Action::ActivatePlayer { player_id, player_action: PlayerActionChoice::Block, block_defender_id: Some(target) }
+            if chomp_applies(g, &player_id, &target) =>
+        {
+            Action::ActivatePlayer { player_id, player_action: PlayerActionChoice::Chomp, block_defender_id: Some(target) }
+        }
         other => other,
     }
+}
+
+fn chomp_applies(g: &Game, player_id: &str, target: &str) -> bool {
+    use ffb_model::model::property::named_properties::NamedProperties as NP;
+    let Some(p) = g.player(player_id) else { return false };
+    let Some(state) = g.field_model.player_state(player_id) else { return false };
+    g.rules == ffb_model::enums::Rules::Bb2025
+        && g.turn_mode != ffb_model::enums::TurnMode::Blitz
+        && state.base() != ffb_model::enums::PS_PRONE
+        && p.all_skill_ids().any(|id| id.has_property_in(g.rules, NP::CAN_PIN_PLAYERS))
+        && g.field_model.chomped.get(player_id).map_or(true, |c| !c.iter().any(|t| t == target))
 }
 
 fn vicious_vines_target(g: &Game, player_id: &str) -> Option<String> {

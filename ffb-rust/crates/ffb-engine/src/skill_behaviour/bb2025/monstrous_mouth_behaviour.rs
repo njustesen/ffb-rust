@@ -53,11 +53,19 @@ impl StepModifierTrait for MonstrousMouthStepModifier {
         }
 
         state.do_push = true;
-        // Java also clears state.pushbackStack (the client-chosen-coordinate stack), which lives
-        // on the StepPushback struct itself, not in the hook state — matches the same limitation
-        // already accepted by the shipped StandFirmStepModifier.
+        // Java: state.pushbackStack.clear() -- the step's own stack, cleared through the flag.
         state.pushback_squares.clear();
+        state.clear_pushback_stack = true;
         state.starting_pushback_square = None;
+        // Java: step.publishParameter(STARTING_PUSHBACK_SQUARE, null); FOLLOWUP_CHOICE=false;
+        // BALL_KNOCKED_LOSE=false; CATCH_SCATTER_THROW_IN_MODE=null. FOLLOWUP_CHOICE=false is what
+        // stops the attacker following up into the chomped defender's (unvacated) square.
+        // (BALL_KNOCKED_LOSE has no Rust parameter; the null CATCH_SCATTER_THROW_IN_MODE maps to
+        // CatchScatterThrowInModeCleared -- same subset the bb2025 Stand Firm hook publishes.)
+        use crate::step::framework::StepParameter;
+        state.published.push(StepParameter::StartingPushbackSquare(None));
+        state.published.push(StepParameter::FollowupChoice(false));
+        state.published.push(StepParameter::CatchScatterThrowInModeCleared);
 
         // Java: if (defender has ball) addReport("Strip ball is prevented as the player is chomped.")
         let defender_coord = game.field_model.player_coordinate(&state.defender_id);

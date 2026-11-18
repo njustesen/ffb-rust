@@ -305,6 +305,9 @@ pub enum PlayerActionChoice {
     /// Vicious Vines (bb2020+ star skill): Java PlayerAction.VICIOUS_VINES + CLIENT_BLOCK on an
     /// opponent TWO squares away (BlockLogicExtension). Rust folds the target in.
     ViciousVines,
+    /// Chomp (bb2025 Monstrous Mouth, canPinPlayers): Java PlayerAction.CHOMP + CLIENT_BLOCK(usingChomp)
+    /// on an adjacent not-yet-chomped opponent (SelectLogicModule CHOMP). Rust folds the target in.
+    Chomp,
 }
 
 impl PlayerActionChoice {

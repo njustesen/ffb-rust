@@ -23,11 +23,22 @@ impl ReportList {
     }
 
     pub fn add(&mut self, report: impl IReport + 'static) {
+        self.flush_chomp_removals();
         self.reports.push(Box::new(report));
     }
 
     pub fn add_boxed(&mut self, report: Box<dyn IReport>) {
+        self.flush_chomp_removals();
         self.reports.push(report);
+    }
+
+    /// Java's ChompRemovalObserver adds `ReportChompRemoved` the moment a FieldModel change drops
+    /// a chomp; the queued updates therefore precede any report written after that change.
+    pub fn flush_chomp_removals(&mut self) {
+        for (chompee, cleared) in crate::chomp_observer::take() {
+            self.reports.push(Box::new(
+                crate::report::bb2025::report_chomp_removed::ReportChompRemoved::new(chompee, cleared)));
+        }
     }
 
     pub fn add_list(&mut self, other: &ReportList) {

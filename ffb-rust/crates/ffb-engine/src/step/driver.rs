@@ -1232,6 +1232,10 @@ impl DriverGameState {
     }
 
     fn apply_effects(&mut self, entry: &mut DriverStepEntry, outcome: &mut StepOutcome) {
+        // bb2025 ChompRemovalObserver: Java adds ReportChompRemoved to the CURRENT step's result
+        // the moment a player state / coordinate change drops a chomp. ReportList::add flushes the
+        // queue before the next report; anything left belongs to the step that just ran.
+        self.game.report_list.flush_chomp_removals();
         self.events.append(&mut outcome.events);
         for seq in outcome.pushes.drain(..) { self.stack.push_sequence(seq); }
         // Java AbstractStep.publishParameter: `setParameter(pParameter)` on the publishing step

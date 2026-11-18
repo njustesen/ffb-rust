@@ -3919,6 +3919,28 @@ public class ParityRunner {
                     stn.get(), true, playerId, null, false));
                 return true;
             }
+            case BLOCK: {
+                // Chomp (§M): a Block by a player the bb2025 client would offer CHOMP to
+                // (isSpecialBlockActionAvailable && canChomp, Monstrous Mouth) on a target he has
+                // not chomped yet goes out as CHOMP + CLIENT_BLOCK(usingChomp). Zero draws;
+                // mirrors heuristic_agent.rs chomp_applies.
+                if (!isBb2025(game) || heuristicTarget == null) {
+                    return false;
+                }
+                Player<?> cp = game.getPlayerById(playerId);
+                Player<?> ct = game.getPlayerById(heuristicTarget);
+                PlayerState cps = cp == null ? null : game.getFieldModel().getPlayerState(cp);
+                if (cp == null || ct == null || cps == null || cps.getBase() == PlayerState.PRONE
+                    || game.getTurnMode() == com.fumbbl.ffb.TurnMode.BLITZ
+                    || !cp.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canPinPlayers)
+                    || !game.getFieldModel().notChomped(cp, ct)) {
+                    return false;
+                }
+                MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId, PlayerAction.CHOMP, false));
+                MatchRunner.inject(gameState, new ClientCommandBlock(
+                    playerId, heuristicTarget, false, false, false, false, true));
+                return true;
+            }
             case MOVE: {
                 // Vicious Vines (§M): a Move by a player the client would offer VICIOUS_VINES to
                 // (LogicModule.isViciousVinesAvailable) goes out as VICIOUS_VINES + CLIENT_BLOCK on

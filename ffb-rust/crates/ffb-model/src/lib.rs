@@ -19,3 +19,4 @@ pub mod injury;
 pub mod report;
 pub mod xml;
 pub mod skill_touch;
+pub mod chomp_observer;

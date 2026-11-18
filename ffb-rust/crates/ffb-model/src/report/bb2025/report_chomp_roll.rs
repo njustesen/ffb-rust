@@ -44,8 +44,8 @@ impl ReportChompRoll {
             "minimumRoll": self.base.minimum_roll,
             "reRolled": self.base.re_rolled,
             "rollModifiers": self.base.roll_modifier_names,
-            "chomper": self.chomper,
-            "chompee": self.chompee,
+            "attackerId": self.chomper,
+            "defenderId": self.chompee,
         })
     }
 
@@ -62,8 +62,8 @@ impl ReportChompRoll {
                     .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
                     .unwrap_or_default(),
             },
-            chomper: json["chomper"].as_str().unwrap_or("").to_string(),
-            chompee: json["chompee"].as_str().unwrap_or("").to_string(),
+            chomper: json["attackerId"].as_str().unwrap_or("").to_string(),
+            chompee: json["defenderId"].as_str().unwrap_or("").to_string(),
         }
     }
 }

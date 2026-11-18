@@ -151,17 +151,36 @@ impl FieldModel {
     }
 
     pub fn set_player_state(&mut self, id: &str, state: PlayerState) {
+        let changed = self.player_states.get(id) != Some(&state);
         self.player_states.insert(id.to_owned(), state);
+        // Java: setPlayerState notifies FIELD_MODEL_SET_PLAYER_STATE on a changed state, and the
+        // bb2025 ChompRemovalObserver answers `!hasTacklezones()` with removeChomps(player).
+        // Chomps only exist in bb2025, so the empty map makes this a no-op elsewhere.
+        if changed && !self.chomped.is_empty() && !state.has_tacklezones() {
+            let events = self.remove_chomps(id);
+            crate::chomp_observer::push(events);
+        }
     }
 
     pub fn set_player_coordinate(&mut self, id: &str, coord: FieldCoordinate) {
         // Java `setPlayerCoordinate`: only a CHANGED coordinate re-appends the player to the
         // square's list (`if (!FieldCoordinate.equals(pCoordinate, oldCoordinate))`).
-        if self.player_coordinates.get(id) != Some(&coord) {
+        let changed = self.player_coordinates.get(id) != Some(&coord);
+        if changed {
             self.arrival_counter += 1;
             self.coordinate_arrival.insert(id.to_owned(), self.arrival_counter);
         }
         self.player_coordinates.insert(id.to_owned(), coord);
+        // Java: FIELD_MODEL_SET_PLAYER_COORDINATE -> ChompRemovalObserver: a box coordinate
+        // removes the player's chomps, any other re-checks adjacency (updateChomps).
+        if changed && !self.chomped.is_empty() {
+            let events = if coord.is_box_coordinate() {
+                self.remove_chomps(id)
+            } else {
+                self.update_chomps(id)
+            };
+            crate::chomp_observer::push(events);
+        }
     }
 
     /// Java: FieldModel.updatePlayerAndBallPosition(Player, FieldCoordinate).

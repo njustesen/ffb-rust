@@ -180,10 +180,14 @@ mod tests {
         let mut game = make_game();
         game.field_model.set_player_state("p2", PlayerState::new(PS_STANDING));
         game.field_model.add_chomp("p1", "p2");
+        let _ = obs;
+        // The live path: FieldModel.set_player_coordinate raises the observer's removal itself
+        // (Java dispatches observers synchronously); the report lands at the next flush.
         game.field_model.set_player_coordinate("p1", FieldCoordinate::new(-1, 3));
+        game.report_list.flush_chomp_removals();
 
-        obs.next(Some("p1"), ModelChangeId::FieldModelSetPlayerCoordinate, &mut game);
-
-        assert!(!game.report_list.is_empty(), "should emit ReportChompRemoved");
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::CHOMP_REMOVED),
+            "should emit ReportChompRemoved");
+        let _ = std::any::type_name::<ReportChompRemoved>();
     }
 }

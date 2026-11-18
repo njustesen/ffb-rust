@@ -507,6 +507,8 @@ impl Step for StepInitSelecting {
                     | PlayerActionChoice::KickEmBlock
                     // VICIOUS_VINES + CLIENT_BLOCK on a target two squares away: BLOCK dispatch.
                     | PlayerActionChoice::ViciousVines
+                    // CHOMP + CLIENT_BLOCK(usingChomp): BLOCK dispatch.
+                    | PlayerActionChoice::Chomp
                 );
                 self.force_goto_on_dispatch = special_block || matches!(
                     player_action,
@@ -1002,6 +1004,8 @@ impl StepInitSelecting {
                                     target_params.push(StepParameter::UsingVomit(true)),
                                 Some(PlayerAction::BreatheFire) =>
                                     target_params.push(StepParameter::UsingBreatheFire(true)),
+                                Some(PlayerAction::Chomp) =>
+                                    target_params.push(StepParameter::UsingChomp(true)),
                                 // bb2020 picks the kind at the block (§K agent policy, mirrored by
                                 // ParityRunner.blockCommand): a declared BLOCK only, never a blitz.
                                 Some(PlayerAction::Block) if dispatch == PlayerAction::Block => {
@@ -1145,6 +1149,7 @@ fn pac_to_player_action(pac: PlayerActionChoice) -> PlayerAction {
         PlayerActionChoice::ShotToNothingFired => PlayerAction::Pass,
         PlayerActionChoice::KickEmBlock => PlayerAction::KickEmBlock,
         PlayerActionChoice::ViciousVines => PlayerAction::ViciousVines,
+        PlayerActionChoice::Chomp => PlayerAction::Chomp,
         PlayerActionChoice::HandOffMoveFired => PlayerAction::HandOver,
         PlayerActionChoice::StandUp => PlayerAction::StandUp,
         PlayerActionChoice::StandUpBlitz => PlayerAction::StandUpBlitz,
