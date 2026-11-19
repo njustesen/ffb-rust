@@ -106,8 +106,14 @@ impl StepInitBlocking {
         let label = self.goto_label_on_end.clone();
 
         // If coming back from SELECT_BLOCK_KIND, restore the last turn mode
+        // Java `game.setTurnMode(game.getLastTurnMode())`: the setter records SELECT_BLOCK_KIND
+        // as the new last mode.
         if game.turn_mode == TurnMode::SelectBlockKind {
-            game.turn_mode = game.last_turn_mode.unwrap_or(TurnMode::Regular);
+            let restored = game.last_turn_mode.unwrap_or(TurnMode::Regular);
+            if restored != TurnMode::SelectBlockKind {
+                game.turn_mode = restored;
+                game.last_turn_mode = Some(TurnMode::SelectBlockKind);
+            }
         }
 
         if self.end_turn {
@@ -193,6 +199,12 @@ impl StepInitBlocking {
 
         // Ask for block kind (Trickster etc.) before proceeding
         if self.ask_for_block_kind {
+            // Java `game.setTurnMode(SELECT_BLOCK_KIND)` records the mode it replaces as
+            // `lastTurnMode`, which the CLIENT_BLOCK arm restores. Assigning the field directly left
+            // a stale `last_turn_mode` (same bug as StepPlaceBall's Safe Pair of Hands, cert5).
+            if game.turn_mode != TurnMode::SelectBlockKind {
+                game.last_turn_mode = Some(game.turn_mode);
+            }
             game.turn_mode = TurnMode::SelectBlockKind;
             self.ask_for_block_kind = false;
             return StepOutcome::cont();
