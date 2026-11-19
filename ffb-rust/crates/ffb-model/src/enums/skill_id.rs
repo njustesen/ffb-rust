@@ -466,6 +466,9 @@ impl SkillId {
         match (self, rules) {
             (SkillId::WisdomOfTheWhiteDwarf, crate::enums::Rules::Bb2020) => OncePerTurnByTeamMate,
             (SkillId::FrenziedRush | SkillId::PutridRegurgitation, crate::enums::Rules::Bb2020) => OncePerGame,
+            // Java bb2020/special/WhirlingDervish declares no usage type (REGULAR); bb2025's is
+            // ONCE_PER_TURN.
+            (SkillId::WhirlingDervish, crate::enums::Rules::Bb2020) => Regular,
             _ => self.usage_type(),
         }
     }
@@ -513,6 +516,12 @@ impl SkillId {
             SkillId::SavageMauling | SkillId::ShotToNothing | SkillId::StarOfTheShow |
             SkillId::StrongPassingGame | SkillId::SwiftAsTheBreeze | SkillId::TastyMorsel |
             SkillId::TheFlashingBlade | SkillId::Treacherous | SkillId::Yoink => OncePerGame,
+            // Java ONCE_PER_GAME, missing here until the cert5 star tier: bb2025 Willow
+            // Rosebark's Woodland Fury was offered again in half 2 (gnome v nurgle seed 1).
+            // scratch usagecmp.py diffs this table against every Java skill class.
+            SkillId::Slayer | SkillId::ToxinConnoisseur | SkillId::WoodlandFury => OncePerGame,
+            // Java bb2025/special/WhirlingDervish: ONCE_PER_TURN.
+            SkillId::WhirlingDervish => OncePerTurn,
 
             // All other skills are Regular
             _ => Regular,
@@ -1159,6 +1168,11 @@ impl SkillId {
             // bb2025/special canRerollSingleBlockDieOncePerPeriod (`properties()` is the union).
             (SkillId::LordOfChaos, Rules::Bb2020) => &["grantsSingleUseTeamRerollWhenOnPitch"],
             (SkillId::LordOfChaos, Rules::Bb2025 | Rules::Common) => &["canRerollSingleBlockDieOncePerPeriod"],
+            // Likewise Incorporeal: bb2020/special registers only canAddStrengthToDodge (a once-
+            // per-game stat modifier on the dodge), bb2025/special only canAvoidDodging (the
+            // declared no-dodge move). With the union, bb2020 Gretchen declared the bb2025 move.
+            (SkillId::Incorporeal, Rules::Bb2020) => &["canAddStrengthToDodge"],
+            (SkillId::Incorporeal, Rules::Bb2025 | Rules::Common) => &["canAvoidDodging"],
             _ => self.properties(),
         }
     }

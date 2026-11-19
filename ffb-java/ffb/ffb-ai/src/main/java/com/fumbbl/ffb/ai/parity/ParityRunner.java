@@ -2521,7 +2521,15 @@ public class ParityRunner {
                 // consumed the actionRng pick); CLIENT_BLOCK with a targetSelectionState
                 // dispatches as BLITZ. After the block, end the activation with CONFIRM.
                 com.fumbbl.ffb.model.TargetSelectionState tss = game.getFieldModel().getTargetSelectionState();
-                if (!blitzBlockSent && tss != null && tss.getSelectedPlayerId() != null) {
+                // The selected victim must still be ON THE PITCH -- Rust's BlitzTarget arm checks
+                // `on_pitch` the same way. A Primal Savagery lash-out can knock the blitz target
+                // out after it was selected (chaos_dwarf v slann_fumbbl bb2020 seed 2: Glotl Stop KOs
+                // home9, the selection stays), and the block was then sent at a player in the KO
+                // box -- the engine pushed him from the dugout and crowd-surfed him to a casualty.
+                FieldCoordinate tssCoord = (tss != null && tss.getSelectedPlayerId() != null)
+                    ? playerCoordinate(game, tss.getSelectedPlayerId()) : null;
+                boolean tssOnPitch = tssCoord != null && !tssCoord.isBoxCoordinate();
+                if (!blitzBlockSent && tss != null && tss.getSelectedPlayerId() != null && tssOnPitch) {
                     blitzBlockSent = true;
                     if (activation != null && activation.plan() != null) {
                         activation.markFired();

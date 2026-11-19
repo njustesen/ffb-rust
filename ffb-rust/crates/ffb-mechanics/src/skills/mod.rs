@@ -103,7 +103,7 @@ pub static SKILL_TABLE: &[SkillDef] = &[
     SkillDef { id: SkillId::TheBallista, class_name: "TheBallista", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::OncePerGame, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2020, Rules::Bb2025] },
     SkillDef { id: SkillId::ThenIStartedBlastin, class_name: "ThenIStartedBlastin", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::OncePerHalf, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2020] },
     SkillDef { id: SkillId::TwoForOne, class_name: "TwoForOne", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::Regular, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2020] },
-    SkillDef { id: SkillId::WhirlingDervish, class_name: "WhirlingDervish", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::Regular, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2020, Rules::Bb2025] },
+    SkillDef { id: SkillId::WhirlingDervish, class_name: "WhirlingDervish", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::OncePerTurn, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2020, Rules::Bb2025] },
     SkillDef { id: SkillId::WisdomOfTheWhiteDwarf, class_name: "WisdomOfTheWhiteDwarf", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::OncePerGame, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2020, Rules::Bb2025] },
     // Java: mixed/special/Yoink — super("Yoink!", TRAIT, ONCE_PER_GAME), @RulesCollection(BB2020) + (BB2025)
     SkillDef { id: SkillId::Yoink, class_name: "Yoink", category: SkillCategory::Trait, usage_type: SkillUsageType::OncePerGame, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2020, Rules::Bb2025] },
@@ -136,8 +136,8 @@ pub static SKILL_TABLE: &[SkillDef] = &[
     SkillDef { id: SkillId::PickMeUp, class_name: "PickMeUp", category: SkillCategory::Trait, usage_type: SkillUsageType::Regular, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2020, Rules::Bb2025] },
     SkillDef { id: SkillId::SafePass, class_name: "SafePass", category: SkillCategory::Passing, usage_type: SkillUsageType::Regular, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2020, Rules::Bb2025] },
     SkillDef { id: SkillId::SafePairOfHands, class_name: "SafePairOfHands", category: SkillCategory::General, usage_type: SkillUsageType::Regular, declare_condition: DeclareCondition::None, editions: &[] },
-    SkillDef { id: SkillId::Slayer, class_name: "Slayer", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::Regular, declare_condition: DeclareCondition::None, editions: &[] },
-    SkillDef { id: SkillId::ToxinConnoisseur, class_name: "ToxinConnoisseur", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::Regular, declare_condition: DeclareCondition::None, editions: &[] },
+    SkillDef { id: SkillId::Slayer, class_name: "Slayer", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::OncePerGame, declare_condition: DeclareCondition::None, editions: &[] },
+    SkillDef { id: SkillId::ToxinConnoisseur, class_name: "ToxinConnoisseur", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::OncePerGame, declare_condition: DeclareCondition::None, editions: &[] },
     SkillDef { id: SkillId::UnchannelledFury, class_name: "UnchannelledFury", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::Regular, declare_condition: DeclareCondition::None, editions: &[] },
     SkillDef { id: SkillId::SafeThrow, class_name: "SafeThrow", category: SkillCategory::Passing, usage_type: SkillUsageType::Regular, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2016] },
     SkillDef { id: SkillId::SecretWeapon, class_name: "SecretWeapon", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::Regular, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2016] },
@@ -185,7 +185,7 @@ pub static SKILL_TABLE: &[SkillDef] = &[
     SkillDef { id: SkillId::Taunt, class_name: "Taunt", category: SkillCategory::General, usage_type: SkillUsageType::Regular, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2025] },
     SkillDef { id: SkillId::Unsteady, class_name: "Unsteady", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::Regular, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2025] },
     SkillDef { id: SkillId::ViolentInnovator, class_name: "ViolentInnovator", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::Regular, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2025] },
-    SkillDef { id: SkillId::WoodlandFury, class_name: "WoodlandFury", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::Regular, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2025] },
+    SkillDef { id: SkillId::WoodlandFury, class_name: "WoodlandFury", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::OncePerGame, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2025] },
     SkillDef { id: SkillId::WorkingInTandem, class_name: "WorkingInTandem", category: SkillCategory::Extraordinary, usage_type: SkillUsageType::Regular, declare_condition: DeclareCondition::None, editions: &[Rules::Bb2025] },
 
     // ── Mixed/special star player traits (BB2020 + BB2025) ────────────────────

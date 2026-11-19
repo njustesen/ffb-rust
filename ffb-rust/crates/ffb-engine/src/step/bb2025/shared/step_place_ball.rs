@@ -8,6 +8,17 @@ use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{CatchScatterThrowInMode, StepId, StepParameter};
 
+/// Java `Game.setTurnMode(TurnMode)`: a no-op for the same mode, otherwise the mode being
+/// replaced becomes `lastTurnMode`.
+fn set_turn_mode(game: &mut Game, turn_mode: ffb_model::enums::TurnMode) {
+    if game.turn_mode == turn_mode {
+        return;
+    }
+    let last = game.turn_mode;
+    game.turn_mode = turn_mode;
+    game.last_turn_mode = Some(last);
+}
+
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.shared.StepPlaceBall.
 /// Places the ball at a player/coordinate; handles the Safe Pair of Hands skill dialog.
 /// The dialog (Phase::Select/Place) is not yet fully ported — skill use auto-declines.
@@ -137,7 +148,12 @@ impl StepPlaceBall {
                     game.field_model.add_move_square(ffb_model::types::MoveSquare {
                         coordinate: *c, minimum_roll_dodge: 0, minimum_roll_gfi: 0 });
                 }
-                game.turn_mode = ffb_model::enums::TurnMode::SafePairOfHands;
+                // Java `game.setTurnMode(SAFE_PAIR_OF_HANDS)`: the setter records the mode it
+                // replaces as `lastTurnMode` -- PLACE restores from exactly that. Assigning the field
+                // directly left `last_turn_mode` stale (None after a Quick Snap kickoff), so PLACE
+                // never left SAFE_PAIR_OF_HANDS, the next EndTurn found no handler and the game ended
+                // at turn 1 (renegades bb2020 @1e6 seed 21).
+                set_turn_mode(game, ffb_model::enums::TurnMode::SafePairOfHands);
                 return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::PlaceBallSquare {
                     player_id,
                     squares: self.adjacent_squares.clone(),
@@ -155,8 +171,9 @@ impl StepPlaceBall {
                         Some(player_id.clone()), direction));
                 game.field_model.ball_coordinate = Some(selected);
                 game.field_model.ball_moving = true;
+                // Java `game.setTurnMode(game.getLastTurnMode())`.
                 if let Some(last) = game.last_turn_mode {
-                    game.turn_mode = last;
+                    set_turn_mode(game, last);
                 }
                 let mut out = StepOutcome::next().publish(StepParameter::CatchScatterThrowInModeCleared);
                 if self.revert_end_turn && game.rules != ffb_model::enums::Rules::Bb2020 {
@@ -307,7 +324,8 @@ mod tests {
         use ffb_model::types::FieldCoordinate as FC;
         let mut game = make_game();
         game.home_playing = true;
-        game.last_turn_mode = Some(ffb_model::enums::TurnMode::Regular);
+        // SELECT records the mode it replaces (Java `setTurnMode`), PLACE restores exactly that.
+        game.turn_mode = ffb_model::enums::TurnMode::Regular;
         game.team_home.players.push(ffb_model::model::player::Player {
             id: "carrier".into(), name: "carrier".into(), nr: 1, position_id: "p".into(),
             movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
@@ -339,6 +357,23 @@ mod tests {
         assert_eq!(game.turn_mode, ffb_model::enums::TurnMode::Regular);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::CatchScatterThrowInModeCleared)));
         assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::PLACE_BALL_DIRECTION));
+    }
+
+    /// Java `Game.setTurnMode` records the replaced mode, so PLACE restores the mode SELECT
+    /// replaced even when `last_turn_mode` was stale or unset beforehand (renegades bb2020 @1e6
+    /// seed 21: last mode None after a Quick Snap kickoff, the turn stuck in SAFE_PAIR_OF_HANDS).
+    #[test]
+    fn safe_pair_of_hands_restores_the_mode_it_replaced_even_with_no_last_mode() {
+        use ffb_model::enums::TurnMode;
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        game.last_turn_mode = None;
+        set_turn_mode(&mut game, TurnMode::SafePairOfHands);
+        assert_eq!(game.last_turn_mode, Some(TurnMode::Regular));
+        let last = game.last_turn_mode.unwrap();
+        set_turn_mode(&mut game, last);
+        assert_eq!(game.turn_mode, TurnMode::Regular);
+        assert_eq!(game.last_turn_mode, Some(TurnMode::SafePairOfHands));
     }
 
     #[test]

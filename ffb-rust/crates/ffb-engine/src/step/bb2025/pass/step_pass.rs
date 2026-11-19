@@ -358,8 +358,16 @@ impl StepPass {
                 ask_for_reroll_if_available_for(
                     game, thrower.as_deref(), "PASS", self.minimum_roll, fumble)
             } else {
-                crate::step::util_server_re_roll::ask_for_reroll_if_available(
-                    game, "PASS", self.minimum_roll, fumble)
+                // Java StepPass (bb2020 + bb2025) calls the PLAYER overload with
+                // `reRollSkill = null` -- `askForReRollIfAvailable(gameState, thrower, PASS, min,
+                // fumble, modificationSkill, null)` -- so no action-keyed skill source is looked up.
+                // The pass skill itself was already handled by `pass_skill_offer`
+                // (`UtilCards.getRerollSource`, REGULAR usage only). The acting-player overload
+                // found Morg 'n' Thorg's ONCE-PER-GAME The Ballista and raised a re-roll dialog
+                // Java never shows (high_elf v black_orc bb2025 seed 2: two draws, rr=0).
+                let acting = game.acting_player.player_id.clone();
+                ask_for_reroll_if_available_for(
+                    game, acting.as_deref(), "PASS", self.minimum_roll, fumble)
             };
             if prompt.is_none() && modifying.is_some() && game.rules == ffb_model::enums::Rules::Bb2025 {
                 let team_id = if game.home_playing { game.team_home.id.clone() } else { game.team_away.id.clone() };
@@ -407,7 +415,12 @@ impl StepPass {
         // !showUseModifyingSkillDialog(...)) handleFailedPass(); return; }` — resolved below, once
         // the passing distance and modifiers the dialog probe needs are known.
         let mut reroll_unspent = false;
-        if self.re_rolled_action.as_deref() == Some("PASS") {
+        // Java nests the whole consume under `if (usingModifyingSkill == null ||
+        // !usingModifyingSkill)`: an ACCEPTED Strong Passing Game re-enters with the bb2020 source
+        // still set (only bb2025 clears it) and must not spend it again -- Rust re-used Pass and
+        // rolled a fresh die where Java added ST to the stored roll (Skrull Halfheight,
+        // khemri_fumbbl v dwarf bb2020 seed 1).
+        if self.re_rolled_action.as_deref() == Some("PASS") && self.using_modifying_skill != Some(true) {
             let thrower_id = game.thrower_id.clone().unwrap_or_default();
             // Java's guard is `usingModifyingSkill == null || !usingModifyingSkill`: the
             // modifying-skill answer re-enters and DOES report again.

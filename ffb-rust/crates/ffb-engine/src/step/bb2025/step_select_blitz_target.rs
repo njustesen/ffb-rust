@@ -211,7 +211,7 @@ impl StepSelectBlitzTarget {
                         if let Some(p) = game.player_mut(&acting_id) {
                             p.add_skill_enhancement(skill.category_and_name_for(rules).1, granted);
                         }
-                        let props = skill.properties();
+                        let props = skill.properties_for(rules);
                         let frenzy = props.contains(&NamedProperties::CAN_GAIN_FRENZY_FOR_BLITZ);
                         let claws = props.contains(&NamedProperties::CAN_GAIN_CLAWS_FOR_BLITZ);
                         let avoid = props.contains(&NamedProperties::CAN_AVOID_DODGING);

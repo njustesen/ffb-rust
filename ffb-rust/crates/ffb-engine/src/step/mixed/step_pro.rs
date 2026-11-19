@@ -94,12 +94,18 @@ impl StepPro {
             .map(|a| a.name == OLD_PRO)
             .unwrap_or(false);
 
+        // Java publishes SUCCESSFUL_PRO only in the `else` arm: a first failure with no re-roll
+        // on offer falls through to NEXT_STEP WITHOUT it, so StepHandleDropPlayerContext keeps
+        // the modified context and its later report reads `skipInjuryParts: ARMOUR` (slann v
+        // nippon bb2020 seed 1, Helmut Wulf's Old Pro: Rust published false, nulled the context
+        // and lost that second injury report).
         if !successful && !already_rerolled {
             if let Some(prompt) = ask_for_reroll_if_available(game, OLD_PRO, MINIMUM_PRO_ROLL, false) {
                 self.re_roll.re_rolled_action = Some(ffb_model::model::re_rolled_action::ReRolledAction::new(OLD_PRO));
                 self.re_roll.re_roll_source = Some(ReRollSource::new("TRR"));
                 return StepOutcome::cont().with_prompt(prompt);
             }
+            return StepOutcome::next();
         }
 
         StepOutcome::next().publish(StepParameter::SuccessfulPro(successful))
@@ -194,8 +200,8 @@ mod tests {
         if succeeds {
             assert!(out.published.iter().any(|p| matches!(p, StepParameter::SuccessfulPro(true))));
         } else {
-            // Still publishes SuccessfulPro(false) when no reroll available
-            assert!(out.published.iter().any(|p| matches!(p, StepParameter::SuccessfulPro(false))));
+            // Java: a first failure with no re-roll on offer publishes NOTHING.
+            assert!(!out.published.iter().any(|p| matches!(p, StepParameter::SuccessfulPro(_))));
         }
     }
 

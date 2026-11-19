@@ -440,6 +440,17 @@ impl Player {
         found
     }
 
+    /// Edition-aware `getSkillWithProperty`: Java only knows the skill class of the game's edition,
+    /// so a skill whose classes register different properties per edition (Incorporeal) must be
+    /// looked up through `properties_for(rules)`, not the union in `properties()`.
+    pub fn skill_id_with_property_in(&self, rules: crate::enums::Rules, property: &str) -> Option<SkillId> {
+        let found = self.all_skill_ids().find(|id| id.properties_for(rules).contains(&property));
+        if let Some(id) = found {
+            crate::skill_touch::touch(id);
+        }
+        found
+    }
+
     /// Java: UtilCards.hasUnusedSkillWithProperty — true if player has a skill with the given property
     /// AND that skill has not been used this drive (not in used_skills).
     pub fn has_unused_skill_with_property(&self, property: &str) -> bool {

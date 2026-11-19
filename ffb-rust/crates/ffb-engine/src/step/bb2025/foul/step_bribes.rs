@@ -85,8 +85,16 @@ impl StepBribes {
 
         // Argue-the-call: random agent always argues. Roll d6.
         // DiceInterpreter: isArgueSuccessful = roll > 5 (≥ 6), isCoachBanned = roll < 2.
+        // Java askForArgueTheCall: `wasCased = playerState(actingPlayer).isCasualty(); if (option &&
+        // !coachBanned && !wasCased) showDialog(...) else fArgueTheCallChoice = false` -- a sent-off
+        // player who is already a casualty is not argued for (Cindy Piewhistle, Badly Hurt by her own
+        // bomb, then fails All You Can Eat: renegades_37733 v human bb2025 seed 1, Rust rolled an
+        // argue die Java never rolls).
         if self.argue_the_call_choice.is_none() {
-            self.argue_the_call_choice = Some(true);
+            let was_cased = game.field_model.player_state(&fouler_id)
+                .map(|s| s.is_casualty())
+                .unwrap_or(false);
+            self.argue_the_call_choice = Some(!was_cased);
         }
 
         if self.argue_the_call_choice == Some(true) && self.argue_the_call_successful.is_none() {

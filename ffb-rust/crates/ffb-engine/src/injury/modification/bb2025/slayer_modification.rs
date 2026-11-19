@@ -2,7 +2,6 @@
 ///
 /// Extends AvOrInjModification. Extra gate: defender has the BigGuy keyword (PlayerType::BigGuy).
 use ffb_model::enums::SkillId;
-use ffb_model::enums::PlayerType;
 use ffb_model::model::game::Game;
 use ffb_model::model::SkillUse;
 use crate::injury::InjuryContext;
@@ -16,10 +15,14 @@ pub struct SlayerModification {
 impl SlayerModification {
     pub fn new() -> Self { Self { base: AvOrInjModification::new() } }
 
+    /// Java: `game.getPlayerById(id).getPosition().getKeywords().contains(Keyword.BIG_GUY)` -- the
+    /// position KEYWORD, not the player type. A star big guy is type Star with the "Big Guy"
+    /// keyword (Grak: necromantic v ogre bb2025 seed 1, Java offered Grim Ironjaw's Slayer and
+    /// Rust did not).
     fn defender_is_big_guy(game: &Game, defender_id: Option<&str>) -> bool {
         defender_id
             .and_then(|id| game.player(id))
-            .map(|p| p.player_type == PlayerType::BigGuy)
+            .map(|p| p.keywords.iter().any(|k| k.eq_ignore_ascii_case("Big Guy")))
             .unwrap_or(false)
     }
 }

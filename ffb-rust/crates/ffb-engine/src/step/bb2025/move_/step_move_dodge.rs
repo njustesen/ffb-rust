@@ -119,7 +119,7 @@ impl Step for StepMoveDodge {
             // auto-declined the dialog without ever raising it (star tier: bb2020 Gretchen
             // Wächter, chaos_pact vs khemri seed 1).
             Action::UseSkill { skill_id, use_skill }
-                if skill_id.properties().contains(
+                if skill_id.properties_for(game.rules).contains(
                     &ffb_model::model::property::named_properties::NamedProperties::CAN_ADD_STRENGTH_TO_DODGE) =>
             {
                 self.using_modifying_skill = Some(*use_skill);
@@ -128,7 +128,16 @@ impl Step for StepMoveDodge {
                         self.re_roll_state.re_roll_source = Some(source.clone());
                         let pid = game.acting_player.player_id.clone().unwrap_or_default();
                         use_reroll(game, &source, &pid, rng);
-                        // Java `doRoll = reRolledAction && source != null` → a fresh die.
+                    }
+                    // Java `doRoll = reRolledAction && getReRollSource() != null` → a fresh die.
+                    // The source is the step's, so a SECOND decline -- the Dodge skill now spent,
+                    // `findSkillReRollSource` null, nothing re-set -- still finds the first
+                    // decline's source and rolls again (chaos_pact v necromantic bb2020 seed 2:
+                    // Java 2-fail, decline, Dodge 2-fail, decline, fresh 1; Rust re-read the stale
+                    // 2 and re-offered Incorporeal in a loop).
+                    let rerolled_dodge = self.re_roll_state.re_rolled_action.as_ref()
+                        .map(|a| a.name == "DODGE").unwrap_or(false);
+                    if rerolled_dodge && self.re_roll_state.re_roll_source.is_some() {
                         self.dodge_roll = 0;
                     }
                 }
@@ -256,7 +265,7 @@ impl StepMoveDodge {
                     && DiceInterpreter::is_skill_roll_successful(self.dodge_roll, self.last_minimum_roll)
                 {
                     let skill = game.player(&pid).and_then(|p|
-                        p.skill_id_with_property(ffb_model::model::property::named_properties::NamedProperties::CAN_ADD_STRENGTH_TO_DODGE));
+                        p.skill_id_with_property_in(game.rules, ffb_model::model::property::named_properties::NamedProperties::CAN_ADD_STRENGTH_TO_DODGE));
                     game.report_list.add(
                         ffb_model::report::mixed::report_modified_dodge_result_successful::ReportModifiedDodgeResultSuccessful::new(skill));
                 }
@@ -345,7 +354,7 @@ impl StepMoveDodge {
         let unused_strength_skill = |game: &Game| -> Option<(ffb_model::enums::SkillId, i32)> {
             let pid = game.acting_player.player_id.as_deref()?;
             let p = game.player(pid)?;
-            let skill = p.skill_id_with_property(
+            let skill = p.skill_id_with_property_in(game.rules,
                 ffb_model::model::property::named_properties::NamedProperties::CAN_ADD_STRENGTH_TO_DODGE)?;
             if p.used_skills.contains(&skill) || game.acting_player.used_skills.contains(&skill) {
                 return None;

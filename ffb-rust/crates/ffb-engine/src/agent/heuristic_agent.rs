@@ -4521,7 +4521,38 @@ impl HeuristicAgent {
                     // skill decisions can be diffed and not just their draw totals (`JSKILL`).
                     eprintln!("RSKILL skill={skill_name} w_use={w_use} idx={i} draws={}", self.probe_draws);
                 }
-                self.take(i)
+                let act = self.take(i);
+                // Java's harness answers the activation's FIRST concrete command for a moving
+                // action with the plan's whole path (`sendMoveAction` -> `takePath`, which marks
+                // the plan delivered), and it is that CLIENT_MOVE at StepInitSelecting which runs
+                // the Select sequence's StepAnimalSavagery. A lash-out against an OPPONENT then
+                // publishes MOVE_STACK = null (AnimalSavageryBehaviour.lashOut), so the path is
+                // gone and the next INIT_MOVING replay sees a delivered plan and ends the
+                // activation. Rust raises the Select sequence on the activation itself, before
+                // any path was handed over, so without this the agent re-delivered the whole path
+                // after the lash-out (amazon v khorne bb2020 seed 2: Glotl Stop dodged on).
+                if matches!(act, Action::UseSkill { use_skill: true, .. })
+                    && skill_id.properties().contains(
+                        &ffb_model::model::property::named_properties::NamedProperties::CAN_LASH_OUT_AGAINST_OPPONENTS,
+                    )
+                    && matches!(
+                        g.acting_player.player_action,
+                        Some(
+                            PlayerAction::Move
+                                | PlayerAction::StandUp
+                                | PlayerAction::PassMove
+                                | PlayerAction::HandOverMove
+                        )
+                    )
+                {
+                    if let Some(pl) = self.plan.as_mut() {
+                        if pl.player == player_id && !pl.delivered {
+                            pl.path.clear();
+                            pl.delivered = true;
+                        }
+                    }
+                }
+                act
             }
 
             // ── interception (§6.19) ────────────────────────────────────────

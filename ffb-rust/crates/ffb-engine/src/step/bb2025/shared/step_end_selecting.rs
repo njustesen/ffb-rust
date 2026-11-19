@@ -441,6 +441,12 @@ impl StepEndSelecting {
                     StepParameter::GotoLabelOnFailure(labels::END_BLOCKING.into()),
                     StepParameter::InSelect(true),
                 ]);
+                // `bb2020/SelectBlitzTarget.java:36` DUMP_OFF follows FOUL_APPEARANCE, and
+                // `bb2020/BlitzBlock.java` has none of its own (blitz_block.rs drops it under
+                // BB2020), so the skipped select sequence's offer is restored here.
+                if game.rules == ffb_model::enums::Rules::Bb2020 {
+                    activation.add(StepId::DumpOff, vec![]);
+                }
                 let mut seq = activation.build();
                 seq.extend(BlitzBlock::build_sequence(&params));
                 StepOutcome::next().push_seq(seq)

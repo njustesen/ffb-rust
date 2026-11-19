@@ -100,14 +100,25 @@ impl BlitzBlock {
                 StepParameter::GotoLabelOnFailure(fl.into()),
             ]);
         }
-        // 5 DUMP_OFF
-        seq.add(StepId::DumpOff, vec![]);
-        // 6 BLOCK_STATISTICS
-        seq.add(StepId::BlockStatistics, vec![]);
-        // 7 DAUNTLESS
-        seq.add(StepId::Dauntless, vec![]);
-        // 8 HORNS (bonus block die for blitz)
-        seq.add(StepId::Horns, vec![]);
+        if params.rules == Rules::Bb2020 {
+            // `bb2020/BlitzBlock.java:34-36`: HORNS, BLOCK_STATISTICS, DAUNTLESS -- and NO
+            // DUMP_OFF: bb2020 offers Dump-Off once, in SELECT_BLITZ_TARGET. Rust asked the
+            // defender a second time at the block (dark_elf_league_fumbbl bb2020 @1e6 seed 21: two
+            // declined Dump-Off reports, two extra draws), and rolled Dauntless before Horns had
+            // added the blitzer's +1 ST.
+            seq.add(StepId::Horns, vec![]);
+            seq.add(StepId::BlockStatistics, vec![]);
+            seq.add(StepId::Dauntless, vec![]);
+        } else {
+            // 5 DUMP_OFF
+            seq.add(StepId::DumpOff, vec![]);
+            // 6 BLOCK_STATISTICS
+            seq.add(StepId::BlockStatistics, vec![]);
+            // 7 DAUNTLESS
+            seq.add(StepId::Dauntless, vec![]);
+            // 8 HORNS (bonus block die for blitz)
+            seq.add(StepId::Horns, vec![]);
+        }
         // 9 TRICKSTER
         seq.add(StepId::Trickster, vec![]);
         // 10 PICK_UP — BB2025 only; see `BlitzBlockParams::rules`.
@@ -450,10 +461,27 @@ mod tests {
             vec![StepId::Tentacles, StepId::Shadowing, StepId::PickUp]);
         let bb2025 = BlitzBlock::build_sequence(&BlitzBlockParams::default());
         let bb2020 = BlitzBlock::build_sequence(&BlitzBlockParams { rules: Rules::Bb2020, ..Default::default() });
-        // Five entries are edition-gated: this PICK_UP and the FOUL_APPEARANCE below are BB2025
-        // only; the ball-and-chain GO_FOR_IT (`bb2020/BlitzBlock.java:89-90`) and the
+        // Six entries are edition-gated: this PICK_UP, the FOUL_APPEARANCE below and DUMP_OFF are
+        // BB2025 only; the ball-and-chain GO_FOR_IT (`bb2020/BlitzBlock.java:89-90`) and the
         // TENTACLES + SHADOWING pair after FOLLOWUP are BB2020 only.
-        assert_eq!(bb2020.len(), bb2025.len() - 2 + 3);
+        assert_eq!(bb2020.len(), bb2025.len() - 3 + 3);
+    }
+
+    /// `bb2020/BlitzBlock.java:34-36`: HORNS, BLOCK_STATISTICS, DAUNTLESS and no DUMP_OFF (bb2020
+    /// offers Dump-Off once, in SELECT_BLITZ_TARGET); bb2025 keeps DUMP_OFF, BLOCK_STATISTICS,
+    /// DAUNTLESS, HORNS (dark_elf_league_fumbbl bb2020 @1e6 seed 21: Dump-Off asked twice).
+    #[test]
+    fn bb2020_blitz_block_has_no_dump_off_and_horns_before_dauntless() {
+        let ids = |rules: Rules| BlitzBlock::build_sequence(&BlitzBlockParams { rules, ..Default::default() })
+            .iter().map(|s| s.step_id).collect::<Vec<_>>();
+        let bb2020 = ids(Rules::Bb2020);
+        assert!(!bb2020.contains(&StepId::DumpOff));
+        let p = |v: &Vec<StepId>, id: StepId| v.iter().position(|s| *s == id).unwrap();
+        assert!(p(&bb2020, StepId::Horns) < p(&bb2020, StepId::BlockStatistics));
+        assert!(p(&bb2020, StepId::BlockStatistics) < p(&bb2020, StepId::Dauntless));
+        let bb2025 = ids(Rules::Bb2025);
+        assert!(p(&bb2025, StepId::DumpOff) < p(&bb2025, StepId::BlockStatistics));
+        assert!(p(&bb2025, StepId::Dauntless) < p(&bb2025, StepId::Horns));
     }
 
     /// `bb2020/BlitzBlock.java:31-33` adds FOUL_APPEARANCE here only for a frenzy follow-up; the

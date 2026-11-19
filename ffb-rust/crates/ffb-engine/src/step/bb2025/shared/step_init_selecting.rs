@@ -713,7 +713,7 @@ impl Step for StepInitSelecting {
                     let p = acting_player_id.as_deref().and_then(|id| game.player(id));
                     p.map(|player| (
                         player.has_skill_property(NamedProperties::CAN_GAIN_HAIL_MARY) && player.has_skill(*skill_id),
-                        player.has_skill_property(NamedProperties::CAN_AVOID_DODGING) && player.has_skill(*skill_id),
+                        player.has_skill_property_in(game.rules, NamedProperties::CAN_AVOID_DODGING) && player.has_skill(*skill_id),
                         player.has_skill_property(NamedProperties::CAN_ADD_BLOCK_DIE) && player.has_skill(*skill_id),
                     )).unwrap_or((false, false, false))
                 };

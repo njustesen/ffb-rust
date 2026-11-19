@@ -108,7 +108,11 @@ impl PassModifierFactory {
         let players = UtilPlayer::find_tacklezone_players(game, player_id);
         let mut zones = players.len();
 
-        if game.turn_mode == TurnMode::DumpOff {
+        // Java `numberOfTacklezones` asks the EDITION's PassMechanic: bb2016's `passModifiers` is
+        // plain `findTacklezones` -- no Dump-Off exemption for the standing-up blitzer. Applying
+        // the bb2020/bb2025 rule to bb2016 dropped the blitzer's zone from a Dump-Off pass roll
+        // (dark_elf bb2016 seeds 7/69 @0: java "2 Tacklezones" min 4, rust "1 Tacklezone" min 3).
+        if game.turn_mode == TurnMode::DumpOff && game.rules != ffb_model::enums::Rules::Bb2016 {
             let ap = &game.acting_player;
             if let Some(ap_id) = ap.player_id.as_deref() {
                 if ap.standing_up && players.iter().any(|id| id.as_str() == ap_id) {
