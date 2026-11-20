@@ -9722,7 +9722,7 @@ rule-legal skill advancements; (2) a coverage-bias mode that plays worse is fine
 a PARAMETER to control randomness/coverage (`--heur-scale` already scales temperature; add
 `--coverage-bias K`, 0 = off, mirrored in ParityRunner).
 
-**Phases** (order 0 -> 1 -> 3 -> 2 -> 4 -> 5):
+**Phases** (order 0 -> 1 -> 3 -> 2 -> 5 (cert6, early) -> 2b -> 4 -> 5 again):
 0. Skill ledger: every skill x edition -> not fielded / fielded-never-fires / thin (<1000) /
    fires, over the cert4 mirror + cross + star roots. Rust-only skill-touch counters (a skill check
    that returned true outside the agent) give the silent skills (Block, Guard, Tackle...) a count;
@@ -9735,6 +9735,18 @@ a PARAMETER to control randomness/coverage (`--heur-scale` already scales temper
    from a ledger-generated table, fed to both engines.
 2. Skill-advancement drafts: set-cover so every catalogue skill sits on a player whose category
    access allows it; gen_java_parity_data.py; a skill sweep.
+2b. Designed skill coverage (user, 2026-11-20: "a step before phase 4") -- design squads +
+   zero-draw agent rules (both engines) + seed hunts so the remaining skills happen. Start with a
+   fresh skill-ledger run on the cert6 build so the list is measured, not documented. Then, cheap
+   first: (a) skill re-roll before team re-roll (Halfling Luck, Thinking Man's Troll); (b) Forgo
+   for a player with no useful action; (c) Hail Mary Bomb squad (Bombardier + Hail Mary Pass) and
+   a bomb-as-HMP rule; (d) Blast It via Barik + HMP-from-deep rule. Then the engine ports:
+   (e) blitz-block skill choice (Java StepInitSelecting :378-398 + prompt; Gored by the Bull,
+   KICK_EM_BLITZ); (f) Bounding Leap (Java :403) + a jump decision; (g) Two for One (partner data
+   both sides, checkForMissingPartners, per-skill value evaluator); (h) STAT_INCREASE drafts
+   (port the load-time PlayerModifier). Rules that play worse sit behind `--coverage-bias` so the
+   default agent and its certs are untouched. Gate per skill; finish with a re-cert that also
+   completes cert6's unfinished star remainder + skill sweep.
 4. Skill-aware value model (Block/Dodge in block odds, Guard assists, Tackle in dodge risk...),
    A/B at >=12800 games, keep only wins.
 5. Re-cert mirror 330 + cross 4012 + star 4012 + skill sweep on one frozen build, steps + reports.
