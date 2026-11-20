@@ -13,7 +13,7 @@ Each iteration:
 
 usage (from anywhere):
   python scripts/skill_parity_loop.py [--max-iters 200] [--permission-mode auto]
-         [--model opus] [--effort high] [--budget-usd 25] [--dry-run]
+         [--model opus] [--effort high] [--dry-run]
 
 Logs: ffb-rust/loop_logs/iter_NNN.json (the session's JSON result) + loop.log (one line each).
 Stop it any time: Ctrl-C, or create ffb-rust/STOP_LOOP (it stops before the next session).
@@ -132,7 +132,6 @@ def main():
                     choices=['acceptEdits', 'auto', 'bypassPermissions', 'dontAsk'])
     ap.add_argument('--model', default=None)
     ap.add_argument('--effort', default=None, choices=['low', 'medium', 'high', 'xhigh', 'max'])
-    ap.add_argument('--budget-usd', type=float, default=None, help='per-session cap')
     ap.add_argument('--claude', default='claude', help='path of the claude CLI')
     ap.add_argument('--dry-run', action='store_true', help='print the first prompt and exit')
     a = ap.parse_args()
@@ -171,8 +170,6 @@ def main():
             cmd += ['--model', a.model]
         if a.effort:
             cmd += ['--effort', a.effort]
-        if a.budget_usd:
-            cmd += ['--max-budget-usd', str(a.budget_usd)]
         log('iteration %d: starting session (%s)' % (it, check.splitlines()[-1]))
         t0 = time.time()
         p = subprocess.run(cmd, cwd=OUTER, capture_output=True, text=True, errors='replace')
@@ -181,17 +178,17 @@ def main():
             fh.write(p.stdout or '')
             if p.stderr:
                 fh.write('\n--- stderr ---\n' + p.stderr)
-        summary, cost = '', None
+        summary, turns = '', None
         try:
             res = json.loads(p.stdout)
             text = res.get('result') or ''
-            cost = res.get('total_cost_usd')
+            turns = res.get('num_turns')
             summary = next((l for l in reversed(text.splitlines()) if l.startswith('SUMMARY:')),
                            text[-200:].replace('\n', ' '))
         except ValueError:
             summary = 'no JSON result (rc=%s): %s' % (p.returncode, (p.stderr or '')[-300:])
-        log('iteration %d: rc=%s %.0f min cost=%s  %s' % (
-            it, p.returncode, (time.time() - t0) / 60, cost, summary))
+        log('iteration %d: rc=%s %.0f min turns=%s  %s' % (
+            it, p.returncode, (time.time() - t0) / 60, turns, summary))
         if p.returncode != 0 and not p.stdout:
             log('session failed to start; pausing 10 min before retrying')
             time.sleep(600)
