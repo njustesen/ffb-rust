@@ -9722,7 +9722,9 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > The work is now driven by `scripts/skill_parity_loop.py` (goal = `scripts/skill_parity_check.py`
 > exits 0). A supervising interactive session STILL OWNS these runs -- do NOT relaunch, kill or
 > duplicate them, and do NOT run the same edition+matchup concurrently:
-> - cert6 chain, PID 11308 (`cert_chain.ps1 -suites starrest,skill -anytime`, workers = star_worker
+> - **[DONE 16:4x -- cert6 FULLY GREEN: mirror 330, cross 4012, star 4012 (window re-gated twice),
+>   skill 110. PID 11308 has exited, so `mvn package` is allowed again; certs still pin PARITY_CP.]**
+>   cert6 chain, PID 11308 (`cert_chain.ps1 -suites starrest,skill -anytime`, workers = star_worker
 >   PIDs 23304/10700/24280, then sksweep into `D:/ffb_sksweep/cert6`). It resolves the IN-REPO jar
 >   (launched before PARITY_CP was pinned), so **no `mvn package` until PID 11308 has exited**.
 >   For dev gates patch a jar copy instead: `javac -cp D:/ffb_star/bin/ffb-ai-cert6.jar -d <dir>
