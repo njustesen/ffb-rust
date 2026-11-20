@@ -201,8 +201,11 @@ impl UtilServerPlayerMove {
         let mut minimum_roll_dodge = 0i32;
         if jumping {
             // Java: minimumRollDodge = mechanic.minimumRollJump(player, jumpModifiers)
-            // no-op: actingPlayer.isJumpsWithoutModifiers() not ported — modifiers always applied
-            if let Some(player) = game.player(&acting_id) {
+            // Java: if (!actingPlayer.isJumpsWithoutModifiers()) jumpModifiers = findModifiers(...)
+            let without_modifiers = game.acting_player.jumps_without_modifiers;
+            if let Some(player) = game.player(&acting_id).filter(|_| without_modifiers) {
+                minimum_roll_dodge = player.agility_with_modifiers().max(2);
+            } else if let Some(player) = game.player(&acting_id) {
                 let ctx = JumpContext::new(game, player, player_coord, coordinate);
                 let factory = JumpModifierFactory::for_rules(game.rules);
                 let mods = factory.find_applicable(&ctx);

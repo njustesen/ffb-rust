@@ -399,8 +399,17 @@ public final class ActivationDriver {
         float pWalk = stepP(bb2016, ag, hasDodge, true, tzMid) * stepP(bb2016, ag, hasDodge,
             tzMid > 0, tzDest);
         boolean vll = hasSkillOn(player, "Very Long Legs");
-        float pJump = Reach.pRoll(
-            Reach.jumpTarget(bb2016, editionIsBb2025(game), ag, tzHere, tzDest, vll, true));
+        // BACKLOG §M 2b(f), mirrored in heuristic_agent.rs jump_over_first_step: an unused
+        // Bounding Leap is declared with the jump (ParityRunner DECLARE_JUMP), so the roll is the
+        // bare agility target and a failure is re-rolled by the skill itself (StepJump.leap()).
+        float pJump;
+        if (com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(game.getActingPlayer(),
+                com.fumbbl.ffb.model.property.NamedProperties.canIgnoreJumpModifiers) != null) {
+            pJump = Reach.pWithReRoll(Reach.pRoll(Math.max(2, ag)), 1.0f);
+        } else {
+            pJump = Reach.pRoll(
+                Reach.jumpTarget(bb2016, editionIsBb2025(game), ag, tzHere, tzDest, vll, true));
+        }
         return pJump > pWalk;
     }
 

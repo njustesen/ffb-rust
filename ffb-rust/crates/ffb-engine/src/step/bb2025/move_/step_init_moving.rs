@@ -335,6 +335,16 @@ impl Step for StepInitMoving {
                         SkillUse::ADD_BLOCK_DIE,
                     ));
                     // Java: also dispatches to blitz if BlitzMove && !hasBlocked — deferred
+                } else if skill_id.properties_for(game.rules)
+                    .contains(&NamedProperties::CAN_IGNORE_JUMP_MODIFIERS)
+                {
+                    // Java (bb2020 :289, bb2025 :309): Bounding Leap declared instead of a plain
+                    // jump -- `actingPlayer.setJumpsWithoutModifiers(true)` (which also sets
+                    // jumping) + `updateMoveSquares(gameState, true)`. SKIP_STEP: the step waits
+                    // for the path; Rust re-runs execute_step only to re-emit the move prompt
+                    // with the jump squares (the DeclareJump arm does the same).
+                    game.acting_player.set_jumps_without_modifiers(true);
+                    crate::util::util_server_player_move::UtilServerPlayerMove::update_move_squares(game, true);
                 }
             }
 

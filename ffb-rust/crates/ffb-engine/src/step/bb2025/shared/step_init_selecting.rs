@@ -707,6 +707,14 @@ impl Step for StepInitSelecting {
                         return self.execute_step(game, rng);
                     }
                 }
+                // Java (bb2020 :383, bb2025 :403): `canIgnoreJumpModifiers` (Bounding Leap) --
+                // setJumpsWithoutModifiers(true) + updateMoveSquares(gameState, true), EXECUTE_STEP.
+                // The property sits on the SKILL (only Bounding Leap registers it).
+                if skill_id.properties_for(game.rules).contains(&NamedProperties::CAN_IGNORE_JUMP_MODIFIERS) {
+                    game.acting_player.set_jumps_without_modifiers(true);
+                    crate::util::util_server_player_move::UtilServerPlayerMove::update_move_squares(game, true);
+                    return self.execute_step(game, rng);
+                }
                 let acting_player_id = game.acting_player.player_id.clone();
                 // Collect skill property booleans before any mutable borrow of game.
                 let (gain_hail_mary, avoid_dodging, add_block_die) = {

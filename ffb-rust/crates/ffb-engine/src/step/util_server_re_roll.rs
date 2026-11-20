@@ -55,6 +55,23 @@ pub fn ask_for_reroll_if_available(
         game, acting.as_deref(), rerolled_action, minimum_roll, fumble, reroll_skill)
 }
 
+/// Java: the ACTING-PLAYER overload with `ignoreSkills` (`StepJump` passes its unused Bounding
+/// Leap): the action-keyed skill lookup skips those skills, so the dialog carries no `reRollSkill`
+/// for them.
+pub fn ask_for_reroll_if_available_ignoring(
+    game: &Game,
+    rerolled_action: &str,
+    minimum_roll: i32,
+    fumble: bool,
+    ignore: &[ffb_model::enums::SkillId],
+) -> Option<AgentPrompt> {
+    let acting = game.acting_player.player_id.clone();
+    let reroll_skill = crate::step::abstract_step_with_re_roll::find_skill_reroll_source_ignoring(
+        game, rerolled_action, ignore);
+    ask_for_reroll_if_available_inner(
+        game, acting.as_deref(), rerolled_action, minimum_roll, fumble, reroll_skill)
+}
+
 /// As [`ask_for_reroll_if_available`], but for a roll made by `player_id` — which may be on the
 /// NON-acting team. Mirrors Java's player argument and its `actingTeam.hasPlayer` gate.
 ///

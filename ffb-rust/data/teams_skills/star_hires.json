@@ -1,5 +1,5 @@
 {
-  "_comment": "BACKLOG §M 2b(p): stars the SKILL suite hires (home side only, on top of the squad, exactly like the star tier: --home-star). Read by scripts/sksweep.py and scripts/skill_ledger.py jobs('skill'). Jeremiah Kool carries The Flashing Blade and joined the star catalogue after the star schedules were cut, so no star gate fields him. §M 2b(t): bb2025 The Black Gobbo (Sneakiest of the Lot) on three eligible squads -- his foul is rare (bench: 0-2 per 20 games per squad) and the star schedule's 2-seed gates gave 0 in 98 games. §M 2b(u): Nobbla Blackwart (Kick 'em While They're Down!) on bb2020 skaven_sk / underworld_sk / goblin_sk and bb2025 skaven_sk -- the Kick 'em block needs a foul on an adjacent downed opponent (bench 0-3 per 20 games per squad); the star schedule gave bb2020 0 in 82 games. §M 2b(v): Eldril Sidewinder (Mesmerizing/Mesmerising Dance, the HYPNOTIC_GAZE re-roll the harnesses now take) on bb2020 + bb2025 dark_elf_sk / high_elf_sk -- the re-roll needs a FAILED gaze, a few per 20 games. §M 2b(x): bb2020 Dribl and Drull (A Sneaky Pair) on slann_sk / slann_fumbbl_sk -- every Drull stab that breaks armour evaluates the pair's injury modifier (bench seeds 1-20: 7 + 8 touches). §M 2b(y): Guffle Pussmaw/Pusmaw (Quick Bite: an opponent catches next to him) on bb2025 chaos_sk / chaos_pact_sk (bench seeds 1-20: 4 + 4) and bb2020 chaos_sk, whose seeds 1-20 never see it (~1 game in 100, same rate as bb2025 over 200 games) -- bb2020 needs the hunted seeds in seed_hunts.json.",
+  "_comment": "BACKLOG §M 2b(p): stars the SKILL suite hires (home side only, on top of the squad, exactly like the star tier: --home-star). Read by scripts/sksweep.py and scripts/skill_ledger.py jobs('skill'). Jeremiah Kool carries The Flashing Blade and joined the star catalogue after the star schedules were cut, so no star gate fields him. §M 2b(t): bb2025 The Black Gobbo (Sneakiest of the Lot) on three eligible squads -- his foul is rare (bench: 0-2 per 20 games per squad) and the star schedule's 2-seed gates gave 0 in 98 games. §M 2b(u): Nobbla Blackwart (Kick 'em While They're Down!) on bb2020 skaven_sk / underworld_sk / goblin_sk and bb2025 skaven_sk -- the Kick 'em block needs a foul on an adjacent downed opponent (bench 0-3 per 20 games per squad); the star schedule gave bb2020 0 in 82 games. §M 2b(v): Eldril Sidewinder (Mesmerizing/Mesmerising Dance, the HYPNOTIC_GAZE re-roll the harnesses now take) on bb2020 + bb2025 dark_elf_sk / high_elf_sk -- the re-roll needs a FAILED gaze, a few per 20 games. §M 2b(x): bb2020 Dribl and Drull (A Sneaky Pair) on slann_sk / slann_fumbbl_sk -- every Drull stab that breaks armour evaluates the pair's injury modifier (bench seeds 1-20: 7 + 8 touches). §M 2b(y): Guffle Pussmaw/Pusmaw (Quick Bite: an opponent catches next to him) on bb2025 chaos_sk / chaos_pact_sk (bench seeds 1-20: 4 + 4) and bb2020 chaos_sk, whose seeds 1-20 never see it (~1 game in 100, same rate as bb2025 over 200 games) -- bb2020 needs the hunted seeds in seed_hunts.json. §M 2b(f): Rowana Forestfoot (Bounding Leap, once per game: a jump without modifiers that the skill itself re-rolls) on bb2020 + bb2025 gnome_sk -- she jumps only when she starts marked and the agent prices the leap above the two-dodge walk (bench: 2 uses per 40 games per edition); bb2020 seeds 1-20 include one (seed 2, with the automatic re-roll), bb2025 needs the hunted seed 21.",
   "bb2020": {"elf_sk": "star.jeremiah_kool",
              "dark_elf_sk": "star.eldril_sidewinder",
              "high_elf_sk": "star.eldril_sidewinder",
@@ -8,7 +8,8 @@
              "underworld_sk": "star.nobbla_blackwart",
              "slann_sk": "star.dribl_and_drull",
              "slann_fumbbl_sk": "star.dribl_and_drull",
-             "chaos_sk": "star.guffle_pussmaw"},
+             "chaos_sk": "star.guffle_pussmaw",
+             "gnome_sk": "star.rowana_forestfoot"},
   "bb2025": {"elf_sk": "star.jeremiah_kool",
              "dark_elf_sk": "star.eldril_sidewinder",
              "high_elf_sk": "star.eldril_sidewinder",
@@ -17,5 +18,6 @@
              "orc_sk": "star.the_black_gobbo",
              "skaven_sk": "star.nobbla_blackwart",
              "chaos_sk": "star.guffle_pusmaw",
-             "chaos_pact_sk": "star.guffle_pusmaw"}
+             "chaos_pact_sk": "star.guffle_pusmaw",
+             "gnome_sk": "star.rowana_forestfoot"}
 }

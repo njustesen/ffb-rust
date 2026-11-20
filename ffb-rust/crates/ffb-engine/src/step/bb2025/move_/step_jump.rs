@@ -9,7 +9,7 @@ use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::ReRollState;
 use crate::step::abstract_step_with_re_roll::find_skill_reroll_source;
-use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available_ignoring, use_reroll};
 use ffb_mechanics::bb2025::jump_mechanic::JumpMechanic;
 use ffb_mechanics::jump_mechanic::JumpMechanic as JumpMechanicTrait;
 use ffb_mechanics::modifiers::jump_modifier_factory::JumpModifierFactory;
@@ -37,7 +37,7 @@ use crate::util::util_server_player_move::UtilServerPlayerMove;
 /// JumpModifierFactory wired: TACKLEZONE (max of from/to zones) and PREHENSILE_TAIL modifiers applied.
 /// client-only: DivingTackle dialog (checkDivingTackle, usingDivingTackle) — client-side.
 /// client-only: canChooseToIgnoreJumpModifierAfterRoll skill dialog — client-side.
-/// client-only: canIgnoreJumpModifiers dialog (useIgnoreModifierSkill) — headless always applies modifiers.
+/// Bounding Leap (canIgnoreJumpModifiers / useIgnoreModifierSkill) ported 2026-11-20 (BACKLOG §M 2b(f)).
 /// handleFailure: COORDINATE_FROM(null if roll==1), updatePlayerAndBallPosition, updateMoveSquares — all implemented.
 /// client-only: checkDivingTackle/usingDivingTackle dialog — headless auto-skips diving tackle activation.
 /// fSecondGoForIt: handled in StepGoForIt (second_go_for_it field there triggers repeat for jumping players).
@@ -104,6 +104,13 @@ impl Step for StepJump {
     }
 }
 
+/// Java `ActionStatus` as `StepJump.leap()` returns it (WAITING_FOR_RE_ROLL carries the prompt).
+enum LeapStatus {
+    Success,
+    Failure,
+    WaitingForReRoll(ffb_model::prompts::AgentPrompt),
+}
+
 impl StepJump {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: doLeap = actingPlayer.isJumping() && mechanic.canStillJump(game, actingPlayer)
@@ -141,6 +148,64 @@ impl StepJump {
             self.roll = 0;
         }
 
+        // Java (bb2020 :173, bb2025 :178): Bounding Leap. A jump declared with the skill
+        // (StepInitMoving / StepInitSelecting `canIgnoreJumpModifiers` arm) sets
+        // `jumpsWithoutModifiers`; the step then reports the use, switches Diving Tackle off and
+        // rolls without modifiers.
+        self.use_ignore_modifier_skill = game.acting_player.jumps_without_modifiers;
+        if self.use_ignore_modifier_skill {
+            let pid = game.acting_player.player_id.clone();
+            let skill = pid.as_deref().and_then(|id| game.player(id)).and_then(|p| {
+                ffb_model::util::util_cards::UtilCards::get_unused_skill_with_property(
+                    p, ffb_model::model::property::named_properties::NamedProperties::CAN_IGNORE_JUMP_MODIFIERS)
+            });
+            match skill {
+                None => self.use_ignore_modifier_skill = false,
+                Some(skill_id) => {
+                    self.using_diving_tackle = Some(false);
+                    game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                        pid,
+                        skill_id,
+                        true,
+                        ffb_model::model::skill_use::SkillUse::PASS_JUMP_WITHOUT_MODIFIERS,
+                    ));
+                }
+            }
+        }
+
+        let mut events = Vec::new();
+        match self.leap(game, rng, &mut events) {
+            LeapStatus::Success => {
+                game.acting_player.set_jumping(false);
+                StepOutcome::next()
+                    .publish(StepParameter::Jumped(true))
+                    .with_events(events)
+            }
+            LeapStatus::WaitingForReRoll(prompt) => {
+                StepOutcome::cont().with_prompt(prompt).with_events(events)
+            }
+            LeapStatus::Failure => {
+                let mut out = self.handle_failure(game);
+                let mut all = events;
+                all.append(&mut out.events);
+                out.events = all;
+                out
+            }
+        }
+    }
+
+    /// Java `StepJump.leap()` (bb2020 + bb2025 share the shape used here).
+    fn leap(
+        &mut self,
+        game: &mut Game,
+        rng: &mut GameRng,
+        events: &mut Vec<ffb_model::events::GameEvent>,
+    ) -> LeapStatus {
+        // Java: reRolled = (reRolledAction == JUMP) && (reRollSource != null)
+        let re_rolled = self.re_roll_state.re_rolled_action
+            .as_ref().map(|a| a.name == "JUMP").unwrap_or(false)
+            && self.re_roll_state.re_roll_source.is_some();
+
         if self.roll == 0 {
             self.roll = rng.d6();
         }
@@ -151,9 +216,12 @@ impl StepJump {
             .map(|p| p.agility_with_modifiers())
             .unwrap_or(3);
 
-        // Java: JumpModifierFactory.findModifiers(JumpContext(game, player, moveStart, to)).
+        // Java: JumpModifierFactory.findModifiers(JumpContext(game, player, moveStart, to)),
+        // skipped entirely when the Bounding Leap is in use (`if (!useIgnoreModifierSkill)`).
         // from = move_start (origin of leap); to = current player coordinate.
-        let (modifier_total, modifier_names) = if let (Some(pid), Some(from)) = (player_id.as_deref(), self.move_start) {
+        let (modifier_total, modifier_names) = if self.use_ignore_modifier_skill {
+            (0, vec![])
+        } else if let (Some(pid), Some(from)) = (player_id.as_deref(), self.move_start) {
             if let Some(player) = game.player(pid) {
                 let to = game.field_model.player_coordinate(pid).unwrap_or(from);
                 let ctx = JumpContext::new(game, player, from, to);
@@ -179,7 +247,7 @@ impl StepJump {
                 successful,
                 self.roll,
                 minimum_roll,
-                already_rerolled,
+                re_rolled,
                 modifier_names,
             ));
         }
@@ -189,49 +257,75 @@ impl StepJump {
         // harvest even once the agent learned to declare a jump (BACKLOG E12). Emitted here on the
         // same rule as `StepMoveDodge`'s `DodgeRoll`: one event per RESOLVED roll, the re-rolled
         // resolution producing its own.
-        let roll_event = ffb_model::events::GameEvent::JumpRoll {
+        events.push(ffb_model::events::GameEvent::JumpRoll {
             player_id: player_id.clone().unwrap_or_default(),
             target: minimum_roll,
             roll: self.roll,
             success: successful,
-        };
+        });
 
-        if successful {
-            game.acting_player.jumping = false;
-            StepOutcome::next()
-                .publish(StepParameter::Jumped(true))
-                .with_event(roll_event)
-        } else {
-            // Try re-roll on first failure
+        let mut status = if successful { LeapStatus::Success } else { LeapStatus::Failure };
+        if !successful {
+            // Java: skill = getUnusedSkillWithProperty(actingPlayer, canIgnoreJumpModifiers);
+            //       ignoreSkills = {skill}
+            let bounding_leap = player_id.as_deref().and_then(|id| game.player(id)).and_then(|p| {
+                ffb_model::util::util_cards::UtilCards::get_unused_skill_with_property(
+                    p, ffb_model::model::property::named_properties::NamedProperties::CAN_IGNORE_JUMP_MODIFIERS)
+            });
+            let already_rerolled = self.re_roll_state.re_rolled_action
+                .as_ref().map(|a| a.name == "JUMP").unwrap_or(false);
             if !already_rerolled {
                 use ffb_model::model::re_rolled_action::ReRolledAction;
                 self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("JUMP"));
 
-                // Java: skillReRollSource = UtilCards.getUnusedRerollSource(actingPlayer, JUMP)
+                // Java: skillReRollSource = UtilCards.getUnusedRerollSource(actingPlayer, JUMP);
+                //   if (skillReRollSource != null && (skill == null
+                //       || skill.getRerollSource(JUMP) != skillReRollSource || useIgnoreModifierSkill))
+                //     status = leap();          // the skill's own re-roll: no useReRoll, no dialog
+                //   else askForReRollIfAvailable(..., ignoreSkills)
+                // Bounding Leap is the only skill registering a JUMP re-roll source, so an unused
+                // Bounding Leap NOT declared for this jump is never spent as a re-roll: the coach is
+                // offered the team re-roll instead, with the skill left out of the dialog.
                 let skill_source = find_skill_reroll_source(game, "JUMP");
-                if let Some(source) = skill_source {
-                    let pid = player_id.as_deref().unwrap_or("").to_owned();
-                    use_reroll(game, &source, &pid, rng);
-                    self.re_roll_state.re_roll_source = Some(source);
+                let source_is_bounding_leap = match (&skill_source, bounding_leap) {
+                    (Some(src), Some(bl)) => {
+                        bl.reroll_sources_for(game.rules).iter().any(|(a, _)| *a == "JUMP")
+                            && src.name == format!("{:?}", bl)
+                    }
+                    _ => false,
+                };
+                if skill_source.is_some()
+                    && (bounding_leap.is_none() || !source_is_bounding_leap || self.use_ignore_modifier_skill)
+                {
                     self.roll = 0;
-                    let mut out = self.execute_step(game, rng);
-                    out.events.insert(0, roll_event);
-                    return out;
-                }
-                // TRR offer
-                if let Some(prompt) = ask_for_reroll_if_available(game, "JUMP", minimum_roll, false) {
-                    self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
-                    return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
+                    status = self.leap(game, rng, events);
+                } else {
+                    let ignore: Vec<ffb_model::enums::SkillId> = bounding_leap.into_iter().collect();
+                    if let Some(prompt) = ask_for_reroll_if_available_ignoring(game, "JUMP", minimum_roll, false, &ignore) {
+                        self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
+                        status = LeapStatus::WaitingForReRoll(prompt);
+                    }
                 }
             }
-
-            self.handle_failure(game).with_event(roll_event)
         }
+        // Java: if (useIgnoreModifierSkill) actingPlayer.markSkillUsed(canIgnoreJumpModifiers)
+        if self.use_ignore_modifier_skill {
+            if let Some(pid) = player_id.as_deref() {
+                let skill = game.player(pid).and_then(|p| {
+                    p.all_skill_ids().find(|id| id.properties_for(game.rules)
+                        .contains(&ffb_model::model::property::named_properties::NamedProperties::CAN_IGNORE_JUMP_MODIFIERS))
+                });
+                if let Some(skill_id) = skill {
+                    crate::step::util_server_steps::mark_skill_used(game, pid, skill_id);
+                }
+            }
+        }
+        status
     }
 
     fn handle_failure(&mut self, game: &mut Game) -> StepOutcome {
         // Java: actingPlayer.setJumping(false)
-        game.acting_player.jumping = false;
+        game.acting_player.set_jumping(false);
         // Java: publishParameter(STEADY_FOOTING_CONTEXT, new SteadyFootingContext(new InjuryTypeDropJump(defender)))
         // Java passes `game.getDefender()` as the DropJump diving tackler (fallback Arm Bar source).
         let injury_name = match game.defender_id.as_deref() {
@@ -539,6 +633,81 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::JUMP_ROLL),
             "JUMP_ROLL report must be added on success");
+    }
+
+    /// Rowana-like leaper (Leap + Bounding Leap) at (5,5) with an opponent on (5,6), jumping from
+    /// (3,3): one tackle zone on the landing square, so a 3 fails WITH modifiers.
+    fn make_game_with_bounding_leaper() -> Game {
+        use ffb_model::enums::PS_STANDING;
+        let mut game = make_game_with_leaper();
+        game.team_home.players[0].starting_skills.push(SkillWithValue::new(SkillId::BoundingLeap));
+        game.field_model.set_player_state("p1", ffb_model::enums::PlayerState::new(PS_STANDING));
+        let mut opp = Player::default();
+        opp.id = "opp".into();
+        opp.agility = 3;
+        game.team_away.players.push(opp);
+        game.field_model.set_player_coordinate("opp", FieldCoordinate::new(5, 6));
+        game.field_model.set_player_state("opp", ffb_model::enums::PlayerState::new(PS_STANDING));
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game
+    }
+
+    fn count_reports(game: &Game, id: ffb_model::report::report_id::ReportId) -> usize {
+        game.report_list.get_reports().iter().filter(|r| r.get_id() == id).count()
+    }
+
+    /// Java StepJump: a jump declared WITH Bounding Leap (`jumpsWithoutModifiers`) reports
+    /// PASS_JUMP_WITHOUT_MODIFIERS, rolls against the bare agility and spends the skill.
+    #[test]
+    fn bounding_leap_ignores_modifiers_and_is_spent() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game_with_bounding_leaper();
+        game.acting_player.set_jumps_without_modifiers(true);
+        assert!(game.acting_player.jumping, "Java setJumpsWithoutModifiers(true) sets jumping");
+        let mut step = StepJump::new("fail".into());
+        step.move_start = Some(FieldCoordinate::new(3, 3));
+        step.roll = 3; // fails at 4+ with the tackle zone, passes at the bare 3+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(game.report_list.has_report(ReportId::SKILL_USE));
+        assert!(game.team_home.players[0].used_skills.contains(&SkillId::BoundingLeap));
+        assert!(!game.acting_player.jumping && !game.acting_player.jumps_without_modifiers);
+    }
+
+    /// Java StepJump.leap(): with Bounding Leap in use, a failed roll is re-rolled at once by the
+    /// skill's own re-roll source (`status = leap()`) -- two jump rolls, no dialog.
+    #[test]
+    fn bounding_leap_failure_rerolls_without_a_dialog() {
+        use ffb_model::report::report_id::ReportId;
+        let mut game = make_game_with_bounding_leaper();
+        game.turn_data_home.rerolls = 1;
+        game.acting_player.set_jumps_without_modifiers(true);
+        let mut step = StepJump::new("fail".into());
+        step.move_start = Some(FieldCoordinate::new(3, 3));
+        step.roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_ne!(out.action, StepAction::Continue, "no re-roll dialog");
+        assert!(out.prompt.is_none());
+        assert_eq!(count_reports(&game, ReportId::JUMP_ROLL), 2);
+        assert_eq!(game.turn_data_home.rerolls, 1, "team re-roll untouched");
+        assert!(game.team_home.players[0].used_skills.contains(&SkillId::BoundingLeap));
+    }
+
+    /// Java StepJump.leap(): an unused Bounding Leap NOT declared for this jump is never spent as
+    /// the jump re-roll (`skill.getRerollSource(JUMP) == skillReRollSource`): the team re-roll is
+    /// offered and the skill stays unused.
+    #[test]
+    fn undeclared_bounding_leap_is_not_a_reroll() {
+        let mut game = make_game_with_bounding_leaper();
+        game.turn_data_home.rerolls = 1;
+        let mut step = StepJump::new("fail".into());
+        step.move_start = Some(FieldCoordinate::new(3, 3));
+        step.roll = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(out.prompt.is_some());
+        assert!(!game.team_home.players[0].used_skills.contains(&SkillId::BoundingLeap));
     }
 
     #[test]

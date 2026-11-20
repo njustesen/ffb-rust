@@ -4374,6 +4374,18 @@ public class ParityRunner {
                     // waits with an empty move stack, so the harness comes straight back here and
                     // the path is delivered on the next iteration.
                     probeMoveVerdict(playerId, coord, "DECLARE_JUMP", targets);
+                    // BACKLOG §M 2b(f), zero draws, mirrored in heuristic_agent.rs: an unused
+                    // Bounding Leap (canIgnoreJumpModifiers) is declared WITH the jump -- the
+                    // client's BOUNDING_LEAP action (MoveLogicModule), CLIENT_USE_SKILL, whose
+                    // StepInitMoving arm sets jumping + jumpsWithoutModifiers.
+                    com.fumbbl.ffb.model.skill.Skill boundingLeap =
+                        com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(game.getActingPlayer(),
+                            com.fumbbl.ffb.model.property.NamedProperties.canIgnoreJumpModifiers);
+                    if (boundingLeap != null) {
+                        MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+                            boundingLeap, true, playerId, null, false));
+                        return;
+                    }
                     MatchRunner.inject(gameState, new ClientCommandActingPlayer(playerId,
                         game.getActingPlayer().getPlayerAction(), true));
                     return;

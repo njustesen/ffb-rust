@@ -22,6 +22,12 @@ pub struct ActingPlayer {
     /// whether a Treeman started the activation standing (only then does it roll Take Root).
     pub old_player_state: Option<PlayerState>,
     pub jumping: bool,
+    /// Java: `jumpsWithoutModifiers` -- set by a Bounding Leap declaration
+    /// (`CLIENT_USE_SKILL` with `canIgnoreJumpModifiers`). Write it through
+    /// [`Self::set_jumps_without_modifiers`] / [`Self::set_jumping`], which carry Java's coupling:
+    /// setting it true also sets `jumping`, clearing `jumping` also clears it.
+    #[serde(default)]
+    pub jumps_without_modifiers: bool,
     pub has_acted: bool,
     pub has_fouled: bool,
     pub held_in_place: bool,
@@ -145,7 +151,7 @@ impl ActingPlayer {
             // Java UtilActingPlayer.changeActingPlayer resets oldPlayerState on a genuine player
             // change; change_player_action re-captures it (sticky) right after this.
             self.old_player_state = None;
-            self.jumping = false;
+            self.set_jumping(false);
             self.suffering_blood_lust = false;
             self.blood_lust_discards_move_stack = false;
             self.suffering_animosity = false;
@@ -164,6 +170,28 @@ impl ActingPlayer {
         }
         // Java setPlayerAction: always (re)assign the action.
         self.player_action = Some(action);
+    }
+
+    /// Java: `setJumping(boolean)` -- clearing the flag also clears `jumpsWithoutModifiers`.
+    pub fn set_jumping(&mut self, jumping: bool) {
+        if jumping == self.jumping {
+            return;
+        }
+        self.jumping = jumping;
+        if !self.jumping {
+            self.set_jumps_without_modifiers(false);
+        }
+    }
+
+    /// Java: `setJumpsWithoutModifiers(boolean)` -- setting it also sets `jumping`.
+    pub fn set_jumps_without_modifiers(&mut self, jumps_without_modifiers: bool) {
+        if self.jumps_without_modifiers == jumps_without_modifiers {
+            return;
+        }
+        self.jumps_without_modifiers = jumps_without_modifiers;
+        if self.jumps_without_modifiers {
+            self.set_jumping(true);
+        }
     }
 
     pub fn is_active(&self) -> bool {

@@ -273,7 +273,7 @@ pub fn change_acting_player(game: &mut Game, player_id: &str, action: PlayerActi
         if changed {
             game.acting_player.standing_up = was_prone;
         }
-        game.acting_player.jumping = jumping;
+        game.acting_player.set_jumping(jumping);
         // Java UtilActingPlayer.changeActingPlayer: "// show acting player as moving" —
         // fieldModel.setPlayerState(newPlayer, oldState.changeBase(PlayerState.MOVING)).
         // The base stays MOVING for the whole activation (Java's `isStanding()` treats

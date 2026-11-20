@@ -595,8 +595,27 @@ fn jump_over_first_step(g: &Game, player_id: &str, path: &[FieldCoordinate]) -> 
     // The two ordinary steps the jump replaces. Only a step that LEAVES a marked square dodges.
     let p_walk = step(true, tz_mid) * step(tz_mid > 0, tz_dest);
     let vll = player.has_skill(SkillId::VeryLongLegs);
-    let p_jump = p_roll(jump_target(g.rules, ag, tz_here, tz_dest, vll, true));
+    // BACKLOG §M 2b(f), mirrored in ActivationDriver.jumpOverFirstStep: an unused Bounding Leap
+    // is declared with the jump (see the DeliverPath arm), so the roll is the bare agility target
+    // (no modifiers) and a failure is re-rolled by the skill itself (Java StepJump.leap()).
+    let p_jump = if unused_bounding_leap(g, player_id).is_some() {
+        p_with_reroll(p_roll(ag.max(2)), 1.0)
+    } else {
+        p_roll(jump_target(g.rules, ag, tz_here, tz_dest, vll, true))
+    };
     p_jump > p_walk
+}
+
+/// The acting player's unused `canIgnoreJumpModifiers` skill (Bounding Leap), Java
+/// `UtilCards.getUnusedSkillWithProperty(actingPlayer, canIgnoreJumpModifiers)`.
+fn unused_bounding_leap(g: &Game, player_id: &str) -> Option<SkillId> {
+    let p = g.player(player_id)?;
+    p.all_skill_ids().find(|id| {
+        id.properties_for(g.rules).contains(
+            &ffb_model::model::property::named_properties::NamedProperties::CAN_IGNORE_JUMP_MODIFIERS)
+            && !p.used_skills.contains(id)
+            && !g.acting_player.used_skills.contains(id)
+    })
 }
 
 /// `GoForItModifierFactory::minimum_roll_going_for_it` — base 2, **Blizzard +1 in every edition**.
@@ -2605,6 +2624,13 @@ impl HeuristicAgent {
                     {
                         pl.path.remove(0);
                         self.plan = Some(pl);
+                        // BACKLOG §M 2b(f), zero draws, mirrored in ParityRunner: a player
+                        // holding an unused Bounding Leap (canIgnoreJumpModifiers, once per
+                        // game) declares the jump WITH it -- the client's BOUNDING_LEAP action,
+                        // CLIENT_USE_SKILL, which sets jumping + jumpsWithoutModifiers.
+                        if let Some(skill_id) = unused_bounding_leap(g, &player_id) {
+                            return Action::UseSkill { skill_id, use_skill: true };
+                        }
                         return Action::DeclareJump;
                     }
                     // BACKLOG §K item 6 -- Fumblerooski, layered after the jump the same way: a

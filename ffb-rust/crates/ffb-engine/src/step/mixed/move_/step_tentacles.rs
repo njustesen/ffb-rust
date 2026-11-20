@@ -194,7 +194,7 @@ impl StepTentacles {
                     // Tentacles wins: hold the mover in place, cancel dodging/jumping,
                     // move actor back to coordinateFrom.
                     game.acting_player.dodging = false;
-                    game.acting_player.jumping = false;
+                    game.acting_player.set_jumping(false);
                     game.acting_player.held_in_place = true;
                     UtilServerPlayerMove::update_move_squares(game, false);
                     if let Some(coord) = self.state.coordinate_from {

@@ -9730,8 +9730,8 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > scales) at seeds 1-20, plus the bb2020 `_sk`/`_st` squads, detached + `.loop_wait.json`; fix any
 > red 1:1. Record the result here, then delete this directive.
 >
-> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 13), read this first (supersedes "Step 1" below).**
-> **Nothing is running after iteration 13** (its gates ran in-session and finished).
+> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 14), read this first (supersedes "Step 1" below).**
+> **Nothing is running after iteration 14** (its gates ran in-session and finished).
 > **State at 17:30: cert6 chain PID 11308 has EXITED (cert6 fully green, see iteration 3); only the
 > ledger PID 17496 still runs. The cert6 bullet below is history.**
 > The work is now driven by `scripts/skill_parity_loop.py` (goal = `scripts/skill_parity_check.py`
@@ -9866,7 +9866,21 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   requires an UNUSED skill (Java `requireUnusedSkill=true`). Gated: 5 squads 20/20 + 4 hunted
 >   seeds 1/1, steps + reports, real effects in green games. Frozen `ffb-parity-sp20b.exe` +
 >   `ffb-ai-md.jar`. TOOL: `D:/ffb_scratch_it13/seedtouch.py` = per-seed skill-touch finder.
-> - **Next for the loop (after iteration 13):** the 2b(e)/(f)/(g) ports (Gored/KICK_EM_BLITZ,
+> - **Loop iteration 14 (2026-11-20 ~20:00-20:45 local):** **Bounding Leap DONE (bb2020 +
+>   bb2025, phase 2b (f) / (z) below).** Engine port 1:1 (Rust had no `jumpsWithoutModifiers` at
+>   all; StepJump also spent an UNDECLARED Bounding Leap as an automatic jump re-roll where Java
+>   offers the team re-roll) + a zero-draw agent rule in both harnesses (declare the jump WITH an
+>   unused Bounding Leap, and price such a jump as bare-AG + skill re-roll) + Rowana Forestfoot
+>   hired on bb2020 + bb2025 `gnome_sk` + hunted bb2025 seed 21 -> **skill suite = 121 gates**.
+>   Gated on frozen `ffb-parity-bl2.exe` + `ffb-ai-bl.jar`: gnome_sk+Rowana seeds 1-40 x2,
+>   slann_sk 1-40 x2 (Leap controls), star mirrors halfling x2 / wood_elf / gnome + Rowana 1-20 --
+>   all steps + reports identical; 7 green games with a real Bounding Leap (one with the automatic
+>   skill re-roll). Every star gate fielding Rowana changes -> the final cert covers it.
+> - **Next for the loop (after iteration 14):** the 2b(e)/(g) ports (Gored/KICK_EM_BLITZ blitz-block
+>   choice, Two for One), the bb2016 sourced rosters (user answer below), then a fresh ledger on a
+>   post-iteration-14 exe (cert6_2b is stale: most of its 40 "missing" are done) + the final cert
+>   + manifest.
+> - **Next for the loop (after iteration 13, Bounding Leap DONE in iteration 14):** the 2b(e)/(f)/(g) ports (Gored/KICK_EM_BLITZ,
 >   Bounding Leap, Two for One), bb2025 SneakiestOfTheLot + ViolentInnovator re-check (both done in
 >   2b(t)/(q) but still SILENT in the stale cert6_2b ledger -- a fresh ledger decides), the bb2016
 >   sourced rosters, then a fresh ledger (on a post-iteration-13 exe) + the final cert + manifest.
@@ -10526,6 +10540,47 @@ documented unreachable.
     Blast radius of the engine fixes: bb2020 games fielding Dribl and Drull (star gates) and any
     game after a Quick Bite -- the final cert covers both. ffb-mechanics 1176/0, ffb-engine lib
     7623/0.
+- **(z) = 2b(f) Bounding Leap (bb2020 + bb2025) -- ENGINE PORT + agent rule, DONE 2026-11-20 (loop
+  iteration 14).** Carrier: Rowana Forestfoot (star; Leap + Bounding Leap, once per game; eligible
+  bb2025 gnome/halfling/wood_elf, bb2020 gnome/halfling). Java: the client's BOUNDING_LEAP action
+  (`MoveLogicModule`, offered with JUMP when `getUnusedSkillWithProperty(actingPlayer,
+  canIgnoreJumpModifiers)`) sends CLIENT_USE_SKILL; `StepInitMoving` (bb2020 :289, bb2025 :309) /
+  `StepInitSelecting` (bb2020 :383, bb2025 :403) call `actingPlayer.setJumpsWithoutModifiers(true)`
+  (which ALSO sets jumping; `setJumping(false)` clears it) + `updateMoveSquares(true)` (squares
+  priced without jump modifiers, `UtilServerPlayerMove` :151). `StepJump` (bb2020 :173, bb2025 :178):
+  reports `skillUse passJumpWithoutModifiers`, sets usingDivingTackle=false, rolls with NO
+  modifiers; on a failure `getUnusedRerollSource(actingPlayer, JUMP)` = BOUNDING_LEAP and the
+  condition `skill == null || skill.getRerollSource(JUMP) != source || useIgnoreModifierSkill`
+  re-rolls at once (`status = leap()`, no useReRoll, no dialog); `markSkillUsed(canIgnoreJumpModifiers)`
+  at the end of leap(). Rust (live shared `step/bb2025/move_/step_jump.rs` for bb2020 + bb2025) had
+  none of it: no ActingPlayer field, both UseSkill arms ignored the skill, and -- a latent bug for
+  every Rowana jump -- an UNDECLARED unused Bounding Leap was taken as an automatic jump re-roll
+  (`find_skill_reroll_source` + `use_reroll`) where Java asks for the TEAM re-roll with the skill in
+  `ignoreSkills`. Ported: `ActingPlayer.jumps_without_modifiers` + Java-coupled `set_jumping` /
+  `set_jumps_without_modifiers` (the live direct writes in `util_server_steps.change_player_action`,
+  `mixed/step_tentacles.rs` and StepJump now go through them); both UseSkill arms; the move-square
+  pricing; StepJump split into Java's executeStep + `leap()` with the re-roll condition and a new
+  `ask_for_reroll_if_available_ignoring` / `find_skill_reroll_source_ignoring` (= Java's
+  `ignoreSkills` overload). 3 unit tests in step_jump.rs (no modifiers + spent; failure re-rolled
+  without a dialog and without the TRR; undeclared skill is NOT a re-roll).
+  - **Agent (both harnesses, zero draws):** where the heuristic declares a jump (Rust
+    `heuristic_agent.rs` DeliverPath LEAP arm / Java `ParityRunner` DECLARE_JUMP) an unused
+    canIgnoreJumpModifiers skill is declared instead (`Action::UseSkill` / `ClientCommandUseSkill`);
+    and `jump_over_first_step` / `ActivationDriver.jumpOverFirstStep` price such a jump as
+    `pWithReRoll(pRoll(max(2, AG)), 1)` -- before this Rowana's Dodge made the walk win every time
+    (0 jump rolls in 100 bench games). Bench after: 2 Bounding Leaps per 40 games in each edition.
+  - **Squads:** Rowana hired on bb2020 + bb2025 `gnome_sk` (`star_hires.json`); bb2020 seeds 1-20
+    contain one use (seed 2), bb2025 needs the hunted seed 21 (`seed_hunts.json`) -> the skill suite
+    is 121 gates (skill_ledger.jobs('skill') = 121).
+  - **Gate** (frozen `D:/ffb_star/bin/ffb-parity-bl2.exe` = this tree, jar `D:/ffb_star/bin/ffb-ai-bl.jar`
+    = fresh mvn package of this tree; `D:/ffb_scratch_it13/gate.py`, roots `D:/ffb_scratch_it14/g1`,
+    `g2`): bb2020 + bb2025 gnome_sk+Rowana seeds 1-40 **40/40 + 40/40** (steps + reports), slann_sk
+    bb2020 + bb2025 1-40 **40/40** each (Leap controls), star-tier mirrors bb2025 halfling /
+    wood_elf + bb2020 halfling / gnome with Rowana 1-20 **20/20** each. Not vacuous: Java + Rust
+    streams both carry `passJumpWithoutModifiers` in 7 green games (gnome_sk bb2020 s2/s24, bb2025
+    s21/s33; gnome bb2020 s2/s17; halfling bb2020 s20), and bb2020 gnome_sk s2 failed the leap (2)
+    and took the skill's own re-roll (5), identical. ffb-model + ffb-engine tests 7626 + 2819 / 0.
+    Blast radius: every game where Rowana plays (star tier) -- the final cert covers it.
 
 ### Phase 1 status (2026-11-18)
 
@@ -10574,8 +10629,7 @@ Deferred, with the reason (each needs a design decision or a larger port):
 - **Halfling Luck / Thinking Man's Troll** (re-roll-source skills): both harnesses answer every
   re-roll offer with the team re-roll (Rust steps hard-code "TRR", ParityRunner.reRollSourceFor
   returns TEAM_RE_ROLL); using the skill is a cross-cutting harness-policy change.
-- **Bounding Leap** (canIgnoreJumpModifiers): Rust's StepInitSelecting UseSkill arm lacks Java
-  :403 (setJumpsWithoutModifiers + updateMoveSquares); driving it needs a jump decision.
+- ~~**Bounding Leap**~~ DONE 2026-11-20 (Phase 2b (z), loop iteration 14).
 - **Forgo** (stalling check on): the client offers it to any standing player; there is no zero-draw
   trigger that maps onto an existing heuristic decision (the activation declaration carries no
   path, so "a Move that stays put" is not visible at declaration time in either agent).
