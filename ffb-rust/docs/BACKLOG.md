@@ -9737,6 +9737,9 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   `D:/ffb_star/bin/ffb-parity-2b2.exe`, no STAMP -> progress only). When it exits run
 >   `python -I scripts/skill_ledger.py report --out D:/ffb_ledger/cert6_2b`; the checker's progress
 >   view then uses it instead of the stale 11-17 `base` ledger.
+> - TODO soon (supervisor, after iteration 6 / d3ee3ede3): the team value of ALL 110 `_sk` squads
+>   changed but only 4 were gated. Run the full skill sweep (sksweep.py, both dirs + star_hires, 20
+>   seeds) on a frozen build before stacking more changes on it -- TV feeds the pregame inducements.
 > - TRAP (hit by loop iteration 4): run `ffb-parity` with cwd = `ffb-rust/ffb-rust`, never the repo
 >   root -- from the root it rewrites the tracked `progress.html`. Stage files explicitly.
 > - Daytime running was OK'd by the user for 2026-11-20 only; after that the 21:00-07:00 / <=70%
