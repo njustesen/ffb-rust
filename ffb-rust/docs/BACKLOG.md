@@ -9716,6 +9716,24 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 
 ## §M — 2026-11-17: SKILL COVERAGE TIER — the agents use every skill (in progress)
 
+> **RESUME HERE (written 2026-11-20 before a reboot; the user is closing Avid Media Composer, whose
+> ~23 GB commit made Claude Code's reaper kill the cert runs).**
+> **Step 1 — finish cert6** (frozen `D:/ffb_star/bin/ffb-parity-cert6.exe` = `e0f63037e`; do NOT
+> rebuild or re-freeze; mirror 330/330 and cross 4012/4012 are already green and stay valid):
+> - run, from `ffb-rust/` as a background job:
+>   `powershell -NoProfile -File scripts/cert_chain.ps1 -suites starrest,skill -maxRun 4`
+>   (add `-anytime` ONLY if the user OKs running outside 21:00-07:00; the budget is <=70% of the
+>   machine, which the script enforces with core mask 0x7FF). starrest ~2-3 h, skill ~1 h.
+> - starrest = the 3023 star gates not reached (`../starjobs_cert6/rest_r{1,2,3}.txt`, logs
+>   `../starjobs_cert6/scratch/sweep_r{1,2,3}.log`); the 989 done are in `sweep_w{1,2,3}.log`.
+>   Star is green when the w+r logs together hold 4012 verdict lines, every one
+>   `PARITY: n/n games match` with `REPORTS: n/n games identical, 0 differ`.
+> - skill = 110 squads, results in `D:/ffb_sksweep/cert6/results.txt` (resumable; rerun skips done).
+> - any red: fix Rust 1:1 against Java, re-gate that cell, then decide with the user whether the
+>   fix needs a re-freeze + re-run.
+> **Step 2 — phase 2b** (designed skill coverage, list below in the phase plan), starting with a
+> fresh skill-ledger run on the cert6 build. **Then phase 4.** 14 commits are unpushed (ask first).
+
 **Goal (user, 2026-11-17):** "make the agent use all skills in the game. Ideally to play better
 but most importantly to reach better coverage." User decisions: (1) drafted teams MAY carry
 rule-legal skill advancements; (2) a coverage-bias mode that plays worse is fine, and there must be

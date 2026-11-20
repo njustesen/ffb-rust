@@ -1,0 +1,69 @@
+# Certification chain (BACKLOG §M phase 5; cert6 = the frozen exe built from e0f63037e).
+# usage: powershell -NoProfile -File scripts/cert_chain.ps1 -suites starrest,skill [-maxRun 4] [-anytime]
+# Suites:
+#   mirror   330 cells   (sweepjobs/w1-6.txt, sweep_worker.ps1)
+#   cross    4012 gates  (../crossjobs_cert2/w1-6.txt, cross_worker.ps1)
+#   star     4012 gates  (../starjobs_full/w1-3.txt, star_worker.ps1)
+#   starrest the 3023 star gates cert6 did not reach (../starjobs_cert6/rest_r1-3.txt, tags r1-r3)
+#   skill    110 skilled squads (scripts/sksweep.py; resumable via D:/ffb_sksweep/cert6/results.txt)
+# Low footprint: at most $maxRun workers at once (job files queued), JVM heap capped at 1 GB.
+# Resource budget (user): <=70% of the machine (cores 0-10, mask 0x7FF), only 21:00-07:00 unless
+# the user says otherwise (-anytime). Outside the window no new suite starts and workers get
+# STOP_SWEEP (each finishes its current gate, then exits).
+param([string[]]$suites = @("mirror","cross","star","skill"), [int]$maxRun = 4, [switch]$anytime)
+$suites = @($suites | ForEach-Object { $_ -split "," })
+$exe   = "D:/ffb_star/bin/ffb-parity-cert6.exe"
+$repo  = "C:\Users\Admin\niels\ffb-rust\ffb-rust"
+$outer = "C:\Users\Admin\niels\ffb-rust"
+$mask  = 2047
+$env:JAVA_TOOL_OPTIONS = "-Xmx1g -XX:+UseSerialGC"
+try { (Get-Process -Id $PID).ProcessorAffinity = [IntPtr]$mask } catch {}
+
+function InWindow { if ($anytime) { return $true }; $h = (Get-Date).Hour; return ($h -ge 21 -or $h -lt 7) }
+while (-not (InWindow)) { Start-Sleep -Seconds 60 }
+
+foreach ($suite in $suites) {
+  if (-not (InWindow)) { "[" + (Get-Date) + "] outside 21:00-07:00, not starting $suite"; break }
+  $jobs = @(); $tagp = "w"
+  switch ($suite) {
+    "mirror" { $scratch = "$outer\mirror_cert6b\scratch"; $script = "sweep_worker.ps1"; $root = "D:/ffb_star/mirror_cert6b"
+      1..6 | ForEach-Object { $jobs += "$repo\sweepjobs\w$_.txt" } }
+    "cross"  { $scratch = "$outer\cross_cert6\scratch"; $script = "cross_worker.ps1"; $root = "D:/ffb_star/cross_cert6"
+      1..6 | ForEach-Object { $jobs += "$outer\crossjobs_cert2\w$_.txt" } }
+    "star"   { $scratch = "$outer\starjobs_cert6\scratch"; $script = "star_worker.ps1"; $root = "D:/ffb_star/cert6"
+      1..3 | ForEach-Object { $jobs += "$outer\starjobs_full\w$_.txt" } }
+    "starrest" { $scratch = "$outer\starjobs_cert6\scratch"; $script = "star_worker.ps1"; $root = "D:/ffb_star/cert6"; $tagp = "r"
+      1..3 | ForEach-Object { $jobs += "$outer\starjobs_cert6\rest_r$_.txt" } }
+    "skill"  { $scratch = "D:\ffb_sksweep\cert6" }
+    default { throw "unknown suite $suite" }
+  }
+  $procs = @()
+  if ($suite -eq "skill") {
+    $procs += Start-Process python -PassThru -WindowStyle Hidden -ArgumentList @(
+      "-I","$repo\scripts\sksweep.py",$exe,"D:/ffb_sksweep/cert6","1-20","1.0","0","$maxRun")
+  }
+  "[" + (Get-Date) + "] started $suite (" + $jobs.Count + " job files, max $maxRun at once)"
+  $next = 0
+  while ($true) {
+    $running = @($procs | Where-Object { -not $_.HasExited })
+    if (InWindow) {
+      while ($next -lt $jobs.Count -and $running.Count -lt $maxRun) {
+        $tag = $tagp + ($next + 1)
+        $p = Start-Process powershell -PassThru -WindowStyle Hidden -ArgumentList @(
+          "-NoProfile","-File","$repo\scripts\$script","-jobfile",$jobs[$next],
+          "-mask",$mask,"-tag",$tag,"-scratch",$scratch,"-root",$root,"-exe",$exe)
+        $procs += $p; $running += $p; $next++
+        "[" + (Get-Date) + "]   $suite $tag started"
+      }
+    } elseif ($suite -ne "skill") {
+      New-Item -ItemType Directory -Force -Path $scratch | Out-Null
+      Set-Content (Join-Path $scratch "STOP_SWEEP") "07:00 budget window closed"
+    } else {
+      $running | ForEach-Object { Stop-Process -Id $_.Id -Force }
+    }
+    if ($running.Count -eq 0 -and ($next -ge $jobs.Count -or -not (InWindow))) { break }
+    Start-Sleep -Seconds 60
+  }
+  "[" + (Get-Date) + "] finished $suite"
+}
+"cert chain done"
