@@ -9723,6 +9723,13 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > (`D:/ffb_sksweep/sk7/results.txt`). The iteration 4-10 changes (TV, StepEndTurn, foul assists,
 > interception, agents, hires) are clean across the whole skill suite. Directive deleted.
 >
+> **SUPERVISOR DIRECTIVE (2026-11-20 19:45) -- do this BEFORE any new skill work:** iteration 12
+> (25bef3e45) gave EVERY bb2020 roster its team special rules (Bribery and Corruption, raise dead,
+> Plague Ridden...), which changes the BASE certified teams, yet only 16 bb2020 matchups were gated.
+> Freeze HEAD (exe + jar) and run every bb2020 mirror cell of `sweepjobs/w*.txt` (all races x 3
+> scales) at seeds 1-20, plus the bb2020 `_sk`/`_st` squads, detached + `.loop_wait.json`; fix any
+> red 1:1. Record the result here, then delete this directive.
+>
 > **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 12), read this first (supersedes "Step 1" below).**
 > **Nothing is running after iteration 12** (its gate ran in-session and finished).
 > **State at 17:30: cert6 chain PID 11308 has EXITED (cert6 fully green, see iteration 3); only the
