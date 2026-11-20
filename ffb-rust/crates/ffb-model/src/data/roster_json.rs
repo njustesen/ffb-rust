@@ -40,6 +40,11 @@ pub struct RosterJson {
     pub special_rules: Vec<String>,
     #[serde(default)]
     pub raised_position_id: Option<String>,
+    /// The roster's Infamous Staff (Java: ordinary `<position>`s of type "Infamous Staff",
+    /// e.g. Josef Bugman, hired as Inducements). Kept apart from `positions` so team building
+    /// never treats them as regular picks; a squad that hires one (BACKLOG §M 2b(n)) names its id.
+    #[serde(default)]
+    pub infamous_staff: Vec<PositionJson>,
 }
 
 impl RosterJson {
@@ -200,6 +205,7 @@ mod tests {
             positions: vec![],
             special_rules: vec![],
             raised_position_id: None,
+            infamous_staff: vec![],
         }
     }
 

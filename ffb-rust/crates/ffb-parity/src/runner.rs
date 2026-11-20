@@ -1031,7 +1031,10 @@ pub fn make_team_from_file(roster_name: &str, side: &str, edition: &str) -> Resu
 
     let mut players: Vec<Player> = Vec::new();
     for pl in &spec.players {
+        // §M 2b(n): a squad may hire an Infamous Staff member (Josef Bugman); Java's roster XML
+        // has him as an ordinary <position> (gen_java_parity_data.py emits the drafted one).
         let pos_json = roster_json.positions.iter()
+            .chain(roster_json.infamous_staff.iter())
             .find(|p| p.id == pl.position_id)
             .ok_or_else(|| format!("position '{}' not in roster '{}'", pl.position_id, spec.roster_id))?;
         let rp = position_json_to_roster_position(pos_json, &roster_json.id, roster_json.undead, edition_to_rules(edition));

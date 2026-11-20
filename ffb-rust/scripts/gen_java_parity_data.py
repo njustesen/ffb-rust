@@ -77,7 +77,10 @@ def roster_xml(d: dict, roster_id: str, drafted_star_ids: set = frozenset()) -> 
         for k in rkws:
             L.append(f"\t\t<keyword>{escape(k)}</keyword>")
         L.append("\t</keywords>")
-    for p in d["positions"]:
+    # The roster JSON keeps Infamous Staff in their own list; Java has them as ordinary
+    # <position>s. Only a drafted one is emitted (§M 2b(n), Josef Bugman on halfling_sk).
+    staff = [p for p in d.get("infamous_staff") or [] if p["id"] in drafted_star_ids]
+    for p in d["positions"] + staff:
         if p.get("type") in ("Star", "Infamous Staff") and p["id"] not in drafted_star_ids:
             continue
         L.append(f'\t<position id="{escape(p["id"])}">')
@@ -128,7 +131,7 @@ def team_xml(team: dict, roster: dict, roster_id: str, side: str, suffix: str,
     # ffb-parity asked for, or loaded the wrong variant.
     race = squad if squad is not None else team["race"]
     team_id = f"team{pascal(race)}Parity{suffix}{side.capitalize()}"
-    pos_by_id = {p["id"]: p for p in roster["positions"]}
+    pos_by_id = {p["id"]: p for p in roster["positions"] + (roster.get("infamous_staff") or [])}
     L = ['<?xml version="1.0" encoding="UTF-8"?>', "", f'<team id="{team_id}">', ""]
     L.append(f"\t<coach>{side.capitalize()}</coach>")
     L.append(f"\t<name>{escape(roster['name'])} Parity{suffix} {side.capitalize()}</name>")
@@ -250,9 +253,13 @@ def main() -> int:
                     f"{tf}: spec carries a 'stars' list. Star players are Inducements and"
                     f" are not drafted onto parity squads -- see"
                     f" docs/PARITY_COVERAGE_REQUIREMENTS.md sec.19.")
+            # §M 2b(n): a skill squad may field an Infamous Staff member (Josef Bugman,
+            # scripts/draft_skill_squads.py INFAMOUS_STAFF); keep exactly the drafted staff /
+            # star positions in this squad's own roster XML.
+            drafted = {pl["position_id"] for pl in team["players"]}
             for server in SERVER_DIRS:
                 emit(server / "rosters" / f"roster_{race}_{edition}.xml",
-                     roster_xml(roster, roster_id))
+                     roster_xml(roster, roster_id, drafted))
                 for side in ("home", "away"):
                     emit(server / "teams" / f"team_{race}_parity{suffix}_{side}.xml",
                          team_xml(team, roster, roster_id, side, suffix, squad=race))

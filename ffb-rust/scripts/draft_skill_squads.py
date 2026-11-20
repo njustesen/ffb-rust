@@ -15,7 +15,8 @@ edition, at the STRICTEST tier so it holds whatever a squad's real tier is (no l
 Skills whose Java class for the edition has `eligible() == false` are not skills of that edition
 (bb2020 PilingOn) and are never drafted.
 Players who cannot use ball/skill advancements are skipped outright: No Hands (bb2016/bb2020),
-No Ball (bb2025). Star / Infamous Staff positions are never skilled (the squads field none).
+No Ball (bb2025). Star / Infamous Staff positions are never skilled; the only one fielded is
+Josef Bugman (INFAMOUS_STAFF below, hired on top of the squad like the star tier's stars).
 
 Not drafted (each deferred with its reason in BACKLOG §M):
   * STAT_INCREASE (MA/ST/AG/PA/AV +1): a characteristic improvement, not a skill, in all three
@@ -113,6 +114,31 @@ def team_captain(roster, spec, taken):
             continue
         return pl
     return None
+
+
+# §M 2b(n): the Infamous Staff member fielded per edition, (squad, position name). Josef Bugman is
+# the only Java position carrying BugmansXXXXXX + KeenPlayer (bb2020/bb2025 roster XMLs, type
+# "Infamous Staff"); halfling squads lose players to KOs most, which exercises both his
+# KO-recovery re-roll inducement and the Keen Player setup rule.
+INFAMOUS_STAFF = {"bb2020": [("halfling", "Josef Bugman")],
+                  "bb2025": [("halfling", "Josef Bugman")]}
+
+
+def infamous_staff(ed, sq, roster, spec):
+    """§M 2b(n): an Infamous Staff member is hired like an Inducement (Java's buy-inducements
+    dialog lists the roster's INFAMOUS_STAFF positions, InfamousStaffTableModel; bb2020
+    StepBuyCardsAndInducements.addStaff creates the player). The parity pregame declines every
+    purchase, so -- exactly like the star tier (crates/ffb-parity/src/stars.rs) -- he is fielded
+    on top of the squad: the next free shirt number, team_value + his position cost (Java's
+    HeadlessGameSetup recomputes TV from position costs). Appends to spec in place."""
+    for want_sq, pos_name in INFAMOUS_STAFF.get(ed, []):
+        if want_sq != sq:
+            continue
+        pos = next(p for p in roster.get("infamous_staff") or []
+                   if p["name"] == pos_name and p.get("type") == "Infamous Staff")
+        nr = max(pl["nr"] for pl in spec["players"]) + 1
+        spec["players"].append({"nr": nr, "position_id": pos["id"], "advancement": "infamous_staff"})
+        spec["team_value"] += pos["cost"]
 
 
 def draft_edition(ed, catalogue, status):
@@ -218,6 +244,7 @@ def draft_edition(ed, catalogue, status):
         if captain is not None:
             captain["skills"] = list(CAPTAIN_SKILLS)
             captain["advancement"] = "team_captain"
+        infamous_staff(ed, sq, rost[spec["roster_id"]], v)
         out[f"{sq}_sk"] = v
     missing = sorted(cls for cls, _, _ in skills if not placed[cls])
     short = sorted(cls for cls, _, _ in skills if 0 < len(placed[cls]) < need[cls])

@@ -12,7 +12,7 @@
 	<apothecaries>1</apothecaries>
 	<cheerleaders>0</cheerleaders>
 	<assistantCoaches>6</assistantCoaches>
-	<currentTeamValue>1040000</currentTeamValue>
+	<currentTeamValue>1140000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>0</treasury>
 	<specialRules/>
@@ -132,6 +132,13 @@
 		<name>Halfling Hopeful Lineman 16</name>
 		<gender>male</gender>
 		<positionId>halfling.halfling</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="17" id="teamHalflingSkParity20Home17">
+		<name>Josef Bugman 17</name>
+		<gender>male</gender>
+		<positionId>47520</positionId>
 		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>

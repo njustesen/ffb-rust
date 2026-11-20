@@ -104,4 +104,26 @@
 			<double>Passing</double>
 		</skillCategoryList>
 	</position>
+	<position id="47520">
+		<quantity>1</quantity>
+		<name>Josef Bugman</name>
+		<displayName>Josef Bugman</displayName>
+		<type>Infamous Staff</type>
+		<cost>100000</cost>
+		<movement>5</movement>
+		<strength>3</strength>
+		<agility>3</agility>
+		<passing>6</passing>
+		<armour>9</armour>
+		<skillList>
+			<skill>Bugman's XXXXXX</skill>
+			<skill>Keen Player</skill>
+			<skill value="5">Loner</skill>
+			<skill>Tackle</skill>
+			<skill>Thick Skull</skill>
+			<skill>Wrestle</skill>
+		</skillList>
+		<skillCategoryList>
+		</skillCategoryList>
+	</position>
 </roster>

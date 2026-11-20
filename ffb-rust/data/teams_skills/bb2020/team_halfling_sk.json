@@ -11,7 +11,7 @@
   "fan_factor": 0,
   "treasury": 0,
   "spent": 1100000,
-  "team_value": 1040000,
+  "team_value": 1140000,
   "players": [
     {
       "nr": 1,
@@ -88,6 +88,11 @@
     {
       "nr": 16,
       "position_id": "halfling.halfling"
+    },
+    {
+      "nr": 17,
+      "position_id": "47520",
+      "advancement": "infamous_staff"
     }
   ],
   "special_rules": [],

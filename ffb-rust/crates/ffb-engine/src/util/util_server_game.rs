@@ -46,11 +46,8 @@ impl UtilServerGame {
     /// Groups the team's RESERVE players into "keen"
     /// (canJoinTeamIfLessThanEleven) and "non-keen".  If there are ≥11
     /// non-keen RESERVE players, all keen RESERVE players are moved to
-    /// SETUP_PREVENTED.
-    ///
-    /// NOTE: the "keen" property check requires `NamedProperties` which is not
-    /// yet in ffb-model.  Until it is added, `has_keen_property` always returns
-    /// false, so the branch that moves players to SETUP_PREVENTED is a no-op.
+    /// SETUP_PREVENTED. Callers: StepInitKickoff (first drive) and, for bb2020/bb2025,
+    /// StepEndTurn's end-of-drive block (BACKLOG §M 2b(n), Josef Bugman's Keen Player).
     fn prepare_for_setup_team(game: &mut Game, team_id: &str) {
         let player_info: Vec<(String, bool)> = {
             let team = if game.team_home.id == team_id {

@@ -18,7 +18,7 @@
 /// - Reports/sounds/timers → skip
 /// - FumbblGame update → skip
 use std::collections::HashSet;
-use ffb_model::enums::{ApothecaryMode, Rules, TurnMode, Weather, PS_KNOCKED_OUT, PS_EXHAUSTED, PS_RESERVE, PS_STANDING};
+use ffb_model::enums::{ApothecaryMode, Rules, TurnMode, Weather, PS_KNOCKED_OUT, PS_EXHAUSTED, PS_RESERVE, PS_SETUP_PREVENTED, PS_STANDING};
 use ffb_model::events::GameEvent;
 use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
@@ -325,14 +325,42 @@ impl StepEndTurn {
                     } else {
                         game.turn_data_away.inducement_set.value(Usage::KNOCKOUT_RECOVERY)
                     };
-                    let roll = rng.d6();
-                    let recovered = DiceInterpreter::is_recovering_from_knockout(roll, bloodweiser_keg);
-                    if recovered {
+                    // Java: `reRollKOsInducement = <team's InducementSet>.forUsage(REROLL_ONES_ON_KOS)`
+                    // (Bugman's XXXXXX, granted in StepBuyInducements / StepBuyCardsAndInducements
+                    // leaveStep when the team has a canReRollOnesOnKORecovery player), then
+                    // `recoverKnockout(player, reRollKOsInducement, playerRecoveries)`: a natural 1
+                    // with the inducement adds an entry whose reason is the inducement's
+                    // description and recurses ONCE with a null inducement. The player recovers
+                    // when ANY entry recovers. Java mixed/bb2025 StepEndTurn.recoverKnockout.
+                    let re_roll_kos = {
+                        let set = if is_home { &game.turn_data_home.inducement_set } else { &game.turn_data_away.inducement_set };
+                        set.for_usage(Usage::REROLL_ONES_ON_KOS).is_some()
+                    };
+                    let mut any_recovering = false;
+                    let mut offer_re_roll = re_roll_kos;
+                    loop {
+                        let roll = rng.d6();
+                        let recovered = DiceInterpreter::is_recovering_from_knockout(roll, bloodweiser_keg);
+                        let will_be_re_rolled = roll == 1 && offer_re_roll;
+                        let mut entry = KnockoutRecovery::with_roll(player_id.clone(), recovered, roll, bloodweiser_keg);
+                        if will_be_re_rolled {
+                            // Java: reRollKOsInducement.getDescription() (bb2020/bb2025
+                            // InducementCollection: "Bugman's XXXXXX").
+                            entry.re_roll_reason = Some("Bugman's XXXXXX".to_string());
+                        }
+                        ko_recoveries.push(entry);
+                        any_recovering |= recovered;
+                        if !will_be_re_rolled { break; }
+                        offer_re_roll = false;
+                    }
+                    if any_recovering {
                         game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
                     }
-                    ko_recoveries.push(KnockoutRecovery::with_roll(player_id.clone(), recovered, roll, bloodweiser_keg));
                 }
-                if base == PS_EXHAUSTED {
+                // Java mixed/bb2025: `EXHAUSTED || SETUP_PREVENTED` -> RESERVE (a Keen Player kept
+                // off the pitch by UtilServerGame.prepareForSetup is available again; the next
+                // prepareForSetup decides anew). bb2016/StepEndTurn:290 resets EXHAUSTED only.
+                if base == PS_EXHAUSTED || (!is_bb2016 && base == PS_SETUP_PREVENTED) {
                     game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
                 }
                 // BB2016: per on-pitch player, roll one rollKnockoutRecovery d6 → faint on
@@ -1010,6 +1038,13 @@ impl StepEndTurn {
                     if game.rules != ffb_model::enums::Rules::Bb2016 {
                         Self::remove_rerolls_lasting_for_drive(game, true, self.new_half);
                         Self::remove_rerolls_lasting_for_drive(game, false, self.new_half);
+                        // Java mixed/bb2025 StepEndTurn (bb2020 :494, bb2025 :508):
+                        // `UtilServerGame.prepareForSetup(game)` closes this block, AFTER
+                        // getFaintingCount (KO recovery + the SETUP_PREVENTED -> RESERVE reset)
+                        // ran above. A Keen Player (canJoinTeamIfLessThanEleven) goes back to
+                        // SETUP_PREVENTED while >= 11 other players are in reserve. bb2016's
+                        // StepEndTurn has no such call; StepInitKickoff covers the first drive.
+                        crate::util::util_server_game::UtilServerGame::prepare_for_setup(game);
                     }
                 }
                 // Java gates UNTIL_END_OF_HALF on `if (fNewHalf)` ALONE (`StepEndTurn.java:502-506`),
@@ -1375,6 +1410,66 @@ mod tests {
         assert!(rng.call_count >= 1, "bb2025 spends halftime dice on the argue FIRST");
         assert_eq!(game.field_model.player_state("ko").unwrap().base(), PS_KNOCKED_OUT,
             "bb2025 has not touched the KO'd player yet at this point in the step");
+    }
+
+    /// BACKLOG §M 2b(n): Java mixed/bb2025 `StepEndTurn.recoverKnockout` -- a team holding the
+    /// Bugman's XXXXXX inducement (REROLL_ONES_ON_KOS) re-rolls a natural-1 KO recovery ONCE: two
+    /// entries, the first with reason "Bugman's XXXXXX", the player recovering if either does.
+    /// Without the inducement a 1 is final. Also `EXHAUSTED || SETUP_PREVENTED` -> RESERVE
+    /// (bb2020/bb2025 only).
+    #[test]
+    fn bugmans_xxxxxx_re_rolls_a_natural_one_ko_recovery_once() {
+        use ffb_model::enums::{PS_KNOCKED_OUT, PS_SETUP_PREVENTED};
+        use ffb_model::inducement::inducement::Inducement as InducementModel;
+        use ffb_model::inducement::usage::Usage;
+        let mut seed = 0u64;
+        let second = loop {
+            let mut r = GameRng::new(seed);
+            let (a, b) = (r.d6(), r.d6());
+            if a == 1 && b >= 4 { break b; }
+            seed += 1;
+            assert!(seed < 5000, "no seed with a 1 then a recovering die");
+        };
+        let setup = |rules: Rules, bugman: bool| {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+            game.team_home.players.push(make_player("ko"));
+            game.field_model.set_player_state("ko", PlayerState::new(PS_KNOCKED_OUT));
+            let mut keen = make_player("keen");
+            keen.nr = 2;
+            game.team_home.players.push(keen);
+            game.field_model.set_player_state("keen", PlayerState::new(PS_SETUP_PREVENTED));
+            if bugman {
+                game.turn_data_home.inducement_set.add_inducement(
+                    InducementModel::new("bugmansXXXXXX", 1, vec![Usage::REROLL_ONES_ON_KOS]));
+            }
+            let mut step = StepEndTurn::new();
+            step.new_half = true;
+            (game, step)
+        };
+
+        for rules in [Rules::Bb2020, Rules::Bb2025] {
+            // With Bugman: 1 is re-rolled, the second die recovers the player.
+            let (mut game, mut step) = setup(rules, true);
+            let mut rng = GameRng::new(seed);
+            step.recover_knockouts_and_fainting(&mut game, &mut rng, false);
+            assert_eq!(rng.call_count, 2, "{rules:?}: the natural 1 is re-rolled once");
+            assert_eq!(game.field_model.player_state("ko").unwrap().base(), PS_RESERVE,
+                "{rules:?}: the re-rolled {second} recovers the player");
+            assert_eq!(game.field_model.player_state("keen").unwrap().base(), PS_RESERVE,
+                "{rules:?}: SETUP_PREVENTED is reset to RESERVE");
+
+            // Without: the 1 stands, one die only.
+            let (mut game, mut step) = setup(rules, false);
+            let mut rng = GameRng::new(seed);
+            step.recover_knockouts_and_fainting(&mut game, &mut rng, false);
+            assert_eq!(rng.call_count, 1, "{rules:?}: no inducement, no re-roll");
+            assert_eq!(game.field_model.player_state("ko").unwrap().base(), PS_KNOCKED_OUT);
+        }
+        // bb2016 resets EXHAUSTED only (bb2016/StepEndTurn:290).
+        let (mut game, mut step) = setup(Rules::Bb2016, false);
+        let mut rng = GameRng::new(seed);
+        step.recover_knockouts_and_fainting(&mut game, &mut rng, false);
+        assert_eq!(game.field_model.player_state("keen").unwrap().base(), PS_SETUP_PREVENTED);
     }
 
     /// Java's `getPlayerIds` eligibility filter is EDITION-SPECIFIC, and this step is shared:

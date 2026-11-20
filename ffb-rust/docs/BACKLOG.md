@@ -9762,7 +9762,16 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   722/4012, star 0/4012 -- hours left). It runs exe `ffb-parity-2b2.exe`, which predates 2b(h),
 >   (i) and (l), so it is a PROGRESS view only. Partial report trick used this iteration:
 >   `D:/ffb_scratch_it3/led` = cert6_2b skill+mirror+cross + the 11-17 base star kind.
-> - **Next for the loop:** (a) **Josef Bugman** -- bb2020 BugmansXXXXXX + KeenPlayer and bb2025
+> - **Loop iteration 4 (2026-11-20 ~17:10):** **Josef Bugman DONE** (phase 2b (n) below): Rust
+>   KO recovery had no Bugman's XXXXXX re-roll and EndTurn neither reset SETUP_PREVENTED nor
+>   called prepareForSetup -- ported 1:1; Bugman fielded on bb2020 + bb2025 `halfling_sk` (an
+>   Infamous Staff hire on top of the squad, like the star tier); gated 20/20 steps + reports
+>   both. Closes bb2020 + bb2025 BugmansXXXXXX + KeenPlayer (4 ledger items) once a ledger runs
+>   on a post-2b(n) exe. Ledger PID 17496 still running at 17:10 (`cert6_2b`: skill, mirror,
+>   cross 4012/4012 done; star 1226/4012).
+> - **Next for the loop (after iteration 4):** (b) bb2025 Kaboom, (c) the Flashing Blade /
+>   Mesmerizing Dance re-check, both as written below; then the older list.
+> - **Next for the loop (iteration 3, item (a) now DONE):** (a) **Josef Bugman** -- bb2020 BugmansXXXXXX + KeenPlayer and bb2025
 >   BugmansXXXXXX + KeenPlayer are on the roster position "Josef Bugman" (`<type>Infamous
 >   Staff</type>`, `ffb-server/rosters/roster_{halfling,human,norse,...}.xml`, Rust
 >   `data/rosters/bb2025/roster_human.json` :206); the `_sk` drafter skips Infamous Staff and no
@@ -10010,6 +10019,40 @@ documented unreachable.
   and no bb2020 roster/star (Rust data or `ffb-server/rosters`) carries it; Java's only
   `eligible()` readers (IntensiveTrainingHandler, MercenaryTable) filter it out. No player can
   hold it, so it cannot fire in either engine. (The `_sk` drafter already skipped it.)
+- **(n) Josef Bugman: BugmansXXXXXX + KeenPlayer, bb2020 + bb2025 -- DONE 2026-11-20 (loop
+  iteration 4).** Josef Bugman is an Infamous Staff position (`<type>Infamous Staff</type>` in
+  the Java roster XMLs; the Rust roster JSON keeps staff in a separate `infamous_staff` list),
+  hired like an Inducement (client InfamousStaffTableModel, bb2020 StepBuyCardsAndInducements
+  `addStaff`). Java consumers and what Rust had:
+  - BugmansXXXXXX (`canReRollOnesOnKORecovery`): StepBuyInducements / StepBuyCardsAndInducements
+    leaveStep grant the `bugmansXXXXXX` inducement (REROLL_ONES_ON_KOS) -- Rust had it
+    (`grant_special_rule_inducements`); its consumer, mixed/bb2025 `StepEndTurn.recoverKnockout`
+    (a natural-1 KO recovery is re-rolled ONCE, two `KnockoutRecovery` entries, the first with
+    reason = inducement description "Bugman's XXXXXX", recovered if either recovers) was
+    MISSING -> ported in `step/bb2025/step_end_turn.rs` (shared by all editions; bb2016 never
+    holds the inducement).
+  - KeenPlayer (`canJoinTeamIfLessThanEleven` + `getsSentOffAtEndOfDrive`): SetupMechanic (mixed
+    :47, bb2025 :48) and `UtilServerGame.prepareForSetup` were ported, but Rust's StepEndTurn
+    (a) never reset `SETUP_PREVENTED -> RESERVE` (Java mixed/bb2025 getFaintingCount: `EXHAUSTED
+    || SETUP_PREVENTED`; bb2016 :290 EXHAUSTED only) and (b) never called `prepareForSetup` at
+    the end of the drive block (bb2020 :494, bb2025 :508). Both ported, (b) at Java's exact spot
+    after `removeReRollsLastingForDrive`. First attempt put it after the KO-recovery call at the
+    END of the step -- a dead site (the live recovery call is the earlier one at the
+    `all_choices_done` block); measured 0/20 (Bugman set up at half 2 in Rust, SETUP_PREVENTED in
+    Java, `FFB_IDSTATE` showed it at the first step of every new drive).
+  - Data: `draft_skill_squads.py` `INFAMOUS_STAFF` puts Josef Bugman on bb2020 + bb2025
+    `halfling_sk` (nr 17, `advancement: "infamous_staff"`, team_value + 100k = Java's
+    recomputed TV), on top of the squad exactly as the star tier fields a hired star (the parity
+    pregame declines purchases). `RosterJson.infamous_staff` (serde default) + `runner.rs
+    make_team_from_file` resolve the staff position; `gen_java_parity_data.py` emits the drafted
+    staff `<position>` into that squad's own roster XML (`roster_xml(.., drafted)`).
+  - Gate (frozen `D:/ffb_star/bin/ffb-parity-bug2.exe`, jar `ffb-ai-pro16.jar` -- no harness
+    change, seeds 1-20, `D:/ffb_scratch_it4/g{20b,25b}`): bb2020 + bb2025 halfling_sk **20/20
+    steps + 20/20 reports**; the "Bugman's XXXXXX" re-roll reason appears in 12 bb2020 + 5 bb2025
+    games, identically in both report streams; Rust skill touches KeenPlayer 10 / BugmansXXXXXX 2
+    per game. Control human_sk bb2020 3/3. Unit test
+    `bugmans_xxxxxx_re_rolls_a_natural_one_ko_recovery_once`. Only the two halfling_sk squads
+    change; no mirror/cross/star team carries Keen Player or the inducement.
 
 ### Phase 1 status (2026-11-18)
 
