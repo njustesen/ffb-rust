@@ -461,7 +461,13 @@ impl StepRightStuff {
             let mut params = drop_player_rng(
                 game, rng, &player_id, false, ApothecaryMode::ThrownPlayer,
             );
-            injury_result.apply_to(game);
+            // §M 2b(g): NO `apply_to` here. Java bb2020 StepRightStuff only PUBLISHES the result;
+            // ThrowTeamMate.java:55 jumps straight to APOTHECARY [APOTHECARY_THROWN_PLAYER]
+            // (THROWN_PLAYER), which reports the injury and THEN applies it (bb2020
+            // StepApothecary :225 report, :255 applyTo) -- the Rust generator has the same step.
+            // Applying here as well put applyTo's side effects BEFORE the injury report: a KO'd
+            // Crumbleberry's ReportTwoForOne (updatePlayerStateDependentProperties) preceded his
+            // ttmLanding injury report (black_orc_sk + Grak & Crumbleberry bb2020 seed 13).
             if !has_ball {
                 params.retain(|p| !matches!(p, StepParameter::EndTurn(_)));
             }

@@ -173,7 +173,7 @@ mod tests {
             is_undead: false,
             is_thrall: false,
             race: None,
-            replaces_position: None,
+            replaces_position: None, team_with_position_id: None,
             inside_skill_list_tag: false,
             inside_skill_category_list_tag: false,
             current_skill_value: None,
@@ -196,7 +196,7 @@ mod tests {
             skills: vec![], skill_categories_normal: vec![],
             skill_categories_double: vec![], keywords: vec![],
             is_big_guy: false, is_lineman: false, is_undead: false, is_thrall: false,
-            race: None, replaces_position: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
+            race: None, replaces_position: None, team_with_position_id: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
         });
         r.positions.push(crate::model::roster_position::RosterPosition {
             id: "star_griff".into(),
@@ -209,7 +209,7 @@ mod tests {
             skills: vec![], skill_categories_normal: vec![],
             skill_categories_double: vec![], keywords: vec![],
             is_big_guy: false, is_lineman: false, is_undead: false, is_thrall: false,
-            race: None, replaces_position: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
+            race: None, replaces_position: None, team_with_position_id: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
         });
         let non_stars: Vec<_> = r.non_star_positions().collect();
         assert_eq!(non_stars.len(), 1, "Should only return non-star positions");
@@ -230,7 +230,7 @@ mod tests {
             skills: vec![], skill_categories_normal: vec![],
             skill_categories_double: vec![], keywords: vec![],
             is_big_guy: false, is_lineman: false, is_undead: false, is_thrall: false,
-            race: None, replaces_position: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
+            race: None, replaces_position: None, team_with_position_id: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
         });
         assert_eq!(r.positions.len(), 1);
     }
@@ -246,7 +246,7 @@ mod tests {
             skills: vec![], skill_categories_normal: vec![],
             skill_categories_double: vec![], keywords: vec![],
             is_big_guy: false, is_lineman: false, is_undead: true, is_thrall: false,
-            race: None, replaces_position: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
+            race: None, replaces_position: None, team_with_position_id: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
         }
     }
 

@@ -337,6 +337,7 @@ pub fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_
         is_thrall: false,
         race: Some(roster_id.to_string()),
         replaces_position: None,
+        team_with_position_id: pos.team_with_position_id.clone(),
         inside_skill_list_tag: false,
         inside_skill_category_list_tag: false,
         current_skill_value: None,

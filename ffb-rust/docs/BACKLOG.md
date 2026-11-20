@@ -9723,15 +9723,18 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > (`D:/ffb_sksweep/sk7/results.txt`). The iteration 4-10 changes (TV, StepEndTurn, foul assists,
 > interception, agents, hires) are clean across the whole skill suite. Directive deleted.
 >
-> **SUPERVISOR DIRECTIVE (2026-11-20 19:45) -- do this BEFORE any new skill work:** iteration 12
-> (25bef3e45) gave EVERY bb2020 roster its team special rules (Bribery and Corruption, raise dead,
-> Plague Ridden...), which changes the BASE certified teams, yet only 16 bb2020 matchups were gated.
-> Freeze HEAD (exe + jar) and run every bb2020 mirror cell of `sweepjobs/w*.txt` (all races x 3
-> scales) at seeds 1-20, plus the bb2020 `_sk`/`_st` squads, detached + `.loop_wait.json`; fix any
-> red 1:1. Record the result here, then delete this directive.
+> **Supervisor directive DONE (loop iteration 16, 2026-11-20 20:47-21:20):** bb2020 re-gate after
+> iteration 12's team special rules. HEAD `6422228d3` (iterations 13-15 included) frozen as
+> `D:/ffb_star/bin/ffb-parity-d20.exe` + `ffb-ai-d20.jar` (fresh mvn package), new
+> `scripts/regate_edition.ps1 -edition bb2020 -out D:/ffb_regate/d20` (mask 0x7FF, PARITY_CP
+> pinned, 4 workers): **all 120 bb2020 mirror cells of sweepjobs/w1-6 (40 races x 3 scales, seeds
+> 1-20) `PARITY: 20/20` + `REPORTS: 20/20 identical`** (`D:/ffb_regate/d20/mirror/sweep_m{1..4}.log`)
+> and **all 46 bb2020 skill gates green** (40 `_sk` + 2 `_st` 20/20, 4 seed hunts 1/1, steps +
+> reports; `D:/ffb_regate/d20/skill/results.txt`). No red. Directive deleted.
 >
-> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 15), read this first (supersedes "Step 1" below).**
-> **Nothing is running after iteration 15** (its gates ran in-session and finished).
+> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 16), read this first (supersedes "Step 1" below).**
+> **Nothing is running after iteration 16** (the directive's detached re-gate finished green;
+> `.loop_wait.json` removed).
 > **State at 17:30: cert6 chain PID 11308 has EXITED (cert6 fully green, see iteration 3); only the
 > ledger PID 17496 still runs. The cert6 bullet below is history.**
 > The work is now driven by `scripts/skill_parity_loop.py` (goal = `scripts/skill_parity_check.py`
@@ -9888,6 +9891,22 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   1-20 **20/20 + 20/20** steps + reports, real Gored use in 11 + 10 green games; controls 1-10:
 >   bb2025 chaos + Grashnak, bb2020 nurgle + Grashnak (5 more green Gored games), bb2025 human,
 >   bb2020 orc -- all 10/10 steps + reports. ffb-engine tests 7630 / 0. Nothing running.
+> - **Loop iteration 16 (2026-11-20 ~20:45-21:40 local):** (1) supervisor directive DONE (box
+>   above, all green). (2) **Two for One DONE (bb2020, phase 2b (g) / (ab) below).** Engine port
+>   1:1 of `UtilServerGame.checkForMissingPartners` (was a documented no-op) + RosterPosition
+>   `teamWithPositionId` (JSON + XML) + Java's ROLL value evaluator for Loner (min of permanent and
+>   temporary values) + the star catalogue gives both bb2020 Two for One pairs (Grak & Crumbleberry,
+>   the Swift Twins) their partner ids like FUMBBL's rosters; Grak & Crumbleberry hired on bb2020
+>   `black_orc_sk` (`star_hires.json`). The first gate exposed an ENGINE BUG: the live bb2020 Right
+>   Stuff path applied the failed-landing injury itself, so applyTo's side effects preceded the
+>   injury report (Java: APOTHECARY_THROWN_PLAYER reports, then applies) -> removed. Gated on
+>   frozen `ffb-parity-tfo2.exe` + `ffb-ai-d20.jar`: black_orc_sk+Grak 20/20 + 20/20 (8 games with
+>   a real Two for One), wood_elf+Swift Twins 20/20 + 20/20 (8 more), TTM controls ogre / halfling
+>   / goblin / snotling / old_world_alliance_ogre / underworld_underworldtroll 20/20 + 20/20 each
+>   (~110 failed TTM landings). Nothing running after iteration 16.
+> - **Next for the loop (after iteration 16):** the 8 bb2016 EXTRAORDINARY skills + bb2016
+>   AgilityIncrease/MovementIncrease (verify) via sourced bb2016 rosters (user answer below), then a
+>   fresh ledger + the final cert + manifest. Two for One is done since cert6_2b too.
 > - **Next for the loop (after iteration 15):** Two for One (bb2020, 2b(g): partner data both
 >   sides, checkForMissingPartners, per-skill value evaluator), then the 8 bb2016 EXTRAORDINARY
 >   skills via sourced bb2016 rosters (user answer below), then the fresh ledger + final cert +
@@ -10650,6 +10669,41 @@ documented unreachable.
     **10/10 each**. Blast radius: every blitz (StepInitSelecting start refactor, StepEndSelecting
     BLITZ arm, StepBlockRoll) and every Grashnak game -- the final cert covers it.
 
+- **(ab) = 2b(g) Two for One (bb2020) -- ENGINE PORT + data, DONE 2026-11-20 (loop iteration 16).**
+  Carriers: Grak & Crumbleberry and the Swift Twins (bb2020 star pairs, both players carry Two for
+  One + Loner 4+). Java `UtilServerGame.updatePlayerStateDependentProperties` ->
+  `checkForMissingPartners`: for every player with `reducesLonerRollIfPartnerIsHurt` whose
+  position names a partner (`RosterPosition.teamWithPositionId`) present on the team, if he is a
+  casualty or KNOCKED_OUT and the partner has no active "Two for One" enhancement:
+  `fieldModel.addSkillEnhancements(partner, skill)` (TemporaryEnhancements: Loner "2"),
+  `partner.markUsed(skill)`, `ReportTwoForOne(partner, player, true)`. Rust had it as a no-op
+  because no data carried the partner id. Ported: `team_with_position_id` on PositionJson /
+  RosterPosition (JSON + the XML `<teamWithPositionId>` tag) / Player
+  (`position_team_with_position_id`); `UtilServerGame::check_for_missing_partners` 1:1 (edition-aware
+  property lookup); `Player::get_skill_int_value` applies Java's ROLL evaluator (Loner, Secret
+  Weapon, Hypnotic Gaze, Blood Lust -> MINIMUM) when one skill carries 2+ values (single-value
+  behaviour unchanged; the MODIFIER evaluator -- Mighty Blow / bb2020 Dirty Player max -- is NOT
+  ported: no data gives those two values yet). `scripts/build_star_catalog.py` gives a star pair
+  whose BOTH players carry Two for One each other's id, as FUMBBL's roster XMLs do (roster_goblin.xml
+  Grak 39459 <-> Crumbleberry 39460); only bb2020 star.grak_and_crumbleberry + star.the_swift_twins
+  changed. Unit tests: player.rs ROLL evaluator, util_server_game.rs pair test.
+  - **Engine bug found by the gate:** the LIVE bb2020 Right Stuff path
+    (`step/bb2025/ttm/step_right_stuff.rs`, `rules == Bb2020` branch) called `apply_to` itself; Java
+    bb2020 StepRightStuff only publishes INJURY_RESULT and ThrowTeamMate.java:55 jumps to
+    APOTHECARY [APOTHECARY_THROWN_PLAYER], which reports (:225) and then applies (:255). The early
+    apply put a KO'd Crumbleberry's ReportTwoForOne before his ttmLanding injury report
+    (black_orc_sk seed 13). Removed. (bb2016's `step_right_stuff.rs:259` has the same early
+    apply_to -- not reached by any red, unverified whether that file is live; follow-up.)
+  - **Squad:** Grak & Crumbleberry hired on bb2020 `black_orc_sk` (`star_hires.json`; the
+    skill suite stays 121 gates).
+  - **Gate** (frozen `D:/ffb_star/bin/ffb-parity-tfo2.exe` = this tree, jar `ffb-ai-d20.jar`
+    (harness unchanged), `D:/ffb_regate/gate.py`, roots `D:/ffb_regate/tfo/*_root`): black_orc_sk +
+    Grak 1-20 **20/20 + 20/20** (twoForOne in 8 games, both streams), wood_elf + Swift Twins 1-20
+    **20/20 + 20/20** (8 games); TTM controls (the Right Stuff fix) ogre, halfling, goblin, snotling,
+    old_world_alliance_ogre, underworld_underworldtroll 1-20 **20/20 + 20/20 each**. ffb-engine /
+    ffb-model / ffb-parity tests 7631 / 2820 / 68, 0 failed. Blast radius: every bb2020 TTM game with
+    a failed landing and every Grak / Swift Twins game -- the final cert covers it.
+
 ### Phase 1 status (2026-11-18)
 
 Driven, gated green (20-seed gates, steps + reports identical), pushed:
@@ -10688,7 +10742,7 @@ Deferred, with the reason (each needs a design decision or a larger port):
   writes the report (Java :378-398 adds the used skill, updates dice decorations, publishes the
   block params, dispatches BLITZ) -- port that 1:1 together with a prompt.
 - **KICK_EM_BLITZ**: same blitz-continuation shape as Gored.
-- **Two for One** (bb2020 Grak & Crumbleberry): unreachable in BOTH engines -- the parity star
+- ~~**Two for One**~~ DONE 2026-11-20 (Phase 2b (ab), loop iteration 16). Old note: (bb2020 Grak & Crumbleberry): unreachable in BOTH engines -- the parity star
   positions carry no `teamWithPositionId`, so Java's `checkForMissingPartners` finds no partner
   (Rust has it as a documented no-op). Needs the data field in both, the Rust port, and Java's
   per-skill value evaluator (Loner's picks the best of the base 4+ and the granted 2+; Rust's

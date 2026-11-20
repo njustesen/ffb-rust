@@ -969,9 +969,10 @@
        "Thick Skull",
        "Two for One"
       ],
-      "keywords": []
+      "keywords": [],
+      "team_with_position_id": "star.crumbleberry"
      },
-     "position_xml": "\t<position id=\"star.grak\">\n\t\t<quantity>1</quantity>\n\t\t<name>Grak</name>\n\t\t<type>Star</type>\n\t\t<cost>250000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>5</strength>\n\t\t<agility>4</agility>\n\t\t<passing>4</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Bone Head</skill>\n\t\t\t<skill>Kick Team-Mate</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill value=\"1\">Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Two for One</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+     "position_xml": "\t<position id=\"star.grak\">\n\t\t<quantity>1</quantity>\n\t\t<name>Grak</name>\n\t\t<type>Star</type>\n\t\t<cost>250000</cost>\n\t\t<movement>5</movement>\n\t\t<strength>5</strength>\n\t\t<agility>4</agility>\n\t\t<passing>4</passing>\n\t\t<armour>10</armour>\n\t\t<skillList>\n\t\t\t<skill>Bone Head</skill>\n\t\t\t<skill>Kick Team-Mate</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill value=\"1\">Mighty Blow</skill>\n\t\t\t<skill>Thick Skull</skill>\n\t\t\t<skill>Two for One</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t\t<teamWithPositionId>star.crumbleberry</teamWithPositionId>\n\t</position>\n"
     },
     {
      "position": {
@@ -996,9 +997,10 @@
        "Sure Hands",
        "Two for One"
       ],
-      "keywords": []
+      "keywords": [],
+      "team_with_position_id": "star.grak"
      },
-     "position_xml": "\t<position id=\"star.crumbleberry\">\n\t\t<quantity>1</quantity>\n\t\t<name>Crumbleberry</name>\n\t\t<type>Star</type>\n\t\t<cost>0</cost>\n\t\t<movement>5</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>6</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t\t<skill>Two for One</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+     "position_xml": "\t<position id=\"star.crumbleberry\">\n\t\t<quantity>1</quantity>\n\t\t<name>Crumbleberry</name>\n\t\t<type>Star</type>\n\t\t<cost>0</cost>\n\t\t<movement>5</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>6</passing>\n\t\t<armour>7</armour>\n\t\t<skillList>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t\t<skill>Two for One</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t\t<teamWithPositionId>star.grak</teamWithPositionId>\n\t</position>\n"
     }
    ],
    "dropped_skills": [],
@@ -2847,9 +2849,10 @@
        "Tackle",
        "Two for One"
       ],
-      "keywords": []
+      "keywords": [],
+      "team_with_position_id": "star.valen_swift"
      },
-     "position_xml": "\t<position id=\"star.lucien_swift\">\n\t\t<quantity>1</quantity>\n\t\t<name>Lucien Swift</name>\n\t\t<type>Star</type>\n\t\t<cost>340000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>5</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Juggernaut</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill value=\"1\">Mighty Blow</skill>\n\t\t\t<skill>Tackle</skill>\n\t\t\t<skill>Two for One</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+     "position_xml": "\t<position id=\"star.lucien_swift\">\n\t\t<quantity>1</quantity>\n\t\t<name>Lucien Swift</name>\n\t\t<type>Star</type>\n\t\t<cost>340000</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>5</passing>\n\t\t<armour>9</armour>\n\t\t<skillList>\n\t\t\t<skill>Block</skill>\n\t\t\t<skill>Juggernaut</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill value=\"1\">Mighty Blow</skill>\n\t\t\t<skill>Tackle</skill>\n\t\t\t<skill>Two for One</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t\t<teamWithPositionId>star.valen_swift</teamWithPositionId>\n\t</position>\n"
     },
     {
      "position": {
@@ -2875,9 +2878,10 @@
        "Sure Hands",
        "Two for One"
       ],
-      "keywords": []
+      "keywords": [],
+      "team_with_position_id": "star.lucien_swift"
      },
-     "position_xml": "\t<position id=\"star.valen_swift\">\n\t\t<quantity>1</quantity>\n\t\t<name>Valen Swift</name>\n\t\t<type>Star</type>\n\t\t<cost>0</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>2</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Pass</skill>\n\t\t\t<skill>Safe Pass</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t\t<skill>Two for One</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+     "position_xml": "\t<position id=\"star.valen_swift\">\n\t\t<quantity>1</quantity>\n\t\t<name>Valen Swift</name>\n\t\t<type>Star</type>\n\t\t<cost>0</cost>\n\t\t<movement>7</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>2</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>Pass</skill>\n\t\t\t<skill>Safe Pass</skill>\n\t\t\t<skill>Sure Hands</skill>\n\t\t\t<skill>Two for One</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t\t<teamWithPositionId>star.lucien_swift</teamWithPositionId>\n\t</position>\n"
     }
    ],
    "dropped_skills": [],

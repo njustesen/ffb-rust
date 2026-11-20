@@ -126,6 +126,8 @@ def position_xml(p: dict) -> str:
         L.append("\t\t<skillList/>")
     L.append("\t\t<skillCategoryList>")
     L.append("\t\t</skillCategoryList>")
+    if p.get("team_with_position_id"):
+        L.append(f"\t\t<teamWithPositionId>{escape(p['team_with_position_id'])}</teamWithPositionId>")
     if p.get("keywords"):
         L.append("\t\t<keywords>")
         L += [f"\t\t\t<keyword>{escape(k)}</keyword>" for k in p["keywords"]]
@@ -224,6 +226,15 @@ def parse_md(path: Path, edition: str, canon: dict):
             "ma": stat(row[0]), "st": stat(row[1]), "ag": stat(row[2]), "pa": stat(row[3]),
             "av": stat(row[4]), "skills": skills, "keywords": keywords,
         })
+    # §M 2b(g): a pair whose players carry Two for One names its partner position, exactly like
+    # FUMBBL's roster data (ffb-server/rosters/roster_goblin.xml: Grak 39459 <teamWithPositionId>
+    # 39460, Crumbleberry 39460 -> 39459). Java's UtilServerGame.checkForMissingPartners finds the
+    # partner by it; without it Two for One can never trigger in either engine. Only Two for One
+    # reads the field server-side, so other pairs are left as they were.
+    if len(players) == 2 and all("Two for One" in [s if isinstance(s, str) else s["name"] for s in p["skills"]]
+                                 for p in players):
+        players[0]["team_with_position_id"] = players[1]["id"]
+        players[1]["team_with_position_id"] = players[0]["id"]
     acc_m = re.search(r"^### Accepts? to play for", text, re.M)
     acc_idx = acc_m.start() if acc_m else -1
     accepts = re.findall(r"\[([^\]]+)\]\(\.\./\.\./teams/", text[acc_idx:]) if acc_idx >= 0 else []

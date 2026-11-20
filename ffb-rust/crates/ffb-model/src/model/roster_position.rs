@@ -82,6 +82,10 @@ pub struct RosterPosition {
     pub race: Option<String>,
     /// ID of the position this replaces (star player slot, etc.).
     pub replaces_position: Option<String>,
+    /// Java: `RosterPosition.fTeamWithPositionId` -- the partner position of a star pair, read by
+    /// `UtilServerGame.checkForMissingPartners` (bb2020 Two for One).
+    #[serde(default)]
+    pub team_with_position_id: Option<String>,
 
     /// Java: `RosterPosition.fInsideSkillListTag` (transient) — true while inside `<skillList>`.
     #[serde(skip)]
@@ -215,9 +219,9 @@ impl IXmlReadable for RosterPosition {
             if tag == XML_TAG_THRALL {
                 self.is_thrall = value.eq_ignore_ascii_case("true");
             }
-            // Java: `<teamWithPositionId>`/`<nameGenerator>` — no field on this struct;
-            // discarded, same treatment as other cosmetic/administrative-only tags.
-            let _ = XML_TAG_TEAM_WITH_POSITION_ID;
+            if tag == XML_TAG_TEAM_WITH_POSITION_ID {
+                self.team_with_position_id = Some(value.to_string());
+            }
             if tag == XML_TAG_REPLACES_POSITION {
                 self.replaces_position = Some(value.to_string());
             }
@@ -286,7 +290,7 @@ mod tests {
             is_undead: false,
             is_thrall: false,
             race: None,
-            replaces_position: None,
+            replaces_position: None, team_with_position_id: None,
             inside_skill_list_tag: false,
             inside_skill_category_list_tag: false,
             current_skill_value: None,

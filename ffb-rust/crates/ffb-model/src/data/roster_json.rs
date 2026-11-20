@@ -84,6 +84,11 @@ pub struct PositionJson {
     pub skill_categories: SkillCategoriesJson,
     #[serde(default)]
     pub keywords: Vec<String>,
+    /// Java: `RosterPosition.teamWithPositionId` (`<teamWithPositionId>`) -- the partner position
+    /// of a star pair (FUMBBL roster data, e.g. Grak 39459 <-> Crumbleberry 39460). Read by
+    /// `UtilServerGame.checkForMissingPartners` (bb2020 Two for One). §M 2b(g).
+    #[serde(default)]
+    pub team_with_position_id: Option<String>,
 }
 
 fn default_type() -> String {

@@ -19,7 +19,8 @@
 // Partially implemented (checkForMissingPartners skipped — needs addSkillEnhancements):
 //   updatePlayerStateDependentProperties, checkForMissingPartners
 
-use ffb_model::enums::{PlayerState, PS_BANNED, PS_RESERVE, PS_SETUP_PREVENTED, TurnMode};
+use ffb_model::enums::{PlayerState, PS_BANNED, PS_KNOCKED_OUT, PS_RESERVE, PS_SETUP_PREVENTED, SkillId, TurnMode};
+use ffb_model::report::bb2020::report_two_for_one::ReportTwoForOne;
 use ffb_model::model::field_model::FieldModel;
 use ffb_model::model::game::Game;
 use ffb_model::model::property::named_properties::NamedProperties;
@@ -99,10 +100,61 @@ impl UtilServerGame {
         let mechanic = state_mechanic_for(game.rules);
         mechanic.update_leader_re_rolls_for_team(game, true);
         mechanic.update_leader_re_rolls_for_team(game, false);
-        // no-op: checkForMissingPartners (TwoForOne skill pair) — RosterPosition.teamWithPositionId
-        // not present in FUMBBL roster data; all teams return empty partner lists.
+        Self::check_for_missing_partners(game, true);
+        Self::check_for_missing_partners(game, false);
         Self::update_single_use_rerolls_for_game(game, true);
         Self::update_single_use_rerolls_for_game(game, false);
+    }
+
+    /// Java: `UtilServerGame.checkForMissingPartners(Game, Team, FieldModel, IStep)` (bb2020 Two
+    /// for One, §M 2b(g)):
+    ///
+    /// ```java
+    /// players = team players with reducesLonerRollIfPartnerIsHurt
+    /// for currentPlayer in players:
+    ///   skill = currentPlayer.getSkillWithProperty(reducesLonerRollIfPartnerIsHurt)
+    ///   partnerPosId = currentPlayer.getPosition().getTeamWithPositionId()
+    ///   if provided: partner = first of players whose position id == partnerPosId
+    ///     if present and currentPlayer is casualty or KNOCKED_OUT
+    ///        and !partner.hasActiveEnhancement(skill): addPartnerEnhancement(partner, currentPlayer)
+    /// ```
+    ///
+    /// `addPartnerEnhancement` = `fieldModel.addSkillEnhancements(player, skill)` (TwoForOne's
+    /// TemporaryEnhancements: Loner with value "2", source = the skill name), `player.markUsed(skill)`,
+    /// `addReport(new ReportTwoForOne(player, partner, true))`.
+    fn check_for_missing_partners(game: &mut Game, home: bool) {
+        let prop = NamedProperties::REDUCES_LONER_ROLL_IF_PARTNER_IS_HURT;
+        let rules = game.rules;
+        // (id, position id, partner position id, skill) of every player with the property.
+        let players: Vec<(String, String, Option<String>, Option<SkillId>)> = {
+            let team = if home { &game.team_home } else { &game.team_away };
+            team.players.iter()
+                .filter(|p| p.has_skill_property_in(rules, prop))
+                .map(|p| (p.id.clone(), p.position_id.clone(), p.position_team_with_position_id.clone(),
+                          p.skill_id_with_property_in(rules, prop)))
+                .collect()
+        };
+        for (current_id, _, partner_pos_id, skill) in &players {
+            let Some(partner_pos_id) = partner_pos_id.as_deref().filter(|s| !s.is_empty()) else { continue };
+            let Some(skill) = skill else { continue };
+            let Some((partner_id, ..)) = players.iter().find(|(_, pos, ..)| pos == partner_pos_id) else { continue };
+            let removed = game.field_model.player_state(current_id)
+                .map(|s| s.is_casualty() || s.base() == PS_KNOCKED_OUT)
+                .unwrap_or(false);
+            let skill_name = skill.display_name();
+            let partner_has = game.player(partner_id).map(|p| p.has_active_enhancement(skill_name)).unwrap_or(true);
+            if removed && !partner_has {
+                // Java: addPartnerEnhancement(game, fieldModel, partner, currentPlayer, skill, step)
+                if let Some(p) = game.player_mut(partner_id) {
+                    // TwoForOne.postConstruct: withSkills({SkillClassWithValue(Loner.class, "2")})
+                    if !p.has_active_enhancement(skill_name) {
+                        p.add_prayer_skill(skill_name, SkillId::Loner, Some("2".to_string()));
+                    }
+                }
+                game.mark_skill_used(partner_id, *skill);
+                game.report_list.add(ReportTwoForOne::new(partner_id.clone(), current_id.clone(), true));
+            }
+        }
     }
 
     /// Helper: calls `update_single_use_rerolls` for home (true) or away (false) team.
@@ -324,6 +376,44 @@ mod tests {
             game.field_model.set_player_state("borak", PlayerState::new(PS_BADLY_HURT));
             UtilServerGame::check_for_wasted_skills(&mut game, "borak");
             assert_eq!(game.report_list.size(), expected, "{rules:?}");
+        }
+    }
+
+    /// §M 2b(g) Java `checkForMissingPartners`: when one of a Two for One pair is KO'd (or a
+    /// casualty) the partner gains the skill's enhancement (Loner "2", source "Two for One") ONCE,
+    /// has Two for One marked used, and ReportTwoForOne(partner, hurt player) is added; a pair
+    /// without partner ids gets nothing. (bb2025 is not a case: Java has only a bb2020 class and
+    /// the bb2025 star catalogue carries no Two for One.)
+    #[test]
+    fn two_for_one_partner_gains_loner_two_once() {
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::enums::{SkillId, PS_KNOCKED_OUT, PS_STANDING};
+        let pair = |link: bool| {
+            let mut grak = make_player("grak");
+            grak.position_id = "star.grak".into();
+            grak.starting_skills = vec![SkillWithValue::with_value(SkillId::Loner, "4"),
+                                        SkillWithValue::new(SkillId::TwoForOne)];
+            let mut crum = make_player("crum");
+            crum.position_id = "star.crumbleberry".into();
+            crum.starting_skills = grak.starting_skills.clone();
+            if link {
+                grak.position_team_with_position_id = Some("star.crumbleberry".into());
+                crum.position_team_with_position_id = Some("star.grak".into());
+            }
+            (grak, crum)
+        };
+        for (rules, link, expected) in [(Rules::Bb2020, true, 1usize), (Rules::Bb2020, false, 0)] {
+            let (grak, crum) = pair(link);
+            let mut game = Game::new(make_team("home", vec![grak, crum]), make_team("away", vec![]), rules);
+            game.field_model.set_player_state("grak", PlayerState::new(PS_STANDING));
+            game.field_model.set_player_state("crum", PlayerState::new(PS_KNOCKED_OUT));
+            UtilServerGame::update_player_state_dependent_properties(&mut game);
+            UtilServerGame::update_player_state_dependent_properties(&mut game);
+            assert_eq!(game.report_list.size(), expected, "{rules:?} link={link}");
+            let g = game.player("grak").unwrap();
+            let rr = g.get_skill_int_value(NamedProperties::HAS_TO_ROLL_TO_USE_TEAM_REROLL);
+            assert_eq!(rr, if expected == 1 { 2 } else { 4 }, "{rules:?} link={link}");
+            assert_eq!(g.used_skills.contains(&SkillId::TwoForOne), expected == 1);
         }
     }
 

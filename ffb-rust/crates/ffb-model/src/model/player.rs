@@ -85,6 +85,10 @@ pub struct Player {
     /// Read by the heuristic agent's setup scorer ("cheap units on the line").
     #[serde(default)]
     pub position_cost: i32,
+    /// Java: `player.getPosition().getTeamWithPositionId()` -- the partner position of a star
+    /// pair (bb2020 Two for One, `UtilServerGame.checkForMissingPartners`). Copied at creation.
+    #[serde(default)]
+    pub position_team_with_position_id: Option<String>,
 
     /// Skills the position starts with (defined on the roster position).
     #[serde(default)]
@@ -512,6 +516,24 @@ impl Player {
             .chain(self.temporary_skills.iter())
             .filter(|sw| sw.skill_id.properties().contains(&property))
             .collect();
+        // Java: `getSkillIntValue(Skill)` hands the skill's permanent value PLUS every temporary
+        // value of the same skill to `skill.evaluator().intValue(values)`. The ROLL evaluator
+        // (Loner, Secret Weapon, Hypnotic Gaze, Bloodlust -- every edition's class returns
+        // `SkillValueEvaluator.ROLL`) takes the MINIMUM. This only matters once one skill carries
+        // two values: bb2020 Two for One grants a temporary "Loner (2+)" on top of the star's
+        // permanent "Loner (4+)" (UtilServerGame.checkForMissingPartners) -> 2. §M 2b(g).
+        if let Some(first) = matching.first().map(|sw| sw.skill_id) {
+            let rolls: Vec<i32> = matching.iter()
+                .filter(|sw| sw.skill_id == first)
+                .filter_map(|sw| sw.value.as_deref()
+                    .and_then(|v| v.trim().trim_end_matches('+').parse::<i32>().ok()))
+                .collect();
+            let roll_evaluator = matches!(first,
+                SkillId::Loner | SkillId::SecretWeapon | SkillId::HypnoticGaze | SkillId::BloodLust);
+            if roll_evaluator && rolls.len() > 1 {
+                return *rolls.iter().min().unwrap();
+            }
+        }
         matching.iter()
             .find_map(|sw| sw.value.as_deref()
                 .and_then(|v| v.trim().trim_end_matches('+').parse::<i32>().ok()))
@@ -620,6 +642,7 @@ impl Player {
             position_passing: pos.passing,
             position_armour: pos.armour,
             position_cost: pos.cost,
+            position_team_with_position_id: pos.team_with_position_id.clone(),
             starting_skills: pos.skills.clone(),
             extra_skills: vec![],
             temporary_skills: vec![],
@@ -944,7 +967,7 @@ mod tests {
             position_agility: 3,
             position_passing: 4,
             position_armour: 8,
-            position_cost: 0,
+            position_cost: 0, position_team_with_position_id: None,
             starting_skills: vec![],
             extra_skills: vec![],
             temporary_skills: vec![],
@@ -1013,6 +1036,25 @@ mod tests {
 
         // A player without the property → 0.
         assert_eq!(test_player().get_skill_int_value(NamedProperties::GETS_SENT_OFF_AT_END_OF_DRIVE), 0);
+    }
+
+    /// §M 2b(g): Java's ROLL evaluator (Loner) takes the MINIMUM of the permanent value and every
+    /// temporary value of the skill -- bb2020 Two for One grants "Loner (2+)" on top of a star's
+    /// "Loner (4+)", so the Loner roll becomes 2+. Order of the grants must not matter.
+    #[test]
+    fn get_skill_int_value_roll_evaluator_takes_the_minimum() {
+        use crate::model::skill_def::SkillWithValue;
+        use crate::model::property::named_properties::NamedProperties;
+        let mut p = test_player();
+        p.starting_skills = vec![SkillWithValue::with_value(SkillId::Loner, "4")];
+        assert_eq!(p.get_skill_int_value(NamedProperties::HAS_TO_ROLL_TO_USE_TEAM_REROLL), 4);
+        p.add_prayer_skill("Two for One", SkillId::Loner, Some("2".to_string()));
+        assert_eq!(p.get_skill_int_value(NamedProperties::HAS_TO_ROLL_TO_USE_TEAM_REROLL), 2);
+        // A MODIFIER-style skill is not affected by the ROLL rule (first value, as before).
+        let mut q = test_player();
+        q.starting_skills = vec![SkillWithValue::with_value(SkillId::SecretWeapon, "3")];
+        q.add_prayer_skill("x", SkillId::SecretWeapon, Some("5".to_string()));
+        assert_eq!(q.get_skill_int_value(NamedProperties::GETS_SENT_OFF_AT_END_OF_DRIVE), 3);
     }
 
     #[test]
@@ -1180,7 +1222,7 @@ mod tests {
             is_undead: false,
             is_thrall: false,
             race: None,
-            replaces_position: None,
+            replaces_position: None, team_with_position_id: None,
             inside_skill_list_tag: false,
             inside_skill_category_list_tag: false,
             current_skill_value: None,
