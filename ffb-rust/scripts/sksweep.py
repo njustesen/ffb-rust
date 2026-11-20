@@ -11,8 +11,12 @@ res_path = os.path.join(out, "results.txt")
 done = set()
 if os.path.exists(res_path):
     done = {" ".join(l.split()[:2]) for l in open(res_path, encoding="utf-8") if l.strip()}
-jobs = [(ed, os.path.basename(f)[5:-5]) for ed in ["bb2016", "bb2020", "bb2025"]
-        for f in sorted(glob.glob(f"{ROOT}/data/teams_skills/{ed}/team_*.json"))]
+# Squad directories under data/ (comma list). Default = the 110 Matched Play `_sk` squads only, so
+# a sweep that was already scheduled (cert6) is unchanged; a full skill cert must name both:
+# SKSWEEP_DIRS=teams_skills,teams_stats (cert_chain.ps1 does; skill_ledger.jobs('skill') = both).
+DIRS = os.environ.get("SKSWEEP_DIRS", "teams_skills").split(",")
+jobs = [(ed, os.path.basename(f)[5:-5]) for ed in ["bb2016", "bb2020", "bb2025"] for d in DIRS
+        for f in sorted(glob.glob(f"{ROOT}/data/{d}/{ed}/team_*.json"))]
 jobs = [j for j in jobs if f"{j[0]} {j[1]}" not in done]
 lock = threading.Lock()
 

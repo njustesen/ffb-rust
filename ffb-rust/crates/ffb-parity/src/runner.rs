@@ -998,6 +998,12 @@ fn team_file_path(roster_name: &str, edition: &str) -> Option<std::path::PathBuf
         "../data/teams_skills",
         "../../data/teams_skills",
         r"C:\Users\Admin\niels\ffb-rust\ffb-rust\data\teams_skills",
+        // §M phase 2b(h) stat-increase squads (`<squad>_st`, scripts/draft_stat_squads.py):
+        // League-play characteristic improvements, kept apart from the Matched Play `_sk` set.
+        "data/teams_stats",
+        "../data/teams_stats",
+        "../../data/teams_stats",
+        r"C:\Users\Admin\niels\ffb-rust\ffb-rust\data\teams_stats",
     ];
     candidates.iter()
         .map(|c| std::path::Path::new(c).join(&file))
@@ -1044,6 +1050,12 @@ pub fn make_team_from_file(roster_name: &str, side: &str, edition: &str) -> Resu
                 player.extra_skills.push(sw);
             }
         }
+        // Java `HeadlessGameSetup` -> `team.updateRoster(roster, rules)` -> `RosterPlayer.
+        // updatePosition(.., updateStats=true, ..)`: stats reset from the position (done by
+        // `from_position`), then every skill behaviour's PlayerModifier -- the stat increases
+        // +MA/+ST/+AG/+PA/+AV (BACKLOG §M phase 2b(h)). No lasting injuries exist in parity games.
+        ffb_engine::skill_behaviour::registry::apply_player_modifiers_from_behaviours(
+            &mut player, edition_to_rules(edition));
         players.push(player);
     }
 
@@ -2035,6 +2047,46 @@ mod team_file_tests {
         assert!(n >= 100, "expected the ~110 skilled squads, found {n}");
     }
 
+    /// BACKLOG §M phase 2b(h): every stat-increase squad (data/teams_stats, `<base>_st`) loads,
+    /// and each improvement moved exactly its stat by one step the way the Java
+    /// `*IncreaseBehaviour` PlayerModifier does (AG/PA are target numbers from BB2020 on; a "-"
+    /// PA becomes 6+); every other stat equals the position's.
+    #[test]
+    fn stat_increase_squads_apply_the_java_player_modifiers() {
+        let mut n = 0;
+        for ed in ["bb2016", "bb2020", "bb2025"] {
+            let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/teams_stats").join(ed);
+            let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+            for e in rd.flatten() {
+                let name = e.file_name().to_string_lossy().to_string();
+                let Some(squad) = name.strip_prefix("team_").and_then(|s| s.strip_suffix(".json")) else { continue };
+                let team = make_team_from_file(squad, "home", ed).unwrap_or_else(|e| panic!("{ed}/{squad}: {e}"));
+                let mut improved = 0;
+                for p in &team.players {
+                    let base = [p.position_movement, p.position_strength, p.position_agility, p.position_passing, p.position_armour];
+                    let mut want = base;
+                    for s in &p.extra_skills {
+                        improved += 1;
+                        let tn = ed != "bb2016";
+                        match s.skill_id {
+                            SkillId::MovementIncrease => want[0] += 1,
+                            SkillId::StrengthIncrease => want[1] += 1,
+                            SkillId::AgilityIncrease => want[2] += if tn { -1 } else { 1 },
+                            SkillId::PassingIncrease => want[3] = if want[3] <= 0 { 6 } else { want[3] - 1 },
+                            SkillId::ArmourIncrease => want[4] += 1,
+                            other => panic!("{ed}/{squad} nr {}: {other:?} is not a stat increase", p.nr),
+                        }
+                    }
+                    assert_eq!([p.movement, p.strength, p.agility, p.passing, p.armour], want,
+                        "{ed}/{squad} nr {}", p.nr);
+                }
+                assert!(improved >= 4, "{ed}/{squad}: only {improved} improvements loaded");
+                n += 1;
+            }
+        }
+        assert_eq!(n, 6, "expected the 6 stat-increase squads");
+    }
+
     #[test]
     fn all_hand_drafted_team_files_are_legal() {
         // All THREE editions. This used to iterate ["bb2016", "bb2025"], leaving every one of
@@ -2494,10 +2546,11 @@ pub fn run_bench_game(
     let rules = edition_to_rules(edition);
 
     let setup_t0 = std::time::Instant::now();
+    // Skill touches accumulate across the bench run; main prints them as `BENCH skills` (§M).
+    // Enabled BEFORE the teams load: the stat-increase PlayerModifiers fire at load time.
+    ffb_model::skill_touch::set_enabled(true);
     let home = make_team(home_roster, "home", edition);
     let away = make_team(away_roster, "away", edition);
-    // Skill touches accumulate across the bench run; main prints them as `BENCH skills` (§M).
-    ffb_model::skill_touch::set_enabled(true);
     for p in home.players.iter().chain(away.players.iter()) {
         p.all_skill_ids().for_each(ffb_model::skill_touch::field);
     }

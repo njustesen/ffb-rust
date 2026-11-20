@@ -1,7 +1,9 @@
 pub mod abstract_dodging_behaviour;
+pub mod armour_increase_behaviour;
 pub mod dauntless_behaviour;
 pub mod indomitable_behaviour;
 pub mod juggernaut_behaviour;
+pub mod movement_increase_behaviour;
 pub mod watch_out_behaviour;
 
 pub use abstract_dodging_behaviour::AbstractDodgingBehaviour;

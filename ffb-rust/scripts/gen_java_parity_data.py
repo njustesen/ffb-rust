@@ -191,6 +191,10 @@ def main() -> int:
                 print(f"MISMATCH {path}")
                 mismatched += 1
             return
+        # Never rewrite an identical file: a parity run in flight reads these at JVM start, and a
+        # rewrite could hand it a half-written file.
+        if path.exists() and path.read_text(encoding="utf-8") == content:
+            return
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         wrote += 1
@@ -198,8 +202,10 @@ def main() -> int:
     # data/teams_skills holds the §M phase-2 SKILLED variants (scripts/draft_skill_squads.py),
     # kept out of data/teams so the certified mirror/cross/star sweeps never pick them up.
     for edition, suffix in EDITIONS.items():
+        # data/teams_stats: the §M phase-2b(h) stat-increase squads (scripts/draft_stat_squads.py).
         team_files = sorted((ROOT / "data" / "teams" / edition).glob("team_*.json")) \
-            + sorted((ROOT / "data" / "teams_skills" / edition).glob("team_*.json"))
+            + sorted((ROOT / "data" / "teams_skills" / edition).glob("team_*.json")) \
+            + sorted((ROOT / "data" / "teams_stats" / edition).glob("team_*.json"))
         for tf in team_files:
             race = tf.stem.replace("team_", "")
             team = json.loads(tf.read_text(encoding="utf-8"))

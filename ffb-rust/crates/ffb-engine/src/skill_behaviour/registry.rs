@@ -152,6 +152,12 @@ impl SkillRegistry {
         WrestleBehaviour::register_into(&mut reg);
         // Mixed (shared logic across editions)
         DauntlessBehaviour::register_into(&mut reg);
+        // Stat increases: load-time PlayerModifiers (§M 2b(h)); +MA/+AV are the mixed classes.
+        crate::skill_behaviour::bb2025::stat_increase_behaviours::AgilityIncreaseBehaviour::register_into(&mut reg);
+        crate::skill_behaviour::bb2025::stat_increase_behaviours::PassingIncreaseBehaviour::register_into(&mut reg);
+        crate::skill_behaviour::bb2025::stat_increase_behaviours::StrengthIncreaseBehaviour::register_into(&mut reg);
+        crate::skill_behaviour::mixed::movement_increase_behaviour::MovementIncreaseBehaviour::register_into(&mut reg);
+        crate::skill_behaviour::mixed::armour_increase_behaviour::ArmourIncreaseBehaviour::register_into(&mut reg);
         reg
     }
 
@@ -226,6 +232,12 @@ impl SkillRegistry {
         TheBallistaBehaviour::register_into(&mut reg);
         // Mixed (shared logic across editions)
         DauntlessBehaviour::register_into(&mut reg);
+        // Stat increases: load-time PlayerModifiers (§M 2b(h)); +MA/+AV are the mixed classes.
+        crate::skill_behaviour::bb2020::stat_increase_behaviours::AgilityIncreaseBehaviour::register_into(&mut reg);
+        crate::skill_behaviour::bb2020::stat_increase_behaviours::PassingIncreaseBehaviour::register_into(&mut reg);
+        crate::skill_behaviour::bb2020::stat_increase_behaviours::StrengthIncreaseBehaviour::register_into(&mut reg);
+        crate::skill_behaviour::mixed::movement_increase_behaviour::MovementIncreaseBehaviour::register_into(&mut reg);
+        crate::skill_behaviour::mixed::armour_increase_behaviour::ArmourIncreaseBehaviour::register_into(&mut reg);
         reg
     }
 
@@ -288,7 +300,38 @@ impl SkillRegistry {
         WildAnimalBehaviour::register_into(&mut reg);
         // Mixed (shared logic across editions)
         DauntlessBehaviour::register_into(&mut reg);
+        // Stat increases: load-time PlayerModifiers (§M 2b(h)); BB2016 has its own four classes.
+        crate::skill_behaviour::bb2016::stat_increase_behaviours::AgilityIncreaseBehaviour::register_into(&mut reg);
+        crate::skill_behaviour::bb2016::stat_increase_behaviours::ArmourIncreaseBehaviour::register_into(&mut reg);
+        crate::skill_behaviour::bb2016::stat_increase_behaviours::MovementIncreaseBehaviour::register_into(&mut reg);
+        crate::skill_behaviour::bb2016::stat_increase_behaviours::StrengthIncreaseBehaviour::register_into(&mut reg);
         reg
+    }
+}
+
+/// 1:1 translation of `RosterPlayer.applyPlayerModifiersFromBehaviours`: every skill of the
+/// player (Java's `fSkills` order: the team file's `<skillList>` advancements first -- added by
+/// the XML parser -- then the position's skills, added by `updatePosition`) applies each
+/// `PlayerModifier` its server behaviour registered. Java runs it from
+/// `RosterPlayer.updatePosition(.., updateStats=true, ..)` right after the stats are reset from
+/// the position, i.e. when `HeadlessGameSetup` calls `team.updateRoster(..)`; the Rust parity
+/// loader calls it at the same point. Today only the stat increases (+MA/+ST/+AG/+PA/+AV)
+/// register a PlayerModifier (BACKLOG §M phase 2b(h)).
+pub fn apply_player_modifiers_from_behaviours(player: &mut ffb_model::model::Player, rules: Rules) {
+    let reg = registry_for(rules);
+    let ids: Vec<SkillId> = player.extra_skills.iter().map(|s| s.skill_id)
+        .chain(player.starting_skills.iter().map(|s| s.skill_id))
+        .collect();
+    for id in ids {
+        if let Some(sb) = reg.get(id) {
+            let mods = sb.get_player_modifiers();
+            if !mods.is_empty() {
+                ffb_model::skill_touch::touch(id); // §M telemetry (observational only)
+            }
+            for m in mods {
+                m.apply(player);
+            }
+        }
     }
 }
 
@@ -394,21 +437,43 @@ mod tests {
     // Translation fidelity (2026-08-01): dropped from 35 — the bb2025 WildAnimalBehaviour was an
     // over-translation with no Java counterpart (Java bb2025 has AnimalSavageryBehaviour and no
     // Wild Animal skill); the spurious file and its registration were removed.
-    fn bb2025_registry_has_thirty_four_entries() {
+    // §M 2b(h) (2026-11-20): +5 / +4 / +5 for the stat-increase behaviours (load-time
+    // PlayerModifiers): BB2025 AG/PA/ST + mixed MA/AV; BB2016 its own AG/AV/MA/ST; BB2020 AG/PA/ST
+    // + mixed MA/AV.
+    fn bb2025_registry_has_thirty_nine_entries() {
         let reg = SkillRegistry::build_bb2025();
-        assert_eq!(reg.len(), 34, "BB2025 registry should have 34 registered skill entries (32 + Dodge + WatchOut)");
+        assert_eq!(reg.len(), 39, "BB2025 registry should have 39 registered skill entries (32 + Dodge + WatchOut + 5 stat increases)");
     }
 
     #[test]
-    fn bb2016_registry_has_twenty_two_entries() {
+    fn bb2016_registry_has_twenty_six_entries() {
         let reg = SkillRegistry::build_bb2016();
-        assert_eq!(reg.len(), 22, "BB2016 registry should have 22 registered skill entries (20 + Catch + MonstrousMouth)");
+        assert_eq!(reg.len(), 26, "BB2016 registry should have 26 registered skill entries (20 + Catch + MonstrousMouth + 4 stat increases)");
     }
 
     #[test]
-    fn bb2020_registry_has_twenty_five_entries() {
+    fn bb2020_registry_has_thirty_entries() {
         let reg = SkillRegistry::build_bb2020();
-        assert_eq!(reg.len(), 25, "BB2020 registry should have 25 registered skill entries (21 + Catch + MonstrousMouth + TheBallista + SneakyGit)");
+        assert_eq!(reg.len(), 30, "BB2020 registry should have 30 registered skill entries (21 + Catch + MonstrousMouth + TheBallista + SneakyGit + 5 stat increases)");
+    }
+
+    #[test]
+    fn stat_increase_modifiers_follow_the_java_lambdas() {
+        use ffb_model::model::Player;
+        let mut p = Player::default();
+        p.position_passing = 0;
+        p.passing = 0;
+        p.position_agility = 3;
+        p.agility = 3;
+        let mut q = p.clone();
+        q.extra_skills.push(ffb_model::model::skill_def::SkillWithValue::new(SkillId::PassingIncrease));
+        q.extra_skills.push(ffb_model::model::skill_def::SkillWithValue::new(SkillId::AgilityIncrease));
+        apply_player_modifiers_from_behaviours(&mut q, Rules::Bb2025);
+        assert_eq!((q.passing, q.agility), (6, 2), "'-' PA becomes 6+; AG 3+ becomes 2+");
+        let mut r = p.clone();
+        r.extra_skills.push(ffb_model::model::skill_def::SkillWithValue::new(SkillId::AgilityIncrease));
+        apply_player_modifiers_from_behaviours(&mut r, Rules::Bb2016);
+        assert_eq!(r.agility, 4, "BB2016 AG is a characteristic: +1");
     }
 
     #[test]

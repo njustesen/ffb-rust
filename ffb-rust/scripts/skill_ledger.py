@@ -44,13 +44,15 @@ SCHEDULES = {
     'star': os.path.join(OUTER, 'starjobs_full', 'w*.txt'),
     # §M phase 2b: the skill-advancement squads (mirror games, as scripts/sksweep.py runs them).
     'skill': os.path.join(ROOT, 'data', 'teams_skills', '*', 'team_*_sk.json'),
+    # §M phase 2b(h): the stat-increase squads (scripts/draft_stat_squads.py), same schedule.
+    'skill_st': os.path.join(ROOT, 'data', 'teams_stats', '*', 'team_*_st.json'),
 }
 
 
 def jobs(kind):
     out = []
     if kind == 'skill':
-        for path in sorted(glob.glob(SCHEDULES[kind])):
+        for path in sorted(glob.glob(SCHEDULES[kind])) + sorted(glob.glob(SCHEDULES['skill_st'])):
             ed = os.path.basename(os.path.dirname(path))
             sq = os.path.basename(path)[len('team_'):-len('.json')]
             out.append(('%s_%s' % (ed, sq), ed,

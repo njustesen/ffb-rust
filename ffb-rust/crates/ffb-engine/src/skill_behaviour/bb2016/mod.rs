@@ -6,6 +6,7 @@ pub mod piling_on_behaviour;
 pub mod really_stupid_behaviour;
 pub mod side_step_behaviour;
 pub mod stand_firm_behaviour;
+pub mod stat_increase_behaviours;
 pub mod wild_animal_behaviour;
 
 pub use bone_head_behaviour::BoneHeadBehaviour;

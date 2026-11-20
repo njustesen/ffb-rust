@@ -542,6 +542,17 @@ impl SkillId {
             _ => None::<SkillId>,
         };
         let _ = exact; // suppress warning
+        // Java `Skill.getName()` of the STAT_INCREASE classes ("+MA" ...), the name a FUMBBL team
+        // file's <skillList> carries and SkillFactory.forName resolves (BACKLOG §M phase 2b(h)).
+        // Matched before normalisation, which would strip the '+'.
+        match s.to_ascii_uppercase().as_str() {
+            "+MA" => return Some(SkillId::MovementIncrease),
+            "+ST" => return Some(SkillId::StrengthIncrease),
+            "+AG" => return Some(SkillId::AgilityIncrease),
+            "+PA" => return Some(SkillId::PassingIncrease),
+            "+AV" => return Some(SkillId::ArmourIncrease),
+            _ => {}
+        }
         let n: String = s.chars().filter(|c| c.is_alphanumeric()).collect::<String>().to_lowercase();
         let skill = match n.as_str() {
             "accurate" => SkillId::Accurate,

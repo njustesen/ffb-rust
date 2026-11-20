@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<team id="teamHumanStParity20Home">
+
+	<coach>Home</coach>
+	<name>Human Parity20 Home</name>
+	<race>Human</race>
+	<rosterId>human_st.bb2020</rosterId>
+	<reRolls>3</reRolls>
+	<fanFactor>0</fanFactor>
+	<dedicatedFans>0</dedicatedFans>
+	<apothecaries>1</apothecaries>
+	<cheerleaders>0</cheerleaders>
+	<assistantCoaches>0</assistantCoaches>
+	<currentTeamValue>1100000</currentTeamValue>
+	<division>[X]</division>
+	<treasury>0</treasury>
+	<specialRules/>
+
+	<player nr="1" id="teamHumanStParity20Home1">
+		<name>Human Lineman 1</name>
+		<gender>male</gender>
+		<positionId>human.lineman</positionId>
+		<skillList>
+			<skill>+MA</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="2" id="teamHumanStParity20Home2">
+		<name>Thrower 2</name>
+		<gender>male</gender>
+		<positionId>human.thrower</positionId>
+		<skillList>
+			<skill>+PA</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="3" id="teamHumanStParity20Home3">
+		<name>Catcher 3</name>
+		<gender>male</gender>
+		<positionId>human.catcher.old</positionId>
+		<skillList>
+			<skill>+AG</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="4" id="teamHumanStParity20Home4">
+		<name>Blitzer 4</name>
+		<gender>male</gender>
+		<positionId>human.blitzer</positionId>
+		<skillList>
+			<skill>+ST</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="5" id="teamHumanStParity20Home5">
+		<name>Halfling Hopeful 5</name>
+		<gender>male</gender>
+		<positionId>human.halflinghopeful</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="6" id="teamHumanStParity20Home6">
+		<name>Ogre 6</name>
+		<gender>male</gender>
+		<positionId>human.ogre</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="7" id="teamHumanStParity20Home7">
+		<name>Human Lineman 7</name>
+		<gender>male</gender>
+		<positionId>human.lineman</positionId>
+		<skillList>
+			<skill>+AV</skill>
+		</skillList>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="8" id="teamHumanStParity20Home8">
+		<name>Thrower 8</name>
+		<gender>male</gender>
+		<positionId>human.thrower</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="9" id="teamHumanStParity20Home9">
+		<name>Catcher 9</name>
+		<gender>male</gender>
+		<positionId>human.catcher.old</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="10" id="teamHumanStParity20Home10">
+		<name>Blitzer 10</name>
+		<gender>male</gender>
+		<positionId>human.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="11" id="teamHumanStParity20Home11">
+		<name>Blitzer 11</name>
+		<gender>male</gender>
+		<positionId>human.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+	<player nr="12" id="teamHumanStParity20Home12">
+		<name>Blitzer 12</name>
+		<gender>male</gender>
+		<positionId>human.blitzer</positionId>
+		<skillList/>
+		<playerStatistics currentSpps="0"/>
+	</player>
+</team>

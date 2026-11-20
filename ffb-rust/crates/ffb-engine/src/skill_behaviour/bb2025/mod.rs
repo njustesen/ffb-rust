@@ -24,6 +24,7 @@ pub mod sidestep_behaviour;
 pub mod sneaky_git_behaviour;
 pub mod stab_behaviour;
 pub mod stand_firm_behaviour;
+pub mod stat_increase_behaviours;
 pub mod swoop_behaviour;
 pub mod take_root_behaviour;
 pub mod tentacles_behaviour;

@@ -5,7 +5,7 @@
 #   cross    4012 gates  (../crossjobs_cert2/w1-6.txt, cross_worker.ps1)
 #   star     4012 gates  (../starjobs_full/w1-3.txt, star_worker.ps1)
 #   starrest the 3023 star gates cert6 did not reach (../starjobs_cert6/rest_r1-3.txt, tags r1-r3)
-#   skill    110 skilled squads (scripts/sksweep.py; resumable via D:/ffb_sksweep/cert6/results.txt)
+#   skill    116 squads = 110 _sk + 6 _st (scripts/sksweep.py, SKSWEEP_DIRS; resumable via results.txt)
 # Low footprint: at most $maxRun workers at once (job files queued), JVM heap capped at 1 GB.
 # Resource budget (user): <=70% of the machine (cores 0-10, mask 0x7FF), only 21:00-07:00 unless
 # the user says otherwise (-anytime). Outside the window no new suite starts and workers get
@@ -42,6 +42,8 @@ foreach ($suite in $suites) {
   }
   $procs = @()
   if ($suite -eq "skill") {
+    # §M 2b(h): the stat-increase squads (data/teams_stats) belong to the skill suite too.
+    $env:SKSWEEP_DIRS = "teams_skills,teams_stats"
     $procs += Start-Process python -PassThru -WindowStyle Hidden -ArgumentList @(
       "-I","$repo\scripts\sksweep.py",$exe,"D:/ffb_sksweep/cert6","1-20","1.0","0","$maxRun")
   }

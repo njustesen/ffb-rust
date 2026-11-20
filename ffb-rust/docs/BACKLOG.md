@@ -9732,6 +9732,19 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   view then uses it instead of the stale 11-17 `base` ledger.
 > - Daytime running was OK'd by the user for 2026-11-20 only; after that the 21:00-07:00 / <=70%
 >   budget applies (memory: overnight resource budget).
+> - **Loop iteration 1 (2026-11-20 ~16:30):** phase 2b(h) STAT_INCREASE done (see Phase 2b status
+>   (h)); the skill suite is now **116 squads** (110 `_sk` in data/teams_skills + 6 `_st` in
+>   data/teams_stats). cert6's queued skill sweep still runs the 110 only (`sksweep.py` default
+>   `SKSWEEP_DIRS=teams_skills`; PID 11308 loaded the old cert_chain.ps1) -- that is expected: the
+>   cert6 exe predates the stat-increase loader, so its `_st` games WOULD be red. The cert6_2b
+>   ledger (PID 17496) also predates it; the stat increases show as firing only in a ledger run on
+>   a post-2b(h) exe. At 16:30 starrest stood at ~2797/3023, ledger cert6_2b: skill 110/110,
+>   mirror ~328/330, cross + star not started.
+> - **Next for the loop:** when PID 17496 exits, `report` it and take the next skill from the
+>   MEASURED list (many "NOT FIELDED" items in the 11-17 base ledger -- Kick, Pro, PilingOn, Leader,
+>   PileDriver ... -- are fielded by the `_sk` squads and should already fire). Until then, the
+>   remaining 2b items in order: (b) Forgo, (c) Hail Mary Bomb squad, (d) Blast It, (e) blitz-block
+>   choice (Gored, KICK_EM_BLITZ), (f) Bounding Leap, (g) Two for One.
 >
 > **Older box (written 2026-11-20 before a reboot; the user is closing Avid Media Composer, whose
 > ~23 GB commit made Claude Code's reaper kill the cert runs).**
@@ -9837,6 +9850,40 @@ documented unreachable.
     two of the 63 dialog-raising steps that are not), and Rust's bb2025 StepApothecary strips the
     skill. Implementation is a driver adapter, not a 100-step port: `Action::UseSkillReRoll` ->
     `Game::command_re_roll_source` for one `handle_command` call -> `use_reroll` spends it.
+
+- **(h) STAT_INCREASE -- DONE 2026-11-20 (loop iteration 1).** Java: the five "skills"
+  +MA/+ST/+AG/+PA/+AV have NO in-play behaviour; each server behaviour
+  (`skillbehaviour/{bb2016,bb2020,bb2025,mixed}/*IncreaseBehaviour`, 12 classes) registers ONE
+  `PlayerModifier` that `RosterPlayer.updatePosition(.., updateStats=true, ..)` applies at load
+  (`HeadlessGameSetup` -> `team.updateRoster`), after the stats are reset from the position. Edition
+  differences: BB2016 AG is a characteristic (+1, cap min(10, pos+2)), BB2016 MA/ST/AV cap 10;
+  BB2020/25 AG/PA are target numbers (-1, floor max(1, pos-2)), "-" PA (stored 0) becomes 6+, ST
+  cap 8, MA cap 9 (mixed), AV cap 11 (mixed). Rust had the skill ids but no behaviour and no
+  load-time application, and `from_class_name("+MA")` did not resolve.
+  - Port: `skill_behaviour/{bb2016,bb2020,bb2025}/stat_increase_behaviours.rs` +
+    `mixed/{movement,armour}_increase_behaviour.rs`, registered per edition;
+    `registry::apply_player_modifiers_from_behaviours` (Java `applyPlayerModifiersFromBehaviours`,
+    fSkills order = team-file advancements then position skills) called by
+    `make_team_from_file`; it records a §M skill touch per applied skill (bench now enables
+    touches BEFORE the teams load). `SkillId::from_class_name` resolves "+MA".."+AV".
+  - Squads: Matched Play has no characteristic improvements, so these are League-play squads in
+    their OWN dir `data/teams_stats/<ed>/team_<base>_st.json` (`scripts/draft_stat_squads.py`, a
+    fixed plan: human + dwarf per edition, one improvement per player, every value inside the
+    edition maxima; +PA on a no-PA player on purpose -- bb2020 Troll Slayer, bb2025 Deathroller).
+    `gen_java_parity_data.py` emits their XML (and now never rewrites an identical file -- parity
+    JVMs read them at start). Test `stat_increase_squads_apply_the_java_player_modifiers`.
+  - Schedules: `skill_ledger.jobs('skill')` = the 110 `_sk` + 6 `_st` squads (116).
+    `scripts/sksweep.py` reads `SKSWEEP_DIRS` (default `teams_skills` = unchanged for the cert6
+    run still queued in PID 11308); `cert_chain.ps1` sets `teams_skills,teams_stats` for every
+    FUTURE skill suite. The final cert's skill suite is therefore 116 squads.
+  - Gate (frozen `D:/ffb_star/bin/ffb-parity-2bh.exe` + jar `ffb-ai-2b.jar`, 20 seeds, steps +
+    reports, `D:/ffb_sksweep/st_dev/results.txt`): **all 6 squads 20/20 steps + 20/20 reports**
+    (bb2016/bb2020/bb2025 x human_st/dwarf_st; the state hash carries MA/ST/AG/AV from step 0,
+    `FFB_SKILL_DUMP` showed identical JSKILLS/RSKILLS). Bench confirms the ledger touches
+    (`BENCH skills` AgilityIncrease/MovementIncrease/PassingIncrease... = 1 per carrier per game).
+  - Closes 8 ledger items: bb2016 AgilityIncrease/MovementIncrease, bb2020 + bb2025
+    AgilityIncrease/MovementIncrease/PassingIncrease (Strength/Armour classes extend an abstract
+    intermediate, so the ledger catalogue never lists them; they are ported and drafted anyway).
 
 ### Phase 1 status (2026-11-18)
 
