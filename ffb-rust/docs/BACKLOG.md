@@ -9730,8 +9730,8 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > scales) at seeds 1-20, plus the bb2020 `_sk`/`_st` squads, detached + `.loop_wait.json`; fix any
 > red 1:1. Record the result here, then delete this directive.
 >
-> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 12), read this first (supersedes "Step 1" below).**
-> **Nothing is running after iteration 12** (its gate ran in-session and finished).
+> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 13), read this first (supersedes "Step 1" below).**
+> **Nothing is running after iteration 13** (its gates ran in-session and finished).
 > **State at 17:30: cert6 chain PID 11308 has EXITED (cert6 fully green, see iteration 3); only the
 > ledger PID 17496 still runs. The cert6 bullet below is history.**
 > The work is now driven by `scripts/skill_parity_loop.py` (goal = `scripts/skill_parity_check.py`
@@ -9855,7 +9855,23 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   nurgle re-gate on `ffb-parity-sr20c.exe` all green incl. 12 bench-found raise seeds, 20 green
 >   games with a real Plague-Ridden raise. EVERY bb2020 cert gate of these races changes -> the final cert
 >   covers it. Nothing running after iteration 12.
-> - **Next for the loop (after iteration 12):** the 2b(e)/(f)/(g) ports (Gored/KICK_EM_BLITZ,
+> - **Loop iteration 13 (2026-11-20 ~19:30-20:15 local):** (1) **bb2020 A Sneaky Pair was an
+>   ENGINE BUG** (phase 2b (x)): Rust applied its +1 injury modifier in bb2025 only, Java's bb2020
+>   class registers exactly that modifier; fixed 1:1 (+ bb2020 armour catalogue had a phantom
+>   entry). (2) **Quick Bite = sampling** (2b (y)): same ~1/100 trigger rate both editions; Guffle
+>   hired on bb2025 chaos_sk / chaos_pact_sk, and for bb2020 (0 in seeds 1-20 on all 7 eligible
+>   squads) a new tracked **`data/teams_skills/seed_hunts.json`**: extra seed ranges per squad,
+>   gated by `sksweep.py` as `<ed> <squad>@<range>` and replayed by `skill_ledger.jobs('skill')`
+>   -> the skill suite is now **120 gates** (116 + 4 hunts). Also the Quick Bite catch trigger now
+>   requires an UNUSED skill (Java `requireUnusedSkill=true`). Gated: 5 squads 20/20 + 4 hunted
+>   seeds 1/1, steps + reports, real effects in green games. Frozen `ffb-parity-sp20b.exe` +
+>   `ffb-ai-md.jar`. TOOL: `D:/ffb_scratch_it13/seedtouch.py` = per-seed skill-touch finder.
+> - **Next for the loop (after iteration 13):** the 2b(e)/(f)/(g) ports (Gored/KICK_EM_BLITZ,
+>   Bounding Leap, Two for One), bb2025 SneakiestOfTheLot + ViolentInnovator re-check (both done in
+>   2b(t)/(q) but still SILENT in the stale cert6_2b ledger -- a fresh ledger decides), the bb2016
+>   sourced rosters, then a fresh ledger (on a post-iteration-13 exe) + the final cert + manifest.
+>   Stale-ledger reminder: cert6_2b predates iterations 1-13; most of its 40 "missing" are done.
+> - **Next for the loop (after iteration 12, A Sneaky Pair + Quick Bite DONE in iteration 13):** the 2b(e)/(f)/(g) ports (Gored/KICK_EM_BLITZ,
 >   Bounding Leap, Two for One), the rare-trigger stars (QuickBite both editions, bb2020
 >   ASneakyPair -- bench first, then skill-suite hires), the bb2016 sourced rosters, then a fresh
 >   ledger + the final cert + manifest.
@@ -10459,6 +10475,57 @@ documented unreachable.
     `raiseDead nurglesRot:true` in 20 of those green games. (The first nurgle gates on
     `ffb-parity-sr20.exe` were green only because no raise could happen.) ffb-engine 7623/0,
     ffb-mechanics 1174/0. Closes bb2020 PlagueRidden once a ledger runs on this tree.
+- **(x) bb2020 A Sneaky Pair -- ENGINE BUG, DONE 2026-11-20 (loop iteration 13).** Bench first
+  (`D:/ffb_scratch_it10/bench.py`, Dribl and Drull hired on bb2020 amazon/lizardman/slann_sk, seeds
+  1-20): 27 Drull stabs, 0 A Sneaky Pair touches. Cause: Java bb2020 `skill/bb2020/special/
+  ASneakyPair` registers ONE modifier, `StaticInjuryModifierAttacker(+1, foul || stab,
+  partnerMarksDefender)` (no armour modifier, no property; the bb2025 class registers an armour
+  modifier + an either/or injury modifier + `affectsEitherArmourOrInjuryWithPartner`). Rust had both
+  injury paths bb2025-only (`injury_modifier_factory::skill_to_injury_modifier_untagged` returned
+  None unless Bb2025; `find_registered_injury_modifiers` registered it under `if rules ==
+  Bb2025`), so a bb2020 stab/foul with both partners marking never got the +1 injury, and the
+  armour CATALOGUE (`find_registered_armour_modifiers`) wrongly listed "A Sneaky Pair" for bb2020.
+  Fixed 1:1 (injury: bb2020 + bb2025; armour catalogue: bb2025 only); the unit test that ASSERTED
+  the bug (`..._requires_bb2025`) became `..._applies_in_bb2020` (foul + stab) + `..._absent_in_
+  bb2016`, plus `a_sneaky_pair_has_no_armour_modifier_in_bb2020`. After the fix the bench touches
+  it 7 / 8 / 2 times (slann_sk / slann_fumbbl_sk / amazon_sk, seeds 1-20), but the +1 only APPLIES
+  when both stars mark the victim and armour broke: `FFB_BENCH_GREP="A Sneaky Pair"` found it on
+  slann_sk 193/227/378 and slann_fumbbl_sk 218/237 (bb2020, seeds 21-600; bb2025 slann 46/86 too).
+  Skill suite: Dribl and Drull hired on bb2020 slann_sk + slann_fumbbl_sk (`star_hires.json`) and
+  the hunted seeds 193 / 218 added (`seed_hunts.json`, (y) below).
+- **(y) Quick Bite (bb2020 + bb2025) -- sampling, DONE 2026-11-20 (loop iteration 13); + seed
+  hunts.** Bench with Guffle hired: 200 games each, Quick Bite touched 8x on bb2020 chaos_sk AND 8x
+  on bb2020 chaos_pact_sk, the same as bb2025 (8 + 8) -- no edition gap, just ~1 game in 100
+  (an opponent must CATCH next to Guffle). bb2025 chaos_sk / chaos_pact_sk see it on seeds 1-20
+  (4 + 4 touches) -> plain hires. bb2020: ALL seven Guffle-eligible `_sk` squads touch it 0x on
+  seeds 1-20 (chaos, chaos_chaosogre, chaos_chaostroll, chaos_pact, nurgle, renegades,
+  renegades_37730), and the ledger's skill kind is seeds 1-20 -> new tracked table
+  **`data/teams_skills/seed_hunts.json`** (edition -> squad -> extra seed ranges): `sksweep.py`
+  gates each as its own verdict `<ed> <squad>@<range>` (only when the sweep runs 1-20; root dir
+  `root_<ed>_<squad>_at_<range>`) and `skill_ledger.jobs('skill')` replays the same ranges (key
+  `<ed>_<squad>@<range>`), so `skill_parity_check.py` expects 120 skill gates/jobs (116 + 4) with
+  no change to it. Hunts found with `D:/ffb_scratch_it13/seedtouch.py` (per-seed touch finder):
+  bb2020 chaos_sk + Guffle seeds 141 and 176 -- seed 141 gated 1/1 + 1/1 on `sp20b` with Java's
+  stream showing `skillUse quickBite` + the `quickBite` injury (armour broken) in both engines.
+  The hunts are FRAGILE: any change that moves the RNG stream re-rolls them; when a ledger shows
+  the skill missing again, re-hunt and replace the seed (never pad with wide ranges).
+  Also fixed 1:1 on the way: the catch step's Quick Bite trigger (`step/bb2025/shared/
+  step_catch_scatter_throw_in.rs`, the live step for bb2020 + bb2025) used the 5-arg
+  `find_adjacent_opposing_players_with_property` (any skill), Java passes `requireUnusedSkill =
+  true` -> after Guffle's once-per-game bite Rust pushed a QuickBite sequence that found no one.
+  - **Iteration-13 gate** (frozen `D:/ffb_star/bin/ffb-parity-sp20b.exe` = this tree, jar
+    `D:/ffb_star/bin/ffb-ai-md.jar` -- no Java change since iteration 11; `D:/ffb_scratch_it13/
+    gate.py`, evidence `evidence.py`): the 5 re-hired squads seeds 1-20 **20/20 steps + 20/20
+    reports** each (`g1/results.txt`: bb2020 chaos_sk+Guffle, slann_sk + slann_fumbbl_sk+Dribl
+    and Drull, bb2025 chaos_sk + chaos_pact_sk+Guffle) and the 4 hunted seeds **1/1 + 1/1** each
+    (`qb141`, `h176`, `h193`, `h218`). Not vacuous: bb2025 Quick Bite bitten in 1 green game of each
+    squad (Java `skillUse quickBite` + `quickBite` injury), bb2020 in seeds 141 + 176; bb2020 Sneaky
+    Pair touched in 6 + 6 green games and APPLIED in seeds 193 (`injuryModifiers ["Dirty Player",
+    "A Sneaky Pair"]`, a Dribl foul) and 218 (`["A Sneaky Pair"]`, a Drull stab), identical streams.
+    Closes bb2020 ASneakyPair + QuickBite and bb2025 QuickBite once a ledger runs on this tree.
+    Blast radius of the engine fixes: bb2020 games fielding Dribl and Drull (star gates) and any
+    game after a Quick Bite -- the final cert covers both. ffb-mechanics 1176/0, ffb-engine lib
+    7623/0.
 
 ### Phase 1 status (2026-11-18)
 

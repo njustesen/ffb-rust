@@ -240,14 +240,15 @@ fn skill_to_injury_modifier_untagged(
             Some(Box::new(StaticInjuryModifierAttacker::new("Lethal Flight", 1, false)))
         }
         SkillId::ASneakyPair => {
-            // BB2025 only: bonus on foul/stab when a partner is adjacent to the defender.
-            // Java: ASneakyPair.postConstruct (BB2025) registers
-            // StaticInjuryModifierAttacker(+1, foul OR stab, partnerMarksDefender). The Java
-            // predicate also guards against double-counting with the armor-side modifier via
-            // `InjuryContext.getArmorModifiers()`; that either/or check isn't ported here — see
-            // this function's doc comment above (armor and injury modifiers are offered
-            // independently, matching the existing gap for other skills).
-            if context.game.rules != Rules::Bb2025 { return None; }
+            // BB2020 + BB2025: bonus on foul/stab when a partner is adjacent to the defender.
+            // Java: bb2020/special/ASneakyPair.postConstruct AND bb2025/special/ASneakyPair
+            // both register StaticInjuryModifierAttacker(+1, foul OR stab, partnerMarksDefender)
+            // (bb2020 registers ONLY this one -- no armour modifier, no property). This arm was
+            // bb2025-only, so a bb2020 Dribl foul / Drull stab with the partner marking never got
+            // the +1 injury (BACKLOG §M 2b(x)). The bb2025 predicate also guards against
+            // double-counting with the armor-side modifier via `InjuryContext.getArmorModifiers()`;
+            // that either/or check isn't ported here — see this function's doc comment above.
+            if context.game.rules != Rules::Bb2025 && context.game.rules != Rules::Bb2020 { return None; }
             if !context.is_foul && !context.is_stab { return None; }
             if !UtilPlayer::partner_marks_defender(context.game, &context.defender.id, SkillId::ASneakyPair) {
                 return None;
@@ -306,10 +307,7 @@ pub fn find_registered_injury_modifiers(rules: Rules) -> Vec<Box<dyn InjuryModif
         mods.push(Box::new(StaticInjuryModifierAttacker::new("Slayer", 1, false).with_predicate(|_| false)));
         mods.push(Box::new(StaticInjuryModifierAttacker::new("Toxin Connoisseur", 1, false).with_predicate(|_| false)));
 
-        // ASneakyPair (bb2025 only per its live-dispatch arm above; the injury-side registration
-        // in Java is unconditional across the BB2025-only skill file, so only bb2025 gets it here).
-    }
-    if rules == Rules::Bb2025 {
+        // ASneakyPair: both the bb2020 and the bb2025 skill class register the injury modifier.
         mods.push(Box::new(StaticInjuryModifierAttacker::new("A Sneaky Pair", 1, false).with_predicate(|ctx| {
             if !ctx.is_foul() && !ctx.is_stab() { return false; }
             let defender = ctx.get_defender();
@@ -617,11 +615,32 @@ mod tests {
         assert!(mods.is_empty());
     }
 
+    /// Java bb2020/special/ASneakyPair registers the same StaticInjuryModifierAttacker(+1, foul OR
+    /// stab, partnerMarksDefender) as bb2025 (BACKLOG §M 2b(x)); this used to assert the opposite.
     #[test]
-    fn find_injury_modifiers_a_sneaky_pair_requires_bb2025() {
+    fn find_injury_modifiers_a_sneaky_pair_applies_in_bb2020() {
         let f = InjuryModifierFactory::new(Rules::Bb2020);
         let mut game = make_sneaky_pair_game();
         game.rules = Rules::Bb2020;
+        let attacker = player_with_skill("a1", SkillId::ASneakyPair);
+        let defender = bare_player("def");
+        // foul
+        let mods = f.find_injury_modifiers_without_niggling(&game, Some(&attacker), &defender, false, true, false, false);
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].get_name(), "A Sneaky Pair");
+        // stab
+        let mods = f.find_injury_modifiers_without_niggling(&game, Some(&attacker), &defender, true, false, false, false);
+        assert_eq!(mods.len(), 1);
+        // neither
+        let mods = f.find_injury_modifiers_without_niggling(&game, Some(&attacker), &defender, false, false, false, false);
+        assert!(mods.is_empty());
+    }
+
+    #[test]
+    fn find_injury_modifiers_a_sneaky_pair_absent_in_bb2016() {
+        let f = InjuryModifierFactory::new(Rules::Bb2016);
+        let mut game = make_sneaky_pair_game();
+        game.rules = Rules::Bb2016;
         let attacker = player_with_skill("a1", SkillId::ASneakyPair);
         let defender = bare_player("def");
         let mods = f.find_injury_modifiers_without_niggling(&game, Some(&attacker), &defender, false, true, false, false);

@@ -174,9 +174,10 @@ pub fn find_registered_armour_modifiers(rules: Rules) -> Vec<Box<dyn ArmorModifi
         })));
     }
 
-    // ASneakyPair (bb2020+bb2025): real foul/stab + adjacent-partner predicate, same as the
-    // live-dispatch arm above.
-    if rules == Rules::Bb2020 || rules == Rules::Bb2025 {
+    // ASneakyPair (bb2025 only): real foul/stab + adjacent-partner predicate, same as the
+    // live-dispatch arm below. Java bb2020/special/ASneakyPair registers only an INJURY
+    // modifier (see injury_modifier_factory), so bb2020 has no "A Sneaky Pair" armour modifier.
+    if rules == Rules::Bb2025 {
         mods.push(Box::new(StaticArmourModifier::new("A Sneaky Pair", 1, false).with_predicate(|ctx| {
             (ctx.is_foul || ctx.is_stab)
                 && UtilPlayer::partner_marks_defender(ctx.game, &ctx.defender.id, SkillId::ASneakyPair)
@@ -762,5 +763,20 @@ mod tests {
         game2.rules = Rules::Bb2016;
         let mods2 = f.find_armor_modifiers(&game2, Some(&attacker), &defender, false, true);
         assert!(mods2.is_empty());
+    }
+
+    /// Java bb2020/special/ASneakyPair registers only an injury modifier: a bb2020 foul or stab
+    /// with the partner marking gets no "A Sneaky Pair" ARMOUR modifier, live or catalogued.
+    #[test]
+    fn a_sneaky_pair_has_no_armour_modifier_in_bb2020() {
+        let f = ArmorModifierFactory::new(Rules::Bb2020);
+        let mut game = make_sneaky_pair_game();
+        game.rules = Rules::Bb2020;
+        let attacker = player_with_skill("a1", SkillId::ASneakyPair);
+        let defender = dummy_player("def");
+        assert!(f.find_armor_modifiers(&game, Some(&attacker), &defender, false, true).is_empty());
+        assert!(f.find_armor_modifiers(&game, Some(&attacker), &defender, true, false).is_empty());
+        assert!(!find_registered_armour_modifiers(Rules::Bb2020).iter().any(|m| m.get_name() == "A Sneaky Pair"));
+        assert!(find_registered_armour_modifiers(Rules::Bb2025).iter().any(|m| m.get_name() == "A Sneaky Pair"));
     }
 }

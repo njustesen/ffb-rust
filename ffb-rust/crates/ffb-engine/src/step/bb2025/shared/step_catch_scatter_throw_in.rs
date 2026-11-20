@@ -427,13 +427,18 @@ impl StepCatchScatterThrowIn {
             let catcher_at_ball = ball_coord
                 .and_then(|c| game.field_model.player_at(c))
                 .map(|id| id.clone());
-            // Java: check QuickBite adjacents
+            // Java: check QuickBite adjacents -- findAdjacentOpposingPlayersWithProperty(game,
+            // catcher, ballCoordinate, canAttackOpponentForBallAfterCatch, false, true): the last
+            // argument is requireUnusedSkill, so a Guffle who already bit this game (Quick Bite is
+            // ONCE_PER_GAME) pushes no QuickBite sequence. Rust used the 5-arg overload (any
+            // skill, used or not) and pushed a sequence that then found no one (§M 2b(y)).
             if let (Some(ref catcher), Some(ball)) = (&catcher_at_ball, ball_coord) {
                 use ffb_model::util::util_player::UtilPlayer;
-                let qb_opponents = UtilPlayer::find_adjacent_opposing_players_with_property(
+                let qb_opponents = UtilPlayer::find_adjacent_opposing_players_with_property_ext(
                     game, catcher, ball,
                     NamedProperties::CAN_ATTACK_OPPONENT_FOR_BALL_AFTER_CATCH,
                     false,
+                    true,
                 );
                 if !qb_opponents.is_empty() {
                     use crate::step::generator::mixed::quick_bite::QuickBite;
