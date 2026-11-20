@@ -9822,7 +9822,16 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   suite hires the Gobbo on bb2025 chaos_dwarf_sk / goblin_sk / orc_sk (`star_hires.json`);
 >   gated 3 x 20/20 + 2 controls x 10/10, steps + reports, 4 SneakiestOfTheLot touches in green
 >   games. Frozen `ffb-parity-sotl.exe` + `ffb-ai-sotl.jar` (patched copy, in-repo jar untouched).
-> - **Next for the loop (after iteration 9):** bb2020 KickEmWhileTheyReDown (82 games 0 fires;
+> - **Loop iteration 10 (2026-11-20 ~19:30 local):** **bb2020 Kick 'em While They're Down DONE**
+>   (phase 2b (u)): no engine/harness gap -- the bench fires it in bb2020 at bb2025's rate (~1 per
+>   20 Nobbla games); the star schedule simply fields Nobbla too rarely. The skill suite now hires
+>   Nobbla on bb2020 goblin_sk / skaven_sk / underworld_sk + bb2025 skaven_sk (`star_hires.json`);
+>   gated 4 x 20/20 steps + reports on the frozen sotl exe + jar, kickEmBlock in 6 + 1 green games.
+> - **Next for the loop (after iteration 10):** item (1) re-roll skill in the dialog (Mesmerizing
+>   Dance), the 2b(e)/(f)/(g) ports (Gored/KICK_EM_BLITZ, Bounding Leap, Two for One), the
+>   rare-trigger stars (QuickBite, PlagueRidden, ASneakyPair -- skill-suite hires like 2b(t)/(u),
+>   bench first), the bb2016 sourced rosters, then the final cert + ledger + manifest.
+> - **Next for the loop (after iteration 9, KickEm DONE in iteration 10):** bb2020 KickEmWhileTheyReDown (82 games 0 fires;
 >   check the bb2020 offer), item (1) re-roll skill in the dialog (Mesmerizing Dance), the
 >   2b(e)/(f)/(g) ports (Gored/KICK_EM_BLITZ, Bounding Leap, Two for One), the rare-trigger stars
 >   (QuickBite, PlagueRidden, ASneakyPair -- consider skill-suite hires like 2b(t)), the bb2016
@@ -10324,6 +10333,22 @@ documented unreachable.
     (chaos_dwarf_sk s2/s4, goblin_sk s16, orc_sk s4), and Java's own report stream has
     `actingPlayerId: teamOrcSkParity25Home13, playerAction: foulMove` (Home13 = the Gobbo, the
     side's bomb thrower) in orc_sk seed 4. ffb-engine 7622/0.
+- **(u) Kick 'em While They're Down!, bb2020 -- DONE 2026-11-20 (loop iteration 10).** Not an
+  engine or harness gap. Java's offer (`LogicModule.isKickEmAvailable`: active, unused
+  canUseChainsawOnDownedOpponents, blocksLikeChainsaw, an adjacent foulable opponent) and the
+  server path (bb2020 `StepInitBlocking` :204 markSkillUsed for `isKickingDowned`) are
+  edition-shared, and the §M phase-1 rule (heuristic `kick_em_applies` / ParityRunner FOUL_MOVE
+  case) is edition-blind. Rust-only bench on the current exe (`D:/ffb_scratch_it10/bench.py`,
+  mirror + Nobbla home, seeds 1-20): bb2020 goblin_sk 1, orc_sk 1, skaven_sk 3, underworld_sk 2,
+  ogre_sk 1, chaos_dwarf/black_orc/snotling 0; bb2025 goblin_sk 1, skaven_sk 1 -- the same rate in
+  both editions. The ledger's 0 in 82 bb2020 games is the star schedule's 2-seed sampling of a
+  ~5%-per-game trigger. **Data:** `star_hires.json` now hires Nobbla (home) on bb2020 goblin_sk /
+  skaven_sk / underworld_sk and bb2025 skaven_sk (bb2025 had only 2 ledger fires); legality test
+  `skill_suite_star_hires_are_legal` green. **Gate** (frozen `ffb-parity-sotl.exe` + jar
+  `ffb-ai-sotl.jar`, `D:/ffb_scratch_it10/gate.py`, `g1/results.txt`): all four **20/20 steps +
+  20/20 reports**; Java's report stream carries `kickEmBlock` in bb2020 goblin_sk s6, skaven_sk
+  s3/s16/s17, underworld_sk s9/s19 and bb2025 skaven_sk s1. Closes bb2020 KickEmWhileTheyReDown
+  once a ledger runs on this tree.
 
 ### Phase 1 status (2026-11-18)
 
