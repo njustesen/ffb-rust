@@ -9732,9 +9732,42 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > and **all 46 bb2020 skill gates green** (40 `_sk` + 2 `_st` 20/20, 4 seed hunts 1/1, steps +
 > reports; `D:/ffb_regate/d20/skill/results.txt`). No red. Directive deleted.
 >
-> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 16), read this first (supersedes "Step 1" below).**
-> **Nothing is running after iteration 16** (the directive's detached re-gate finished green;
-> `.loop_wait.json` removed).
+> **RESUME HERE -- UPDATED 2026-11-20 21:30 (loop iteration 17), read this first (supersedes everything below).**
+> **RUNNING (launched 21:16, detached): the cert7 FINAL-PROOF chain, driver PID 26464**
+> (`scripts/final_cert.ps1 -name cert7 -maxRun 4`, self-pinned to mask 0x7FF; children inherit).
+> Frozen pair: `D:/ffb_star/bin/ffb-parity-cert7.exe` (= HEAD `2c4f4554d`, release build 21:14,
+> sha256 `bb340611...`) + `D:/ffb_star/bin/ffb-ai-cert7.jar` (fresh `mvn package` 21:15). Order:
+> 1. **skill ledger** (python PID 31992, 4 workers, 8475 jobs = 121 skill + 330 mirror + 4012 cross
+>    + 4012 star) -> `D:/ffb_ledger/cert7` (STAMP = the cert7 sha); progress in
+>    `D:/ffb_ledger/cert7.run.log` (UTF-16-ish, read with `powershell Get-Content`), then `report`
+>    -> `D:/ffb_ledger/cert7/LEDGER.txt` + `ledger.json` (log `cert7.report.log`). Expected ~3-4 h.
+> 2. **cert chain** `cert_chain.ps1 -name cert7` (mirror -> cross -> star -> skill), log
+>    `D:/ffb_star/cert7.chain.log`; verdicts in `../mirror_cert7/scratch/sweep_w*.log`,
+>    `../cross_cert7/scratch/sweep_w*.log`, `../starjobs_cert7/scratch/sweep_w*.log`,
+>    `D:/ffb_sksweep/cert7/results.txt`. The chain STOPS at 07:00 (budget window) and does not
+>    restart by itself. **To continue the next evening (>= 21:00):** relaunch
+>    `scripts/final_cert.ps1 -name cert7 -skipLedger` detached (same Start-Process form as below);
+>    since iteration 17 the three workers SKIP every gate that already has a verdict in their
+>    `sweep_<tag>.log` (NO VERDICT lines re-run) and sksweep resumes from results.txt, so nothing
+>    reruns. Launch form (from bash, single quotes!):
+>    `powershell -NoProfile -Command '$p = Start-Process powershell -PassThru -WindowStyle Hidden -WorkingDirectory C:\Users\Admin\niels\ffb-rust\ffb-rust -ArgumentList @("-NoProfile","-File","C:\Users\Admin\niels\ffb-rust\ffb-rust\scripts\final_cert.ps1","-name","cert7","-skipLedger"); $p.Id'`
+> `.loop_wait.json` holds PID 26464 until 2026-11-21 01:45. **The session that wakes then:** do
+> NOT relaunch or duplicate anything. Read `D:/ffb_ledger/cert7/LEDGER.txt` (if the ledger is done)
+> and run `python -I scripts/skill_parity_check.py` -- it now reads the cert7 ledger, so the
+> "missing" list is MEASURED for the first time since cert6_2b. Expected missing: only the 8 bb2016
+> EXTRAORDINARY skills (blocked, question 2 below) + bb2016 AgilityIncrease/MovementIncrease (check
+> the `_st` bb2016 squads -- if they show NOT FIELDED that is a real gap). Anything else missing =
+> a real item: fix it, but note that ANY exe change invalidates the running cert7 (stop driver
+> 26464 + its children only if the fix cannot wait; otherwise let the cert finish -- its reds are
+> worth knowing either way). Then write a new `.loop_wait.json` for the chain (deadline ~07:15).
+> When the chain is green on all four suites, write `docs/cert_manifest.json` (schema in the
+> checker docstring) -- the checker will still say NOT DONE until the bb2016 question is answered.
+> If at that point question 2 is still unanswered and nothing else is missing, create
+> `ffb-rust/STOP_LOOP` (only the user can unblock it) instead of spinning sessions.
+> **BLOCKED: the 8 bb2016 EXTRAORDINARY skills** -- see QUESTION FOR THE USER 2 (FUMBBL refuses
+> automated fetches; no in-repo source). The loop must NOT invent stats for them.
+> **Iteration 16 and before (history):** nothing was running after iteration 16 (the directive's
+> detached re-gate finished green).
 > **State at 17:30: cert6 chain PID 11308 has EXITED (cert6 fully green, see iteration 3); only the
 > ledger PID 17496 still runs. The cert6 bullet below is history.**
 > The work is now driven by `scripts/skill_parity_loop.py` (goal = `scripts/skill_parity_check.py`
@@ -9904,6 +9937,13 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   a real Two for One), wood_elf+Swift Twins 20/20 + 20/20 (8 more), TTM controls ogre / halfling
 >   / goblin / snotling / old_world_alliance_ogre / underworld_underworldtroll 20/20 + 20/20 each
 >   (~110 failed TTM landings). Nothing running after iteration 16.
+> - **Loop iteration 17 (2026-11-20 ~21:10-21:40 local):** no supervisor directive. The bb2016
+>   sourced-roster item is BLOCKED (question 2: fumbbl.com bot-filters every fetch, `ffb-java/`
+>   has no bb2016 carrier). Instead started the final proof: froze cert7 (HEAD `2c4f4554d` exe +
+>   fresh jar), `cert_chain.ps1` now takes `-name certN` (exe/jar/dirs derived), new
+>   `scripts/final_cert.ps1` (ledger -> report -> cert chain), the three cert workers are now
+>   resumable (skip gates already judged in their log; tested on a scratch shard), and launched
+>   the driver detached (box at the top).
 > - **Next for the loop (after iteration 16):** the 8 bb2016 EXTRAORDINARY skills + bb2016
 >   AgilityIncrease/MovementIncrease (verify) via sourced bb2016 rosters (user answer below), then a
 >   fresh ledger + the final cert + manifest. Two for One is done since cert6_2b too.
@@ -10038,6 +10078,24 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
    `docs/BB2016_DRAFTING_AND_ROSTERS.md`, run `gen_java_parity_data.py`, keep them out of the
    certified data/teams sets unless the schedule is extended deliberately, and gate them like any
    other squad (every skill must FIRE on a green gate). Do NOT exempt them.
+
+2. **(2026-11-20 21:30, loop iteration 17) BLOCKED: no reachable source for those bb2016 rosters.**
+   Answer 1(b) needs real data, and neither allowed source has it:
+   - `ffb-java/` has the 8 bb2016 skill CLASSES (`skill/bb2016/{Disposable,FanFavourite,
+     KickTeamMate,MonstrousMouth,Swarming,Swoop,Timmmber,WeepingDagger}.java`) but no roster, team
+     or star XML anywhere carries them for bb2016 (grep of all `ffb-server/rosters` + `teams`: the
+     only carriers are bb2020/bb2025 goblin, snotling, halfling, OWA, underworld...). The bb2016
+     star catalogue (`data/star_players/bb2016.json`, FUMBBL LRB6 star positions) has none either.
+   - **fumbbl.com refuses automated fetches** (every page, incl. `help:LRB6BretonnianSetUp` and the
+     races index, returns an Anubis "Access Denied" bot-filter page), so the FUMBBL LRB6 rosters
+     (e.g. their Spike!-era Goblin/Snotling/Underworld/Halfling definitions) cannot be read from
+     here. The only other web hits are unofficial PDF copies of GW's Spike! Journals -- not a
+     source the loop should use.
+   **What the loop needs from you (any one):** (a) paste FUMBBL's roster XML/JSON (or a screenshot
+   of the position tables) for the LRB6 teams/stars that carry these skills -- the loop then adds
+   them with that citation; (b) name another source you accept; or (c) revise answer 1 to (a)
+   exempt them. Until then the loop does NOT invent stats for them and works on the cert7 proof
+   instead; the checker cannot reach DONE while these 8 stay unexempted and unfielded.
 
 **Goal (user, 2026-11-17):** "make the agent use all skills in the game. Ideally to play better
 but most importantly to reach better coverage." User decisions: (1) drafted teams MAY carry

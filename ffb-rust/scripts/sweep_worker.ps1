@@ -26,10 +26,15 @@ if (-not $exe) { $exe = Join-Path $repo "target\release\ffb-parity.exe" }
 $log  = Join-Path $scratch ("sweep_" + $tag + ".log")
 $stop = Join-Path $scratch "STOP_SWEEP"
 New-Item -ItemType Directory -Force -Path $scratch | Out-Null  # a missing dir silently loses verdicts
+# Resumable: a gate that already has a verdict line in this worker's log is skipped, so a cert cut
+# off at 07:00 (budget window) is continued by re-running the same chain the next evening.
+$judged = @(); if (Test-Path $log) { $judged = @(Get-Content $log | Where-Object { $_ -notmatch 'NO VERDICT' }) }
 foreach ($line in (Get-Content $jobfile)) {
   $t = $line.Trim(); if (-not $t) { continue }
   if (Test-Path $stop) { Add-Content $log ("[" + $tag + "] STOPPED"); exit 0 }
   $f = $t -split '\s+'; $ed = $f[0]; $race = $f[1]; $sc = $f[2]
+  $key = "$race $ed @$sc "
+  if (@($judged | Where-Object { $_.StartsWith($key) }).Count -gt 0) { continue }
   $out = Join-Path $scratch ("sw_" + $race + "_" + $ed + "_" + $sc + ".log")
   # Sweep logs land on the DATA volume: a full 330-gate sweep writes ~8 GB of per-seed step,
   # event and report logs, which does not fit next to the repo. FFB_PARITY_ROOT takes an absolute

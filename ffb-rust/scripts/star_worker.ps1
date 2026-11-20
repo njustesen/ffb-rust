@@ -29,11 +29,16 @@ $stop = Join-Path $scratch "STOP_SWEEP"
 New-Item -ItemType Directory -Force -Path $scratch | Out-Null
 $env:PARITY_JVM_CORES = "2"
 $n = 0
+# Resumable: a gate that already has a verdict line in this worker's log is skipped, so a cert cut
+# off at 07:00 (budget window) is continued by re-running the same chain the next evening.
+$judged = @(); if (Test-Path $log) { $judged = @(Get-Content $log | Where-Object { $_ -notmatch 'NO VERDICT' }) }
 foreach ($line in (Get-Content $jobfile)) {
   $t = $line.Trim(); if (-not $t) { continue }
   $n++
   if (Test-Path $stop) { try { Add-Content $log ("[" + $tag + "] STOPPED") } catch {}; exit 0 }
   $f = $t -split '\s+'; $ed = $f[0]; $hm = $f[1]; $hs = $f[2]; $aw = $f[3]; $as = $f[4]
+  $key = "$hm" + "_vs_" + "$aw $ed @$scale [$hs|$as] #$tag/$n "
+  if (@($judged | Where-Object { $_.StartsWith($key) }).Count -gt 0) { continue }
   $env:FFB_PARITY_ROOT = $root + "/" + $tag + "/" + $n
   $cell = $hm + "_vs_" + $aw
   $out = Join-Path $scratch ("sw_" + $tag + "_" + $n + ".log")
