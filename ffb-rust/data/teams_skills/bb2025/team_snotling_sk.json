@@ -25,7 +25,7 @@
       "nr": 2,
       "position_id": "snotling.fun_hoppa",
       "skills": [
-        "Pile Driver"
+        "Lethal Flight"
       ],
       "advancement": "primary"
     },
@@ -33,7 +33,7 @@
       "nr": 3,
       "position_id": "snotling.stilty_runna",
       "skills": [
-        "Quick Foul"
+        "Put the Boot In"
       ],
       "advancement": "primary"
     },

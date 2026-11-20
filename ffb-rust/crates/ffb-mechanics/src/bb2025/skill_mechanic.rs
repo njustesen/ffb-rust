@@ -77,7 +77,9 @@ impl SkillMechanicTrait for SkillMechanic {
     }
 
     fn can_always_assist_foul(&self, _game: &Game, assistant: &Player) -> bool {
-        assistant.has_skill_property(NamedProperties::CAN_ALWAYS_ASSIST_FOULS)
+        // Java resolves the property through the bb2025 skill classes: bb2025/SneakyGit registers
+        // none, PutTheBootIn does (the edition-blind union would count a Sneaky Git).
+        assistant.has_skill_property_in(ffb_model::enums::Rules::Bb2025, NamedProperties::CAN_ALWAYS_ASSIST_FOULS)
     }
 
     fn animosity_exists(&self, thrower: &Player, catcher: &Player) -> bool {

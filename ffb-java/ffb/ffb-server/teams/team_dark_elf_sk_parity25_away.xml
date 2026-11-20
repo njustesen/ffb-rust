@@ -22,7 +22,7 @@
 		<gender>male</gender>
 		<positionId>darkelf.lineman</positionId>
 		<skillList>
-			<skill>Safe Pair Of Hands</skill>
+			<skill>Sprint</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -40,7 +40,7 @@
 		<gender>male</gender>
 		<positionId>darkelf.assassin</positionId>
 		<skillList>
-			<skill>Saboteur</skill>
+			<skill>Quick Foul</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>

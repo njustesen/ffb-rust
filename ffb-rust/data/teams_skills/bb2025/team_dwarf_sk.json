@@ -25,7 +25,7 @@
       "nr": 2,
       "position_id": "dwarf.runner",
       "skills": [
-        "Dauntless"
+        "Block"
       ],
       "advancement": "primary"
     },
@@ -45,7 +45,7 @@
       "nr": 6,
       "position_id": "dwarf.blocker",
       "skills": [
-        "Sneaky Git"
+        "Saboteur"
       ],
       "advancement": "primary"
     },
@@ -61,7 +61,7 @@
       "nr": 9,
       "position_id": "dwarf.blocker",
       "skills": [
-        "Violent Innovator"
+        "Sneaky Git"
       ],
       "advancement": "primary"
     },

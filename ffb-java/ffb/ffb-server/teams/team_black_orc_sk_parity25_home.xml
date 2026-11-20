@@ -48,7 +48,7 @@
 		<gender>male</gender>
 		<positionId>blackorc.goblin_bruiser</positionId>
 		<skillList>
-			<skill>Violent Innovator</skill>
+			<skill>Diving Catch</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -64,7 +64,7 @@
 		<gender>male</gender>
 		<positionId>blackorc.goblin_bruiser</positionId>
 		<skillList>
-			<skill>Put the Boot In</skill>
+			<skill>Pile Driver</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -80,7 +80,7 @@
 		<gender>male</gender>
 		<positionId>blackorc.goblin_bruiser</positionId>
 		<skillList>
-			<skill>Saboteur</skill>
+			<skill>Quick Foul</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>

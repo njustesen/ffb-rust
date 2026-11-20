@@ -17,7 +17,7 @@
       "nr": 1,
       "position_id": "darkelf.lineman",
       "skills": [
-        "Safe Pair Of Hands"
+        "Sprint"
       ],
       "advancement": "primary"
     },
@@ -33,7 +33,7 @@
       "nr": 3,
       "position_id": "darkelf.assassin",
       "skills": [
-        "Saboteur"
+        "Quick Foul"
       ],
       "advancement": "primary"
     },

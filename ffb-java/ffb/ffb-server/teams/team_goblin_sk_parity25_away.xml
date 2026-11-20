@@ -40,7 +40,7 @@
 		<gender>male</gender>
 		<positionId>goblin.bombardier</positionId>
 		<skillList>
-			<skill>Lethal Flight</skill>
+			<skill>Violent Innovator</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -49,7 +49,7 @@
 		<gender>male</gender>
 		<positionId>goblin.ooligan</positionId>
 		<skillList>
-			<skill>Violent Innovator</skill>
+			<skill>Sneaky Git</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>

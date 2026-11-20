@@ -22,7 +22,7 @@
 		<gender>male</gender>
 		<positionId>elf.lineman</positionId>
 		<skillList>
-			<skill>Sure Feet</skill>
+			<skill>Dauntless</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>

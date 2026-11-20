@@ -50,6 +50,15 @@ VALUED = {("bb2020", "MightyBlow"): 1, ("bb2025", "MightyBlow"): 1,
           ("bb2020", "DirtyPlayer"): 1, ("bb2025", "DirtyPlayer"): 1}
 UNSKILLABLE = {"bb2016": {"no hands"}, "bb2020": {"no hands"}, "bb2025": {"no ball"}}
 SKILL_POINTS, MAX_SECONDARY, MAX_ELITE = 6, 1, 4
+# §M 2b(q): skills with a holder prerequisite. BB2025 Violent Innovator: "A player can only have
+# this Skill if they have a Trait that allows them to perform a Special Action"
+# (rules/core_rules/08_skills_and_traits.md :204). The Special Action traits of the bb2025 rulebook
+# (same file): Ball & Chain, Bombardier, Breathe Fire, Chainsaw, Chomp, Hypnotic Gaze, Kick
+# Team-mate, Projectile Vomit, Stab. Java's consumers (grantsSppFromSpecialActionsCas) are exactly
+# Stab, Chainsaw, Breathe Fire, Bombardier, Kick Team-mate and Ball & Chain.
+PREREQ = {("bb2025", "ViolentInnovator"): {
+    "ballchain", "ballandchain", "bombardier", "breathefire", "chainsaw", "chomp", "hypnoticgaze",
+    "kickteammate", "projectilevomit", "stab"}}
 NEED_RARE, NEED_LIVE = 3, 1
 
 
@@ -205,6 +214,9 @@ def draft_edition(ed, catalogue, status):
         out = []
         for nr, pos, held in slots[sq]:
             if norm(disp) in held or norm(cls) in held:
+                continue
+            need_any = PREREQ.get((ed, cls))
+            if need_any is not None and not (held & need_any):
                 continue
             cats = pos.get("skill_categories") or {}
             if CATEGORY[cat] in cats.get("normal", []):

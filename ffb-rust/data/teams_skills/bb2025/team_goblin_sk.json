@@ -32,7 +32,7 @@
       "nr": 3,
       "position_id": "goblin.bombardier",
       "skills": [
-        "Lethal Flight"
+        "Violent Innovator"
       ],
       "advancement": "primary"
     },
@@ -40,7 +40,7 @@
       "nr": 4,
       "position_id": "goblin.ooligan",
       "skills": [
-        "Violent Innovator"
+        "Sneaky Git"
       ],
       "advancement": "primary"
     },

@@ -33,7 +33,7 @@
 		<gender>male</gender>
 		<positionId>chaos.warrior</positionId>
 		<skillList>
-			<skill>Block</skill>
+			<skill>Strong Arm</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>

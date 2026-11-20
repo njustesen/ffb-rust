@@ -257,12 +257,17 @@ impl UtilPlayer {
                 // bb2020 foul (star tier: halfling vs underworld_underworldtroll bb2020 seed 2).
                 let option_ok = game.rules == crate::enums::Rules::Bb2025
                     || game.options.is_enabled("sneakyGitAsFoulGuard");
+                // Edition-aware (`has_skill_property_in`): Java asks the PER-EDITION skill class.
+                // bb2025/SneakyGit registers NO property (only bb2016/bb2020 SneakyGit and bb2025
+                // PutTheBootIn register canAlwaysAssistFouls), so a marked bb2025 Sneaky Git is no
+                // foul assist; the edition-blind union counted it (§M 2b(q): goblin_sk bb2025 seed
+                // 9 report #386, Rust "1 Offensive Assist", Java none).
                 let can_always_assist = option_ok && game.player(assist_id)
-                    .map(|p| p.has_skill_property(NamedProperties::CAN_ALWAYS_ASSIST_FOULS))
+                    .map(|p| p.has_skill_property_in(game.rules, NamedProperties::CAN_ALWAYS_ASSIST_FOULS))
                     .unwrap_or(false);
                 let cancelled = adjacent_defenders.iter().any(|def_id| {
                     game.player(def_id)
-                        .map(|p| p.has_skill_property(NamedProperties::CANCELS_CAN_ALWAYS_ASSIST_FOULS))
+                        .map(|p| p.has_skill_property_in(game.rules, NamedProperties::CANCELS_CAN_ALWAYS_ASSIST_FOULS))
                         .unwrap_or(false)
                 });
                 if adjacent_defenders.is_empty() || (can_always_assist && !cancelled) {
@@ -1266,6 +1271,22 @@ mod tests {
         add_player(&mut game, false, "def2", FieldCoordinate::new(7, 5), ACTIVE_STANDING);
         assert_eq!(UtilPlayer::find_offensive_foul_assists(&game, "att", "def"), 0);
         game.options.set("sneakyGitAsFoulGuard", "true");
+        assert_eq!(UtilPlayer::find_offensive_foul_assists(&game, "att", "def"), 1);
+    }
+
+    /// Java bb2025/SneakyGit registers NO property (its canAlwaysAssistFouls moved to
+    /// PutTheBootIn): a marked bb2025 Sneaky Git gives no foul assist, a marked Put the Boot In
+    /// does (§M 2b(q), goblin_sk bb2025 seed 9).
+    #[test]
+    fn bb2025_marked_sneaky_git_is_no_foul_assist_but_put_the_boot_in_is() {
+        let mut game = minimal_game();
+        game.rules = Rules::Bb2025;
+        add_player(&mut game, true, "att", FieldCoordinate::new(5, 5), ACTIVE_STANDING);
+        add_player(&mut game, false, "def", FieldCoordinate::new(7, 7), PRONE);
+        add_skilled_player(&mut game, true, "git", FieldCoordinate::new(7, 6), ACTIVE_STANDING, SkillId::SneakyGit);
+        add_player(&mut game, false, "def2", FieldCoordinate::new(7, 5), ACTIVE_STANDING);
+        assert_eq!(UtilPlayer::find_offensive_foul_assists(&game, "att", "def"), 0);
+        add_skilled_player(&mut game, true, "boot", FieldCoordinate::new(8, 6), ACTIVE_STANDING, SkillId::PutTheBootIn);
         assert_eq!(UtilPlayer::find_offensive_foul_assists(&game, "att", "def"), 1);
     }
 

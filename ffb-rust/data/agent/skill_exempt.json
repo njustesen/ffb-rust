@@ -5,6 +5,7 @@
  },
  "bb2025": {
   "Insignificant": "No in-game behaviour in Java: skill/bb2025/Insignificant.java registers no property, modifier or behaviour and nothing in ffb-server or ffb-common references it; its only rule is a team-draft-list limit (the class javadoc), so no game can make it fire in either engine.",
-  "Unsteady": "No server-side behaviour in Java: skill/bb2025/Unsteady.java only registers preventSecureTheBallAction, which ffb-server never reads; the sole consumer is the client action menu (ffb-client-logic LogicModule :340), mirrored in both harnesses (ParityRunner :4924 / legal_actions.rs :688), where the Rust skill-touch counter is off by design (agent decisions)."
+  "Unsteady": "No server-side behaviour in Java: skill/bb2025/Unsteady.java only registers preventSecureTheBallAction, which ffb-server never reads; the sole consumer is the client action menu (ffb-client-logic LogicModule :340), mirrored in both harnesses (ParityRunner :4924 / legal_actions.rs :688), where the Rust skill-touch counter is off by design (agent decisions).",
+  "TheBallista": "Unreachable in Java bb2025 for its only carrier: skill/bb2025/special/TheBallista registers PASS/THROW_TEAM_MATE/KICK_TEAM_MATE re-roll sources, but StepPass :251 and ThrowTeamMateBehaviour :113 call askForReRollIfAvailable with the PLAYER overload and reRollSkill=null, so RollMechanic (bb2025 :272-278) only adds canRerollSingleDieOncePerPeriod skills; the one ACTING-player lookup (UtilCards.getUnusedRerollSource) is PassBehaviour :173, the Hail Mary Pass fumble, and Morg 'n' Thorg -- the sole Ballista carrier -- has no Hail Mary Pass (stars take no advancements; only Gloriel's Shot to Nothing grants it). bb2020 TTM uses the acting overload and fires."
  }
 }

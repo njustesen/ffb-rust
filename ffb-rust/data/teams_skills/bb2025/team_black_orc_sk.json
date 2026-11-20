@@ -33,7 +33,7 @@
       "nr": 4,
       "position_id": "blackorc.goblin_bruiser",
       "skills": [
-        "Violent Innovator"
+        "Diving Catch"
       ],
       "advancement": "primary"
     },
@@ -45,7 +45,7 @@
       "nr": 6,
       "position_id": "blackorc.goblin_bruiser",
       "skills": [
-        "Put the Boot In"
+        "Pile Driver"
       ],
       "advancement": "primary"
     },
@@ -57,7 +57,7 @@
       "nr": 8,
       "position_id": "blackorc.goblin_bruiser",
       "skills": [
-        "Saboteur"
+        "Quick Foul"
       ],
       "advancement": "primary"
     },

@@ -34,7 +34,7 @@
 		<gender>male</gender>
 		<positionId>dwarf.runner</positionId>
 		<skillList>
-			<skill>Dauntless</skill>
+			<skill>Block</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -64,7 +64,7 @@
 		<gender>male</gender>
 		<positionId>dwarf.blocker</positionId>
 		<skillList>
-			<skill>Sneaky Git</skill>
+			<skill>Saboteur</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -87,7 +87,7 @@
 		<gender>male</gender>
 		<positionId>dwarf.blocker</positionId>
 		<skillList>
-			<skill>Violent Innovator</skill>
+			<skill>Sneaky Git</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>

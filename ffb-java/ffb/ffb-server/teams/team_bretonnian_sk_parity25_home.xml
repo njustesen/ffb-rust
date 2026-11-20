@@ -61,7 +61,7 @@
 		<gender>male</gender>
 		<positionId>bretonnian.knight_catcher</positionId>
 		<skillList>
-			<skill>Diving Catch</skill>
+			<skill>Diving Tackle</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>

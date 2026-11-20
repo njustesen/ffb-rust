@@ -17,7 +17,7 @@
       "nr": 1,
       "position_id": "chaosdwarf.hobgoblin",
       "skills": [
-        "Quick Foul"
+        "Put the Boot In"
       ],
       "advancement": "primary"
     },
@@ -25,7 +25,7 @@
       "nr": 2,
       "position_id": "chaosdwarf.sneaky_stabba",
       "skills": [
-        "Sneaky Git"
+        "Violent Innovator"
       ],
       "advancement": "primary"
     },
@@ -47,15 +47,15 @@
     },
     {
       "nr": 6,
-      "position_id": "chaosdwarf.minotaur",
-      "skills": [
-        "Two Heads"
-      ],
-      "advancement": "primary"
+      "position_id": "chaosdwarf.minotaur"
     },
     {
       "nr": 7,
-      "position_id": "chaosdwarf.hobgoblin"
+      "position_id": "chaosdwarf.hobgoblin",
+      "skills": [
+        "Saboteur"
+      ],
+      "advancement": "primary"
     },
     {
       "nr": 8,

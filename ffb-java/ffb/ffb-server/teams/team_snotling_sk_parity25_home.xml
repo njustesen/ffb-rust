@@ -35,7 +35,7 @@
 		<gender>male</gender>
 		<positionId>snotling.fun_hoppa</positionId>
 		<skillList>
-			<skill>Pile Driver</skill>
+			<skill>Lethal Flight</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -44,7 +44,7 @@
 		<gender>male</gender>
 		<positionId>snotling.stilty_runna</positionId>
 		<skillList>
-			<skill>Quick Foul</skill>
+			<skill>Put the Boot In</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>

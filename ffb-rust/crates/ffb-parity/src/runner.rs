@@ -2053,6 +2053,20 @@ mod team_file_tests {
                 let team = make_team_from_file(squad, "home", ed).unwrap_or_else(|e| panic!("{ed}/{squad}: {e}"));
                 let extras: usize = team.players.iter().map(|p| p.extra_skills.len()).sum();
                 assert!(extras > 0, "{ed}/{squad}: no advancement reached extra_skills");
+                // §M 2b(q): BB2025 Violent Innovator -- "A player can only have this Skill if they
+                // have a Trait that allows them to perform a Special Action" (rules/core_rules/
+                // 08_skills_and_traits.md :204; scripts/draft_skill_squads.py PREREQ).
+                {
+                    use ffb_model::enums::SkillId as S;
+                    const SPECIAL_ACTION_TRAITS: [S; 8] = [S::BallAndChain, S::Bombardier, S::BreatheFire,
+                        S::Chainsaw, S::HypnoticGaze, S::KickTeamMate, S::ProjectileVomit, S::Stab];
+                    for p in &team.players {
+                        if p.extra_skills.iter().any(|sw| sw.skill_id == S::ViolentInnovator) {
+                            assert!(p.starting_skills.iter().any(|sw| SPECIAL_ACTION_TRAITS.contains(&sw.skill_id)),
+                                "{ed}/{squad} nr {}: Violent Innovator without a Special Action trait", p.nr);
+                        }
+                    }
+                }
                 n += 1;
             }
         }

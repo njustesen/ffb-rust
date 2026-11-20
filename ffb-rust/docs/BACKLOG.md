@@ -9792,6 +9792,21 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   reports**; `theFlashingBlade` action in 5 + 9 games, both streams. Controls on TV-changed
 >   mirrors (seeds 1-5, human_sk bb2025 + orc_sk bb2016): 5/5 + 5/5. Committed + pushed. The ledger list's two TheFlashingBlade items close once a ledger
 >   runs on a post-iteration-6 tree.
+> - **Loop iteration 7 (2026-11-20 ~18:30 local):** (1) **bb2025 Violent Innovator** re-drafted
+>   rule-legally (phase 2b (q)): the drafter put it on players with no Special Action, where Java
+>   can never read it; now on Stab / Bombardier holders, 14 bb2025 `_sk` squads reshuffled. The
+>   gate found a REAL engine bug: Rust counted a marked bb2025 Sneaky Git as a foul assist
+>   (edition-blind property union; Java bb2025 SneakyGit registers nothing) -> fixed 1:1 in
+>   `UtilPlayer::find_offensive_foul_assists` + bb2025 SkillMechanic. (2) **bb2025 TheBallista
+>   EXEMPTED** (2b (r): Java never offers it to Morg). (3) A probe on the current exe shows bb2020
+>   ExcuseMeAreYouAZoat already fires (stale ledger), and pins the reasons for Yoink (engine +
+>   harness gap, the next unit), SneakiestOfTheLot and the rare triggers -- see "Iteration-7 probe"
+>   in Phase 2b status. Frozen exe for this iteration: `D:/ffb_star/bin/ffb-parity-vi.exe`
+>   (jar `ffb-ai-pro16.jar`, harness unchanged).
+> - **Next for the loop (after iteration 7):** **Yoink** (bb2020 + bb2025) -- engine prompt field +
+>   command arm + both harnesses (design in "Iteration-7 probe"); then item (1) below (re-roll
+>   skill in the dialog), SneakiestOfTheLot (Black Gobbo foul rule), the 2b(e)/(f)/(g) ports and
+>   the bb2016 sourced rosters.
 > - **Next for the loop (after iteration 6):** item (1) below (re-roll skill in the dialog).
 >   Groundwork read in iteration 6: Java `StepHypnoticGaze` (bb2020 + bb2025) handles
 >   CLIENT_USE_SKILL ITSELF (`setReRollSource(skill.getRerollSource(HYPNOTIC_GAZE))`), unlike the
@@ -10151,6 +10166,72 @@ documented unreachable.
     controls on TV-changed mirrors seeds 1-5: bb2025 human_sk (+110k) and bb2016 orc_sk **5/5 +
     5/5** each (`D:/ffb_scratch_it6/c{25,16}`). The full skill suite re-runs in the final cert.
     `cargo test -p ffb-parity stars` 4/4.
+- **(q) bb2025 Violent Innovator: the draft was rule-ILLEGAL -- DONE 2026-11-20 (loop iteration
+  7).** Rulebook (rules/core_rules/08_skills_and_traits.md :204): "A player can only have this
+  Skill if they have a Trait that allows them to perform a Special Action". The drafter had put it
+  on an Ooligan, a dwarf Blocker and a Goblin Bruiser -- none can make a Special Action, and every
+  Java consumer (`grantsSppFromSpecialActionsCas`: StabBehaviour, StepBlockChainsaw,
+  StepBreatheFire, StepSpecialEffect (bomb), StepInitScatterPlayer (KTM), StepDropFallingPlayers
+  (B&C)) reads the ACTING special-action player, so it could never fire (ledger SILENT).
+  `draft_skill_squads.PREREQ` now restricts it to holders of a Special Action trait (Ball & Chain,
+  Bombardier, Breathe Fire, Chainsaw, Chomp, Hypnotic Gaze, KTM, Projectile Vomit, Stab); the
+  greedy re-draft moved VI to goblin Bomma, chaos-dwarf Sneaky Stabba and skaven Gutter Runner and
+  shuffled 14 bb2025 `_sk` squads (every skill keeps its placement count; bb2016/bb2020
+  unchanged); `gen_java_parity_data.py` rewrote their 28 team XMLs. Runner test
+  `all_skilled_squads_load_and_obey_matched_play_limits` now asserts the prerequisite (checked to
+  FAIL on the old goblin_sk). Bench skaven_sk bb2025 seeds 1-20: ViolentInnovator touched 10x,
+  `injuryType:stabForSpp` 20 -- the SPP variant is live.
+  Gates (seeds 1-20, scale 1.0, coverage-bias 0, jar `ffb-ai-pro16.jar`): first on the
+  iteration-6 exe `ffb-parity-fb.exe`, `D:/ffb_scratch_it7/vi/results.txt`: **13 of 14 squads
+  20/20 steps + 20/20 reports**; goblin_sk 20/20 steps, **19/20 reports** -- seed 9 report #386,
+  a foul armour roll: Rust `armorModifiers ["1 Offensive Assist"]`, Java `[]`. **ENGINE BUG**
+  (the new draft put Sneaky Git on the goblin Ooligan): Rust's `find_offensive_foul_assists` asked
+  the edition-blind `has_skill_property`, whose SneakyGit union carries bb2016/bb2020's
+  `canAlwaysAssistFouls`; Java bb2025/SneakyGit registers NO property (bb2025 moved it to
+  PutTheBootIn), so a MARKED bb2025 Sneaky Git is no foul assist. Fixed 1:1 with
+  `has_skill_property_in(game.rules, ..)` for both the property and its cancel
+  (`util_player.rs`), and the bb2025 `SkillMechanic::can_always_assist_foul`; test
+  `bb2025_marked_sneaky_git_is_no_foul_assist_but_put_the_boot_in_is`. Latent since §M phase 2
+  (no bb2025 base roster position has Sneaky Git; only `_sk` squads and stars do). Re-gated on
+  the fixed exe **`D:/ffb_star/bin/ffb-parity-vi.exe`** (`D:/ffb_scratch_it7/vi2`): goblin_sk,
+  dwarf_sk, undead_sk (the three bb2025 `_sk` squads with Sneaky Git) **20/20 + 20/20** each;
+  star control bb2025 orc+The Black Gobbo vs elf+Zolcath seeds 1-10 **10/10 + 10/10**. goblin_sk
+  seed 4 is a `JAVA_CRASH` = known JD-002 (SneakyGitBehaviour NPE on a Ball & Chain foul victim),
+  which Rust stalls on identically -- compares, as designed (§H.49). ffb-model 2819/0,
+  ffb-mechanics 1173/0. Rust-only skill-kind ledger on the new squads
+  (`D:/ffb_scratch_it7/skled`, compare script `cmp.py`): no skill LOST firing vs cert6_2b;
+  ViolentInnovator 27, LethalFlight (bb2025) newly fire.
+- **(r) bb2025 The Ballista: EXEMPTED (loop iteration 7)** -- Java cannot offer it to its only
+  carrier. Java bb2025 `StepPass` :251 and `ThrowTeamMateBehaviour` :113 call
+  `askForReRollIfAvailable` with the PLAYER overload and `reRollSkill = null`; RollMechanic
+  (bb2025 :272-278) then adds only a `canRerollSingleDieOncePerPeriod` skill. The sole
+  acting-player lookup (`UtilCards.getUnusedRerollSource`, which would find the Ballista) is
+  PassBehaviour :173 -- a HAIL MARY PASS fumble -- and Morg 'n' Thorg, the sole carrier, has no
+  Hail Mary Pass (stars take no advancements; only Gloriel's Shot to Nothing grants it). bb2020
+  differs: its ThrowTeamMateBehaviour :96 uses the ACTING overload, so bb2020 Ballista fires (9
+  touches in cert6_2b). Reason in `data/agent/skill_exempt.json`.
+- **Iteration-7 probe (stale-ledger check).** `D:/ffb_scratch_it7/probe.py` re-ran on the
+  iteration-6 exe (`ffb-parity-fb.exe`) only the 947 cert6_2b star jobs that field a still-missing
+  bb2020/bb2025 skill (results `D:/ffb_scratch_it7/led/star`). Finding: **bb2020
+  ExcuseMeAreYouAZoat fires** on the current build (34 named in 88 games; 0 in cert6_2b, built on
+  the older 2b2 exe) -- it closes with the next ledger. Still 0 on the current build, with the
+  reason found:
+  - **Yoink (bb2020 + bb2025), engine + harness gap:** Java StepIntercept (bb2020/bb2025 :143-148)
+    puts `getUnusedSkillWithProperty(interceptor, canInterceptEasily)` on the
+    DialogInterceptionParameter and the client answers `sendInterceptorChoice(player, skill)`
+    (DialogInterceptionHandler: "Use Yoink!" picks the interceptor with `hasUnused(skill)`). Rust's
+    LIVE shared step (`step/bb2025/pass/step_intercept.rs`) never computes the found skill, its
+    `AgentPrompt::Interception` has no skill field, and `interception_skill_name` is never set from
+    a command; ParityRunner `sendInterceptorChoice` always sends skill `null`. Port: prompt field +
+    `Action::Intercept{skill}` -> `interception_skill_name` + markUsed at doNextStep; rule in both
+    harnesses (accepting with a listed skill -> use it, zero draws); gate on a bb2020/bb2025 Yoink
+    star squad.
+  - **SneakiestOfTheLot (bb2025):** the Black Gobbo never FOULS (98 games; StepInitFouling's
+    `has_skill(SneakiestOfTheLot)` touches on every Gobbo foul). Agent policy, not engine.
+  - **QuickBite (both), PlagueRidden (bb2020), ASneakyPair (bb2020):** rare triggers (catch next
+    to Guffle; a KILL by Guffle for a Favoured-of-Nurgle team; foul/stab with the partner marking).
+  - **KickEmWhileTheyReDown (bb2020):** 82 games, 0 -- bb2025 fires (2); check the bb2020 offer.
+  - BoundingLeap, GoredByTheBull, TwoForOne: the 2b(e)/(f)/(g) engine ports, unchanged.
 
 ### Phase 1 status (2026-11-18)
 

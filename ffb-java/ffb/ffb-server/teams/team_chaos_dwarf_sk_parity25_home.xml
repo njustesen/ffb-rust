@@ -22,7 +22,7 @@
 		<gender>male</gender>
 		<positionId>chaosdwarf.hobgoblin</positionId>
 		<skillList>
-			<skill>Quick Foul</skill>
+			<skill>Put the Boot In</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -31,7 +31,7 @@
 		<gender>male</gender>
 		<positionId>chaosdwarf.sneaky_stabba</positionId>
 		<skillList>
-			<skill>Sneaky Git</skill>
+			<skill>Violent Innovator</skill>
 		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
@@ -62,16 +62,16 @@
 		<name>Minotaur 6</name>
 		<gender>male</gender>
 		<positionId>chaosdwarf.minotaur</positionId>
-		<skillList>
-			<skill>Two Heads</skill>
-		</skillList>
+		<skillList/>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="7" id="teamChaosDwarfSkParity25Home7">
 		<name>Hobgoblin Lineman 7</name>
 		<gender>male</gender>
 		<positionId>chaosdwarf.hobgoblin</positionId>
-		<skillList/>
+		<skillList>
+			<skill>Saboteur</skill>
+		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="8" id="teamChaosDwarfSkParity25Home8">
