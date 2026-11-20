@@ -10096,6 +10096,11 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
    them with that citation; (b) name another source you accept; or (c) revise answer 1 to (a)
    exempt them. Until then the loop does NOT invent stats for them and works on the cert7 proof
    instead; the checker cannot reach DONE while these 8 stay unexempted and unfielded.
+   **ANSWERED (user, 2026-11-20 ~21:30): "You should only test rosters that make sense within each
+   ruleset of course."** -> no invented bb2016 rosters; the 8 are exempted for bb2016 as out of
+   scope (no team/star of the bb2016 LRB6/CRP set carries them; supervisor wrote the entries in
+   data/agent/skill_exempt.json). The same principle applies everywhere: draft/hire only what the
+   edition's own rosters and advancement rules allow.
 
 **Goal (user, 2026-11-17):** "make the agent use all skills in the game. Ideally to play better
 but most importantly to reach better coverage." User decisions: (1) drafted teams MAY carry
