@@ -1319,6 +1319,25 @@ pub fn legal_pass_receivers(game: &Game, player_id: &str, side: TeamSide) -> Vec
     targets
 }
 
+/// BACKLOG §M 2b(e): the agents' answer to `AgentPrompt::BlitzBlockSkill` (Gored by the Bull),
+/// zero draws, mirrored by `ParityRunner.goredBlitzBlockSkill`: use the skill exactly when it adds
+/// the die -- the engine's own canAddBlockDie condition (decoration 1|2 dice, or 3 when the
+/// defender can move first, on an adjacent target) -- and the blitzer is not standing up (a
+/// prone blitzer's UseSkill path re-runs the select negatraits, which this rule keeps out of
+/// reach); otherwise the plain block.
+pub fn gored_blitz_block_action(
+    game: &Game,
+    defender_id: &str,
+    skill_id: ffb_model::enums::SkillId,
+) -> crate::action::Action {
+    let adds_die = crate::util::server_util_block::ServerUtilBlock::add_block_die_check(game, skill_id).1;
+    if adds_die && !game.acting_player.standing_up {
+        crate::action::Action::UseSkill { skill_id, use_skill: true }
+    } else {
+        crate::action::Action::Block { defender_id: defender_id.to_string() }
+    }
+}
+
 /// Dump-Off receivers (BACKLOG §M): the thrower's on-pitch team-mates the edition's
 /// `PassMechanic.findPassingDistance` accepts from the thrower's square (the same gate
 /// StepInitPassing applies, Blizzard included), coordinate-sorted (x, then y). Both agents pick

@@ -326,15 +326,33 @@ impl Step for StepInitMoving {
 
             // Java: CLIENT_USE_SKILL → canAddBlockDie → ReportSkillUse(skill, true, ADD_BLOCK_DIE)
             Action::UseSkill { skill_id, use_skill: true } => {
-                if skill_id.properties().contains(&NamedProperties::CAN_ADD_BLOCK_DIE) {
-                    let player_id = game.acting_player.player_id.clone();
-                    game.report_list.add(ReportSkillUse::new(
-                        player_id,
-                        *skill_id,
-                        true,
-                        SkillUse::ADD_BLOCK_DIE,
-                    ));
-                    // Java: also dispatches to blitz if BlitzMove && !hasBlocked — deferred
+                if skill_id.properties_for(game.rules).contains(&NamedProperties::CAN_ADD_BLOCK_DIE) {
+                    // Java bb2025 :285-307 (BACKLOG §M 2b(e), Gored by the Bull): only with a
+                    // target selection state and the skill unused; the die is recorded when the
+                    // decoration shows 1|2 dice (3 if the defender can move first) on an adjacent
+                    // target -- ReportSkillUse WITHOUT a player id -- and a BLITZ_MOVE that has not
+                    // blocked yet dispatches the BLITZ (USING_CHAINSAW / USING_VOMIT false).
+                    use crate::util::server_util_block::ServerUtilBlock;
+                    let (applies, adds_die) = ServerUtilBlock::add_block_die_check(game, *skill_id);
+                    if applies {
+                        if adds_die {
+                            if let Some(t) = game.field_model.target_selection_state.as_mut() {
+                                t.add_used_skill(*skill_id);
+                            }
+                            game.report_list.add(ReportSkillUse::new(
+                                None,
+                                *skill_id,
+                                true,
+                                SkillUse::ADD_BLOCK_DIE,
+                            ));
+                            ServerUtilBlock::update_dice_decorations(game);
+                        }
+                        if player_action == Some(PlayerAction::BlitzMove) && !has_blocked {
+                            return self.dispatch_player_action(PlayerAction::Blitz)
+                                .publish(StepParameter::UsingChainsaw(false))
+                                .publish(StepParameter::UsingVomit(false));
+                        }
+                    }
                 } else if skill_id.properties_for(game.rules)
                     .contains(&NamedProperties::CAN_IGNORE_JUMP_MODIFIERS)
                 {

@@ -2554,6 +2554,16 @@ public class ParityRunner {
                         activation.markFired();
                     }
                     if (DEBUG) System.err.println("JAVA_BLITZ_BLOCK pid=" + pid + " def=" + tss.getSelectedPlayerId());
+                    // BACKLOG §M 2b(e), zero draws, every agent mode, mirrored by
+                    // legal_actions::gored_blitz_block_action (answer to Rust's BlitzBlockSkill
+                    // prompt): an unused canAddBlockDie skill (Gored by the Bull) goes out as the
+                    // client's CLIENT_USE_SKILL (BlitzLogicModule) exactly when it adds the die.
+                    com.fumbbl.ffb.model.skill.Skill gored = goredBlitzBlockSkill(game, ap, tss);
+                    if (gored != null) {
+                        MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
+                            gored, true, pid, null, false));
+                        break;
+                    }
                     MatchRunner.inject(gameState, new ClientCommandBlock(
                         pid, tss.getSelectedPlayerId(), false, false, false, false, false));
                 } else if (activation != null) {
@@ -2663,6 +2673,40 @@ public class ParityRunner {
         MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(
             skill.get(), true, pid, null, false));
         return true;
+    }
+
+    /**
+     * BACKLOG §M 2b(e): the blitzer's unused canAddBlockDie skill (Gored by the Bull) when using
+     * it at the blitz block ADDS the die -- the engine's own condition in StepInitSelecting's
+     * CLIENT_USE_SKILL arm (decoration 1|2 dice, or 3 when the defender has an unused
+     * canMoveBeforeBeingBlocked skill, on an adjacent target) -- and the blitzer is not standing
+     * up; else null (the plain CLIENT_BLOCK). Zero draws. Mirrors
+     * legal_actions::gored_blitz_block_action.
+     */
+    private static com.fumbbl.ffb.model.skill.Skill goredBlitzBlockSkill(Game game, ActingPlayer ap,
+            com.fumbbl.ffb.model.TargetSelectionState tss) {
+        if (isBb2016(game) || ap == null || ap.getPlayer() == null || ap.isStandingUp()) {
+            return null;
+        }
+        com.fumbbl.ffb.model.skill.Skill gored = com.fumbbl.ffb.util.UtilCards.getUnusedSkillWithProperty(ap,
+            com.fumbbl.ffb.model.property.NamedProperties.canAddBlockDie);
+        if (gored == null) {
+            return null;
+        }
+        Player<?> defender = game.getPlayerById(tss.getSelectedPlayerId());
+        FieldCoordinate tc = defender == null ? null : game.getFieldModel().getPlayerCoordinate(defender);
+        FieldCoordinate pc = game.getFieldModel().getPlayerCoordinate(ap.getPlayer());
+        if (tc == null || pc == null || !tc.isAdjacent(pc)) {
+            return null;
+        }
+        com.fumbbl.ffb.DiceDecoration dd = game.getFieldModel().getDiceDecoration(tc);
+        boolean opponentCanMove = com.fumbbl.ffb.util.UtilCards.hasUnusedSkillWithProperty(defender,
+            com.fumbbl.ffb.model.property.NamedProperties.canMoveBeforeBeingBlocked);
+        if (dd == null) {
+            return null;
+        }
+        int n = dd.getNrOfDice();
+        return (n == 1 || n == 2 || (n == 3 && opponentCanMove)) ? gored : null;
     }
 
     private void sendBlitzTargetSelection(Game game, GameState gameState) {

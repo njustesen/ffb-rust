@@ -1602,6 +1602,10 @@ impl Agent for RandomAgent {
             // Kick: ParityRunner KICK_SKILL arm declines (CLIENT_USE_SKILL false), zero RNG.
             Some(AgentPrompt::KickSkill { .. }) =>
                 Action::UseSkill { skill_id: ffb_model::enums::SkillId::Kick, use_skill: false },
+            // BACKLOG §M 2b(e): the Gored by the Bull blitz-block choice -- the zero-draw rule
+            // ParityRunner's blitz arm applies in every agent mode.
+            Some(AgentPrompt::BlitzBlockSkill { defender_id, skill_id, .. }) =>
+                crate::legal_actions::gored_blitz_block_action(&gs.game, defender_id, *skill_id),
             Some(AgentPrompt::BuyCards { team_id, .. }) =>
                 Action::BuyCard { home: *team_id == gs.game.team_home.id, card_type: None },
             Some(AgentPrompt::BuyInducements { team_id, .. }) =>

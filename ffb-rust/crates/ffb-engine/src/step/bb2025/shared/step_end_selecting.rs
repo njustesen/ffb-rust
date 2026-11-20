@@ -417,6 +417,18 @@ impl StepEndSelecting {
                 // plain activation SelectBlitzTarget would have run (failure → END_BLOCKING ends the
                 // block, mirroring END_BLITZING ending the blitz) so the negatrait roll lands at the
                 // Java dice position, immediately before the block.
+                //
+                // BACKLOG §M 2b(e): a BLITZ dispatched from the SECOND pass of the real chain (a
+                // selected target selection state: StepSelectBlitzTarget DID run, with its
+                // activation) is Java's own `case BLITZ` - just the BlitzBlock sequence. That is
+                // the Gored by the Bull CLIENT_USE_SKILL arm of StepInitSelecting; the folded
+                // single-command blitz never has a target selection state.
+                let chain_second_pass = game.field_model.target_selection_state.as_ref()
+                    .map(|t| t.is_selected())
+                    .unwrap_or(false);
+                if chain_second_pass {
+                    return StepOutcome::next().push_seq(BlitzBlock::build_sequence(&params));
+                }
                 let mut activation = Sequence::new();
                 ActivationSequenceBuilder::new()
                     .with_failure_label(labels::END_BLOCKING)

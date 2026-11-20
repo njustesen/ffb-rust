@@ -9730,8 +9730,8 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > scales) at seeds 1-20, plus the bb2020 `_sk`/`_st` squads, detached + `.loop_wait.json`; fix any
 > red 1:1. Record the result here, then delete this directive.
 >
-> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 14), read this first (supersedes "Step 1" below).**
-> **Nothing is running after iteration 14** (its gates ran in-session and finished).
+> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 15), read this first (supersedes "Step 1" below).**
+> **Nothing is running after iteration 15** (its gates ran in-session and finished).
 > **State at 17:30: cert6 chain PID 11308 has EXITED (cert6 fully green, see iteration 3); only the
 > ledger PID 17496 still runs. The cert6 bullet below is history.**
 > The work is now driven by `scripts/skill_parity_loop.py` (goal = `scripts/skill_parity_check.py`
@@ -9876,7 +9876,23 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   slann_sk 1-40 x2 (Leap controls), star mirrors halfling x2 / wood_elf / gnome + Rowana 1-20 --
 >   all steps + reports identical; 7 green games with a real Bounding Leap (one with the automatic
 >   skill re-roll). Every star gate fielding Rowana changes -> the final cert covers it.
-> - **Next for the loop (after iteration 14):** the 2b(e)/(g) ports (Gored/KICK_EM_BLITZ blitz-block
+> - **Loop iteration 15 (2026-11-20 ~20:15-21:00 local):** **Gored by the Bull DONE (bb2020 +
+>   bb2025, phase 2b (e) / (aa) below).** Engine port 1:1 of the canAddBlockDie chain (Java
+>   StepInitSelecting :378-398 / bb2020 :358-378, StepInitMoving :285-307, StepBlockRoll's
+>   addDieSkill + markSkillUsed, ServerUtilBlock's addBlockDie decoration) + a Rust-only
+>   `AgentPrompt::BlitzBlockSkill` raised at the blitz's second pass ONLY for a blitzer with an
+>   unused Gored + a zero-draw rule in both harnesses (use it exactly when it adds the die and the
+>   blitzer is not standing up) + Grashnak Blackhoof hired on bb2020 + bb2025 `khorne_sk`
+>   (`star_hires.json`; skill suite still 121 gates). Gated on frozen `ffb-parity-gored.exe` +
+>   `ffb-ai-gored.jar` (patched copy of ffb-ai-bl.jar; in-repo jar untouched): khorne_sk+Grashnak
+>   1-20 **20/20 + 20/20** steps + reports, real Gored use in 11 + 10 green games; controls 1-10:
+>   bb2025 chaos + Grashnak, bb2020 nurgle + Grashnak (5 more green Gored games), bb2025 human,
+>   bb2020 orc -- all 10/10 steps + reports. ffb-engine tests 7630 / 0. Nothing running.
+> - **Next for the loop (after iteration 15):** Two for One (bb2020, 2b(g): partner data both
+>   sides, checkForMissingPartners, per-skill value evaluator), then the 8 bb2016 EXTRAORDINARY
+>   skills via sourced bb2016 rosters (user answer below), then the fresh ledger + final cert +
+>   manifest. Done since cert6_2b now also includes Gored by the Bull (bb2020 + bb2025).
+> - **Next for the loop (after iteration 14, Gored DONE in iteration 15):** the 2b(e)/(g) ports (Gored/KICK_EM_BLITZ blitz-block
 >   choice, Two for One), the bb2016 sourced rosters (user answer below), then a fresh ledger on a
 >   post-iteration-14 exe (cert6_2b is stale: most of its 40 "missing" are done) + the final cert
 >   + manifest. WHY THE CHECKER OUTPUT DOES NOT MOVE: its "missing" list is read from the newest
@@ -10591,6 +10607,48 @@ documented unreachable.
     s21/s33; gnome bb2020 s2/s17; halfling bb2020 s20), and bb2020 gnome_sk s2 failed the leap (2)
     and took the skill's own re-roll (5), identical. ffb-model + ffb-engine tests 7626 + 2819 / 0.
     Blast radius: every game where Rowana plays (star tier) -- the final cert covers it.
+- **(aa) = 2b(e) Gored by the Bull (bb2020 + bb2025) -- ENGINE PORT + agent rule, DONE 2026-11-20
+  (loop iteration 15).** Carrier: Grashnak Blackhoof (star; Frenzy, Horns, Unchannelled Fury,
+  Gored -- ONCE_PER_GAME, canAddBlockDie + providesBlockAlternativeDuringBlitz). Java: at the
+  blitz's second pass the client sends CLIENT_USE_SKILL(gored) instead of CLIENT_BLOCK
+  (BlitzLogicModule); `StepInitSelecting` (bb2025 :378, bb2020 :358) checks `targetSelectionState
+  != null && hasUnusedSkill`, records the skill in the selection state + `ReportSkillUse(skill,
+  ADD_BLOCK_DIE)` (no player id) + updates decorations when the target's decoration shows 1|2 dice
+  (3 if the defender has an unused canMoveBeforeBeingBlocked) on an adjacent target, then publishes
+  BLOCK_DEFENDER_ID / USING_STAB|CHAINSAW|VOMIT false / USE_ALTERNATE_LABEL **false** and dispatches
+  BLITZ (no forceGoto, so a standing blitzer still GOTOs END_SELECTING). `StepBlockRoll` (bb2025
+  :226, bb2020 :190) passes the selection state's canAddBlockDie skill as addBlockDie to
+  findNrOfBlockDice and marks it used only when the die was really added. Rust had: a report-only
+  UseSkill arm in StepInitSelecting (no selection state, no dispatch) and in StepInitMoving
+  (dispatch "deferred"), no addBlockDie anywhere in the block roll, and the blitz's second pass
+  folded with no command at all. Ported: `ServerUtilBlock::total_block_dice` (StepBlockRoll's
+  dice computation extracted unchanged, now shared), `dice_decoration_nr_of_dice` (Java's
+  decoration for one target: guard, adjacent-blockable, bystander / lastDefender skips,
+  needsNoDiceDecorations), `add_block_die_check`, `selection_state_add_block_die_skill`; both
+  UseSkill arms 1:1; StepBlockRoll's add-die + markSkillUsed; the decoration addBlockDie flag;
+  StepEndSelecting's BLITZ arm pushes ONLY BlitzBlock when the selection state is selected (Java's
+  `case BLITZ`; the folded single-command blitz -- no selection state -- keeps its prepended
+  activation). StepInitSelecting::start now raises `AgentPrompt::BlitzBlockSkill {player_id,
+  defender_id, skill_id}` at the second pass only when the blitzer holds an unused canAddBlockDie
+  skill; `Action::Block` = the old fold (BLITZ_MOVE + USE_ALTERNATE_LABEL true), `Action::UseSkill`
+  = the Java arm. 4 unit tests in step_init_selecting.rs.
+  - **Agent (both harnesses, zero draws, every agent mode):** Rust
+    `legal_actions::gored_blitz_block_action` (random, uniform, heuristic -- the heuristic answers it
+    before its class mask) / Java `ParityRunner.goredBlitzBlockSkill` in the common blitz arm of
+    sendConcreteAction: use the skill exactly when `add_block_die_check` says it adds the die and the
+    blitzer is not standing up (a prone blitzer's UseSkill path runs the select negatraits/stand-up
+    with USE_ALTERNATE_LABEL false -- ported but deliberately kept out of the agents' reach).
+  - **Not covered (documented, not a checker item):** the Frenzy second-block Gored offer
+    (StepEndBlocking :94 / :276-285) and StepInitBlocking's SELECT_BLOCK_KIND Gored arm -- both
+    agents still answer those windows with the plain block; KICK_EM_BLITZ (same blitz-continuation
+    shape) is still not offered by the agents.
+  - **Gate** (frozen `D:/ffb_star/bin/ffb-parity-gored.exe` = this tree, jar
+    `D:/ffb_star/bin/ffb-ai-gored.jar` = ffb-ai-bl.jar + this ParityRunner; `D:/ffb_scratch_it13/gate.py`,
+    roots `D:/ffb_scratch_it15/g1`, `g2`): bb2020 + bb2025 khorne_sk + Grashnak 1-20 **20/20 +
+    20/20** steps + reports, `addBlockDie` in both streams of 11 + 10 games; controls 1-10 bb2025
+    chaos + Grashnak, bb2020 nurgle + Grashnak (5 more Gored games), bb2025 human, bb2020 orc --
+    **10/10 each**. Blast radius: every blitz (StepInitSelecting start refactor, StepEndSelecting
+    BLITZ arm, StepBlockRoll) and every Grashnak game -- the final cert covers it.
 
 ### Phase 1 status (2026-11-18)
 
@@ -10622,7 +10680,8 @@ Driven, gated green (20-seed gates, steps + reports identical), pushed:
   twins had no variant value) -- parity green says nothing about reachability.
 
 Deferred, with the reason (each needs a design decision or a larger port):
-- **Gored by the Bull** (bb2025 Grashnak, canAddBlockDie during a blitz): the client sends
+- ~~**Gored by the Bull**~~ DONE 2026-11-20 (Phase 2b (aa), loop iteration 15). Old note:
+  (bb2025 Grashnak, canAddBlockDie during a blitz): the client sends
   UseSkill instead of CLIENT_BLOCK at the blitz block. Rust folds the blitz block into an automatic
   continuation (`StepInitSelecting` start(), BlitzMove + USE_ALTERNATE_LABEL) with no agent prompt,
   so the choice would have to live in the engine; also Rust's UseSkill canAddBlockDie arm only

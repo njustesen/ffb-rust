@@ -769,84 +769,24 @@ impl StepBlockRoll {
         // Java: fNrOfDice = ServerUtilBlock.findNrOfBlockDice(...).getLeft()
         // Only compute from player strengths when nr_of_dice is not already set.
         if self.nr_of_dice == 0 {
-            let attacker_str = game.acting_player.player_id.as_deref()
-                .and_then(|id| game.player(id))
-                .map(|p| p.strength_with_modifiers())
-                .unwrap_or(3);
-            let defender_str = game.defender_id.as_deref()
-                .and_then(|id| game.player(id))
-                .map(|p| p.strength_with_modifiers())
-                .unwrap_or(3);
-            // Java RollMechanic.getTotalAttackerStrength: a SUCCESSFUL Dauntless roll raises the
-            // attacker's block strength to at least the defender's base strength (doubled when
-            // doubleTargetStrength). This is applied to the base strength BEFORE the Horns +1 and
-            // before assists — `blockStrengthAttacker = max(base, doubleTargetStrength ? 2*defST : defST)`.
-            // Rust set the `successful_dauntless` flag but never fed it into the die count, so a
-            // weaker Dauntless attacker (e.g. a Dwarf blitzer vs a stronger target, dwarf seed 1
-            // i=101) rolled the "attacker much weaker" 3-dice defender-choice block instead of Java's
-            // 1 die, rolling extra dice and desyncing the game-die stream.
-            let attacker_str = if self.successful_dauntless {
-                let target = if self.double_target_strength { 2 * defender_str } else { defender_str };
-                attacker_str.max(target)
-            } else {
-                attacker_str
-            };
-            // Java RollMechanic.getAttackerBaseStrength: a blitzing player with the
-            // `addStrengthOnBlitz` property (Horns) gets +1 ST, and if the DEFENDER has
-            // `weakenOpposingBlitzer` and the blitzer has moved the attacker gets -1. These apply to
-            // the BASE strength (before assists). Rust's StepHorns hook only set a display flag and
-            // never fed the +1 into the block-dice count, so an equal-ST blitz (Minotaur vs Minotaur,
-            // chaos seed 1 i=100) rolled 1 die instead of Java's 2 and desynced the whole die stream.
-            let attacker_str = {
-                use ffb_model::enums::PlayerAction;
-                use ffb_model::model::property::named_properties::NamedProperties;
-                let is_blitz = matches!(game.acting_player.player_action,
-                    Some(PlayerAction::Blitz) | Some(PlayerAction::BlitzMove));
-                let mut s = attacker_str;
-                if is_blitz {
-                    let atk_horns = game.acting_player.player_id.as_deref()
-                        .and_then(|id| game.player(id))
-                        .map(|p| p.has_skill_property(NamedProperties::ADD_STRENGTH_ON_BLITZ))
-                        .unwrap_or(false);
-                    if atk_horns { s += 1; }
-                    if game.acting_player.has_moved {
-                        let def_weakens = game.defender_id.as_deref()
-                            .and_then(|id| game.player(id))
-                            .map(|p| p.has_skill_property(NamedProperties::WEAKEN_OPPOSING_BLITZER))
-                            .unwrap_or(false);
-                        if def_weakens { s -= 1; }
+            // The strength computation (Dauntless, Horns, weakenOpposingBlitzer, assists, Cheering
+            // Fans) lives in `ServerUtilBlock::total_block_dice`, shared with the Gored by the Bull
+            // decoration check so both count dice the same way.
+            let defender_id = game.defender_id.clone();
+            self.nr_of_dice = crate::util::server_util_block::ServerUtilBlock::total_block_dice(
+                game, defender_id.as_deref(), self.successful_dauntless, self.double_target_strength);
+            // Java (bb2025 :226-237, bb2020 :190-200): the selection state's canAddBlockDie skill
+            // (Gored by the Bull, recorded by a StepInitSelecting/StepInitMoving/StepEndBlocking
+            // CLIENT_USE_SKILL) goes into findNrOfBlockDice as addBlockDie -- one more die on a 1 or
+            // 2 dice block -- and is marked used only when that die was really added.
+            if let Some(skill) = crate::util::server_util_block::ServerUtilBlock::selection_state_add_block_die_skill(game) {
+                if self.nr_of_dice == 1 || self.nr_of_dice == 2 {
+                    self.nr_of_dice += 1;
+                    if let Some(pid) = game.acting_player.player_id.clone() {
+                        crate::step::util_server_steps::mark_skill_used(game, &pid, skill);
                     }
                 }
-                s
-            };
-            // Java: blockStrengthAttacker = RollMechanic.getTotalAttackerStrength(...) and
-            // blockStrengthDefender = ServerUtilPlayer.findBlockStrength(...) — BOTH sides
-            // add their assists (teammates with tackle zones adjacent to the opponent and
-            // otherwise unmarked). Comparing bare strengths made every equal-ST block a
-            // 1-die block; 2-dice blocks were unreachable without stat differences.
-            let coords = game.acting_player.player_id.as_deref()
-                .and_then(|aid| game.field_model.player_coordinate(aid))
-                .zip(game.defender_id.as_deref().and_then(|did| game.field_model.player_coordinate(did)));
-            let (attacker_str, defender_str) = if let Some((ac, dc)) = coords {
-                (
-                    crate::util::server_util_player::ServerUtilPlayer::find_block_strength(game, ac, attacker_str, dc),
-                    crate::util::server_util_player::ServerUtilPlayer::find_block_strength(game, dc, defender_str, ac),
-                )
-            } else {
-                (attacker_str, defender_str)
-            };
-            // bb2025 RollMechanic.getTotalAttackerStrength: for a non-multiblock the acting team's
-            // additional assists (granted by the Cheering Fans kickoff result) are added to the
-            // attacker's block strength. handle_cheering_fans increments home/away_additional_assists,
-            // but the block-dice calc dropped it — so a +1 additional assist turned a 2-dice block into
-            // a 1-die block, rolling one fewer die and desyncing the whole game-die stream.
-            let additional_assists = if game.home_playing {
-                game.home_additional_assists
-            } else {
-                game.away_additional_assists
-            };
-            let attacker_str = attacker_str + additional_assists;
-            self.nr_of_dice = block_dice_count(attacker_str, defender_str);
+            }
         }
 
         let source = self.re_roll_source.as_deref().unwrap_or("");

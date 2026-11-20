@@ -41,6 +41,11 @@ pub struct StepInitSelecting {
     /// purely to decide whether to persist the game state on start(); persistence is not
     /// modeled in this crate, so the value is stored but unused.
     pub update_persistence: bool,
+    /// Rust bridging (BACKLOG §M 2b(e)): the post-BLITZ_SELECT continuation is waiting for the
+    /// blitz block command because the blitzer holds an unused `canAddBlockDie` skill (Gored by
+    /// the Bull). Java's client sends either CLIENT_BLOCK or CLIENT_USE_SKILL(gored) here; Rust's
+    /// fold has no command at that point, so it raises `AgentPrompt::BlitzBlockSkill` instead.
+    pub blitz_block_skill_pending: bool,
 }
 
 impl StepInitSelecting {
@@ -52,6 +57,7 @@ impl StepInitSelecting {
             end_player_action: false,
             force_goto_on_dispatch: false,
             update_persistence: false,
+            blitz_block_skill_pending: false,
         }
     }
 }
@@ -68,12 +74,6 @@ impl Step for StepInitSelecting {
         // activated a DIFFERENT player while Java threw the pass (renegades bb2020 seed 91
         // i=94). BombRethrow is the generic "acting player must pass now" window — both agents
         // answer it with sendPassAction's exact contract.
-        let acted = game.acting_player.has_moved
-            || game.acting_player.has_fouled
-            || game.acting_player.has_blocked
-            || game.acting_player.has_passed
-            || game.acting_player.has_triggered_effect
-            || game.acting_player.forgone;
         // Post-BLITZ_SELECT continuation. StepSelectBlitzTargetEnd sets the acting action back to
         // BLITZ_MOVE and pushes the Select sequence, which re-enters this step with the target
         // already chosen. Java's :114 guard is `BLITZ_MOVE && targetSelectionState == null`, so on
@@ -90,7 +90,54 @@ impl Step for StepInitSelecting {
         if game.acting_player.player_action == Some(PlayerAction::BlitzMove)
             && game.field_model.target_selection_state.is_some()
         {
-            self.dispatch_player_action = Some(PlayerAction::BlitzMove);
+            // BACKLOG §M 2b(e): this is where Java's client sends the blitz block -- CLIENT_BLOCK,
+            // or CLIENT_USE_SKILL with an unused canAddBlockDie skill (Gored by the Bull,
+            // BlitzLogicModule). Only for such a blitzer is there a choice, so only then ask.
+            if let Some(prompt) = Self::blitz_block_skill_prompt(game) {
+                self.blitz_block_skill_pending = true;
+                return StepOutcome::cont().with_prompt(prompt);
+            }
+            return self.continue_blitz_with_block(game, _rng);
+        }
+        self.start_after_blitz_continuation(game, _rng)
+    }
+
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // BACKLOG §M 2b(e): the answer to `AgentPrompt::BlitzBlockSkill`. A plain block is the
+        // CLIENT_BLOCK continuation every other blitzer takes; the skill goes through the
+        // CLIENT_USE_SKILL canAddBlockDie arm below.
+        if self.blitz_block_skill_pending {
+            match action {
+                Action::Block { .. } | Action::UseSkill { use_skill: false, .. } => {
+                    self.blitz_block_skill_pending = false;
+                    return self.continue_blitz_with_block(game, rng);
+                }
+                Action::UseSkill { use_skill: true, .. } => {
+                    self.blitz_block_skill_pending = false;
+                }
+                _ => {}
+            }
+        }
+        self.handle_command_inner(action, game, rng)
+    }
+
+    fn set_parameter(&mut self, param: &StepParameter) -> bool {
+        match param {
+            StepParameter::GotoLabelOnEnd(v) => { self.goto_label_on_end = v.clone(); true }
+            // Java init(): UPDATE_PERSISTENCE (mandatory; stored for persistence only)
+            StepParameter::UpdatePersistence(v) => { self.update_persistence = *v; true }
+            StepParameter::EndTurn(v) => { self.end_turn = *v; true }
+            StepParameter::EndPlayerAction(v) => { self.end_player_action = *v; true }
+            _ => false,
+        }
+    }
+}
+
+impl StepInitSelecting {
+    /// The blitz block's CLIENT_BLOCK continuation (see `start`): dispatch BLITZ_MOVE and skip the
+    /// select negatraits via USE_ALTERNATE_LABEL.
+    fn continue_blitz_with_block(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        self.dispatch_player_action = Some(PlayerAction::BlitzMove);
             self.force_goto_on_dispatch = true;
             // Java `StepInitSelecting:238`, case CLIENT_BLOCK - the command that carries a blitz's
             // SECOND phase - publishes USE_ALTERNATE_LABEL=true. The Select sequence that
@@ -102,10 +149,18 @@ impl Step for StepInitSelecting {
             // actionRng calls on one goblin Troll blitz (goblin seed 1 i=47: main 52->53,
             // branch 52->56). Java queues the activation twice exactly as Rust does; this publish
             // is what stops the second one from rolling.
-            return self.execute_step(game, _rng)
-                .publish(StepParameter::UseAlternateLabel(true));
-        }
+            self.execute_step(game, _rng)
+                .publish(StepParameter::UseAlternateLabel(true))
+    }
 
+    /// The rest of `start` once the post-BLITZ_SELECT continuation does not apply.
+    fn start_after_blitz_continuation(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        let acted = game.acting_player.has_moved
+            || game.acting_player.has_fouled
+            || game.acting_player.has_blocked
+            || game.acting_player.has_passed
+            || game.acting_player.has_triggered_effect
+            || game.acting_player.forgone;
         // bb2020 post-GAZE_SELECT continuation (BACKLOG §K). StepSelectGazeTargetEnd sets the
         // action back to GAZE_MOVE and pushes the Select sequence; the client then sends
         // CLIENT_GAZE on the selected target (ParityRunner.sendGazeAction's bb2020 arm, no draw),
@@ -211,7 +266,7 @@ impl Step for StepInitSelecting {
             .with_prompt(AgentPrompt::ActivatePlayer { eligible_players: eligible })
     }
 
-    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn handle_command_inner(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
             Action::EndTurn => {
                 self.end_turn = true;
@@ -730,13 +785,46 @@ impl Step for StepInitSelecting {
                 } else if avoid_dodging {
                     Self::apply_avoid_dodging(game, *skill_id);
                 } else if add_block_die {
-                    // Java: getResult().addReport(new ReportSkillUse(skill, true, ADD_BLOCK_DIE)) — no player_id
-                    game.report_list.add(ReportSkillUse::new(
-                        None,
-                        *skill_id,
-                        true,
-                        SkillUse::ADD_BLOCK_DIE,
-                    ));
+                    // Java bb2025 :378-398 / bb2020 :358-378 (BACKLOG §M 2b(e), Gored by the Bull):
+                    //   if (targetSelectionState != null && hasUnusedSkill(actingPlayer, skill)) {
+                    //     if (<decoration 1|2, or 3 and the defender can move first> && adjacent) {
+                    //       targetSelectionState.addUsedSkill(skill);
+                    //       addReport(new ReportSkillUse(skill, true, ADD_BLOCK_DIE));
+                    //       ServerUtilBlock.updateDiceDecorations(gameState);
+                    //     }
+                    //     publish BLOCK_DEFENDER_ID(selected), USING_STAB/CHAINSAW/VOMIT(false),
+                    //             USE_ALTERNATE_LABEL(false);
+                    //     fDispatchPlayerAction = BLITZ; EXECUTE_STEP
+                    //   }
+                    // The skill is marked used later, by StepBlockRoll, once the die is added.
+                    use crate::util::server_util_block::ServerUtilBlock;
+                    let (applies, adds_die) = ServerUtilBlock::add_block_die_check(game, *skill_id);
+                    if applies {
+                        if adds_die {
+                            if let Some(t) = game.field_model.target_selection_state.as_mut() {
+                                t.add_used_skill(*skill_id);
+                            }
+                            game.report_list.add(ReportSkillUse::new(
+                                None,
+                                *skill_id,
+                                true,
+                                SkillUse::ADD_BLOCK_DIE,
+                            ));
+                            ServerUtilBlock::update_dice_decorations(game);
+                        }
+                        let selected = game.field_model.target_selection_state.as_ref()
+                            .and_then(|t| t.get_selected_player_id().cloned());
+                        self.dispatch_player_action = Some(PlayerAction::Blitz);
+                        let mut out = self.execute_step(game, rng);
+                        if let Some(def) = selected {
+                            out = out.publish(StepParameter::BlockDefenderId(def));
+                        }
+                        return out
+                            .publish(StepParameter::UsingStab(false))
+                            .publish(StepParameter::UsingChainsaw(false))
+                            .publish(StepParameter::UsingVomit(false))
+                            .publish(StepParameter::UseAlternateLabel(false));
+                    }
                 }
                 return self.execute_step(game, rng);
             }
@@ -745,19 +833,23 @@ impl Step for StepInitSelecting {
         self.execute_step(game, rng)
     }
 
-    fn set_parameter(&mut self, param: &StepParameter) -> bool {
-        match param {
-            StepParameter::GotoLabelOnEnd(v) => { self.goto_label_on_end = v.clone(); true }
-            // Java init(): UPDATE_PERSISTENCE (mandatory; stored for persistence only)
-            StepParameter::UpdatePersistence(v) => { self.update_persistence = *v; true }
-            StepParameter::EndTurn(v) => { self.end_turn = *v; true }
-            StepParameter::EndPlayerAction(v) => { self.end_player_action = *v; true }
-            _ => false,
-        }
+    /// BACKLOG §M 2b(e): the blitz-block choice prompt, raised only when the blitzer holds an
+    /// unused `canAddBlockDie` skill (Java `UtilCards.hasUnusedSkill(actingPlayer, skill)`, the
+    /// gate of the CLIENT_USE_SKILL arm) and the selection state names a target.
+    fn blitz_block_skill_prompt(game: &Game) -> Option<AgentPrompt> {
+        let player_id = game.acting_player.player_id.clone()?;
+        let defender_id = game.field_model.target_selection_state.as_ref()
+            .filter(|t| t.is_selected())
+            .and_then(|t| t.get_selected_player_id().cloned())?;
+        let player = game.player(&player_id)?;
+        let skill_id = player.all_skill_ids().find(|s| {
+            s.properties_for(game.rules).contains(&NamedProperties::CAN_ADD_BLOCK_DIE)
+                && !player.used_skills.contains(s)
+                && !game.acting_player.used_skills.contains(s)
+        })?;
+        Some(AgentPrompt::BlitzBlockSkill { player_id, defender_id, skill_id })
     }
-}
 
-impl StepInitSelecting {
     /// Java StepInitSelecting CLIENT_USE_SKILL, `canGainHailMary` arm (bb2025 :351, bb2020 :331):
     ///
     /// ```java
@@ -1685,6 +1777,104 @@ mod tests {
         assert!(out.published.iter().any(|p|
             matches!(p, StepParameter::DispatchPlayerAction(Some(PlayerAction::BlitzSelect)))),
             "a prone blitz must still route through BLITZ_SELECT");
+    }
+
+    /// BACKLOG §M 2b(e): a blitz's second pass with an unused Gored by the Bull. `atk` (ST 4,
+    /// Gored) stands next to `def` (ST `def_st`), target selected, action BLITZ_MOVE.
+    fn gored_second_pass(def_st: i32) -> Game {
+        use ffb_model::enums::{PlayerState, SkillId, PS_STANDING};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::target_selection_state::TargetSelectionState;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        let mut atk = Player {
+            id: "atk".into(), name: "atk".into(), nr: 1, position_id: "pos".into(),
+            movement: 6, strength: 4, agility: 3, passing: 4, armour: 9,
+            ..Default::default()
+        };
+        atk.add_skill(SkillId::GoredByTheBull);
+        game.team_home.players.push(atk);
+        game.team_away.players.push(Player {
+            id: "def".into(), name: "def".into(), nr: 1, position_id: "pos".into(),
+            movement: 6, strength: def_st, agility: 3, passing: 4, armour: 9,
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate("atk", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_coordinate("def", FieldCoordinate::new(6, 5));
+        game.field_model.set_player_state("atk", PlayerState::new(PS_STANDING).change_active(true));
+        game.field_model.set_player_state("def", PlayerState::new(PS_STANDING));
+        game.acting_player.player_id = Some("atk".into());
+        game.acting_player.player_action = Some(PlayerAction::BlitzMove);
+        game.defender_id = Some("def".into());
+        let mut tss = TargetSelectionState::new("def");
+        tss.select();
+        game.field_model.target_selection_state = Some(tss);
+        game
+    }
+
+    #[test]
+    fn gored_blitzer_second_pass_asks_for_the_blitz_block_choice() {
+        let mut game = gored_second_pass(4);
+        let mut step = StepInitSelecting::new("end_label".into());
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.prompt, Some(AgentPrompt::BlitzBlockSkill { ref defender_id, .. })
+            if defender_id == "def"), "an unused Gored by the Bull must raise the choice");
+        // The plain block is the CLIENT_BLOCK continuation every other blitzer takes.
+        let out = step.handle_command(&Action::Block { defender_id: "def".into() }, &mut game,
+            &mut GameRng::new(0));
+        assert!(out.published.iter().any(|p|
+            matches!(p, StepParameter::DispatchPlayerAction(Some(PlayerAction::BlitzMove)))));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::UseAlternateLabel(true))));
+    }
+
+    /// Java bb2025 StepInitSelecting :378-398: a 1-die blitz takes the die (selection state +
+    /// ReportSkillUse without a player id), and the arm dispatches BLITZ with
+    /// USE_ALTERNATE_LABEL=false; the skill is NOT yet marked used (StepBlockRoll does that).
+    #[test]
+    fn gored_use_skill_adds_the_die_and_dispatches_blitz() {
+        use ffb_model::enums::SkillId;
+        let mut game = gored_second_pass(4);
+        let mut step = StepInitSelecting::new("end_label".into());
+        let _ = step.start(&mut game, &mut GameRng::new(0));
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::GoredByTheBull, use_skill: true },
+            &mut game, &mut GameRng::new(0));
+        let tss = game.field_model.target_selection_state.as_ref().unwrap();
+        assert!(tss.get_used_skills().contains(&SkillId::GoredByTheBull));
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
+        assert!(!game.acting_player.used_skills.contains(&SkillId::GoredByTheBull));
+        assert!(out.published.iter().any(|p|
+            matches!(p, StepParameter::DispatchPlayerAction(Some(PlayerAction::Blitz)))));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::UseAlternateLabel(false))));
+        assert!(out.published.iter().any(|p|
+            matches!(p, StepParameter::BlockDefenderId(ref d) if d == "def")));
+    }
+
+    /// A 3-dice blitz (ST 4 + 0 vs ST 1) records nothing but still dispatches BLITZ; the agents'
+    /// rule answers with the plain block there.
+    #[test]
+    fn gored_on_a_three_dice_block_records_nothing() {
+        use ffb_model::enums::SkillId;
+        let mut game = gored_second_pass(1);
+        assert_eq!(crate::legal_actions::gored_blitz_block_action(&game, "def", SkillId::GoredByTheBull),
+            Action::Block { defender_id: "def".into() });
+        let mut step = StepInitSelecting::new("end_label".into());
+        let _ = step.start(&mut game, &mut GameRng::new(0));
+        let out = step.handle_command(
+            &Action::UseSkill { skill_id: SkillId::GoredByTheBull, use_skill: true },
+            &mut game, &mut GameRng::new(0));
+        assert!(game.field_model.target_selection_state.as_ref().unwrap().get_used_skills().is_empty());
+        assert!(!game.report_list.has_report(ffb_model::report::report_id::ReportId::SKILL_USE));
+        assert!(out.published.iter().any(|p|
+            matches!(p, StepParameter::DispatchPlayerAction(Some(PlayerAction::Blitz)))));
+    }
+
+    #[test]
+    fn gored_rule_uses_the_skill_on_a_one_die_blitz() {
+        use ffb_model::enums::SkillId;
+        let game = gored_second_pass(4);
+        assert_eq!(crate::legal_actions::gored_blitz_block_action(&game, "def", SkillId::GoredByTheBull),
+            Action::UseSkill { skill_id: SkillId::GoredByTheBull, use_skill: true });
     }
 
     #[test]

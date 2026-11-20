@@ -83,6 +83,9 @@ impl Agent for UniformAgent {
         match gs.current_prompt() {
             // Mirrors random_agent: answer the mid-sequence block-target ask by deselecting.
             Some(AgentPrompt::BlockTarget { .. }) => Action::EndPlayerAction,
+            // BACKLOG §M 2b(e): the Gored by the Bull blitz-block choice -- the plain block.
+            Some(AgentPrompt::BlitzBlockSkill { defender_id, .. }) =>
+                Action::Block { defender_id: defender_id.clone() },
             // Bomb re-throw window: decline, mirroring ParityRunner's INIT_PASSING case.
             // A decline cannot advance the re-throw park (the thrower==null early return swallows
             // EndTurn) — the bomb must be thrown, like the parity agent does.

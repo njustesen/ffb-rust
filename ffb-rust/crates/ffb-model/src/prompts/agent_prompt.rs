@@ -287,6 +287,14 @@ pub enum AgentPrompt {
     /// KICK_SKILL arm DECLINE with zero RNG (the kick choice changes the scatter dice in bb2025).
     KickSkill { player_id: PlayerId },
 
+    /// BACKLOG §M 2b(e): the blitz block of a blitzer holding an unused `canAddBlockDie` skill
+    /// (Gored by the Bull). Java's client answers the blitz's second pass with either
+    /// CLIENT_BLOCK or CLIENT_USE_SKILL(skill) (BlitzLogicModule); Rust folds that pass into
+    /// `StepInitSelecting::start`, so the choice surfaces as this prompt -- raised ONLY for such
+    /// a blitzer. Answer `Action::Block { defender_id }` (the plain block) or
+    /// `Action::UseSkill { skill_id, use_skill: true }` (StepInitSelecting's canAddBlockDie arm).
+    BlitzBlockSkill { player_id: PlayerId, defender_id: PlayerId, skill_id: SkillId },
+
     // ── Inducements ────────────────────────────────────────────────────────────
     /// bb2016 `StepBuyCards` / `DialogBuyCardsParameter`: the team may buy one card at a time
     /// with `available_gold`. Answered with `Action::BuyCard { card_type }`; `None` = done.

@@ -4093,6 +4093,11 @@ impl Agent for HeuristicAgent {
         // answered by the parity RandomAgent contract instead, so a partially-ported Java side can
         // still be gated at 100/100: rung 0 delegates everything and must reproduce the
         // random-agent gate exactly. `ClassMask::ALL` (the default) never takes this branch.
+        // BACKLOG §M 2b(e): the Gored by the Bull blitz-block choice is a zero-draw rule shared by
+        // every agent mode (ParityRunner applies it in its common blitz arm).
+        if let AgentPrompt::BlitzBlockSkill { defender_id, skill_id, .. } = &prompt {
+            return crate::legal_actions::gored_blitz_block_action(g, defender_id, *skill_id);
+        }
         if !self.classes.has(prompt_class_of(&prompt)) {
             return self.parity.act(gs);
         }

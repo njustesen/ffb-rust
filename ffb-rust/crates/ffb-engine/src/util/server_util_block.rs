@@ -115,6 +115,10 @@ impl ServerUtilBlock {
                 // find_nr_of_block_dice per edition (attacker/defender), not as a spurious
                 // attacker `+1` here.
 
+                // Java addDiceDecorations :111 -- `addBlockDie = targetSelectionState != null &&
+                // targetSelectionState.getUsedSkills().stream().anyMatch(canAddBlockDie)`: once a
+                // Gored by the Bull use sits in the selection state the decoration shows the extra die.
+                let add_block_die = Self::selection_state_add_block_die_skill(game).is_some();
                 // Java addDiceDecorations: for putrid/chainsaw we skip the dice-count path.
                 // For normal blocks we compute per-target strengths via ServerUtilPlayer.findBlockStrength.
                 for target_id in &target_ids {
@@ -129,7 +133,7 @@ impl ServerUtilBlock {
                             let def_str = ServerUtilPlayer::find_block_strength(
                                 game, target_coord, def_base_str, coord,
                             );
-                            Self::find_nr_of_block_dice(att_str, def_str, false, is_multi_block, game.rules, false)
+                            Self::find_nr_of_block_dice(att_str, def_str, false, is_multi_block, game.rules, add_block_die)
                         } else {
                             0
                         };
@@ -153,6 +157,177 @@ impl ServerUtilBlock {
                 }
             }
         }
+    }
+
+    /// The `canAddBlockDie` skill (Gored by the Bull) recorded in the target selection state, if
+    /// any -- Java `targetSelectionState.getUsedSkills().stream().filter(skill ->
+    /// skill.hasSkillProperty(NamedProperties.canAddBlockDie)).findFirst()` (bb2020/bb2025
+    /// StepBlockRoll, ServerUtilBlock.addDiceDecorations).
+    pub fn selection_state_add_block_die_skill(game: &Game) -> Option<ffb_model::enums::SkillId> {
+        game.field_model.target_selection_state.as_ref().and_then(|t| {
+            t.get_used_skills().iter().copied()
+                .find(|s| s.properties_for(game.rules).contains(&NamedProperties::CAN_ADD_BLOCK_DIE))
+        })
+    }
+
+    /// The block-dice count of the acting player against `defender_id`: Java
+    /// `ServerUtilBlock.findNrOfBlockDice(gameState, attacker, defender, false, successfulDauntless,
+    /// doubleTargetStrength, false).getLeft()` with `RollMechanic.getTotalAttackerStrength` folded in
+    /// (base strength, successful Dauntless, Horns on a blitz, the defender's weakenOpposingBlitzer,
+    /// both sides' assists, the Cheering Fans additional assist). Extracted unchanged from
+    /// `StepBlockRoll.handle_initial_roll_and_reroll_with_explicit_selection`, which still uses it, so
+    /// the Gored by the Bull decoration check (BACKLOG §M 2b(e)) counts dice exactly as the roll does.
+    pub fn total_block_dice(
+        game: &Game,
+        defender_id: Option<&str>,
+        successful_dauntless: bool,
+        double_target_strength: bool,
+    ) -> i32 {
+        let attacker_str = game.acting_player.player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .map(|p| p.strength_with_modifiers())
+            .unwrap_or(3);
+        let defender_str = defender_id
+            .and_then(|id| game.player(id))
+            .map(|p| p.strength_with_modifiers())
+            .unwrap_or(3);
+        // Java RollMechanic.getTotalAttackerStrength: a SUCCESSFUL Dauntless roll raises the
+        // attacker's block strength to at least the defender's base strength (doubled when
+        // doubleTargetStrength), BEFORE the Horns +1 and before assists.
+        let attacker_str = if successful_dauntless {
+            let target = if double_target_strength { 2 * defender_str } else { defender_str };
+            attacker_str.max(target)
+        } else {
+            attacker_str
+        };
+        // Horns (`addStrengthOnBlitz`) +1 on BLITZ / BLITZ_MOVE; the defender's
+        // `weakenOpposingBlitzer` -1 once the blitzer has moved.
+        let attacker_str = {
+            let is_blitz = matches!(game.acting_player.player_action,
+                Some(PlayerAction::Blitz) | Some(PlayerAction::BlitzMove));
+            let mut s = attacker_str;
+            if is_blitz {
+                let atk_horns = game.acting_player.player_id.as_deref()
+                    .and_then(|id| game.player(id))
+                    .map(|p| p.has_skill_property(NamedProperties::ADD_STRENGTH_ON_BLITZ))
+                    .unwrap_or(false);
+                if atk_horns { s += 1; }
+                if game.acting_player.has_moved {
+                    let def_weakens = defender_id
+                        .and_then(|id| game.player(id))
+                        .map(|p| p.has_skill_property(NamedProperties::WEAKEN_OPPOSING_BLITZER))
+                        .unwrap_or(false);
+                    if def_weakens { s -= 1; }
+                }
+            }
+            s
+        };
+        // Both sides add their assists (ServerUtilPlayer.findBlockStrength).
+        let coords = game.acting_player.player_id.as_deref()
+            .and_then(|aid| game.field_model.player_coordinate(aid))
+            .zip(defender_id.and_then(|did| game.field_model.player_coordinate(did)));
+        let (attacker_str, defender_str) = if let Some((ac, dc)) = coords {
+            (
+                ServerUtilPlayer::find_block_strength(game, ac, attacker_str, dc),
+                ServerUtilPlayer::find_block_strength(game, dc, defender_str, ac),
+            )
+        } else {
+            (attacker_str, defender_str)
+        };
+        // bb2025 RollMechanic.getTotalAttackerStrength: the Cheering Fans additional assists.
+        let additional_assists = if game.home_playing {
+            game.home_additional_assists
+        } else {
+            game.away_additional_assists
+        };
+        ffb_mechanics::mechanics::block_dice_count(attacker_str + additional_assists, defender_str)
+    }
+
+    /// The dice decoration Java's `ServerUtilBlock.updateDiceDecorations` leaves on `target_id`
+    /// (`game.getFieldModel().getDiceDecoration(targetCoordinate).getNrOfDice()`), or `None` when it
+    /// leaves none. Rust's decorations are display-only and simplified, so the `canAddBlockDie`
+    /// arms read this instead: the guard of `updateDiceDecorations(gameState)` (no frenzy
+    /// decoration), the target among `findAdjacentBlockablePlayers(otherTeam, attacker)`, the
+    /// `addDiceDecorations` skips (a bystander during a blitz, `game.getLastDefenderId()`), 0 dice
+    /// for `needsNoDiceDecorations`, else findNrOfBlockDice with the selection state's addBlockDie.
+    pub fn dice_decoration_nr_of_dice(game: &Game, target_id: &str) -> Option<i32> {
+        let player_action = game.acting_player.player_action?;
+        let attacker_id = game.acting_player.player_id.as_deref()?;
+        let attacker = game.player(attacker_id)?;
+        let is_blitz = player_action == PlayerAction::BlitzMove;
+        let is_block = player_action.is_block_action();
+        let is_multi_block = player_action == PlayerAction::MultipleBlock;
+        let kicks_downed = player_action.is_kicking_downed();
+        let guard = attacker.has_skill_property(NamedProperties::BLOCKS_DURING_MOVE)
+            || (!game.acting_player.has_blocked && (is_blitz || is_block || is_multi_block || kicks_downed))
+            || player_action == PlayerAction::MaximumCarnage
+            || player_action.is_putrid();
+        if !guard || kicks_downed || player_action == PlayerAction::ViciousVines
+            || player_action.is_putrid_block()
+        {
+            return None;
+        }
+        let coord = game.field_model.player_coordinate(attacker_id)?;
+        let other_team = if game.team_home.has_player(attacker_id) { &game.team_away } else { &game.team_home };
+        let adjacent = UtilPlayer::find_adjacent_blockable_players(game, other_team, coord)
+            .into_iter().any(|id| id.as_str() == target_id);
+        if !adjacent {
+            return None;
+        }
+        let selected = game.field_model.target_selection_state.as_ref()
+            .filter(|t| t.is_selected())
+            .and_then(|t| t.get_selected_player_id().cloned());
+        if selected.as_deref().map(|s| s != target_id).unwrap_or(false)
+            || game.last_defender_id.as_deref() == Some(target_id)
+        {
+            return None;
+        }
+        if attacker.has_skill_property(NamedProperties::NEEDS_NO_DICE_DECORATIONS) {
+            return Some(0);
+        }
+        let mut nr_of_dice = Self::total_block_dice(game, Some(target_id), false, false);
+        if Self::selection_state_add_block_die_skill(game).is_some() && (nr_of_dice == 1 || nr_of_dice == 2) {
+            nr_of_dice += 1;
+        }
+        Some(nr_of_dice)
+    }
+
+    /// The condition every `canAddBlockDie` arm (Gored by the Bull) applies before recording the
+    /// skill -- bb2025 StepInitSelecting :378-385, StepInitMoving :285-296, StepEndBlocking :98-104
+    /// (bb2020 StepInitSelecting :358-365 the same):
+    ///
+    /// ```java
+    /// if (targetSelectionState != null && UtilCards.hasUnusedSkill(actingPlayer, skill)) {
+    ///   ... DiceDecoration diceDecoration = game.getFieldModel().getDiceDecoration(targetCoordinate);
+    ///   boolean opponentCanMove = UtilCards.hasUnusedSkillWithProperty(defender, canMoveBeforeBeingBlocked);
+    ///   if (diceDecoration != null && (nrOfDice == 1 || nrOfDice == 2 || (nrOfDice == 3 && opponentCanMove))
+    ///       && targetCoordinate.isAdjacent(playerCoordinate)) { addUsedSkill ... }
+    /// ```
+    /// Returns `(applies_outer, adds_die)`: the outer `targetSelectionState != null && unused` gate
+    /// (which decides whether the arm dispatches at all) and the inner decoration gate.
+    pub fn add_block_die_check(game: &Game, skill: ffb_model::enums::SkillId) -> (bool, bool) {
+        let Some(tss) = game.field_model.target_selection_state.as_ref() else { return (false, false) };
+        let Some(attacker_id) = game.acting_player.player_id.as_deref() else { return (false, false) };
+        let unused = game.player(attacker_id)
+            .map(|p| p.has_skill(skill) && !p.used_skills.contains(&skill))
+            .unwrap_or(false)
+            && !game.acting_player.used_skills.contains(&skill);
+        if !unused {
+            return (false, false);
+        }
+        let Some(target_id) = tss.get_selected_player_id().cloned() else { return (true, false) };
+        let target_coord = game.field_model.player_coordinate(&target_id);
+        let player_coord = game.field_model.player_coordinate(attacker_id);
+        let opponent_can_move = game.player(&target_id)
+            .map(|d| ffb_model::util::util_cards::UtilCards::has_unused_skill_with_property_for(
+                d, NamedProperties::CAN_MOVE_BEFORE_BEING_BLOCKED, game.rules))
+            .unwrap_or(false);
+        let dice_ok = match Self::dice_decoration_nr_of_dice(game, &target_id) {
+            Some(n) => n == 1 || n == 2 || (n == 3 && opponent_can_move),
+            None => false,
+        };
+        let adjacent = matches!((target_coord, player_coord), (Some(t), Some(p)) if t.is_adjacent(p));
+        (true, dice_ok && adjacent)
     }
 
     /// Java: ServerUtilBlock.removePlayerBlockStates(Game, PlayerState oldDefenderState)
