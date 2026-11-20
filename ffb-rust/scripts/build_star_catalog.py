@@ -71,7 +71,11 @@ ANY_TEAM_FRACTION = 0.9
 
 # Rulebook spelling -> Java canonical spelling, where they differ beyond case/punctuation.
 SKILL_ALIASES = {"claws": "claw", "claw": "claws", "dwarvenscourge": "dwarfenscourge",
-                 "dwarfenscourge": "dwarvenscourge", "ballchain": "ballandchain"}
+                 "dwarfenscourge": "dwarvenscourge", "ballchain": "ballandchain",
+                 # bb2020 Eldril Sidewinder's page calls his special rule "Mesmerizing Gaze";
+                 # Java's bb2020 MesmerizingDance ("Mesmerizing Dance") carries the same text
+                 # verbatim in its javadoc (once-per-game Hypnotic Gaze re-roll).
+                 "mesmerizinggaze": "mesmerizingdance"}
 
 
 def norm(name: str) -> str:
@@ -195,7 +199,9 @@ def parse_md(path: Path, edition: str, canon: dict):
         kw_m = re.search(r"_\(([^)]*)\)_", ptxt)
         keywords = [k.strip() for k in kw_m.group(1).split(",")] if kw_m else []
         skills = []
-        for m in re.finditer(r"^\s*\*\s+(?:\[([^\]]+)\]\([^)]*\)|\*\*(.+?)\*\*)\s*(?:\(([^)]*)\))?\s*$", ptxt, re.M):
+        # A bold special rule may carry its rules prose on the same line (bb2025 Bomber
+        # Dribblesnot: "**Kaboom!** Once per game, ..."); the prose is not an argument.
+        for m in re.finditer(r"^\s*\*\s+(?:\[([^\]]+)\]\([^)]*\)|\*\*(.+?)\*\*(?:\s+[^\s(].*?)?)\s*(?:\(([^)]*)\))?\s*$", ptxt, re.M):
             raw = (m.group(1) or m.group(2)).strip()
             arg = m.group(3)
             # "Hatred (Undead)" may also be written inline in the link text.

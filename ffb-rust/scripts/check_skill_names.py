@@ -15,7 +15,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
-JAVA = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT.parent / "ffb-java" / "ffb"
+# A flag is not a path: importers (build_star_catalog.py --check) share this sys.argv.
+JAVA = (Path(sys.argv[1]) if len(sys.argv) > 1 and not sys.argv[1].startswith("-")
+        else ROOT.parent / "ffb-java" / "ffb")
 SKILL_DIR = JAVA / "ffb-common" / "src" / "main" / "java" / "com" / "fumbbl" / "ffb" / "skill"
 
 # bb2020 was excluded here as "an unaudited legacy clone (not used by the parity matrix)". That

@@ -303,14 +303,15 @@
        },
        "Right Stuff",
        "Secret Weapon",
-       "Stunty"
+       "Stunty",
+       "Kaboom!"
       ],
       "keywords": [
        "Goblin",
        "Special"
       ]
      },
-     "position_xml": "\t<position id=\"star.bomber_dribblesnot\">\n\t\t<quantity>1</quantity>\n\t\t<name>Bomber Dribblesnot</name>\n\t\t<type>Star</type>\n\t\t<cost>80000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>3</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill>Bombardier</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t\t<keywords>\n\t\t\t<keyword>Goblin</keyword>\n\t\t\t<keyword>Special</keyword>\n\t\t</keywords>\n\t</position>\n"
+     "position_xml": "\t<position id=\"star.bomber_dribblesnot\">\n\t\t<quantity>1</quantity>\n\t\t<name>Bomber Dribblesnot</name>\n\t\t<type>Star</type>\n\t\t<cost>80000</cost>\n\t\t<movement>6</movement>\n\t\t<strength>2</strength>\n\t\t<agility>3</agility>\n\t\t<passing>3</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Accurate</skill>\n\t\t\t<skill>Bombardier</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill>Right Stuff</skill>\n\t\t\t<skill>Secret Weapon</skill>\n\t\t\t<skill>Stunty</skill>\n\t\t\t<skill>Kaboom!</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t\t<keywords>\n\t\t\t<keyword>Goblin</keyword>\n\t\t\t<keyword>Special</keyword>\n\t\t</keywords>\n\t</position>\n"
     }
    ],
    "dropped_skills": [],

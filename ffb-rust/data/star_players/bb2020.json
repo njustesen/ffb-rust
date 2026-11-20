@@ -634,16 +634,15 @@
         "value": 4
        },
        "Nerves of Steel",
-       "On The Ball"
+       "On The Ball",
+       "Mesmerizing Dance"
       ],
       "keywords": []
      },
-     "position_xml": "\t<position id=\"star.eldril_sidewinder\">\n\t\t<quantity>1</quantity>\n\t\t<name>Eldril Sidewinder</name>\n\t\t<type>Star</type>\n\t\t<cost>230000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>5</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Hypnotic Gaze</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>On The Ball</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
+     "position_xml": "\t<position id=\"star.eldril_sidewinder\">\n\t\t<quantity>1</quantity>\n\t\t<name>Eldril Sidewinder</name>\n\t\t<type>Star</type>\n\t\t<cost>230000</cost>\n\t\t<movement>8</movement>\n\t\t<strength>3</strength>\n\t\t<agility>2</agility>\n\t\t<passing>5</passing>\n\t\t<armour>8</armour>\n\t\t<skillList>\n\t\t\t<skill>Catch</skill>\n\t\t\t<skill>Dodge</skill>\n\t\t\t<skill>Hypnotic Gaze</skill>\n\t\t\t<skill value=\"4\">Loner</skill>\n\t\t\t<skill>Nerves of Steel</skill>\n\t\t\t<skill>On The Ball</skill>\n\t\t\t<skill>Mesmerizing Dance</skill>\n\t\t</skillList>\n\t\t<skillCategoryList>\n\t\t</skillCategoryList>\n\t</position>\n"
     }
    ],
-   "dropped_skills": [
-    "Mesmerizing Gaze"
-   ],
+   "dropped_skills": [],
    "eligible": [
     "dark_elf",
     "dark_elf_league_fumbbl",

@@ -9716,7 +9716,7 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 
 ## §M — 2026-11-17: SKILL COVERAGE TIER — the agents use every skill (in progress)
 
-> **RESUME HERE -- UPDATED 2026-11-20 ~17:30 (loop iteration 3), read this first (supersedes "Step 1" below).**
+> **RESUME HERE -- UPDATED 2026-11-20 ~17:45 (loop iteration 5), read this first (supersedes "Step 1" below).**
 > **State at 17:30: cert6 chain PID 11308 has EXITED (cert6 fully green, see iteration 3); only the
 > ledger PID 17496 still runs. The cert6 bullet below is history.**
 > The work is now driven by `scripts/skill_parity_loop.py` (goal = `scripts/skill_parity_check.py`
@@ -9774,7 +9774,24 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   both. Closes bb2020 + bb2025 BugmansXXXXXX + KeenPlayer (4 ledger items) once a ledger runs
 >   on a post-2b(n) exe. Ledger PID 17496 still running at 17:10 (`cert6_2b`: skill, mirror,
 >   cross 4012/4012 done; star 1226/4012).
-> - **Next for the loop (after iteration 4):** (b) bb2025 Kaboom, (c) the Flashing Blade /
+> - **Loop iteration 5 (2026-11-20 ~17:45):** star-catalogue parser fixes (phase 2b (o) below):
+>   bb2025 **Kaboom!** (Bomber's page writes the rule prose on the skill line, the parser dropped
+>   it) and bb2020 **Mesmerizing Dance** (Eldril's bb2020 page calls it "Mesmerizing Gaze") are
+>   now on their stars; gated 20/20 steps + reports (2 Kaboom gates, 1 Eldril gate). Ledger PID
+>   17496 still running at 17:45 (star ~3250/4012 files).
+> - **Next for the loop (after iteration 5):** (1) **re-roll skill in the dialog**: Mesmerizing
+>   Dance (bb2020 + bb2025 MesmerisingDance) reaches the RE_ROLL dialog as `reRollSkill`, but both
+>   harnesses use a listed skill only if it is `canRerollSingleDieOncePerPeriod` (2b(a),
+>   `ParityRunner.usesSingleDieSkillReRoll`, Rust `util_server_re_roll.rs` ~125-168 which drops a
+>   caller-supplied `reroll_skill` from the prompt) -- so it is "touched" (ledger: fires) but the
+>   re-roll is never taken (md1 gate: 2 failed gazes, both declined). Widen the rule to any listed
+>   skill whose `getRerollSource(action) != null` in BOTH harnesses, find which other steps list a
+>   skill (blast radius = every suite; the final cert re-runs them anyway), gate. (2) **The
+>   Flashing Blade** bb2020 + bb2025: on Jeremiah Kool, who joined the catalogue in phase 1 AFTER
+>   the star schedules were cut -- he is in no `starjobs_full` / `starjobs_cert6` line, so no
+>   ledger kind fields him. Options: field him in the skill suite (a star hire on an elf `_sk`
+>   squad, like 2b(n)'s Bugman) or add star gates; then gate. Then the older list.
+> - **Next for the loop (after iteration 4, DONE in iteration 5):** (b) bb2025 Kaboom, (c) the Flashing Blade /
 >   Mesmerizing Dance re-check, both as written below; then the older list.
 > - **Next for the loop (iteration 3, item (a) now DONE):** (a) **Josef Bugman** -- bb2020 BugmansXXXXXX + KeenPlayer and bb2025
 >   BugmansXXXXXX + KeenPlayer are on the roster position "Josef Bugman" (`<type>Infamous
@@ -10058,6 +10075,31 @@ documented unreachable.
     per game. Control human_sk bb2020 3/3. Unit test
     `bugmans_xxxxxx_re_rolls_a_natural_one_ko_recovery_once`. Only the two halfling_sk squads
     change; no mirror/cross/star team carries Keen Player or the inducement.
+- **(o) star catalogue: bb2025 Kaboom! + bb2020 Mesmerizing Dance -- DONE 2026-11-20 (loop
+  iteration 5).** Both stars existed in `data/star_players/`, minus the skill:
+  - bb2025 Bomber Dribblesnot: `rules/star_players/Bomber_Dribblesnot.md` writes the rule prose
+    on the skill line (`**Kaboom!** Once per game, ...`, the only such line in either edition);
+    `build_star_catalog.parse_md`'s skill regex required the line to end after the bold name.
+    It now allows trailing prose after a bold name (never an argument). bb2020's page has the
+    bare `**Kaboom!**`, which is why bb2020 Kaboom was LIVE all along. Java: `mixed/special/
+    Kaboom` (BB2020 + BB2025, canForceBombExplosion), consumed by bb2025 `StepInitBomb` :133/:164;
+    Rust `step/bb2025/special/step_init_bomb.rs` already had both arms.
+  - bb2020 Eldril Sidewinder: his bb2020 page names the rule "Mesmerizing Gaze"; Java's
+    `skill/bb2020/special/MesmerizingDance` ("Mesmerizing Dance") carries the same text verbatim
+    in its javadoc -> `SKILL_ALIASES["mesmerizinggaze"] = "mesmerizingdance"` (generator reported
+    it as "dropped: Java cannot resolve" before).
+  - `check_skill_names.py` took `sys.argv[1]` as the Java path even when it was a flag, so
+    `build_star_catalog.py --check` resolved NO skill and reported every file MISMATCH; it now
+    ignores a leading `-` argument, and `--check` passes on the committed data.
+  - Diff: exactly one skill added to each star (`bb2025.json` Bomber, `bb2020.json` Eldril).
+    Every star gate with bb2025 Bomber or bb2020 Eldril changes => covered by the final cert.
+  - Gates (frozen `D:/ffb_star/bin/ffb-parity-kab25.exe` = this tree, jar `ffb-ai-pro16.jar`
+    (current ParityRunner), seeds 1-20, `D:/ffb_scratch_it5/{kab1,kab2,md1}`): bb2025 goblin+
+    Bomber vs high_elf+Grak **20/20 steps + 20/20 reports** (Kaboom `forceBombExplosion` in 10
+    games, both streams), bb2025 black_orc+Scrappa vs snotling+Bomber (away side) **20/20 +
+    20/20** (Kaboom in 9 games), bb2020 dark_elf+Eldril vs human+Akhorne **20/20 + 20/20**
+    (Mesmerizing Dance touched -- the re-roll is OFFERED but not taken, see RESUME "Next" (1)).
+    `cargo test -p ffb-parity stars` 3/3.
 
 ### Phase 1 status (2026-11-18)
 
