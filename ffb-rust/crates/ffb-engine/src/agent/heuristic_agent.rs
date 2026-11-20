@@ -2764,7 +2764,7 @@ impl HeuristicAgent {
         self.refresh_turn(g);
         let eligible: Vec<(String, Vec<PlayerAction>)> = eligible
             .iter()
-            .map(|(pid, acts)| (pid.clone(), crate::agent::filter_stale_actions(g, acts)))
+            .map(|(pid, acts)| (pid.clone(), crate::agent::filter_stale_actions(g, pid, acts)))
             .filter(|(_, acts)| !acts.is_empty())
             .collect();
         if g.turn_mode != ffb_model::enums::TurnMode::Regular && !self.used_this_turn.is_empty() {
@@ -2833,7 +2833,7 @@ impl HeuristicAgent {
                 continue;
             }
             let live: Vec<PlayerAction> =
-                actions.iter().filter(|a| action_is_live(a, td, g.rules)).cloned().collect();
+                actions.iter().filter(|a| action_is_live(a, td, g.rules, crate::agent::allows_additional_foul(g, pid))).cloned().collect();
             if live.is_empty() {
                 continue;
             }
@@ -3281,7 +3281,7 @@ impl HeuristicAgent {
         self.refresh_turn(g);
         let eligible: Vec<(String, Vec<PlayerAction>)> = eligible
             .iter()
-            .map(|(pid, acts)| (pid.clone(), crate::agent::filter_stale_actions(g, acts)))
+            .map(|(pid, acts)| (pid.clone(), crate::agent::filter_stale_actions(g, pid, acts)))
             .filter(|(_, acts)| !acts.is_empty())
             .collect();
         if g.turn_mode != ffb_model::enums::TurnMode::Regular && !self.used_this_turn.is_empty() {
@@ -3333,7 +3333,7 @@ impl HeuristicAgent {
                 continue;
             }
             let live: Vec<PlayerAction> =
-                actions.iter().filter(|a| action_is_live(a, td, g.rules)).cloned().collect();
+                actions.iter().filter(|a| action_is_live(a, td, g.rules, crate::agent::allows_additional_foul(g, pid))).cloned().collect();
             if live.is_empty() {
                 continue;
             }
@@ -4859,12 +4859,19 @@ fn has_negatrait(p: &ffb_model::model::player::Player) -> bool {
         || p.has_skill(SkillId::BloodLust)
 }
 
-fn action_is_live(a: &PlayerAction, td: &ffb_model::model::turn_data::TurnData, rules: Rules) -> bool {
+/// `additional_foul`: the player `allowsAdditionalFoul` (Sneakiest of the Lot) -- his foul stays
+/// live after the team's (`crate::agent::allows_additional_foul`, BACKLOG §M 2b(t)).
+fn action_is_live(
+    a: &PlayerAction,
+    td: &ffb_model::model::turn_data::TurnData,
+    rules: Rules,
+    additional_foul: bool,
+) -> bool {
     match a {
         PlayerAction::Block | PlayerAction::Blitz | PlayerAction::StandUpBlitz => !td.blitz_used,
         PlayerAction::Pass | PlayerAction::HailMaryPass => !td.pass_used,
         PlayerAction::HandOver => !td.hand_over_used,
-        PlayerAction::Foul => !td.foul_used,
+        PlayerAction::Foul => !td.foul_used || additional_foul,
         PlayerAction::ThrowTeamMate => {
             if rules == Rules::Bb2025 {
                 !td.ttm_used

@@ -223,8 +223,16 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
             }
         }
 
-        // Foul: requires adjacent prone/stunned opponent
-        if !turn_data.foul_used {
+        // Foul: requires adjacent prone/stunned opponent, and the team's foul unspent -- unless the
+        // player allowsAdditionalFoul (Sneakiest of the Lot, BACKLOG §M 2b(t)): Java
+        // StepInitSelecting (bb2020 :203, bb2025 :221) accepts his foul after the team's.
+        // An OFFER is no skill use: keep this harness-side question out of the §M touch ledger.
+        if !turn_data.foul_used || {
+            let _quiet = ffb_model::skill_touch::suppress();
+            player.has_skill_property(
+                ffb_model::model::property::named_properties::NamedProperties::ALLOWS_ADDITIONAL_FOUL,
+            )
+        } {
             let foul_target_exists = opponent_team.players.iter().any(|op| {
                 game.field_model.player_coordinate(&op.id)
                     .map(|oc| oc.is_on_pitch() && oc.is_adjacent(coord))

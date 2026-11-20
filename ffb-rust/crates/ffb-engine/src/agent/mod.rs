@@ -48,19 +48,24 @@ pub trait Agent {
 /// the same rule for the same reason, and two copies would drift.
 ///
 /// `Move`/`StandUp` always survive, so the result is never empty.
+///
+/// `Foul` survives a spent team foul for an `allowsAdditionalFoul` player (Sneakiest of the Lot,
+/// BACKLOG §M 2b(t)) -- see [`allows_additional_foul`].
 pub(crate) fn filter_stale_actions(
     game: &ffb_model::model::game::Game,
+    player_id: &str,
     actions: &[ffb_model::enums::PlayerAction],
 ) -> Vec<ffb_model::enums::PlayerAction> {
     use ffb_model::enums::{PlayerAction, Rules, TurnMode};
     let td = if game.home_playing { &game.turn_data_home } else { &game.turn_data_away };
+    let additional_foul = allows_additional_foul(game, player_id);
     let live: Vec<PlayerAction> = actions
         .iter()
         .filter(|a| match a {
             PlayerAction::Block | PlayerAction::Blitz | PlayerAction::StandUpBlitz => !td.blitz_used,
             PlayerAction::Pass | PlayerAction::HailMaryPass => !td.pass_used,
             PlayerAction::HandOver => !td.hand_over_used,
-            PlayerAction::Foul => !td.foul_used,
+            PlayerAction::Foul => !td.foul_used || additional_foul,
             // BB2016 and BB2020 spend the team's PASS on a Throw Team-Mate; only BB2025 tracks it
             // on its own flag.
             PlayerAction::ThrowTeamMate => {
@@ -86,6 +91,22 @@ pub(crate) fn filter_stale_actions(
             .collect();
     }
     live
+}
+
+/// Java `StepInitSelecting` CLIENT_FOUL (bb2020 :203, bb2025 :221) and the client's
+/// `LogicModule` :363 accept a foul when `!turnData.isFoulUsed() ||
+/// player.hasSkillProperty(allowsAdditionalFoul)` -- Sneakiest of the Lot lets the Black Gobbo
+/// foul after his team's foul (and his own foul never spends it, `StepInitFouling` :147). Every
+/// agent-side "is the foul still live" filter must ask the same, in BOTH harnesses
+/// (`ParityRunner.filterStaleActions` / `computeEligiblePlayers`).
+pub(crate) fn allows_additional_foul(game: &ffb_model::model::game::Game, player_id: &str) -> bool {
+    // Agent-side question: never a skill use in the §M touch ledger.
+    let _quiet = ffb_model::skill_touch::suppress();
+    game.player(player_id)
+        .map(|p| p.has_skill_property(
+            ffb_model::model::property::named_properties::NamedProperties::ALLOWS_ADDITIONAL_FOUL,
+        ))
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -116,14 +137,14 @@ mod filter_stale_actions_tests {
             PlayerAction::HandOver,
             PlayerAction::Foul,
         ];
-        assert_eq!(filter_stale_actions(&g, &all).len(), all.len(), "nothing spent yet");
+        assert_eq!(filter_stale_actions(&g, "nobody", &all).len(), all.len(), "nothing spent yet");
 
         g.turn_data_home.blitz_used = true;
         g.turn_data_home.pass_used = true;
         g.turn_data_home.hand_over_used = true;
         g.turn_data_home.foul_used = true;
         assert_eq!(
-            filter_stale_actions(&g, &all),
+            filter_stale_actions(&g, "nobody", &all),
             vec![PlayerAction::Move],
             "Move always survives; every once-per-turn action is spent"
         );
@@ -143,7 +164,7 @@ mod filter_stale_actions_tests {
             PlayerAction::Treacherous,
         ];
         assert_eq!(
-            filter_stale_actions(&g, &offered),
+            filter_stale_actions(&g, "nobody", &offered),
             vec![PlayerAction::Move, PlayerAction::Treacherous]
         );
     }
@@ -158,17 +179,44 @@ mod filter_stale_actions_tests {
         for rules in [Rules::Bb2016, Rules::Bb2020] {
             let mut g = game(rules);
             g.turn_data_home.pass_used = true;
-            assert!(filter_stale_actions(&g, &ttm).is_empty(), "{rules:?} TTM spends the pass");
+            assert!(filter_stale_actions(&g, "nobody", &ttm).is_empty(), "{rules:?} TTM spends the pass");
         }
         let mut g25 = game(Rules::Bb2025);
         g25.turn_data_home.pass_used = true;
-        assert_eq!(filter_stale_actions(&g25, &ttm), ttm, "bb2025 TTM has its own flag");
+        assert_eq!(filter_stale_actions(&g25, "nobody", &ttm), ttm, "bb2025 TTM has its own flag");
 
         let mut g16 = game(Rules::Bb2016);
         g16.turn_data_home.blitz_used = true;
-        assert!(filter_stale_actions(&g16, &ktm).is_empty(), "bb2016 KTM spends the blitz");
+        assert!(filter_stale_actions(&g16, "nobody", &ktm).is_empty(), "bb2016 KTM spends the blitz");
         let mut g20 = game(Rules::Bb2020);
         g20.turn_data_home.blitz_used = true;
-        assert_eq!(filter_stale_actions(&g20, &ktm), ktm, "bb2020 KTM has its own flag");
+        assert_eq!(filter_stale_actions(&g20, "nobody", &ktm), ktm, "bb2020 KTM has its own flag");
+    }
+
+    /// BACKLOG §M 2b(t). Java StepInitSelecting (bb2020 :203, bb2025 :221) accepts a foul after
+    /// the team's foul from an `allowsAdditionalFoul` player -- the Black Gobbo's Sneakiest of the
+    /// Lot. The stale filter (both harnesses) must keep his Foul and drop everyone else's.
+    #[test]
+    fn sneakiest_of_the_lot_keeps_the_foul_after_the_teams_foul() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::skill_def::SkillWithValue;
+        for rules in [Rules::Bb2020, Rules::Bb2025] {
+            let mut home = test_team("home", 0);
+            let mut gobbo = ffb_model::model::player::Player::default();
+            gobbo.id = "gobbo".into();
+            gobbo.starting_skills = vec![SkillWithValue::new(SkillId::SneakiestOfTheLot)];
+            home.players.push(gobbo);
+            let mut grunt = ffb_model::model::player::Player::default();
+            grunt.id = "grunt".into();
+            home.players.push(grunt);
+            let mut g = Game::new(home, test_team("away", 0), rules);
+            g.home_playing = true;
+            g.turn_data_home.foul_used = true;
+            let offered = [PlayerAction::Move, PlayerAction::Foul];
+            assert_eq!(filter_stale_actions(&g, "gobbo", &offered), offered, "{rules:?} Gobbo");
+            assert_eq!(filter_stale_actions(&g, "grunt", &offered), vec![PlayerAction::Move], "{rules:?}");
+            assert!(super::allows_additional_foul(&g, "gobbo"));
+            assert!(!super::allows_additional_foul(&g, "grunt"));
+        }
     }
 }

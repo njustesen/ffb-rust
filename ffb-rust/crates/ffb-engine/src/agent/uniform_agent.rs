@@ -166,7 +166,7 @@ impl Agent for UniformAgent {
                     PlayerAction::Block | PlayerAction::Blitz | PlayerAction::StandUpBlitz => !td.blitz_used,
                     PlayerAction::Pass | PlayerAction::HailMaryPass => !td.pass_used,
                     PlayerAction::HandOver => !td.hand_over_used,
-                    PlayerAction::Foul => !td.foul_used,
+                    PlayerAction::Foul => !td.foul_used || crate::agent::allows_additional_foul(&gs.game, player_id),
                     // Staleness filters mirrored from RandomAgent/ParityRunner.filterStaleActions:
                     // TTM/KTM are once per team turn, and BB2016/BB2020 spend the team's PASS on a
                     // throw (BB2016 spends the BLITZ on a kick). The turn-start snapshot can still

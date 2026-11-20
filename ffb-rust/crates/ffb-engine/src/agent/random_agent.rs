@@ -520,7 +520,7 @@ impl Agent for RandomAgent {
                     PlayerAction::Block | PlayerAction::Blitz | PlayerAction::StandUpBlitz => !td.blitz_used,
                     PlayerAction::Pass | PlayerAction::HailMaryPass => !td.pass_used,
                     PlayerAction::HandOver => !td.hand_over_used,
-                    PlayerAction::Foul => !td.foul_used,
+                    PlayerAction::Foul => !td.foul_used || crate::agent::allows_additional_foul(&gs.game, player_id),
                     // Throw/Kick Team-Mate are once per team turn (set ttm_used/ktm_used). The
                     // turn-start snapshot can still offer a second one after the first Ogre throws;
                     // filter it out as stale, or the engine rejects the second throw and the harness

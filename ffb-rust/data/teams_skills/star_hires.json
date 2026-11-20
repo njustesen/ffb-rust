@@ -1,5 +1,8 @@
 {
-  "_comment": "BACKLOG §M 2b(p): stars the SKILL suite hires (home side only, on top of the squad, exactly like the star tier: --home-star). Read by scripts/sksweep.py and scripts/skill_ledger.py jobs('skill'). Jeremiah Kool carries The Flashing Blade and joined the star catalogue after the star schedules were cut, so no star gate fields him.",
+  "_comment": "BACKLOG §M 2b(p): stars the SKILL suite hires (home side only, on top of the squad, exactly like the star tier: --home-star). Read by scripts/sksweep.py and scripts/skill_ledger.py jobs('skill'). Jeremiah Kool carries The Flashing Blade and joined the star catalogue after the star schedules were cut, so no star gate fields him. §M 2b(t): bb2025 The Black Gobbo (Sneakiest of the Lot) on three eligible squads -- his foul is rare (bench: 0-2 per 20 games per squad) and the star schedule's 2-seed gates gave 0 in 98 games.",
   "bb2020": {"elf_sk": "star.jeremiah_kool"},
-  "bb2025": {"elf_sk": "star.jeremiah_kool"}
+  "bb2025": {"elf_sk": "star.jeremiah_kool",
+             "chaos_dwarf_sk": "star.the_black_gobbo",
+             "goblin_sk": "star.the_black_gobbo",
+             "orc_sk": "star.the_black_gobbo"}
 }

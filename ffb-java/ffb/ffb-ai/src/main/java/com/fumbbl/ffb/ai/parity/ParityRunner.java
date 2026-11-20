@@ -814,7 +814,7 @@ public class ParityRunner {
                         // (historical T2 RNG pattern).
                         PlayerAction action;
                         if (tier >= 3) {
-                            PlayerAction[] live = filterStaleActions(game, actions);
+                            PlayerAction[] live = filterStaleActions(game, playerId, actions);
                             int ai = (int) Long.remainderUnsigned(actionRng.nextLong(), live.length);
                             action = live[ai];
                             if (DEBUG_ACT) {
@@ -3492,8 +3492,15 @@ public class ParityRunner {
      * entries may have been consumed by an earlier activation. Mirrors Rust's
      * RandomAgent::filter_stale_actions exactly; both sides must keep the action
      * pick's N identical. Move/StandUp always survive, so the result is never empty.
+     *
+     * FOUL survives a spent team foul for an allowsAdditionalFoul player (Sneakiest of the Lot,
+     * BACKLOG §M 2b(t)): the engine accepts it -- StepInitSelecting (bb2020 :203, bb2025 :221)
+     * `!isFoulUsed() || hasSkillProperty(allowsAdditionalFoul)`, the client's LogicModule :363.
      */
-    private static PlayerAction[] filterStaleActions(Game game, PlayerAction[] actions) {
+    private static PlayerAction[] filterStaleActions(Game game, String playerId, PlayerAction[] actions) {
+        Player<?> actor = game.getPlayerById(playerId);
+        boolean additionalFoul = actor != null
+            && actor.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.allowsAdditionalFoul);
         TurnData td = game.isHomePlaying() ? game.getTurnDataHome() : game.getTurnDataAway();
         List<PlayerAction> live = new ArrayList<>();
         // Non-REGULAR window modes (PASS_BLOCK): the harness contract shrinks the list to
@@ -3526,7 +3533,7 @@ public class ParityRunner {
                     keep = !td.isHandOverUsed();
                     break;
                 case FOUL:
-                    keep = !td.isFoulUsed();
+                    keep = !td.isFoulUsed() || additionalFoul;
                     break;
                 case THROW_TEAM_MATE:
                     // BB2016 spends the team's PASS action on a Throw Team-Mate: bb2016
@@ -4217,7 +4224,7 @@ public class ParityRunner {
             // only the declaration differs, and it is the declaration the engine reads.
             boolean prone = st.getBase() == PlayerState.PRONE;
             List<String> actions = new ArrayList<>();
-            for (PlayerAction a : filterStaleActions(game, (PlayerAction[]) entry[1])) {
+            for (PlayerAction a : filterStaleActions(game, pid, (PlayerAction[]) entry[1])) {
                 actions.add(nameForAgent(a));
             }
             if (actions.isEmpty()) {
@@ -4641,9 +4648,11 @@ public class ParityRunner {
                     }
                 }
 
-                // Foul: adjacent to prone/stunned opponent, foul not used
-                // (SneakiestOfTheLot exception not handled here for simplicity)
-                if (!td.isFoulUsed()) {
+                // Foul: adjacent to prone/stunned opponent, foul not used -- or an
+                // allowsAdditionalFoul player (Sneakiest of the Lot, BACKLOG §M 2b(t)), whom
+                // StepInitSelecting (bb2020 :203, bb2025 :221) lets foul after the team's foul.
+                if (!td.isFoulUsed()
+                        || p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.allowsAdditionalFoul)) {
                     if (hasAdjacentFoulTarget(coord, opponent.getPlayers(), fm)) {
                         actions.add(PlayerAction.FOUL);
                     }

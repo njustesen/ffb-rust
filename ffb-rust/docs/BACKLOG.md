@@ -9716,7 +9716,7 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 
 ## §M — 2026-11-17: SKILL COVERAGE TIER — the agents use every skill (in progress)
 
-> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 8), read this first (supersedes "Step 1" below).**
+> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 9), read this first (supersedes "Step 1" below).**
 > **State at 17:30: cert6 chain PID 11308 has EXITED (cert6 fully green, see iteration 3); only the
 > ledger PID 17496 still runs. The cert6 bullet below is history.**
 > The work is now driven by `scripts/skill_parity_loop.py` (goal = `scripts/skill_parity_check.py`
@@ -9809,7 +9809,18 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   harnesses; gated orc+Scrappa vs elf bb2020 + bb2025 20/20 + 20/20 and 11 bench-found Yoink
 >   seeds 1/1 each, controls 10/10 x2. Frozen `ffb-parity-yoink.exe` + `ffb-ai-yoink.jar` (the
 >   in-repo jar was rebuilt with mvn package -- no cert was running).
-> - **Next for the loop (after iteration 8):** bb2025 SneakiestOfTheLot (the Black Gobbo never
+> - **Loop iteration 9 (2026-11-20 ~19:00 local):** **bb2025 Sneakiest of the Lot DONE** (phase
+>   2b (t)): both harnesses now keep the Gobbo's Foul after a team-mate's foul (Java
+>   StepInitSelecting :221 allows it; the harness filtered it "for simplicity"), and the skill
+>   suite hires the Gobbo on bb2025 chaos_dwarf_sk / goblin_sk / orc_sk (`star_hires.json`);
+>   gated 3 x 20/20 + 2 controls x 10/10, steps + reports, 4 SneakiestOfTheLot touches in green
+>   games. Frozen `ffb-parity-sotl.exe` + `ffb-ai-sotl.jar` (patched copy, in-repo jar untouched).
+> - **Next for the loop (after iteration 9):** bb2020 KickEmWhileTheyReDown (82 games 0 fires;
+>   check the bb2020 offer), item (1) re-roll skill in the dialog (Mesmerizing Dance), the
+>   2b(e)/(f)/(g) ports (Gored/KICK_EM_BLITZ, Bounding Leap, Two for One), the rare-trigger stars
+>   (QuickBite, PlagueRidden, ASneakyPair -- consider skill-suite hires like 2b(t)), the bb2016
+>   sourced rosters, then the final cert + ledger + manifest.
+> - **Next for the loop (after iteration 8, SneakiestOfTheLot DONE in iteration 9):** bb2025 SneakiestOfTheLot (the Black Gobbo never
 >   fouls -- agent foul policy), bb2020 KickEmWhileTheyReDown (82 games 0 fires; check the bb2020
 >   offer), item (1) re-roll skill in the dialog (Mesmerizing Dance), the 2b(e)/(f)/(g) ports
 >   (Gored/KICK_EM_BLITZ, Bounding Leap, Two for One), the bb2016 sourced rosters (user answer
@@ -10277,6 +10288,35 @@ documented unreachable.
     black_orc+Scrappa 10/10 + 10/10. Ledger probe on the 947 cert6_2b star jobs that field a
     missing skill (`D:/ffb_scratch_it8/led`): Yoink touch 2 + named 1 in bb2020 and in bb2025 --
     the ledger's own seeds will see it. Every star gate with Scrappa can change => final cert.
+- **(t) Sneakiest of the Lot, bb2025 -- DONE 2026-11-20 (loop iteration 9).** Not an engine gap:
+  the Black Gobbo's foul is simply RARE (he bombs and stabs). Rust-only bench on the current exe:
+  orc+Gobbo vs elf seeds 1-100 = 2 touches; the probe's 98 star-schedule games (2 seeds per
+  pair) = 0. Two changes, one Java-faithful harness fix and one data change:
+  - **Harness gap (both harnesses):** Java StepInitSelecting CLIENT_FOUL (bb2020 :203, bb2025 :221)
+    and the client's LogicModule :363 accept a foul when `!isFoulUsed() ||
+    hasSkillProperty(allowsAdditionalFoul)`, and StepInitFouling :147 never spends the team foul
+    on the Gobbo's own foul. ParityRunner dropped his Foul once a team-mate had fouled ("not
+    handled here for simplicity") and Rust mirrored it. Now `computeEligiblePlayers` +
+    `filterStaleActions(game, playerId, ..)` (Java) and `legal_activate_player_actions`,
+    `agent::filter_stale_actions(g, pid, ..)`, heuristic `action_is_live(.., additional_foul)`,
+    random + uniform agents (Rust, shared helper `agent::allows_additional_foul`) keep his Foul.
+    The engine-side offer check runs under `skill_touch::suppress()` -- an OFFER must not count
+    as a skill use in the §M ledger. Test
+    `sneakiest_of_the_lot_keeps_the_foul_after_the_teams_foul` (bb2020 + bb2025). The exception
+    itself stays rare (bench unchanged), but it is the real use of the skill.
+  - **Data:** `data/teams_skills/star_hires.json` bb2025 now also hires the Gobbo (home) on
+    `chaos_dwarf_sk`, `goblin_sk`, `orc_sk` (all on his eligible list; legality test green).
+    Bench seeds 1-20 per squad: 2 / 1 / 1 touches -- three squads so one later behaviour shift
+    cannot drop the skill out of the ledger.
+  - Gate (frozen `D:/ffb_star/bin/ffb-parity-sotl.exe` + jar `D:/ffb_star/bin/ffb-ai-sotl.jar` =
+    ffb-ai-yoink.jar + javac/jar-uf of this ParityRunner, in-repo jar untouched;
+    `D:/ffb_scratch_it9/gate.py`, `g1/results.txt`): bb2025 chaos_dwarf_sk / goblin_sk / orc_sk
+    mirrors + Gobbo seeds 1-20 **20/20 steps + 20/20 reports** each; controls (star-schedule
+    Gobbo pairs) bb2025 goblin+Gobbo vs chaos+Akhorne and bb2020 elf+Gloriel vs black_orc+Gobbo
+    seeds 1-10 **10/10 + 10/10** each. Not vacuous: SneakiestOfTheLot touched in 4 green games
+    (chaos_dwarf_sk s2/s4, goblin_sk s16, orc_sk s4), and Java's own report stream has
+    `actingPlayerId: teamOrcSkParity25Home13, playerAction: foulMove` (Home13 = the Gobbo, the
+    side's bomb thrower) in orc_sk seed 4. ffb-engine 7622/0.
 
 ### Phase 1 status (2026-11-18)
 
