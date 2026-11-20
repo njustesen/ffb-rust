@@ -9716,7 +9716,24 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 
 ## §M — 2026-11-17: SKILL COVERAGE TIER — the agents use every skill (in progress)
 
-> **RESUME HERE (written 2026-11-20 before a reboot; the user is closing Avid Media Composer, whose
+> **RESUME HERE -- UPDATED 2026-11-20 ~15:30, read this first (supersedes "Step 1" below).**
+> The work is now driven by `scripts/skill_parity_loop.py` (goal = `scripts/skill_parity_check.py`
+> exits 0). A supervising interactive session STILL OWNS these runs -- do NOT relaunch, kill or
+> duplicate them, and do NOT run the same edition+matchup concurrently:
+> - cert6 chain, PID 11308 (`cert_chain.ps1 -suites starrest,skill -anytime`, workers = star_worker
+>   PIDs 23304/10700/24280, then sksweep into `D:/ffb_sksweep/cert6`). It resolves the IN-REPO jar
+>   (launched before PARITY_CP was pinned), so **no `mvn package` until PID 11308 has exited**.
+>   For dev gates patch a jar copy instead: `javac -cp D:/ffb_star/bin/ffb-ai-cert6.jar -d <dir>
+>   ParityRunner.java` + `jar uf <copy> -C <dir> com/fumbbl/ffb/ai/parity`, run with `PARITY_CP=<copy>`.
+>   When it exits: re-gate the 14:39:30-14:42:30 contamination window (see Phase 2b status).
+> - skill ledger, PID 17496 (`skill_ledger.py run --out D:/ffb_ledger/cert6_2b`, exe
+>   `D:/ffb_star/bin/ffb-parity-2b2.exe`, no STAMP -> progress only). When it exits run
+>   `python -I scripts/skill_ledger.py report --out D:/ffb_ledger/cert6_2b`; the checker's progress
+>   view then uses it instead of the stale 11-17 `base` ledger.
+> - Daytime running was OK'd by the user for 2026-11-20 only; after that the 21:00-07:00 / <=70%
+>   budget applies (memory: overnight resource budget).
+>
+> **Older box (written 2026-11-20 before a reboot; the user is closing Avid Media Composer, whose
 > ~23 GB commit made Claude Code's reaper kill the cert runs).**
 > **Step 1 — finish cert6** (frozen `D:/ffb_star/bin/ffb-parity-cert6.exe` = `e0f63037e`; do NOT
 > rebuild or re-freeze; mirror 330/330 and cross 4012/4012 are already green and stay valid):
