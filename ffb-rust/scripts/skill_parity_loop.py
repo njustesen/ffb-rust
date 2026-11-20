@@ -46,6 +46,9 @@ The goal is defined ONLY by scripts/skill_parity_check.py (read its docstring). 
 Iteration {it}. {stall}
 
 How to work:
+- FIRST check docs/BACKLOG.md §M for a "SUPERVISOR DIRECTIVE" block (the human-side supervisor of
+  this loop writes them). If one exists, carrying it out IS this iteration's unit of work -- do it
+  before any new skill work, record the result where it says, and delete the block when done.
 - Start from the auto-memory index, docs/BACKLOG.md §M ("RESUME HERE" + the phase-2b status) and
   the plan at C:/Users/Admin/.claude/plans/figure-out-where-we-precious-dahl.md. All the house
   rules in memory apply (parity fixes are Rust-only and 1:1 against Java, the harness may be
