@@ -19,14 +19,19 @@ jobs = [(ed, os.path.basename(f)[5:-5]) for ed in ["bb2016", "bb2020", "bb2025"]
         for f in sorted(glob.glob(f"{ROOT}/data/{d}/{ed}/team_*.json"))]
 jobs = [j for j in jobs if f"{j[0]} {j[1]}" not in done]
 lock = threading.Lock()
+# §M 2b(p): stars the skill suite hires on the HOME side (data/teams_skills/star_hires.json).
+import json
+_hires = json.load(open(f"{ROOT}/data/teams_skills/star_hires.json", encoding="utf-8"))
+STAR = {(ed, sq): st for ed, m in _hires.items() if not ed.startswith("_") for sq, st in m.items()}
 
 
 def run(job):
     ed, sq = job
     env = dict(os.environ, FFB_PARITY_ROOT=f"{out}/root_{ed}_{sq}", PARITY_JVM_CORES="2")
+    star = ["--home-star", STAR[(ed, sq)]] if (ed, sq) in STAR else []
     p = subprocess.run([exe, "--home", sq, "--away", sq, "--edition", ed, "--tier", "3", "--seeds", seeds,
                         "--no-abort", "--agent", "heuristic", "--heur-scale", scale, "--heur-classes", "all",
-                        "--coverage-bias", cb, "--quiet"], cwd=ROOT, env=env, capture_output=True,
+                        "--coverage-bias", cb, "--quiet"] + star, cwd=ROOT, env=env, capture_output=True,
                        text=True, errors="replace")
     txt = p.stdout + p.stderr
     par = re.search(r"PARITY: (\d+)/(\d+)", txt)

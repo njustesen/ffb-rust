@@ -11,7 +11,9 @@ edition, at the STRICTEST tier so it holds whatever a squad's real tier is (no l
     Secondary per squad;
   * one additional skill per player; never a skill the player already has; Elite skills (Block,
     Dodge, Guard, Mighty Blow) at most 4 per roster;
-  * Team Value does NOT increase in Matched Play, so team_value is copied unchanged.
+  * Team Value does NOT increase in Matched Play -- but Java's engine recomputes TV on load
+    (HeadlessGameSetup -> UtilTeamValue.findTeamValue, which adds Skill.getCost per extra skill),
+    and Rust takes TV from the spec, so team_value = Java's number (java_team_value, §M 2b(p)).
 Skills whose Java class for the edition has `eligible() == false` are not skills of that edition
 (bb2020 PilingOn) and are never drafted.
 Players who cannot use ball/skill advancements are skipped outright: No Hands (bb2016/bb2020),
@@ -141,6 +143,36 @@ def infamous_staff(ed, sq, roster, spec):
         spec["team_value"] += pos["cost"]
 
 
+def java_skill_cost(pos, cat, disp):
+    """Java `Skill.getCost(player)` (model/skill/Skill.java :262-272): 0 when the player's position
+    already has the skill, 30000 when the skill's category is one of the position's DOUBLE
+    categories, else 20000. Overridden only by Loner (0) and the *Increase stat skills, neither
+    of which the `_sk` drafter places."""
+    if norm(disp) in {norm(skill_name(s)) for s in pos.get("skills", [])}:
+        return 0
+    cats = pos.get("skill_categories") or {}
+    return 30000 if CATEGORY.get(cat) in cats.get("double", []) else 20000
+
+
+def java_team_value(spec, pos_by_id, catalogue_ed):
+    """§M 2b(p): the TV Java's HeadlessGameSetup sets (`UtilTeamValue.findTeamValue`): the base
+    squad's TV (already Java's formula, runner test `drafted_teams_are_rule_legal`) plus, per
+    drafted skill, `Skill.getCost(player)`. Rust reads `team_value` from the spec, so the spec must
+    carry Java's number -- it becomes visible in the inducement reports as soon as the two TVs
+    differ (a skill-suite star hire)."""
+    by_disp = {norm(disp): cat for cat, disp in catalogue_ed.values()}
+    extra = 0
+    for pl in spec["players"]:
+        if pl.get("advancement") in (None, "infamous_staff"):
+            continue
+        pos = pos_by_id[pl["position_id"]]
+        for s in pl.get("skills", []):
+            name = skill_name(s)
+            assert norm(name) not in {"loner"} and "increase" not in norm(name), name
+            extra += java_skill_cost(pos, by_disp[norm(name)], name)
+    return extra
+
+
 def draft_edition(ed, catalogue, status):
     rost = rosters(ed)
     squads = {}
@@ -245,6 +277,9 @@ def draft_edition(ed, catalogue, status):
             captain["skills"] = list(CAPTAIN_SKILLS)
             captain["advancement"] = "team_captain"
         infamous_staff(ed, sq, rost[spec["roster_id"]], v)
+        roster = rost[spec["roster_id"]]
+        pos_all = {p["id"]: p for p in roster["positions"] + (roster.get("infamous_staff") or [])}
+        v["team_value"] += java_team_value(v, pos_all, catalogue[ed])
         out[f"{sq}_sk"] = v
     missing = sorted(cls for cls, _, _ in skills if not placed[cls])
     short = sorted(cls for cls, _, _ in skills if 0 < len(placed[cls]) < need[cls])

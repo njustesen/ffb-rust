@@ -87,13 +87,20 @@ fn star_numbers(team_nrs: impl Iterator<Item = i32>, count: usize) -> Vec<i32> {
     (1..=count as i32).map(|k| max + k).collect()
 }
 
+/// The squad whose star eligibility a squad has: a §M skill-suite variant (`<base>_sk`,
+/// `<base>_st`, drafted by scripts/draft_skill_squads.py / draft_stat_squads.py) is the same race
+/// and roster as its base squad, so it may hire exactly the base squad's stars.
+pub fn hiring_squad(squad: &str) -> &str {
+    squad.strip_suffix("_sk").or_else(|| squad.strip_suffix("_st")).unwrap_or(squad)
+}
+
 /// Append `star_id` to `team` (built from squad `squad`). Errors when the star is unknown or not
 /// hireable by the squad -- a star schedule must never field an illegal hire.
 pub fn apply_star(team: &mut Team, side: &str, edition: &str, squad: &str, star_id: &str) -> Result<(), String> {
     let cat = load_catalog(edition)?;
     let star = cat.stars.iter().find(|s| s.id == star_id)
         .ok_or_else(|| format!("{edition}: unknown star '{star_id}'"))?;
-    if !star.eligible.iter().any(|e| e == squad) {
+    if !star.eligible.iter().any(|e| e == hiring_squad(squad)) {
         return Err(format!("{edition}: star '{star_id}' is not hireable by '{squad}'"));
     }
     let nrs = star_numbers(team.players.iter().map(|p| p.nr), star.players.len());
@@ -162,7 +169,7 @@ pub fn prepare_java_server_dir(
         if let Some(star_id) = star {
             let entry = cat.stars.iter().find(|s| s.id == star_id)
                 .ok_or_else(|| format!("{edition}: unknown star '{star_id}'"))?;
-            if !entry.eligible.iter().any(|e| e == squad) {
+            if !entry.eligible.iter().any(|e| e == hiring_squad(squad)) {
                 return Err(format!("{edition}: star '{star_id}' is not hireable by '{squad}'"));
             }
             let roster_id = xml_text(&text, "rosterId").ok_or("team XML without rosterId")?.to_string();
@@ -267,5 +274,29 @@ mod tests {
         let mut orc = crate::runner::make_team_from_file("undead", "home", "bb2025").unwrap();
         assert!(apply_star(&mut orc, "home", "bb2025", "undead", "star.griff_oberwald").is_err(),
             "Griff does not play for Shambling Undead");
+    }
+
+    /// §M 2b(p): a skill-suite variant hires its base squad's stars, and every entry of the
+    /// skill-suite hire table (`data/teams_skills/star_hires.json`) is a legal hire.
+    #[test]
+    fn skill_suite_star_hires_are_legal() {
+        assert_eq!(hiring_squad("elf_sk"), "elf");
+        assert_eq!(hiring_squad("human_st"), "human");
+        assert_eq!(hiring_squad("dark_elf"), "dark_elf");
+        let path = catalog_path("bb2025").unwrap().parent().unwrap().parent().unwrap()
+            .join("teams_skills").join("star_hires.json");
+        let table: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let mut n = 0;
+        for (ed, hires) in &table {
+            if ed.starts_with('_') { continue; }
+            for (squad, star) in hires.as_object().unwrap() {
+                let star = star.as_str().unwrap();
+                let mut team = crate::runner::make_team_from_file(squad, "home", ed).unwrap();
+                apply_star(&mut team, "home", ed, squad, star).unwrap_or_else(|e| panic!("{e}"));
+                n += 1;
+            }
+        }
+        assert!(n >= 2, "expected the Jeremiah Kool hires, found {n}");
     }
 }

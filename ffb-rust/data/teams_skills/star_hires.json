@@ -1,0 +1,5 @@
+{
+  "_comment": "BACKLOG §M 2b(p): stars the SKILL suite hires (home side only, on top of the squad, exactly like the star tier: --home-star). Read by scripts/sksweep.py and scripts/skill_ledger.py jobs('skill'). Jeremiah Kool carries The Flashing Blade and joined the star catalogue after the star schedules were cut, so no star gate fields him.",
+  "bb2020": {"elf_sk": "star.jeremiah_kool"},
+  "bb2025": {"elf_sk": "star.jeremiah_kool"}
+}

@@ -9716,7 +9716,7 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 
 ## §M — 2026-11-17: SKILL COVERAGE TIER — the agents use every skill (in progress)
 
-> **RESUME HERE -- UPDATED 2026-11-20 ~17:45 (loop iteration 5), read this first (supersedes "Step 1" below).**
+> **RESUME HERE -- UPDATED 2026-11-20 ~18:45 (loop iteration 6), read this first (supersedes "Step 1" below).**
 > **State at 17:30: cert6 chain PID 11308 has EXITED (cert6 fully green, see iteration 3); only the
 > ledger PID 17496 still runs. The cert6 bullet below is history.**
 > The work is now driven by `scripts/skill_parity_loop.py` (goal = `scripts/skill_parity_check.py`
@@ -9779,6 +9779,27 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   it) and bb2020 **Mesmerizing Dance** (Eldril's bb2020 page calls it "Mesmerizing Gaze") are
 >   now on their stars; gated 20/20 steps + reports (2 Kaboom gates, 1 Eldril gate). Ledger PID
 >   17496 still running at 17:45 (star ~3250/4012 files).
+> - **Loop iteration 6 (2026-11-20 ~18:45):** **The Flashing Blade DONE** (phase 2b (p) below):
+>   Jeremiah Kool is hired (home side) on bb2020 + bb2025 `elf_sk` through the new tracked table
+>   `data/teams_skills/star_hires.json`, read by `sksweep.py` + `skill_ledger.jobs('skill')`.
+>   The first gate exposed a TV bug invisible in mirrors (Java recomputes TV incl. skill costs,
+>   the `_sk` specs did not) -> all 110 `_sk` team_values now = Java's formula. Gates (frozen
+>   `D:/ffb_star/bin/ffb-parity-fb.exe`, jar `ffb-ai-pro16.jar`, seeds 1-20,
+>   `D:/ffb_scratch_it6/g{20b,25b}`): bb2020 + bb2025 elf_sk+Kool **20/20 steps + 20/20
+>   reports**; `theFlashingBlade` action in 5 + 9 games, both streams. Controls on TV-changed
+>   mirrors (seeds 1-5, human_sk bb2025 + orc_sk bb2016): 5/5 + 5/5. Committed + pushed. The ledger list's two TheFlashingBlade items close once a ledger
+>   runs on a post-iteration-6 tree.
+> - **Next for the loop (after iteration 6):** item (1) below (re-roll skill in the dialog).
+>   Groundwork read in iteration 6: Java `StepHypnoticGaze` (bb2020 + bb2025) handles
+>   CLIENT_USE_SKILL ITSELF (`setReRollSource(skill.getRerollSource(HYPNOTIC_GAZE))`), unlike the
+>   base `AbstractStepWithReRoll` arm that only knows `canRerollSingleDieOncePerPeriod`; so the
+>   harness rule must be "listed skill whose `getRerollSource(reRolledAction) != null` AND the
+>   current step handles CLIENT_USE_SKILL for it" -- widening blindly to every
+>   AbstractStepWithReRoll would STALL Java on any step without such an arm. Skills that register
+>   a re-roll source (`grep registerRerollSource ffb-common/.../skill`): MesmerizingDance,
+>   TheBallista (PASS/TTM/KTM), MonstrousMouth, BlindRage (DAUNTLESS), BoundingLeap (JUMP),
+>   WhirlingDervish, Kick (bb2025 PUNT), Swoop, Brawler, Hatred, ... -- check per step which of
+>   them reach a RE_ROLL dialog as `reRollSkill` (RollMechanic.askForReRollIfAvailable).
 > - **Next for the loop (after iteration 5):** (1) **re-roll skill in the dialog**: Mesmerizing
 >   Dance (bb2020 + bb2025 MesmerisingDance) reaches the RE_ROLL dialog as `reRollSkill`, but both
 >   harnesses use a listed skill only if it is `canRerollSingleDieOncePerPeriod` (2b(a),
@@ -10100,6 +10121,33 @@ documented unreachable.
     20/20** (Kaboom in 9 games), bb2020 dark_elf+Eldril vs human+Akhorne **20/20 + 20/20**
     (Mesmerizing Dance touched -- the re-roll is OFFERED but not taken, see RESUME "Next" (1)).
     `cargo test -p ffb-parity stars` 3/3.
+- **(p) The Flashing Blade, bb2020 + bb2025: Jeremiah Kool hired by the skill suite -- DONE
+  2026-11-20 (loop iteration 6).** Kool joined the star catalogue in phase 1, after the star
+  schedules (`starjobs_full`, untracked) were cut, so no gate fielded him.
+  - Hire table `data/teams_skills/star_hires.json` (tracked): `{bb2020,bb2025}: elf_sk ->
+    star.jeremiah_kool`, HOME side only (one copy of a star per game). `scripts/sksweep.py` and
+    `skill_ledger.jobs('skill')` pass `--home-star` from it, so the final cert's skill suite and the
+    ledger both field him. `stars.rs hiring_squad()`: a `<base>_sk` / `<base>_st` squad hires its
+    base squad's stars (same race + roster); test `skill_suite_star_hires_are_legal`.
+  - **Bug found by the first gate (20/20 steps, 0/20 reports):** with a star, the two TVs differ,
+    so the inducement phase reports TV -- Java 1,470,000 vs Rust 1,410,000. Java's
+    `HeadlessGameSetup` sets TV = `UtilTeamValue.findTeamValue`, which adds
+    `Skill.getCost(player)` per skill (0 if the position has it, 30k on a double category, else
+    20k; `Skill.java` :262-272); the `_sk` drafter copied the base squad's TV ("Matched Play TV
+    does not increase"), and Rust takes TV from the spec. Invisible in every mirror (equal TVs
+    -> no inducement reports). Fix in the DATA, like the base squads (whose spec TV a runner
+    test already pins to the Java formula): `draft_skill_squads.java_team_value` adds the Java
+    cost of every drafted skill (Team Captain + Pro included, staff skills = position skills = 0);
+    all 110 `_sk` specs changed one line each, `gen_java_parity_data.py` rewrote the 220 team
+    XMLs' `currentTeamValue` (Java ignores it -- it recomputes). LATENT, not fixed: the 6 `_st`
+    squads still carry the base TV while Java adds the `*Increase` `getCost` overrides
+    (e.g. bb2025 AgilityIncrease 30000) -- unobservable until an `_st` squad meets a different TV.
+  - Gates (frozen `D:/ffb_star/bin/ffb-parity-fb.exe`, jar `ffb-ai-pro16.jar`, no harness
+    change): bb2020 + bb2025 elf_sk + Kool seeds 1-20 **20/20 steps + 20/20 reports** each
+    (`D:/ffb_scratch_it6/g{20b,25b}`; `theFlashingBlade` in 5 + 9 games, Java and Rust alike);
+    controls on TV-changed mirrors seeds 1-5: bb2025 human_sk (+110k) and bb2016 orc_sk **5/5 +
+    5/5** each (`D:/ffb_scratch_it6/c{25,16}`). The full skill suite re-runs in the final cert.
+    `cargo test -p ffb-parity stars` 4/4.
 
 ### Phase 1 status (2026-11-18)
 

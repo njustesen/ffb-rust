@@ -52,12 +52,16 @@ SCHEDULES = {
 def jobs(kind):
     out = []
     if kind == 'skill':
+        # §M 2b(p): home-side star hires of the skill suite (same table as scripts/sksweep.py).
+        hires = json.load(open(os.path.join(ROOT, 'data', 'teams_skills', 'star_hires.json'),
+                               encoding='utf-8'))
         for path in sorted(glob.glob(SCHEDULES[kind])) + sorted(glob.glob(SCHEDULES['skill_st'])):
             ed = os.path.basename(os.path.dirname(path))
             sq = os.path.basename(path)[len('team_'):-len('.json')]
+            star = hires.get(ed, {}).get(sq)
             out.append(('%s_%s' % (ed, sq), ed,
                         ['--home', sq, '--away', sq, '--edition', ed, '--seeds', '1-20',
-                         '--heur-scale', '1.0']))
+                         '--heur-scale', '1.0'] + (['--home-star', star] if star else [])))
         return out
     for path in sorted(glob.glob(SCHEDULES[kind])):
         for line in open(path, encoding='utf-8'):
