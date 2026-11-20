@@ -9734,6 +9734,8 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   `D:/ffb_star/bin/ffb-parity-2b2.exe`, no STAMP -> progress only). When it exits run
 >   `python -I scripts/skill_ledger.py report --out D:/ffb_ledger/cert6_2b`; the checker's progress
 >   view then uses it instead of the stale 11-17 `base` ledger.
+> - TRAP (hit by loop iteration 4): run `ffb-parity` with cwd = `ffb-rust/ffb-rust`, never the repo
+>   root -- from the root it rewrites the tracked `progress.html`. Stage files explicitly.
 > - Daytime running was OK'd by the user for 2026-11-20 only; after that the 21:00-07:00 / <=70%
 >   budget applies (memory: overnight resource budget).
 > - **Loop iteration 1 (2026-11-20 ~16:30):** phase 2b(h) STAT_INCREASE done (see Phase 2b status
