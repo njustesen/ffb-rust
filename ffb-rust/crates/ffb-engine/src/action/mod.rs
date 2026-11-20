@@ -100,6 +100,11 @@ pub enum Action {
     Pass { coord: FieldCoordinate },
     /// Attempt to intercept the pass (declaring intent before the roll).
     Intercept { attempt: bool },
+    /// Java `ClientCommandInterceptorChoice(interceptorId, interceptionSkill)` with a skill: the
+    /// client's "Use Yoink!" button (`DialogInterceptionHandler` :81-107) picks an interceptor that
+    /// `hasUnused(skill)` and sends it WITH the skill, which bb2020/bb2025 `StepIntercept` stores as
+    /// `interceptionSkill` (easy intercept on 2+, marked used at the step's tail).
+    InterceptWithSkill { player_id: PlayerId, skill_id: SkillId },
 
     // ── Hand-off ─────────────────────────────────────────────────────────────
     HandOff { receiver_id: PlayerId },

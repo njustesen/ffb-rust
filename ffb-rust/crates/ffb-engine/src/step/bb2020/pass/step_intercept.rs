@@ -304,6 +304,9 @@ impl StepIntercept {
                 player_id: possible_interceptors[0].clone(),
                 target_number: 0,
                 candidates: possible_interceptors.clone(),
+                // Dead twin (driver.rs routes StepId::Intercept to bb2025/pass/step_intercept.rs,
+                // which computes the Yoink! offer); kept compiling only.
+                interception_skill: None,
             });
         }
 

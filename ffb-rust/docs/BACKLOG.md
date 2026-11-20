@@ -9716,7 +9716,7 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 
 ## §M — 2026-11-17: SKILL COVERAGE TIER — the agents use every skill (in progress)
 
-> **RESUME HERE -- UPDATED 2026-11-20 ~18:45 (loop iteration 6), read this first (supersedes "Step 1" below).**
+> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 8), read this first (supersedes "Step 1" below).**
 > **State at 17:30: cert6 chain PID 11308 has EXITED (cert6 fully green, see iteration 3); only the
 > ledger PID 17496 still runs. The cert6 bullet below is history.**
 > The work is now driven by `scripts/skill_parity_loop.py` (goal = `scripts/skill_parity_check.py`
@@ -9803,7 +9803,18 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   harness gap, the next unit), SneakiestOfTheLot and the rare triggers -- see "Iteration-7 probe"
 >   in Phase 2b status. Frozen exe for this iteration: `D:/ffb_star/bin/ffb-parity-vi.exe`
 >   (jar `ffb-ai-pro16.jar`, harness unchanged).
-> - **Next for the loop (after iteration 7):** **Yoink** (bb2020 + bb2025) -- engine prompt field +
+> - **Loop iteration 8 (2026-11-20 ~18:30 local):** **Yoink! DONE** (phase 2b (s)): engine port of
+>   StepIntercept's interception skill (prompt field, `Action::InterceptWithSkill`, hasUnused easy
+>   check, markUsed at the tail) + a zero-draw "accept => use the offered skill" rule in both
+>   harnesses; gated orc+Scrappa vs elf bb2020 + bb2025 20/20 + 20/20 and 11 bench-found Yoink
+>   seeds 1/1 each, controls 10/10 x2. Frozen `ffb-parity-yoink.exe` + `ffb-ai-yoink.jar` (the
+>   in-repo jar was rebuilt with mvn package -- no cert was running).
+> - **Next for the loop (after iteration 8):** bb2025 SneakiestOfTheLot (the Black Gobbo never
+>   fouls -- agent foul policy), bb2020 KickEmWhileTheyReDown (82 games 0 fires; check the bb2020
+>   offer), item (1) re-roll skill in the dialog (Mesmerizing Dance), the 2b(e)/(f)/(g) ports
+>   (Gored/KICK_EM_BLITZ, Bounding Leap, Two for One), the bb2016 sourced rosters (user answer
+>   below), then the final cert + ledger + manifest.
+> - **Next for the loop (after iteration 7, DONE in iteration 8):** **Yoink** (bb2020 + bb2025) -- engine prompt field +
 >   command arm + both harnesses (design in "Iteration-7 probe"); then item (1) below (re-roll
 >   skill in the dialog), SneakiestOfTheLot (Black Gobbo foul rule), the 2b(e)/(f)/(g) ports and
 >   the bb2016 sourced rosters.
@@ -10232,6 +10243,40 @@ documented unreachable.
     to Guffle; a KILL by Guffle for a Favoured-of-Nurgle team; foul/stab with the partner marking).
   - **KickEmWhileTheyReDown (bb2020):** 82 games, 0 -- bb2025 fires (2); check the bb2020 offer.
   - BoundingLeap, GoredByTheBull, TwoForOne: the 2b(e)/(f)/(g) engine ports, unchanged.
+- **(s) Yoink!, bb2020 + bb2025 -- DONE 2026-11-20 (loop iteration 8).** Carrier: Scrappa
+  Sorehead (star, both editions). Java bb2020/bb2025 `StepIntercept` :144-149 put the first
+  candidate's unused `canInterceptEasily` skill on `DialogInterceptionParameter`; the client's
+  "Use Yoink!" (`DialogInterceptionHandler` :81-107) sends `ClientCommandInterceptorChoice(player,
+  skill)`; the step stores `interceptionSkill` (a STEP field -- a Cloud Burster re-push starts
+  without it), `easyIntercept = skill != null && interceptor.hasUnused(skill)` (2+, no modifiers,
+  `ReportSkillUse(EASY_INTERCEPT)`), and its doNextStep tail `interceptor.markUsed(skill, game)`
+  (once per game). bb2016's StepIntercept offers no skill. Rust (live shared
+  `step/bb2025/pass/step_intercept.rs`) had none of it: no skill on the prompt, no command arm,
+  `interception_skill_name` never set, easy check = edition-blind `has_skill_property` (ignores
+  used state), never marked used.
+  - Port: `AgentPrompt::Interception.interception_skill` (serde default), new
+    `Action::InterceptWithSkill { player_id, skill_id }` (= the command with a skill),
+    `StepIntercept.interception_skill: Option<SkillId>`, `has_unused` easy check, report names the
+    stored skill, tail marks it used (`Game::mark_skill_used`, Java `Player.markUsed`). The dead
+    bb2020 twin only got `interception_skill: None` to compile; `ffb-client` encodes the new
+    action as attempt=true (the protocol struct has no skill yet -- GUI tier).
+  - Agent rule (zero draws, both harnesses): after the heuristic's usual accept/decline draw, an
+    ACCEPT with an offered skill sends the first candidate that `hasUnused(skill)` WITH the skill
+    (Rust `heuristic_agent.rs` Interception arm, Java `ParityRunner.sendInterceptorChoice`). The
+    random/uniform agents are unchanged (skill null, as before).
+  - Test `yoink_is_offered_used_once_and_marked_used` (all three editions). ffb-engine 7621/0,
+    ffb-model 2819/0, ffb-client + ffb-server green.
+  - Gate (frozen `D:/ffb_star/bin/ffb-parity-yoink.exe` + jar `D:/ffb_star/bin/ffb-ai-yoink.jar`
+    (mvn package of this ParityRunner), `D:/ffb_scratch_it8/gate.py`, results
+    `D:/ffb_scratch_it8/g1/results.txt`): orc + Scrappa (home) vs elf, seeds 1-20 **20/20 steps +
+    20/20 reports** in bb2020 AND bb2025, plus the bench-found Yoink seeds (`FFB_BENCH_GREP=Yoink`)
+    bb2020 22/124/173/191 and bb2025 34/137/186/198/233/260/272 **all 1/1 + 1/1**; Java's report
+    stream carries `"skill":"Yoink!","skillUse":"easyIntercept"` in each (not vacuous). Controls
+    (`D:/ffb_scratch_it8/c1`, schedule star pairs, Scrappa home in bb2020 / AWAY in bb2025):
+    bb2020 orc+Scrappa vs halfling+Grak 10/10 + 10/10, bb2025 renegades+Bilerot vs
+    black_orc+Scrappa 10/10 + 10/10. Ledger probe on the 947 cert6_2b star jobs that field a
+    missing skill (`D:/ffb_scratch_it8/led`): Yoink touch 2 + named 1 in bb2020 and in bb2025 --
+    the ledger's own seeds will see it. Every star gate with Scrappa can change => final cert.
 
 ### Phase 1 status (2026-11-18)
 

@@ -93,6 +93,13 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
             }))
         }
 
+        // The protocol struct has no interceptor/skill fields yet (GUI tier); encode the attempt.
+        Action::InterceptWithSkill { .. } => {
+            Some(ClientCommand::ClientInterceptorChoice(ClientInterceptorChoice {
+                attempt_interception: true,
+            }))
+        }
+
         Action::HandOff { receiver_id } => {
             Some(ClientCommand::ClientHandOver(ClientHandOver { target_player_id: receiver_id }))
         }

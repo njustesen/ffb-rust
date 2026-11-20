@@ -228,6 +228,12 @@ pub enum AgentPrompt {
         /// `ParityRunner`) recomputes the same list from the same shared util — publishing it here
         /// lets both harnesses pick from an identical candidate set.
         candidates: Vec<PlayerId>,
+        /// Java `DialogInterceptionParameter.getInterceptionSkill()`: bb2020/bb2025
+        /// `StepIntercept` :144-149 puts the first candidate's unused `canInterceptEasily` skill
+        /// (Yoink!) here; the client offers "Use <skill>" and answers
+        /// `sendInterceptorChoice(player, skill)` (`DialogInterceptionHandler`).
+        #[serde(default)]
+        interception_skill: Option<SkillId>,
     },
 
     // ── Apothecary ─────────────────────────────────────────────────────────────

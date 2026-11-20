@@ -32,8 +32,8 @@ use crate::step::framework::{StepId, StepParameter};
 pub struct StepIntercept {
     /// Java: fGotoLabelOnFailure (init param, mandatory)
     pub goto_label_on_failure: String,
-    /// Java: interceptionSkill (Skill) — stored as name string until Skill is fully ported
-    pub interception_skill_name: Option<String>,
+    /// Java: interceptionSkill (Skill) — from CLIENT_INTERCEPTOR_CHOICE (`Action::InterceptWithSkill`)
+    pub interception_skill: Option<ffb_model::enums::SkillId>,
     /// Java: PassState.interceptorId — set from CLIENT_INTERCEPTOR_CHOICE command
     pub interceptor_id: Option<String>,
     /// Java: PassState.interceptorChosen — set when CLIENT_INTERCEPTOR_CHOICE received
@@ -57,7 +57,7 @@ impl StepIntercept {
     pub fn new(goto_label_on_failure: String) -> Self {
         Self {
             goto_label_on_failure,
-            interception_skill_name: None,
+            interception_skill: None,
             interceptor_id: None,
             interceptor_chosen: false,
             original_bombardier: None,
@@ -192,10 +192,10 @@ impl StepIntercept {
         };
 
         // Java: easyIntercept = interceptionSkill != null && pInterceptor.hasUnused(interceptionSkill)
-        // We approximate: easyIntercept is flagged by skill name "canInterceptEasily"
-        let easy_intercept = self.interception_skill_name
-            .as_deref()
-            .map(|_| interceptor.has_skill_property(NamedProperties::CAN_INTERCEPT_EASILY))
+        // (`Player.hasUnused` = has the skill AND it is not in the player's used set; the skill is
+        // only marked used at the step's tail, so a re-rolled easy intercept is still easy).
+        let easy_intercept = self.interception_skill
+            .map(|sid| interceptor.has_skill(sid) && !interceptor.used_skills.contains(&sid))
             .unwrap_or(false);
 
         let roll = rng.d6();
@@ -261,9 +261,7 @@ impl StepIntercept {
 
         // Java: if (easyIntercept && !reRolled) addReport(new ReportSkillUse(..., SkillUse.EASY_INTERCEPT))
         if easy_intercept && !re_rolled {
-            let skill_id = game.player(interceptor_id)
-                .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_INTERCEPT_EASILY));
-            if let Some(sid) = skill_id {
+            if let Some(sid) = self.interception_skill {
                 game.report_list.add(ReportSkillUse::new(
                     Some(interceptor_id.to_string()),
                     sid,
@@ -356,6 +354,13 @@ impl Step for StepIntercept {
                 let chosen = if *attempt { Self::find_interceptors(game).first().cloned() } else { None };
                 self.set_interceptor_id(game, chosen);
                 self.set_interceptor_chosen(game);
+            }
+            // Java CLIENT_INTERCEPTOR_CHOICE with a skill ("Use Yoink!"):
+            // `interceptionSkill = interceptorCommand.getInterceptionSkill()`.
+            Action::InterceptWithSkill { player_id, skill_id } => {
+                self.set_interceptor_id(game, Some(player_id.clone()));
+                self.set_interceptor_chosen(game);
+                self.interception_skill = Some(*skill_id);
             }
             // Java AbstractStepWithReRoll CLIENT_USE_RE_ROLL: `setReRolledAction(command action)`
             // (the dialog's INTERCEPTION) and the source — null on a decline.
@@ -479,11 +484,30 @@ impl StepIntercept {
         if !rerolled_away && !self.interceptor_chosen(game) {
             // Java: UtilServerDialog.showDialog(DialogInterceptionParameter) → the agent answers
             // with Action::Intercept (or SelectPlayer). A bare cont() waited forever.
+            // Java bb2020/bb2025 :144-149: `foundSkill = possibleInterceptors.map(p ->
+            // UtilCards.getUnusedSkillWithProperty(p, canInterceptEasily)).findFirst()` goes on the
+            // dialog. bb2016's StepIntercept shows the bare `DialogInterceptionParameter(thrower)`.
+            let interception_skill = if game.rules == ffb_model::enums::Rules::Bb2016 {
+                None
+            } else {
+                possible_interceptors.iter().find_map(|pid| {
+                    let p = game.player(pid)?;
+                    let found = p.all_skill_ids().find(|id| {
+                        id.properties_for(game.rules).contains(&NamedProperties::CAN_INTERCEPT_EASILY)
+                            && !p.used_skills.contains(id)
+                    });
+                    if let Some(id) = found {
+                        ffb_model::skill_touch::touch(id); // §M telemetry (observational only)
+                    }
+                    found
+                })
+            };
             self.enter_interception_mode(game);
             return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Interception {
                 player_id: possible_interceptors[0].clone(),
                 target_number: 0,
                 candidates: possible_interceptors.clone(),
+                interception_skill,
             });
         }
 
@@ -526,6 +550,12 @@ impl StepIntercept {
             false
         };
 
+        // Java doNextStep tail: `if (interceptionSkill != null && interceptor != null)
+        // interceptor.markUsed(interceptionSkill, game)` -- the PLAYER's set (Yoink! is once per
+        // game), whether or not the roll succeeded.
+        if let (Some(sid), Some(pid)) = (self.interception_skill, self.interceptor_id(game)) {
+            game.mark_skill_used(&pid, sid);
+        }
         // Java's doNextStep tail restores the turn mode saved when the dialog was shown.
         self.restore_turn_mode(game);
         if do_intercept {
@@ -838,6 +868,55 @@ mod tests {
         }
     }
 
+    /// §M 2b(s) Yoink!, Java bb2020/bb2025 `StepIntercept`:
+    /// - :144-149 the dialog carries the first candidate's UNUSED `canInterceptEasily` skill
+    ///   (bb2016 shows the bare dialog);
+    /// - CLIENT_INTERCEPTOR_CHOICE with that skill -> `easyIntercept` (2+, no modifiers,
+    ///   `ReportSkillUse(EASY_INTERCEPT)`);
+    /// - the doNextStep tail marks it used on the PLAYER (once per game) -> the next pass offers
+    ///   nothing.
+    #[test]
+    fn yoink_is_offered_used_once_and_marked_used() {
+        use ffb_model::enums::PlayerState as PS;
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::skill_def::SkillWithValue;
+
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            let mut game = game_with_one_interceptor(rules);
+            game.player_mut("opp1").unwrap().starting_skills = vec![SkillWithValue::new(SkillId::Yoink)];
+            game.field_model.set_player_state("opp1", PS::new(ffb_model::enums::PS_STANDING));
+            let mut step = StepIntercept::new("fail".into());
+            let out = step.start(&mut game, &mut GameRng::new(3));
+            let offered = match out.prompt {
+                Some(ffb_model::prompts::AgentPrompt::Interception { interception_skill, .. }) => interception_skill,
+                ref other => panic!("{rules:?}: expected the interception dialog, got {other:?}"),
+            };
+            if rules == Rules::Bb2016 {
+                assert_eq!(offered, None, "bb2016 StepIntercept never offers a skill");
+                continue;
+            }
+            assert_eq!(offered, Some(SkillId::Yoink), "{rules:?}");
+            let before = game.report_list.get_reports().len();
+            let _ = step.handle_command(
+                &Action::InterceptWithSkill { player_id: "opp1".into(), skill_id: SkillId::Yoink },
+                &mut game, &mut GameRng::new(3));
+            let new: Vec<String> = game.report_list.get_reports()[before..].iter()
+                .filter_map(|r| r.to_json()).map(|v| v.to_string()).collect();
+            assert!(new.iter().any(|r| r.contains("Yoink")),
+                "{rules:?}: an easy intercept reports the skill use: {new:?}");
+            assert!(game.player("opp1").unwrap().used_skills.contains(&SkillId::Yoink),
+                "{rules:?}: the tail marks Yoink! used on the player");
+
+            // A later pass: the used skill is no longer offered.
+            game.interceptor_chosen = false;
+            let mut again = StepIntercept::new("fail".into());
+            let out2 = again.start(&mut game, &mut GameRng::new(3));
+            assert!(matches!(out2.prompt,
+                Some(ffb_model::prompts::AgentPrompt::Interception { interception_skill: None, .. })),
+                "{rules:?}: a used Yoink! is not offered again");
+        }
+    }
+
     #[test]
     fn interceptor_chosen_but_not_in_game_goes_to_failure() {
         // interceptor_chosen = true, interceptor_id set, but player not found → failure
@@ -1023,7 +1102,7 @@ mod tests {
 
         let mut step = StepIntercept {
             goto_label_on_failure: "fail".into(),
-            interception_skill_name: None,
+            interception_skill: None,
             interceptor_id: Some("opp1".into()),
             interceptor_chosen: true,
             original_bombardier: None,

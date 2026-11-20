@@ -5292,6 +5292,23 @@ public class ParityRunner {
         if (heuristic != null
             && heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.INTERCEPTION)) {
             String chosen = heuristic.intercept() ? candidates.get(0).getId() : null;
+            // §M 2b(s) Yoink! (zero draws, mirrors Rust heuristic_agent's Interception arm): an
+            // accepted interception with an offered skill uses it -- the client's "Use <skill>"
+            // button takes the first interceptor that hasUnused(skill)
+            // (DialogInterceptionHandler :81-84; with several it asks for a click, we take the first).
+            com.fumbbl.ffb.model.skill.Skill offered = null;
+            if (game.getDialogParameter() instanceof com.fumbbl.ffb.dialog.DialogInterceptionParameter) {
+                offered = ((com.fumbbl.ffb.dialog.DialogInterceptionParameter) game.getDialogParameter())
+                    .getInterceptionSkill();
+            }
+            if (chosen != null && offered != null) {
+                for (Player<?> p : candidates) {
+                    if (p.hasUnused(offered)) {
+                        MatchRunner.inject(gameState, new ClientCommandInterceptorChoice(p.getId(), offered));
+                        return;
+                    }
+                }
+            }
             MatchRunner.inject(gameState, new ClientCommandInterceptorChoice(chosen, null));
             return;
         }

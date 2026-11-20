@@ -1946,6 +1946,7 @@ mod tests {
             player_id: candidates[0].clone(),
             target_number: 0,
             candidates: candidates.clone(),
+            interception_skill: None,
         });
         let mut agent = RandomAgent::new_parity(1);
         let before = agent.decision_rng_count;
@@ -2002,6 +2003,7 @@ mod tests {
             player_id: String::new(),
             target_number: 0,
             candidates: vec![],
+            interception_skill: None,
         });
         let mut agent = RandomAgent::new_parity(1);
         assert!(matches!(agent.act(&gs), Action::Intercept { attempt: false }));

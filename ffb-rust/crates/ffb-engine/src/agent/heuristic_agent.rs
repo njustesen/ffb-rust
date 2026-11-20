@@ -4569,12 +4569,25 @@ impl HeuristicAgent {
             }
 
             // ── interception (§6.19) ────────────────────────────────────────
-            AgentPrompt::Interception { target_number, .. } => {
+            AgentPrompt::Interception { target_number, candidates, interception_skill, .. } => {
                 let w = p_roll(target_number) * 1.5;
                 self.buf.push(Action::Intercept { attempt: true }, w, Rule::Flat, w);
                 self.buf.push(Action::Intercept { attempt: false }, 0.20, Rule::Flat, 0.20);
                 let i = self.sample(0.20);
-                self.take(i)
+                let act = self.take(i);
+                // §M 2b(s) Yoink! (zero draws, mirrored in ParityRunner.sendInterceptorChoice): an
+                // accepted interception with an offered skill uses it -- Java's "Use Yoink!" button
+                // takes the first candidate that `hasUnused(skill)` (DialogInterceptionHandler
+                // :81-84; with several the client asks for a click, the harness takes the first).
+                if let (Action::Intercept { attempt: true }, Some(skill_id)) = (&act, interception_skill) {
+                    let holder = candidates.iter().find(|pid| g.player(pid)
+                        .map(|p| p.has_skill(skill_id) && !p.used_skills.contains(&skill_id))
+                        .unwrap_or(false));
+                    if let Some(pid) = holder {
+                        return Action::InterceptWithSkill { player_id: pid.clone(), skill_id };
+                    }
+                }
+                act
             }
 
             // ── kickoff placement (§6.27) ───────────────────────────────────
