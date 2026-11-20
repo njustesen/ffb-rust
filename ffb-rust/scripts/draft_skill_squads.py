@@ -90,6 +90,31 @@ def rosters(ed):
     return by_id
 
 
+CAPTAIN_SKILLS = ("Team Captain", "Pro")
+
+
+def team_captain(roster, spec, taken):
+    """§M 2b(l): the BB2025 TEAM CAPTAIN special rule (rules/core_rules/10_the_teams.md: "you may
+    nominate any player on your starting roster (with the exception of a Big Guy) to be your Team
+    Captain. A Team Captain immediately gains the Pro Skill without increasing their cost").
+    Java models it as the player skills `Team Captain` (skill/bb2025/special/TeamCaptain:
+    canSaveReRolls + needsToBeSetUp) and `Pro` on the team file -- StepPlayerLoss.countAdvancements
+    subtracts exactly those two. Nominated: the lowest shirt number that is not a Star / Infamous
+    Staff / Big Guy, holds no drafted advancement and no Pro. Returns that player dict or None."""
+    if "Team Captain" not in (roster.get("special_rules") or []):
+        return None
+    pos_by_id = {p["id"]: p for p in roster["positions"]}
+    for pl in sorted(spec["players"], key=lambda p: p["nr"]):
+        pos = pos_by_id[pl["position_id"]]
+        big = pos.get("type") == "Big Guy" or "Big Guy" in (pos.get("keywords") or [])
+        if pos.get("type") in ("Star", "Infamous Staff") or big or pl["nr"] in taken:
+            continue
+        if "pro" in {norm(skill_name(s)) for s in pos.get("skills", [])}:
+            continue
+        return pl
+    return None
+
+
 def draft_edition(ed, catalogue, status):
     rost = rosters(ed)
     squads = {}
@@ -189,6 +214,10 @@ def draft_edition(ed, catalogue, status):
                 val = VALUED.get((ed, cls))
                 pl["skills"] = [{"name": disp, "value": val} if val is not None else disp]
                 pl["advancement"] = "primary" if primary else "secondary"
+        captain = team_captain(rost[spec["roster_id"]], v, taken[sq])
+        if captain is not None:
+            captain["skills"] = list(CAPTAIN_SKILLS)
+            captain["advancement"] = "team_captain"
         out[f"{sq}_sk"] = v
     missing = sorted(cls for cls, _, _ in skills if not placed[cls])
     short = sorted(cls for cls, _, _ in skills if 0 < len(placed[cls]) < need[cls])

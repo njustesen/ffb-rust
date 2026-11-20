@@ -50,7 +50,10 @@
 		<name>Orc Blitzer 4</name>
 		<gender>male</gender>
 		<positionId>orc.blitzer</positionId>
-		<skillList/>
+		<skillList>
+			<skill>Team Captain</skill>
+			<skill>Pro</skill>
+		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="5" id="teamOrcSkParity25Home5">

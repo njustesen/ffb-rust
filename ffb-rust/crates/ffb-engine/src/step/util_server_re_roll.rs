@@ -344,6 +344,53 @@ fn loner_roll(game: &mut Game, player_id: &str, rng: &mut GameRng)
     )
 }
 
+/// Java bb2025 `RollMechanic.TEAM_CAPTAIN_MINIMUM_ROLL` (:73).
+const TEAM_CAPTAIN_MINIMUM_ROLL: i32 = 6;
+
+/// 1:1 with Java bb2025 `RollMechanic.checkTeamCaptain` (:416-430):
+/// ```java
+/// if (Arrays.stream(game.getActingTeam().getPlayers())
+///     .noneMatch(player -> player.hasSkillProperty(NamedProperties.canSaveReRolls) &&
+///         FieldCoordinateBounds.FIELD.isInBounds(fieldModel.getPlayerCoordinate(player)))) {
+///   return false;
+/// }
+/// int roll = gameState.getDiceRoller().rollDice(6);
+/// boolean rrSaved = roll >= TEAM_CAPTAIN_MINIMUM_ROLL;
+/// stepResult.addReport(new ReportTeamCaptainRoll(actingTeam.getId(), TEAM_CAPTAIN_MINIMUM_ROLL, roll, rrSaved));
+/// return rrSaved;
+/// ```
+/// Rust had the report, the event and the skill but no caller, so a bb2025 team whose Team
+/// Captain stood on the pitch spent every team re-roll without Java's d6 (§M 2b(l)).
+fn check_team_captain(
+    game: &mut Game,
+    rng: &mut GameRng,
+    events: &mut Vec<ffb_model::events::GameEvent>,
+) -> bool {
+    use ffb_model::model::property::named_properties::NamedProperties;
+    use ffb_model::types::FieldCoordinateBounds;
+    let rules = game.rules;
+    let team = if game.home_playing { &game.team_home } else { &game.team_away };
+    let captain_on_pitch = team.players.iter().any(|p| {
+        p.has_skill_property_in(rules, NamedProperties::CAN_SAVE_RE_ROLLS)
+            && game.field_model.player_coordinate(&p.id)
+                .is_some_and(|c| FieldCoordinateBounds::FIELD.is_in_bounds(c))
+    });
+    if !captain_on_pitch {
+        return false;
+    }
+    let team_id = team.id.clone();
+    let roll = rng.d6();
+    let rr_saved = roll >= TEAM_CAPTAIN_MINIMUM_ROLL;
+    game.report_list.add(ffb_model::report::bb2025::report_team_captain_roll::ReportTeamCaptainRoll::new(
+        team_id.clone(),
+        TEAM_CAPTAIN_MINIMUM_ROLL,
+        roll,
+        rr_saved,
+    ));
+    events.push(ffb_model::events::GameEvent::TeamCaptainRoll { team_id, roll, reroll_saved: rr_saved });
+    rr_saved
+}
+
 pub fn use_reroll(
     game: &mut Game,
     re_roll_source: &ReRollSource,
@@ -386,6 +433,13 @@ pub fn use_reroll_with_events(
         // (16) and Java re-rolls again (17, success) while Rust fell over and rolled armour+injury.
         // Structurally invisible while the parity contract declined every offer.
         let is_bb2016 = game.rules == ffb_model::enums::Rules::Bb2016;
+        // Java bb2025 `RollMechanic.useTeamReRoll` :435 rolls `checkTeamCaptain` FIRST and passes
+        // `!rrSaved` to `updateTurnDataAfterReRollUsage`: a saved re-roll decrements nothing, yet
+        // the one-drive source is still chosen and reported. BB2016/BB2020 have no Team Captain.
+        let mut events = Vec::new();
+        let rr_saved = game.rules == ffb_model::enums::Rules::Bb2025
+            && check_team_captain(game, rng, &mut events);
+        let rr_actually_used = !rr_saved;
         let td = game.turn_data_mut();
         // Java `RollMechanic.useTeamReRoll` (all three editions) NEVER re-checks the bank: reaching
         // useReRoll means the OFFER was made (availability is an ask-time check), and
@@ -396,7 +450,9 @@ pub fn use_reroll_with_events(
         // continues; Rust's `if rerolls > 0` guard returned false → fall + turnover). The guard
         // was a Rust invention; `rerolls` is i32 and may go negative exactly as Java's does.
         {
-            td.rerolls -= 1;
+            if rr_actually_used {
+                td.rerolls -= 1;
+            }
             if is_bb2016 {
                 td.reroll_used = true;
             }
@@ -417,14 +473,15 @@ pub fn use_reroll_with_events(
             // `useTeamReRoll` reports THAT source, else Leader, else the team re-roll itself —
             // `new ReportReRoll(pid, source, successful=false, 0)` — BEFORE the Loner check. Rust
             // reported nothing here, so every team re-roll was missing from the stream (H.50).
+            let spend = rr_actually_used as i32;
             let used_additional = if td.rerolls_brilliant_coaching_one_drive > 0 {
-                td.rerolls_brilliant_coaching_one_drive -= 1;
+                td.rerolls_brilliant_coaching_one_drive -= spend;
                 Some("Brilliant Coaching ReRoll")
             } else if td.rerolls_pump_up_the_crowd_one_drive > 0 {
-                td.rerolls_pump_up_the_crowd_one_drive -= 1;
+                td.rerolls_pump_up_the_crowd_one_drive -= spend;
                 Some("Pump up the Crowd")
             } else if td.reroll_show_star_one_drive > 0 {
-                td.reroll_show_star_one_drive -= 1;
+                td.reroll_show_star_one_drive -= spend;
                 Some("Star of the Show")
             } else {
                 None
@@ -449,7 +506,8 @@ pub fn use_reroll_with_events(
                 0,
             ));
             let (success, event) = loner_roll(game, player_id, rng);
-            return (success, event.into_iter().collect());
+            events.extend(event);
+            return (success, events);
         }
     }
 
@@ -995,6 +1053,45 @@ mod tests {
         // `bb2016/RollMechanic`. This assertion used to require the latch, pinning a deviation that
         // refused the second team re-roll of a turn; see `reroll_used_latch_is_bb2016_only`.
         assert!(!game.turn_data_home.reroll_used);
+    }
+
+    /// Java bb2025 `useTeamReRoll` :435: with a Team Captain (canSaveReRolls) ON THE PITCH the team
+    /// rolls a d6 before spending; a natural 6 keeps the re-roll (nothing decremented) and the
+    /// roll is reported as ReportTeamCaptainRoll. Off the pitch, or in bb2020, nothing is rolled.
+    #[test]
+    fn team_captain_saves_the_team_reroll_on_a_six_bb2025_only() {
+        use ffb_model::report::report_id::ReportId;
+        let mut seen = [false, false];
+        for seed in 0..64u64 {
+            for rules in [Rules::Bb2025, Rules::Bb2020] {
+                let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
+                game.home_playing = true;
+                game.turn_data_home.rerolls = 2;
+                add_player_with_skill(&mut game, "cap", SkillId::TeamCaptain);
+                let first = GameRng::new(seed).d6();
+                use_reroll(&mut game, &ReRollSource::new("TRR"), "cap", &mut GameRng::new(seed));
+                let rolled = game.report_list.has_report(ReportId::TEAM_CAPTAIN_ROLL);
+                if rules == Rules::Bb2025 {
+                    assert!(rolled, "seed {seed}: bb2025 captain on the pitch must roll");
+                    let saved = first >= 6;
+                    seen[saved as usize] = true;
+                    assert_eq!(game.turn_data_home.rerolls, if saved { 2 } else { 1 }, "seed {seed}");
+                } else {
+                    assert!(!rolled, "bb2020 has no Team Captain roll");
+                    assert_eq!(game.turn_data_home.rerolls, 1);
+                }
+            }
+        }
+        assert!(seen[0] && seen[1], "64 seeds must cover a save and a spend");
+        // Captain in the reserves box: no roll, re-roll spent.
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 2;
+        add_player_with_skill(&mut game, "cap", SkillId::TeamCaptain);
+        game.field_model.set_player_coordinate("cap", FieldCoordinate::new(-1, 3));
+        use_reroll(&mut game, &ReRollSource::new("TRR"), "cap", &mut GameRng::new(1));
+        assert!(!game.report_list.has_report(ReportId::TEAM_CAPTAIN_ROLL));
+        assert_eq!(game.turn_data_home.rerolls, 1);
     }
 
     /// Java `useTeamReRoll` has no bank check — availability gates the OFFER, never the spend

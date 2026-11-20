@@ -39,7 +39,12 @@
     },
     {
       "nr": 4,
-      "position_id": "orc.blitzer"
+      "position_id": "orc.blitzer",
+      "skills": [
+        "Team Captain",
+        "Pro"
+      ],
+      "advancement": "team_captain"
     },
     {
       "nr": 5,

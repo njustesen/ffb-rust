@@ -1,6 +1,8 @@
 {
  "bb2016": {},
- "bb2020": {},
+ "bb2020": {
+  "PilingOn": "Not a skill of BB2020 in Java: skill/bb2020/PilingOn.java overrides eligible() to return false (comment: kept only because PilingOnBehaviour handles block knockdowns), registers no property, and no bb2020 roster or star (data/rosters/bb2020, data/star_players, ffb-server/rosters) carries it; the only eligible() readers (IntensiveTrainingHandler, MercenaryTable) filter it out, so no player can ever hold it."
+ },
  "bb2025": {
   "Insignificant": "No in-game behaviour in Java: skill/bb2025/Insignificant.java registers no property, modifier or behaviour and nothing in ffb-server or ffb-common references it; its only rule is a team-draft-list limit (the class javadoc), so no game can make it fire in either engine.",
   "Unsteady": "No server-side behaviour in Java: skill/bb2025/Unsteady.java only registers preventSecureTheBallAction, which ffb-server never reads; the sole consumer is the client action menu (ffb-client-logic LogicModule :340), mirrored in both harnesses (ParityRunner :4924 / legal_actions.rs :688), where the Rust skill-touch counter is off by design (agent decisions)."

@@ -2026,9 +2026,18 @@ mod team_file_tests {
                 let spec: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(e.path()).unwrap()).unwrap();
                 let base = spec["skilled_from"].as_str().unwrap_or_else(|| panic!("{ed}/{squad}: no skilled_from"));
                 assert_eq!(format!("{base}_sk"), squad, "{ed}/{squad}: name must be <base>_sk");
-                let (mut points, mut secondary, mut elite) = (0, 0, 0);
+                let (mut points, mut secondary, mut elite, mut captains) = (0, 0, 0, 0);
                 for pl in spec["players"].as_array().unwrap() {
                     let Some(sk) = pl.get("skills").and_then(|s| s.as_array()) else { continue };
+                    // §M 2b(l): the BB2025 Team Captain special rule is not an advancement -- the
+                    // nominated non-Big-Guy gains `Team Captain` + `Pro` free (one per squad).
+                    if pl["advancement"] == "team_captain" {
+                        assert_eq!(ed, "bb2025", "{squad}: Team Captain is a BB2025 rule");
+                        assert_eq!(sk, &vec![serde_json::json!("Team Captain"), serde_json::json!("Pro")],
+                            "{ed}/{squad} nr {}: a captain carries exactly Team Captain + Pro", pl["nr"]);
+                        captains += 1;
+                        continue;
+                    }
                     assert_eq!(sk.len(), 1, "{ed}/{squad} nr {}: one advancement per player", pl["nr"]);
                     let primary = pl["advancement"] == "primary";
                     points += if primary { 1 } else { 2 };
@@ -2036,8 +2045,8 @@ mod team_file_tests {
                     let nm = sk[0].get("name").and_then(|v| v.as_str()).or(sk[0].as_str()).unwrap();
                     elite += ["Block", "Dodge", "Guard", "Mighty Blow"].contains(&nm) as i32;
                 }
-                assert!(points <= 6 && secondary <= 1 && elite <= 4,
-                    "{ed}/{squad}: points {points}, secondary {secondary}, elite {elite}");
+                assert!(points <= 6 && secondary <= 1 && elite <= 4 && captains <= 1,
+                    "{ed}/{squad}: points {points}, secondary {secondary}, elite {elite}, captains {captains}");
                 let team = make_team_from_file(squad, "home", ed).unwrap_or_else(|e| panic!("{ed}/{squad}: {e}"));
                 let extras: usize = team.players.iter().map(|p| p.extra_skills.len()).sum();
                 assert!(extras > 0, "{ed}/{squad}: no advancement reached extra_skills");

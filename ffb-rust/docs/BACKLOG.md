@@ -9716,7 +9716,9 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 
 ## §M — 2026-11-17: SKILL COVERAGE TIER — the agents use every skill (in progress)
 
-> **RESUME HERE -- UPDATED 2026-11-20 ~15:30, read this first (supersedes "Step 1" below).**
+> **RESUME HERE -- UPDATED 2026-11-20 ~17:30 (loop iteration 3), read this first (supersedes "Step 1" below).**
+> **State at 17:30: cert6 chain PID 11308 has EXITED (cert6 fully green, see iteration 3); only the
+> ledger PID 17496 still runs. The cert6 bullet below is history.**
 > The work is now driven by `scripts/skill_parity_loop.py` (goal = `scripts/skill_parity_check.py`
 > exits 0). A supervising interactive session STILL OWNS these runs -- do NOT relaunch, kill or
 > duplicate them, and do NOT run the same edition+matchup concurrently:
@@ -9749,7 +9751,29 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   skill sweep (110 `_sk`) was at 91/110, all 20/20, at ~17:15 (`D:/ffb_sksweep/cert6`). (2) bb2016 **Pro** now really fires (phase 2b (i) below). (3) the
 >   ledger now counts Java modifier names that differ from the skill's display name -- bb2016
 >   **Claw** registers "Claws" and was reported SILENT although it fires every game (2b (j)).
-> - **Next for the loop:** when PID 17496 exits, `report` it and take the next skill from the
+> - **Loop iteration 3 (2026-11-20 ~17:30):** (1) **cert6 is COMPLETE**: PID 11308 exited, the
+>   skill sweep ended **110/110** (all 20/20 steps + reports, `D:/ffb_sksweep/cert6/results.txt`)
+>   => cert6 = mirror 330/330 + cross 4012/4012 + star 4012/4012 + skill 110/110 on `e0f63037e`.
+>   The in-repo jar is free again (no cert running). (2) bb2025 **Team Captain** ported + fielded
+>   (phase 2b (l) below). (3) bb2020 **PilingOn** exempted (2b (m)). (4) The skill ledger PID 17496
+>   is still running (`D:/ffb_ledger/cert6_2b`; at 16:35 skill 110 + mirror 330 done, cross
+>   722/4012, star 0/4012 -- hours left). It runs exe `ffb-parity-2b2.exe`, which predates 2b(h),
+>   (i) and (l), so it is a PROGRESS view only. Partial report trick used this iteration:
+>   `D:/ffb_scratch_it3/led` = cert6_2b skill+mirror+cross + the 11-17 base star kind.
+> - **Next for the loop:** (a) **Josef Bugman** -- bb2020 BugmansXXXXXX + KeenPlayer and bb2025
+>   BugmansXXXXXX + KeenPlayer are on the roster position "Josef Bugman" (`<type>Infamous
+>   Staff</type>`, `ffb-server/rosters/roster_{halfling,human,norse,...}.xml`, Rust
+>   `data/rosters/bb2025/roster_human.json` :206); the `_sk` drafter skips Infamous Staff and no
+>   squad fields him. Java consumers: KeenPlayer = SetupMechanic `canJoinTeamIfLessThanEleven`
+>   (mixed :47, bb2025 :48) + `getsSentOffAtEndOfDrive` + UtilServerGame :116; Bugman =
+>   StepBuyInducements (bb2020 :722, bb2025 :652) `canReRollOnesOnKORecovery`. Check the Rust
+>   ports of all of those, then add Bugman to a squad per edition (rule-legal: Infamous Staff is
+>   bought like an inducement -- check the edition rules) and gate. (b) bb2025 Kaboom (Bomber
+>   Dribblesnot is only in Rust `data/star_players/bb2020.json` -- does Java have a bb2025
+>   Bomber?), (c) bb2020 MesmerizingDance / TheFlashingBlade and bb2025 TheFlashingBlade show
+>   NOT FIELDED only in the 11-17 base star kind (Flashing Blade was fixed in phase 1) -- re-check
+>   once cert6_2b's star kind is done. Then the older list below.
+> - **Older next (iteration 2):** when PID 17496 exits, `report` it and take the next skill from the
 >   MEASURED list (many "NOT FIELDED" items in the 11-17 base ledger -- Kick, Pro, PilingOn, Leader,
 >   PileDriver ... -- are fielded by the `_sk` squads and should already fire). Until then, the
 >   remaining 2b items in order: (b) Forgo, (c) Hail Mary Bomb squad, (d) Blast It, (e) blitz-block
@@ -9945,6 +9969,39 @@ documented unreachable.
     inside agent decisions by design, so the menu filter can never register; and no agent has
     ever chosen SECURE_THE_BALL (0 in every ledger), so the filter has nothing observable to do.
     If Secure the Ball ever gets an agent rule, revisit (the touch would then still be agent-side).
+- **(l) bb2025 Team Captain -- DONE 2026-11-20 (loop iteration 3).** BB2025 special rule (Human,
+  Orc): a nominated non-Big-Guy gains Pro free, must be set up if able, and while on the pitch
+  "whenever you use a Team Re-roll you may roll a D6; on a natural 6 the Team Re-roll is free".
+  Java: the team file gives the player the skills `Team Captain` (skill/bb2025/special/TeamCaptain:
+  `canSaveReRolls` + `needsToBeSetUp`) and `Pro`; bb2025 `RollMechanic.useTeamReRoll` :435 calls
+  `checkTeamCaptain` (:416-430: any acting-team player with canSaveReRolls inside
+  `FieldCoordinateBounds.FIELD` -> d6, `ReportTeamCaptainRoll(team, 6, roll, saved)`) BEFORE
+  `updateTurnDataAfterReRollUsage(turnData, !rrSaved)` -- a saved re-roll decrements neither the
+  bank nor the one-drive counter, but the one-drive source is still chosen and reported. Rust had
+  the skill, report and event but NO caller (setup's needsToBeSetUp was already ported).
+  - Port: `util_server_re_roll.rs` `check_team_captain` + the TRR branch of
+    `use_reroll_with_events` (bb2025 only; returns the `TeamCaptainRoll` event). Test
+    `team_captain_saves_the_team_reroll_on_a_six_bb2025_only` (64 seeds, save + spend, bb2020 no
+    roll, captain in the box no roll). Not reachable, so not ported: the MASCOT/PRO_TRR callers
+    (Rust has no mascot roll; pregame purchases are declined) and bb2025 `StepPlayerLoss
+    .countAdvancements` (captain offset 2, STAT_DECREASE filter, not-dead check -- only runs on
+    an illegal concession, which no agent does; Rust counts `extra_skills.len()`).
+  - Squads: `draft_skill_squads.py team_captain()` nominates, for every roster whose
+    `special_rules` lists "Team Captain", the lowest shirt number that is not Star / Infamous
+    Staff / Big Guy, holds no drafted advancement and no Pro: bb2025 `human_sk` nr 2 (Halfling
+    Hopeful), `orc_sk` nr 4 (Blitzer), skills `["Team Captain", "Pro"]`, `advancement:
+    "team_captain"` (costs no skill points; the Matched Play test allows one per squad). XML
+    regenerated (`gen_java_parity_data.py`, 4 files).
+  - Gate (dev exe `D:/ffb_star/bin/ffb-parity-tc25.exe`, jar `ffb-ai-pro16.jar` -- no harness
+    change, seeds 1-20, `D:/ffb_scratch_it3/g_{human,orc}`): human_sk + orc_sk **20/20 steps +
+    20/20 reports** each; `teamCaptainRoll` in all 40 games (Java and Rust), saves included.
+    `cargo test -p ffb-engine --lib` 7619 passed. Only these two skill-suite squads change; no
+    mirror/cross/star team has the rule's skills.
+- **(m) exemption bb2020 PilingOn (2026-11-20):** `skill/bb2020/PilingOn.java` overrides
+  `eligible()` -> false ("PilingOnBehavior is used to handle block knockdowns"), has no property,
+  and no bb2020 roster/star (Rust data or `ffb-server/rosters`) carries it; Java's only
+  `eligible()` readers (IntensiveTrainingHandler, MercenaryTable) filter it out. No player can
+  hold it, so it cannot fire in either engine. (The `_sk` drafter already skipped it.)
 
 ### Phase 1 status (2026-11-18)
 

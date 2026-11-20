@@ -30,7 +30,10 @@
 		<name>Halfling Hopeful 2</name>
 		<gender>male</gender>
 		<positionId>human.halfling_hopeful</positionId>
-		<skillList/>
+		<skillList>
+			<skill>Team Captain</skill>
+			<skill>Pro</skill>
+		</skillList>
 		<playerStatistics currentSpps="0"/>
 	</player>
 	<player nr="3" id="teamHumanSkParity25Away3">

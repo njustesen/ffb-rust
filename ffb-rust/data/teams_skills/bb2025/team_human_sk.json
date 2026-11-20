@@ -23,7 +23,12 @@
     },
     {
       "nr": 2,
-      "position_id": "human.halfling_hopeful"
+      "position_id": "human.halfling_hopeful",
+      "skills": [
+        "Team Captain",
+        "Pro"
+      ],
+      "advancement": "team_captain"
     },
     {
       "nr": 3,
