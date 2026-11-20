@@ -9879,7 +9879,17 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > - **Next for the loop (after iteration 14):** the 2b(e)/(g) ports (Gored/KICK_EM_BLITZ blitz-block
 >   choice, Two for One), the bb2016 sourced rosters (user answer below), then a fresh ledger on a
 >   post-iteration-14 exe (cert6_2b is stale: most of its 40 "missing" are done) + the final cert
->   + manifest.
+>   + manifest. WHY THE CHECKER OUTPUT DOES NOT MOVE: its "missing" list is read from the newest
+>   ledger, cert6_2b (exe 2b2, before iterations 1-14), so it cannot change until a ledger runs
+>   on a newer exe. Iteration 14 decided NOT to run an interim progress ledger: it takes hours,
+>   needs `.loop_wait.json` (which stops the loop's port work for that time), breaks the <=70%
+>   overnight budget if gates run beside it, and the final step re-runs the ledger on the cert exe
+>   anyway. Run it once the remaining ports + bb2016 rosters are in, ideally as part of the final
+>   cert chain. Items done since cert6_2b (fire on gated green games, per this box): stat
+>   increases bb2020/25, bb2016 Pro, Bugman + Keen Player, Team Captain, Kaboom, Mesmerizing
+>   Dance, Flashing Blade, Violent Innovator, Zoat, Yoink, Sneakiest of the Lot, Kick 'em,
+>   Plague Ridden, A Sneaky Pair, Quick Bite, Bounding Leap. Still genuinely open: Gored by the
+>   Bull (bb2020 + bb2025), Two for One (bb2020), the 11 bb2016 roster-less items.
 > - **Next for the loop (after iteration 13, Bounding Leap DONE in iteration 14):** the 2b(e)/(f)/(g) ports (Gored/KICK_EM_BLITZ,
 >   Bounding Leap, Two for One), bb2025 SneakiestOfTheLot + ViolentInnovator re-check (both done in
 >   2b(t)/(q) but still SILENT in the stale cert6_2b ledger -- a fresh ledger decides), the bb2016
