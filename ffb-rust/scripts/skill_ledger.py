@@ -175,6 +175,39 @@ def java_catalogue():
     return cat
 
 
+MODIFIER_RE = re.compile(r'registerModifier\(\s*new\s+\w+(?:<[^>]*>)?\(\s*"([^"]+)"')
+
+
+def java_modifier_names(cat):
+    """{edition: {norm(modifier name): class}} for the roll/armour/injury modifiers a Java skill
+    class registers in postConstruct() under a name that is NOT its display name -- bb2016
+    Claw.java registers StaticArmourModifier("Claws"), bb2025 DwarvenScourge.java registers
+    "DwarfenScourge". A report naming such a modifier names the skill that registered it (the
+    modifier exists only on that skill's players). Names registered by two classes of one edition
+    are ambiguous and dropped; a name equal to some display name keeps the display match."""
+    seen = defaultdict(lambda: defaultdict(set))   # ed -> norm(name) -> classes
+    for pkg in ['common', 'mixed', 'bb2016', 'bb2020', 'bb2025']:
+        for path in glob.glob(os.path.join(JAVA_SKILLS, pkg, '**', '*.java'), recursive=True):
+            src = open(path, encoding='utf-8', errors='replace').read()
+            if not re.search(r'extends\s+Skill\b', src):
+                continue
+            cls = os.path.splitext(os.path.basename(path))[0]
+            if pkg == 'common':
+                targets = list(cat)
+            elif pkg == 'mixed':
+                targets = [r.lower() for r in re.findall(r'Rules\.(BB20\d\d)', src)]
+            else:
+                targets = [pkg]
+            for ed in targets:
+                for name in MODIFIER_RE.findall(src):
+                    seen[ed][norm(name)].add(cls)
+    out = {}
+    for ed in cat:
+        disp = {norm(d) for _, d in cat[ed].values()}
+        out[ed] = {n: next(iter(c)) for n, c in seen[ed].items() if len(c) == 1 and n not in disp}
+    return out
+
+
 # Report keys whose string values are never skill names (they would collide: playerAction
 # "block" vs the skill Block, kickoff "Blitz", weather, directions, team/coach names).
 NON_SKILL_KEYS = {'playerAction', 'direction', 'kickoffResult', 'weather', 'teamName',
@@ -188,10 +221,12 @@ ID_GENERIC = {'catch', 'kick', 'pass', 'block', 'dodge', 'leap', 'accurate', 'fo
               'guard', 'stab', 'swoop'}
 
 
-def named_counts(reports, catalogue_ed):
+def named_counts(reports, catalogue_ed, modifiers_ed=None):
     """skill class -> times a report NAMED it: a free-text value equal to the display name or
-    starting with it plus a space ("Break Tackle ST 5+"), longest display name winning, plus
-    reportIds that start with the class name (jumpUpRoll -> JumpUp)."""
+    starting with it plus a space ("Break Tackle ST 5+"), longest display name winning, then a
+    value equal to a modifier name the class registers (java_modifier_names), plus reportIds
+    that start with the class name (jumpUpRoll -> JumpUp)."""
+    modifiers_ed = modifiers_ed or {}
     by_disp = sorted(((norm(d), cls) for cls, (_, d) in catalogue_ed.items()), key=lambda t: -len(t[0]))
     by_cls = sorted(((norm(cls), cls) for cls in catalogue_ed), key=lambda t: -len(t[0]))
     out = Counter()
@@ -216,6 +251,10 @@ def named_counts(reports, catalogue_ed):
             if low == d or low.startswith(d + ' ') or norm(val) == nd:
                 out[cls] += n
                 break
+        else:
+            cls = modifiers_ed.get(norm(val))
+            if cls:
+                out[cls] += n
     return out
 
 
@@ -225,6 +264,7 @@ def norm(s):
 
 def cmd_report(a):
     cat = java_catalogue()
+    mods = java_modifier_names(cat)
     touches = defaultdict(Counter)      # ed -> class -> n
     fielded = defaultdict(set)          # ed -> class
     where = defaultdict(Counter)        # (ed, class) -> kind -> jobs touching
@@ -243,7 +283,7 @@ def cmd_report(a):
 
     rows = []
     for ed in sorted(cat):
-        named = named_counts(reports[ed], cat[ed])
+        named = named_counts(reports[ed], cat[ed], mods[ed])
         # Rust class names may differ in spelling from the Java file name; join on norm().
         rust_by_norm = {norm(k): k for k in set(touches[ed]) | fielded[ed]}
         for cls, (category, display) in sorted(cat[ed].items()):

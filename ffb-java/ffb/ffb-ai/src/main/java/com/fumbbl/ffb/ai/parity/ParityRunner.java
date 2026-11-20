@@ -1338,6 +1338,17 @@ public class ParityRunner {
                 if (answerBlockReRoll(br.hasTeamReRollOption(), dialog, game, gameState)) {
                     break;
                 }
+                // BACKLOG §M: bb2016's "Pro Re-Roll" button re-rolls the WHOLE block roll -- the
+                // client answers this dialog with sendUseReRoll(BLOCK, PRO) (DialogBlockRoll
+                // :149-150, DialogBlockRollHandler :83). Same zero-draw rule as the later editions'
+                // skill half (answerBlockSkillReRoll); Rust raises AgentPrompt::BlockSkillReRoll
+                // { pro } after the TRR half.
+                if (br.hasProReRollOption() && blockSkillReRollWanted(br.getNrOfDice(), br.getBlockRoll(), game)) {
+                    comm.clearCaptured();
+                    comm.sendUseReRoll(com.fumbbl.ffb.ReRolledActions.BLOCK, com.fumbbl.ffb.ReRollSources.PRO);
+                    injectCaptured(dialog, game, gameState);
+                    break;
+                }
                 int brIdx = heuristicBlockChoice(game, br.getNrOfDice(), br.getBlockRoll());
                 comm.clearCaptured();
                 comm.sendBlockChoice(brIdx);
@@ -3597,6 +3608,28 @@ public class ParityRunner {
      *
      * @return true when a skill re-roll was sent; false to fall through to the die choice.
      */
+    /**
+     * The gate of {@link #answerBlockSkillReRoll} without the answer: the heuristic owns the
+     * {@code reroll} class, the attacker chooses, and every die is a Skull or Both Down (Rust
+     * {@code heuristic_agent::block_skill_reroll_answer}).
+     */
+    private boolean blockSkillReRollWanted(int nrOfDice, int[] blockRoll, Game game) {
+        if (heuristic == null
+            || !heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.RE_ROLL_OFFER)
+            || nrOfDice < 0 || blockRoll == null || blockRoll.length == 0) {
+            return false;
+        }
+        com.fumbbl.ffb.factory.BlockResultFactory brf =
+            game.getFactory(com.fumbbl.ffb.FactoryType.Factory.BLOCK_RESULT);
+        for (int roll : blockRoll) {
+            com.fumbbl.ffb.BlockResult r = brf.forRoll(roll);
+            if (r != com.fumbbl.ffb.BlockResult.SKULL && r != com.fumbbl.ffb.BlockResult.BOTH_DOWN) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private boolean answerBlockSkillReRoll(int nrOfDice, int[] blockRoll, boolean brawler, boolean pro,
             String singleBlockDie, boolean multiBlockDice,
             IDialogParameter dialog, Game game, GameState gameState) {

@@ -36,6 +36,10 @@ pub struct StepBlockRoll {
     pub successful_dauntless: bool,
     /// AbstractStepWithReRoll embedded state.
     pub re_roll: ReRollState,
+    /// The last dialog's `proReRollOption` (Rust-only: Java keeps it in the dialog parameter).
+    pub pro_reroll_option: bool,
+    /// Rust-only: the dialog's Pro half has been asked (one prompt per question).
+    pub skill_offer_asked: bool,
 }
 
 impl StepBlockRoll {
@@ -47,6 +51,8 @@ impl StepBlockRoll {
             block_result: None,
             successful_dauntless: false,
             re_roll: ReRollState::new(),
+            pro_reroll_option: false,
+            skill_offer_asked: false,
         }
     }
 
@@ -163,10 +169,11 @@ impl StepBlockRoll {
                 // again). Until BACKLOG §H.13.1 the flag was computed and thrown away, so no block
                 // was ever re-rolled in any edition.
                 let team_reroll_option = self.show_block_roll_dialog(game, true);
+                self.skill_offer_asked = false;
                 let mut outcome = if team_reroll_option {
                     StepOutcome::cont().with_prompt(self.block_reroll_offer_prompt(game))
                 } else {
-                    StepOutcome::cont().with_prompt(self.block_choice_prompt(game))
+                    StepOutcome::cont().with_prompt(self.after_team_reroll_prompt(game))
                 };
                 if let Some(ev) = block_event { outcome = outcome.with_event(ev); }
                 for ev in reroll_events {
@@ -226,6 +233,25 @@ impl StepBlockRoll {
         }
     }
 
+    /// The prompt after the dialog's TRR half: its Pro half (`AgentPrompt::BlockSkillReRoll`)
+    /// when the dialog carries `proReRollOption` and it has not been asked yet, else the die
+    /// choice (same bridge as the bb2025 step's `after_team_reroll_prompt`).
+    fn after_team_reroll_prompt(&mut self, game: &Game) -> ffb_model::prompts::AgentPrompt {
+        if self.pro_reroll_option && !self.skill_offer_asked {
+            self.skill_offer_asked = true;
+            return ffb_model::prompts::AgentPrompt::BlockSkillReRoll {
+                attacker_id: game.acting_player.player_id.clone().unwrap_or_default(),
+                dice: self.block_roll.clone(),
+                own_choice: self.nr_of_dice >= 0,
+                brawler: false,
+                pro: true,
+                single_block_die: None,
+                multi_block_dice: false,
+            };
+        }
+        self.block_choice_prompt(game)
+    }
+
     /// The TRR half of Java's `DialogBlockRollParameter`, as an agent prompt. The source is
     /// `"TRR"` because that is what `ParityRunner.reRollSourceFor` answers a block dialog with
     /// (`ReRollSources.TEAM_RE_ROLL`), and what `use_reroll` consumes.
@@ -249,7 +275,7 @@ impl StepBlockRoll {
     /// caller can raise the offer prompt. bb2016 uses its own inline formula here rather than
     /// `RollMechanic.isTeamReRollAvailable` (no turn-mode or acting-team term); that is the Java,
     /// and the two must not be conflated.
-    fn show_block_roll_dialog(&self, game: &mut Game, do_roll: bool) -> bool {
+    fn show_block_roll_dialog(&mut self, game: &mut Game, do_roll: bool) -> bool {
         let acting_id = game.acting_player.player_id.as_deref().unwrap_or("").to_string();
 
         // Java: boolean teamReRollOption = (getReRollSource() == null) && !reRollUsed && (reRolls > 0)
@@ -262,11 +288,8 @@ impl StepBlockRoll {
         //   && UtilCards.hasUnusedSkillWithProperty(actingPlayer, canRerollOncePerTurn)
         let mut pro_reroll_option = self.re_roll.re_roll_source.is_none()
             && game.player(&acting_id)
-                .map(|p| {
-                    p.all_skill_ids()
-                        .any(|id| id.properties().contains(&NamedProperties::CAN_REROLL_ONCE_PER_TURN)
-                            && !p.used_skills.contains(&id))
-                })
+                .map(|p| p.has_unused_skill_with_property_in(
+                    ffb_model::enums::Rules::Bb2016, NamedProperties::CAN_REROLL_ONCE_PER_TURN))
                 .unwrap_or(false);
 
         // Java: String teamId = homePlaying ? teamHome.getId() : teamAway.getId()
@@ -293,12 +316,13 @@ impl StepBlockRoll {
             team_reroll_option = false;
             pro_reroll_option = false;
         }
-        // `pro_reroll_option` is not modeled further: Pro on a block re-rolls ONE chosen die
-        // (Java's CLIENT_USE_PRO_RE_ROLL_FOR_BLOCK carries a proIndex), a different answer shape
-        // from the team re-roll, and `ParityRunner` answers a block dialog only with
-        // `ReRollSources.TEAM_RE_ROLL`. Offering it here would cost sampler draws the harness
-        // never spends (BACKLOG §H.10, §H.14 phase 3).
-        let _ = pro_reroll_option;
+        // BACKLOG §M: the dialog's Pro half. bb2016 Pro re-rolls the WHOLE block roll -- the
+        // client's "Pro Re-Roll" button answers this same dialog with
+        // `sendUseReRoll(BLOCK, ReRollSources.PRO)` (`DialogBlockRoll` :149-150 +
+        // `DialogBlockRollHandler` :83), and `useReRoll` then rolls the Pro die (4+). Rust asks it
+        // as `AgentPrompt::BlockSkillReRoll { pro }` after the TRR half, the order `ParityRunner`'s
+        // BLOCK_ROLL arm answers the dialog in (zero sampler draws either way).
+        self.pro_reroll_option = pro_reroll_option;
 
         // Java: getResult().addReport(new ReportBlockRoll(teamId, fBlockRoll))
         {
@@ -353,7 +377,14 @@ impl Step for StepBlockRoll {
             // would roll a fresh set of block dice, since `re_rolled_action` is still unset.
             Action::UseReRoll { use_reroll: false } => {
                 self.re_roll.re_roll_source = None;
-                return StepOutcome::cont().with_prompt(self.block_choice_prompt(game));
+                return StepOutcome::cont().with_prompt(self.after_team_reroll_prompt(game));
+            }
+            // BACKLOG §M: the dialog's "Pro Re-Roll" -- Java CLIENT_USE_RE_ROLL(BLOCK, PRO) via
+            // `AbstractStepWithReRoll.handleCommand`; `useReRoll` rolls the Pro die. bb2016 Pro
+            // re-rolls the whole block roll, so the agents' die index is not used.
+            Action::UseProReRollForBlock { .. } => {
+                self.re_roll.set_re_rolled_action(ReRolledAction::new("BLOCK"));
+                self.re_roll.set_re_roll_source(ReRollSource::new("Pro"));
             }
             // Java: CLIENT_USE_RE_ROLL via `AbstractStepWithReRoll.handleCommand` — set the
             // action and the source, then re-execute, where `useReRoll` spends the team re-roll
@@ -656,6 +687,59 @@ mod tests {
             &Action::UseReRoll { use_reroll: true }, &mut game, &mut GameRng::new(2));
         assert_eq!(game.turn_data_home.rerolls, 1, "the team re-roll is spent");
         assert!(game.turn_data_home.reroll_used, "bb2016 also sets the per-turn flag");
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::BlockChoice { .. })));
+    }
+
+    // ── Pro on the block dialog (BACKLOG §M) ──────────────────────────────────
+    //
+    // bb2016's dialog carries `proReRollOption`; the client's "Pro Re-Roll" answers it with
+    // CLIENT_USE_RE_ROLL(BLOCK, PRO), which re-rolls the WHOLE roll after a 4+ Pro die.
+
+    fn game_with_pro_2016() -> Game {
+        let mut game = game_with_team_reroll_2016();
+        game.team_home.players[0].starting_skills =
+            vec![ffb_model::model::skill_def::SkillWithValue::new(ffb_model::enums::SkillId::Pro)];
+        game
+    }
+
+    #[test]
+    fn bb2016_pro_is_asked_after_the_declined_team_reroll() {
+        let mut step = StepBlockRoll::new();
+        let mut game = game_with_pro_2016();
+        step.start(&mut game, &mut GameRng::new(1));
+        let out = step.handle_command(
+            &Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(2));
+        assert!(matches!(out.prompt,
+            Some(ffb_model::prompts::AgentPrompt::BlockSkillReRoll { pro: true, brawler: false, .. })));
+        // Declining the Pro half too: the die choice, same dice.
+        let out = step.handle_command(
+            &Action::UseReRoll { use_reroll: false }, &mut game, &mut GameRng::new(3));
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::BlockChoice { .. })));
+    }
+
+    #[test]
+    fn bb2016_pro_without_team_reroll_is_asked_first() {
+        let mut step = StepBlockRoll::new();
+        let mut game = game_with_pro_2016();
+        game.turn_data_home.rerolls = 0;
+        let out = step.start(&mut game, &mut GameRng::new(1));
+        assert!(matches!(out.prompt,
+            Some(ffb_model::prompts::AgentPrompt::BlockSkillReRoll { pro: true, .. })));
+    }
+
+    #[test]
+    fn bb2016_using_pro_rolls_the_pro_die_and_marks_used_pro() {
+        let mut step = StepBlockRoll::new();
+        let mut game = game_with_pro_2016();
+        game.turn_data_home.rerolls = 0;
+        step.start(&mut game, &mut GameRng::new(1));
+        let out = step.handle_command(
+            &Action::UseProReRollForBlock { die_index: 0 }, &mut game, &mut GameRng::new(2));
+        assert!(game.field_model.player_state("atk").unwrap_or_default().has_used_pro(),
+            "useReRoll(PRO) sets usedPro before rolling the Pro die");
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::RE_ROLL),
+            "the Pro die is reported (ReportReRoll PRO)");
+        // Whatever the Pro die did, the re-shown dialog carries no option any more.
         assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::BlockChoice { .. })));
     }
 }

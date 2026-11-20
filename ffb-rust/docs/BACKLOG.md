@@ -9740,6 +9740,15 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   ledger (PID 17496) also predates it; the stat increases show as firing only in a ledger run on
 >   a post-2b(h) exe. At 16:30 starrest stood at ~2797/3023, ledger cert6_2b: skill 110/110,
 >   mirror ~328/330, cross + star not started.
+> - **Loop iteration 2 (2026-11-20 ~16:45):** (1) cert6 **starrest finished**: 3018/3023 green
+>   + the 5 reds (all in the 14:40 jar-contamination window, all `step=0`) re-gated GREEN on the
+>   frozen cert6 exe + jar (`../starjobs_cert6/rest_regate.txt`, `scratch/sweep_g1.log`); the
+>   ~94 gates that RAN in the window are being re-gated the same way (`window_r{1,2,3}.txt` ->
+>   `scratch/sweep_win{1,2,3}.log`; read them -- every line must be `n/n games match` +
+>   `REPORTS: n/n ... 0 differ`). cert6 skill sweep was running at 16:45 (`D:/ffb_sksweep/cert6`,
+>   bb2016 28/28 green so far). (2) bb2016 **Pro** now really fires (phase 2b (i) below). (3) the
+>   ledger now counts Java modifier names that differ from the skill's display name -- bb2016
+>   **Claw** registers "Claws" and was reported SILENT although it fires every game (2b (j)).
 > - **Next for the loop:** when PID 17496 exits, `report` it and take the next skill from the
 >   MEASURED list (many "NOT FIELDED" items in the 11-17 base ledger -- Kick, Pro, PilingOn, Leader,
 >   PileDriver ... -- are fielded by the `_sk` squads and should already fire). Until then, the
@@ -9884,6 +9893,36 @@ documented unreachable.
   - Closes 8 ledger items: bb2016 AgilityIncrease/MovementIncrease, bb2020 + bb2025
     AgilityIncrease/MovementIncrease/PassingIncrease (Strength/Armour classes extend an abstract
     intermediate, so the ledger catalogue never lists them; they are ported and drafted anyway).
+
+- **(i) bb2016 Pro on the block dialog -- DONE 2026-11-20 (loop iteration 2).** bb2016 Pro was
+  fielded (3 `_sk` squads: lizardman, necromantic, nippon) but never used by either harness, so
+  the ledger showed it SILENT. Java: bb2016 `StepBlockRoll.showBlockRollDialog` puts
+  `proReRollOption` (`UtilCards.hasUnusedSkillWithProperty(actingPlayer, canRerollOncePerTurn)`)
+  on `DialogBlockRollParameter`; the client's "Pro Re-Roll" button answers the SAME dialog with
+  `sendUseReRoll(BLOCK, ReRollSources.PRO)` (`DialogBlockRoll` :149-150,
+  `DialogBlockRollHandler` :83) -- bb2016 Pro re-rolls the WHOLE block roll; `useReRoll(PRO)`
+  then sets usedPro and rolls the Pro die (4+). Rust computed the flag and threw it away.
+  - Rust `step/bb2016/block/step_block_roll.rs`: keeps `pro_reroll_option`, asks
+    `AgentPrompt::BlockSkillReRoll { pro }` after the TRR half (or first when there is no TRR
+    option), answers `Action::UseProReRollForBlock` with re-rolled action BLOCK + source "Pro"
+    (the existing `use_reroll` Pro branch rolls the die). The flag now uses
+    `has_unused_skill_with_property_in(Bb2016, ..)` (same check, records the ledger touch).
+  - Harness `ParityRunner` BLOCK_ROLL arm: after `answerBlockReRoll`, `br.hasProReRollOption()`
+    + the shared zero-draw gate (`blockSkillReRollWanted`: heuristic owns `reroll`, own choice,
+    every die Skull/Both Down) -> `sendUseReRoll(BLOCK, PRO)`. Rust's agent rule is the existing
+    `block_skill_reroll_answer` (0 draws).
+  - Gate (dev exe `D:/ffb_star/bin/ffb-parity-pro16.exe`, jar `D:/ffb_star/bin/ffb-ai-pro16.jar`
+    = ffb-ai-2b.jar + this ParityRunner, seeds 1-20, `D:/ffb_scratch_c6/g1`): lizardman_sk,
+    necromantic_sk, nippon_sk **20/20 steps + 20/20 reports** each; `reRollSource:"Pro"` in 15
+    of the 60 games, Java and Rust alike. Pro is fielded nowhere else in bb2016 (11-17 base
+    ledger: NOT FIELDED over mirror+cross+star), so no other suite moves. 3 unit tests.
+- **(j) ledger: Java modifier names -- DONE 2026-11-20.** `skill_ledger.java_modifier_names`
+  reads each Java skill class's `registerModifier(new XxxModifier("<name>"...` and lets a report
+  value equal to such a name count for that class when it is not some skill's display name and
+  only one class of the edition registers it. Only two classes differ from their display name:
+  bb2016 `Claw` ("Claws": the armour modifier, named in every Claw armour report -- it was
+  SILENT, now LIVE) and bb2025 `DwarvenScourge` ("DwarfenScourge"). Not a weaker gate: a report
+  naming the modifier exists only when that skill's modifier applied.
 
 ### Phase 1 status (2026-11-18)
 
