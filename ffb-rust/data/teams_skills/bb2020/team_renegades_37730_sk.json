@@ -74,7 +74,9 @@
       "position_id": "37724"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Favoured of Chaos Undivided"
+  ],
   "skilled_from": "renegades_37730",
   "skill_points": {
     "tier_assumed": 1,

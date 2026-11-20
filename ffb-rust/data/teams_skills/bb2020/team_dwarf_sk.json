@@ -70,7 +70,10 @@
       "position_id": "dwarf.dwarfblockerlineman"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Worlds Edge Superleague",
+    "Old World Classic"
+  ],
   "skilled_from": "dwarf",
   "skill_points": {
     "tier_assumed": 1,

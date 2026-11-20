@@ -81,7 +81,10 @@
       "position_id": "blackorc.black_orc"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Badlands Brawl",
+    "Bribery and Corruption"
+  ],
   "skilled_from": "black_orc",
   "skill_points": {
     "tier_assumed": 1,

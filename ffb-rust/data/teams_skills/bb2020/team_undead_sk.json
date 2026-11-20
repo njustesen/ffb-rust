@@ -74,7 +74,10 @@
       "position_id": "undead.ghoul"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Sylvanian Spotlight",
+    "Masters of Undeath"
+  ],
   "skilled_from": "undead",
   "skill_points": {
     "tier_assumed": 1,

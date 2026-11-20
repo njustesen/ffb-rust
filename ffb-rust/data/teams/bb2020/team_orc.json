@@ -62,5 +62,7 @@
       "position_id": "orc.bigun"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Badlands Brawl"
+  ]
 }

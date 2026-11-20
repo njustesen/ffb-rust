@@ -15,7 +15,9 @@
 	<currentTeamValue>1085000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>5000</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Favoured of Chaos Undivided</rule>
+	</specialRules>
 
 	<player nr="1" id="teamRenegades37730Parity20Away1">
 		<name>Renegade Rat Ogre 1</name>

@@ -15,7 +15,10 @@
 	<currentTeamValue>1100000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>0</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Sylvanian Spotlight</rule>
+		<rule>Masters of Undeath</rule>
+	</specialRules>
 
 	<player nr="1" id="teamUndeadParity20Away1">
 		<name>Skeleton Lineman 1</name>

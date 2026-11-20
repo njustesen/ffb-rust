@@ -74,7 +74,9 @@
       "position_id": "oldworldalliance.halfling_hopeful"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Old World Classic"
+  ],
   "skilled_from": "old_world_alliance_ogre",
   "skill_points": {
     "tier_assumed": 1,

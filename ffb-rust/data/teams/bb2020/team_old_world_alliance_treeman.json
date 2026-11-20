@@ -66,5 +66,7 @@
       "position_id": "oldworldalliance.human_lineman"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Old World Classic"
+  ]
 }

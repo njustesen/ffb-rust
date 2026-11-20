@@ -78,6 +78,9 @@
       "position_id": "dwarf.dwarfblockerlineman"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Worlds Edge Superleague",
+    "Old World Classic"
+  ],
   "stat_increased_from": "dwarf"
 }

@@ -15,7 +15,9 @@
 	<currentTeamValue>1090000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>0</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Sylvanian Spotlight</rule>
+	</specialRules>
 
 	<player nr="1" id="teamVampireParity20Away1">
 		<name>Thrall Lineman 1</name>

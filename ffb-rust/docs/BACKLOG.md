@@ -9723,8 +9723,8 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > (`D:/ffb_sksweep/sk7/results.txt`). The iteration 4-10 changes (TV, StepEndTurn, foul assists,
 > interception, agents, hires) are clean across the whole skill suite. Directive deleted.
 >
-> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 11), read this first (supersedes "Step 1" below).**
-> **Nothing is running after iteration 11** (sweep PID 2188 exited; `.loop_wait.json` removed).
+> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 12), read this first (supersedes "Step 1" below).**
+> **Nothing is running after iteration 12** (its gate ran in-session and finished).
 > **State at 17:30: cert6 chain PID 11308 has EXITED (cert6 fully green, see iteration 3); only the
 > ledger PID 17496 still runs. The cert6 bullet below is history.**
 > The work is now driven by `scripts/skill_parity_loop.py` (goal = `scripts/skill_parity_check.py`
@@ -9836,7 +9836,23 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   backticks inside a double-quoted bash string ran `ffb-parity-sk7.exe` with default args from
 >   the repo root (rewrote progress.html -> restored with git restore). Edit docs via a script
 >   FILE, never inline python with backticks.
-> - **Next for the loop (after iteration 11):** the 2b(e)/(f)/(g) ports (Gored/KICK_EM_BLITZ,
+> - **Loop iteration 12 (2026-11-20 ~19:20-20:00 local):** **bb2020 team special rules DONE**
+>   (phase 2b (w)): bb2020 PlagueRidden was SILENT because no bb2020 roster carried ANY team
+>   special rule (Java needs FAVOURED_OF_NURGLE). The audit now diffs + applies the official
+>   pages' rules to all 29 bb2020 rosters (also turns on bb2020 raise dead / Masters of Undeath
+>   and the Bribery and Corruption re-roll); 70 team JSONs + 140 team XMLs regenerated. Gated
+>   16 bb2020 matchups (12 mirrors + 4 crosses) all 20/20 steps + 20/20 reports on frozen
+>   `ffb-parity-sr20.exe` + `ffb-ai-md.jar`. Then bb2020 nurgle's dangling raised_position_id
+>   (`nurgle.beast` -> `nurgle.rotter`) made raises possible, which exposed an ENGINE bug (Rust
+>   asked the edition-blind Decay property union; fixed 1:1, `has_skill_property_in(Bb2020)`);
+>   nurgle re-gate on `ffb-parity-sr20c.exe` all green incl. 12 bench-found raise seeds, 20 green
+>   games with a real Plague-Ridden raise. EVERY bb2020 cert gate of these races changes -> the final cert
+>   covers it. Nothing running after iteration 12.
+> - **Next for the loop (after iteration 12):** the 2b(e)/(f)/(g) ports (Gored/KICK_EM_BLITZ,
+>   Bounding Leap, Two for One), the rare-trigger stars (QuickBite both editions, bb2020
+>   ASneakyPair -- bench first, then skill-suite hires), the bb2016 sourced rosters, then a fresh
+>   ledger + the final cert + manifest.
+> - **Next for the loop (after iteration 11, PlagueRidden DONE in iteration 12):** the 2b(e)/(f)/(g) ports (Gored/KICK_EM_BLITZ,
 >   Bounding Leap, Two for One), the rare-trigger stars (QuickBite, PlagueRidden, ASneakyPair --
 >   bench first, then skill-suite hires like 2b(t)/(u)), the bb2016 sourced rosters, then the
 >   final cert + ledger + manifest. Many checker items are STALE (ledger cert6_2b predates
@@ -10382,6 +10398,60 @@ documented unreachable.
   **20/20 steps + 20/20 reports**; `reRoll` source Mesmerizing/Mesmerising Dance followed by a
   re-rolled gaze in bb2020 high_elf_sk s17/s19/s20 and bb2025 dark_elf_sk s2/s16. Every star gate
   fielding Eldril changes behaviour -> covered by the final cert.
+- **(w) bb2020 team special rules from the official pages -- DONE 2026-11-20 (loop iteration
+  12).** bb2020 PlagueRidden was SILENT because it CANNOT fire without the team rule: Java
+  bb2020 `InjuryMechanic.canRaiseInfectedPlayers` requires `FAVOURED_OF_NURGLE`, and NO bb2020
+  roster JSON carried `special_rules` at all (`ROSTER_PROVENANCE_BB2020.md` had recorded it as
+  "page-only ... whether that matters depends on whether any bb2020 mechanic keys off a team
+  special rule"). It does: besides Plague Ridden, bb2020 raise dead (`canRaiseDead`
+  MASTERS_OF_UNDEATH -- necromantic/undead never raised a Zombie in bb2020), the Bribery and
+  Corruption argue re-roll (`StepBuyCardsAndInducements` :707) and the bb2020
+  `InducementCollection` availabilities (Plague Doctor, Mortuary Assistant, Riotous Rookies,
+  Biased Ref reduced cost).
+  - Data: `scripts/audit_rosters.py --edition bb2020` now DIFFS special_rules (was cosmetic) and
+    `--apply` writes the page's list into the 29 official bb2020 rosters (special-rules-only
+    mismatch -> only that field changes; positions byte-identical). A "Choose either:" list
+    (Chaos Chosen, Renegades, Norse) resolves through `SPECIAL_RULE_CHOICE_BB2020` = the bb2025
+    roster's pick for the race (Undivided / Undivided / Khorne). Selftest: the stale amazon
+    known-bad (its reroll cost was fixed long ago -> 2 FAILs before this change) replaced by
+    special_rules known-bad cases; ALL PASS. `gen_java_parity_data.py` then filtered to Java's
+    SpecialRule enum (drops Favoured of Hashut, Vampire Lord) and rewrote 70 bb2020 team JSONs
+    (teams, teams_skills, teams_stats) + 140 bb2020 team XMLs. The 6 non-official bb2020
+    rosters (chaos_pact, nippon, slann, ...) are untouched.
+  - Second data defect: bb2020 `roster_nurgle.json` `raised_position_id` was `nurgle.beast` (the
+    LRB6/bb2025 Beast of Nurgle id, absent from the bb2020 roster), so the generator emitted no
+    `<raisedPositionId>` and NEITHER engine could raise. bb2020 rule text
+    (`rules/bb2020/core_rules/03_skills_and_traits.md` :533): the infected player becomes a "Rotter
+    Lineman" -> `nurgle.rotter`. (bb2025 picks its raised Lineman via `raisePositions` = LINEMAN
+    keyword, so its `nurgle.beast` id is unused; every other roster's id resolves -- checked.)
+  - **ENGINE BUG exposed (fixed 1:1):** with raises live, the bb2020 nurgle mirrors went 18/20 and
+    15/20 -- Java raised a dead Rotter, Rust did not. Rust bb2020
+    `InjuryMechanic::can_raise_infected_players` asked the edition-blind
+    `has_skill_property(REQUIRES_SECOND_CASUALTY_ROLL)`, whose union carries bb2016 Decay's
+    property; Java bb2020 resolves `mixed/Decay` (only cancelsAllowsRaisingLineman). Now every
+    conjunct uses `has_skill_property_in(Rules::Bb2020, ..)`; test
+    `plague_ridden_raises_a_dead_bb2020_decay_rotter`.
+  - Blast radius: EVERY bb2020 game with one of these races (mirror, cross, star, skill) -- the
+    final cert re-runs them all.
+  - Gate (frozen `D:/ffb_star/bin/ffb-parity-sr20.exe` = this tree, jar `ffb-ai-md.jar` (harness
+    unchanged since iteration 11), seeds 1-20, `D:/ffb_scratch_it12/gate.py`, `g1/results.txt`,
+    evidence `evidence.py`): **16/16 gates 20/20 steps + 20/20 reports** -- bb2020 mirrors
+    nurgle, nurgle_sk, necromantic, undead, black_orc, goblin, snotling, underworld, ogre,
+    khemri, vampire, chaos and crosses (unequal TVs -> inducement paths) nurgle-elf,
+    snotling-human, necromantic-dwarf, underworld-wood_elf. Not vacuous: Java's report stream has
+    `briberyAndCorruptionReRoll` in all 20 games of every B&C squad, `raiseDead` in 6 games
+    (necromantic x2, undead x2, vampire x2), and Rust touches PlagueRidden in 10 nurgle games
+    (`seed_N_rust_skills.json`; no Plague-Ridden RAISE yet -- mirror victims carry Decay /
+    Regeneration, and the one nurgle-elf touch was not a raise-eligible kill). `cargo test
+    --release -p ffb-parity` 68/0. **Superseded for the nurgle squads** by the re-gate after the
+    two fixes above (frozen `D:/ffb_star/bin/ffb-parity-sr20c.exe`, same jar,
+    `D:/ffb_scratch_it12/gate2.py`, `g3/results.txt`): bb2020 nurgle mirror, nurgle_sk mirror,
+    nurgle-elf, nurgle-human seeds 1-20 **20/20 + 20/20** each, plus the 12 bench-found
+    Plague-Ridden-raise seeds (nurgle vs human 53/79/99/105/108/144/152/193/224/243/244/269,
+    `FFB_BENCH_GREP='nurglesRot":true'`, 12/300) **1/1 + 1/1** each. Java's stream has
+    `raiseDead nurglesRot:true` in 20 of those green games. (The first nurgle gates on
+    `ffb-parity-sr20.exe` were green only because no raise could happen.) ffb-engine 7623/0,
+    ffb-mechanics 1174/0. Closes bb2020 PlagueRidden once a ledger runs on this tree.
 
 ### Phase 1 status (2026-11-18)
 

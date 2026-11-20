@@ -74,7 +74,9 @@
       "position_id": "skaven.lineman"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Underworld Challenge"
+  ],
   "skilled_from": "skaven",
   "skill_points": {
     "tier_assumed": 1,

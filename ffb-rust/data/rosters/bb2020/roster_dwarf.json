@@ -163,5 +163,9 @@
       ]
     }
   ],
-  "name_generator": "default"
+  "name_generator": "default",
+  "special_rules": [
+    "Worlds Edge Superleague",
+    "Old World Classic"
+  ]
 }

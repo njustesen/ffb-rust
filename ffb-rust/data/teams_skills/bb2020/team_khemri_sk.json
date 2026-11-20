@@ -74,7 +74,9 @@
       "position_id": "khemri.tombguardian"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Sylvanian Spotlight"
+  ],
   "skilled_from": "khemri",
   "skill_points": {
     "tier_assumed": 1,

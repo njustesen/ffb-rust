@@ -32,13 +32,18 @@ impl InjuryMechanicTrait for InjuryMechanic {
         attacker: Option<&Player>,
         dead_player: &Player,
     ) -> bool {
+        // Every hasSkillProperty here resolves the bb2020 skill classes (Java asks the game's
+        // per-edition Skill). The edition-blind union is WRONG for the last conjunct: only bb2016
+        // Decay registers requiresSecondCasualtyRoll, bb2020's mixed/Decay does not -- so a dead
+        // bb2020 Rotter IS raise-eligible (nurgle mirror bb2020 seeds 13/17, §M 2b(w)).
+        use ffb_model::enums::Rules;
         team.special_rules.iter().any(|r| r == SpecialRule::FAVOURED_OF_NURGLE.get_rule_name())
             && team_result.raised_dead == 0
             && attacker.is_some()
-            && attacker.unwrap().has_skill_property(NamedProperties::ALLOWS_RAISING_LINEMAN)
+            && attacker.unwrap().has_skill_property_in(Rules::Bb2020, NamedProperties::ALLOWS_RAISING_LINEMAN)
             && dead_player.strength <= 4
-            && !dead_player.has_skill_property_in(ffb_model::enums::Rules::Bb2020, NamedProperties::PREVENT_RAISE_FROM_DEAD)
-            && !dead_player.has_skill_property(NamedProperties::REQUIRES_SECOND_CASUALTY_ROLL)
+            && !dead_player.has_skill_property_in(Rules::Bb2020, NamedProperties::PREVENT_RAISE_FROM_DEAD)
+            && !dead_player.has_skill_property_in(Rules::Bb2020, NamedProperties::REQUIRES_SECOND_CASUALTY_ROLL)
     }
 
     fn infected_goes_to_reserves(&self) -> bool { true }
@@ -132,6 +137,28 @@ mod tests {
         tr.raised_dead = 1;
         let dead = bare_player();
         assert!(!m.can_raise_infected_players(&team, &tr, None, &dead));
+    }
+
+    #[test]
+    fn plague_ridden_raises_a_dead_bb2020_decay_rotter() {
+        // Java bb2020 InjuryMechanic.canRaiseInfectedPlayers: mixed/Decay (BB2020+BB2025) registers
+        // only cancelsAllowsRaisingLineman -- NOT bb2016 Decay's requiresSecondCasualtyRoll -- so a
+        // Rotter killed by a Plague Ridden player is raised. Regeneration (preventRaiseFromDead in
+        // bb2020) still blocks it.
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let m = InjuryMechanic::new();
+        let team = empty_team(vec![SpecialRule::FAVOURED_OF_NURGLE.get_rule_name().into()]);
+        let tr = empty_team_result();
+        let mut attacker = bare_player();
+        attacker.starting_skills.push(SkillWithValue { skill_id: SkillId::PlagueRidden, value: None });
+        let mut rotter = bare_player();
+        rotter.strength = 3;
+        rotter.starting_skills.push(SkillWithValue { skill_id: SkillId::Decay, value: None });
+        assert!(m.can_raise_infected_players(&team, &tr, Some(&attacker), &rotter));
+        let mut regen = rotter.clone();
+        regen.starting_skills.push(SkillWithValue { skill_id: SkillId::Regeneration, value: None });
+        assert!(!m.can_raise_infected_players(&team, &tr, Some(&attacker), &regen));
     }
 
     #[test]

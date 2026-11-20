@@ -62,5 +62,7 @@
       "position_id": "vampire.thrall"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Sylvanian Spotlight"
+  ]
 }

@@ -62,5 +62,7 @@
       "position_id": "chaos.beastmanrunnerlineman"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Favoured of Chaos Undivided"
+  ]
 }

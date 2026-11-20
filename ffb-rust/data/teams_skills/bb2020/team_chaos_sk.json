@@ -74,7 +74,9 @@
       "position_id": "chaos.beastmanrunnerlineman"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Favoured of Chaos Undivided"
+  ],
   "skilled_from": "chaos",
   "skill_points": {
     "tier_assumed": 1,

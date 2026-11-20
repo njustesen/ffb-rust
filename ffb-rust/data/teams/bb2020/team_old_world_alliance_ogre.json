@@ -62,5 +62,7 @@
       "position_id": "oldworldalliance.halfling_hopeful"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Old World Classic"
+  ]
 }

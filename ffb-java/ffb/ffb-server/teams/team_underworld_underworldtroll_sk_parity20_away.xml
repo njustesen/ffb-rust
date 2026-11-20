@@ -15,7 +15,10 @@
 	<currentTeamValue>1155000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>5000</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Bribery and Corruption</rule>
+		<rule>Underworld Challenge</rule>
+	</specialRules>
 
 	<player nr="1" id="teamUnderworldUnderworldtrollSkParity20Away1">
 		<name>Underworld Goblin Lineman 1</name>

@@ -74,7 +74,9 @@
       "position_id": "imperialnobility.imperial_retainer_lineman"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Old World Classic"
+  ],
   "skilled_from": "imperial_nobility",
   "skill_points": {
     "tier_assumed": 1,

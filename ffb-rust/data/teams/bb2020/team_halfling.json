@@ -78,5 +78,8 @@
       "position_id": "halfling.halfling"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Old World Classic",
+    "Halfling Thimble Cup"
+  ]
 }

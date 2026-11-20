@@ -15,7 +15,10 @@
 	<currentTeamValue>1145000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>5000</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Sylvanian Spotlight</rule>
+		<rule>Masters of Undeath</rule>
+	</specialRules>
 
 	<player nr="1" id="teamNecromanticSkParity20Home1">
 		<name>Zombie Lineman 1</name>

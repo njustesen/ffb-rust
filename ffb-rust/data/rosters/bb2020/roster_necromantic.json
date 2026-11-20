@@ -149,5 +149,9 @@
     }
   ],
   "name_generator": "default",
-  "raised_position_id": "necromantic.zombie"
+  "raised_position_id": "necromantic.zombie",
+  "special_rules": [
+    "Sylvanian Spotlight",
+    "Masters of Undeath"
+  ]
 }

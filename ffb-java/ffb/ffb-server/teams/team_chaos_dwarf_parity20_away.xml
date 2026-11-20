@@ -15,7 +15,9 @@
 	<currentTeamValue>1100000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>0</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Badlands Brawl</rule>
+	</specialRules>
 
 	<player nr="1" id="teamChaosDwarfParity20Away1">
 		<name>Hobgoblin Lineman 1</name>

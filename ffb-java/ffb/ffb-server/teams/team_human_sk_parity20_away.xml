@@ -15,7 +15,9 @@
 	<currentTeamValue>1160000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>0</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Old World Classic</rule>
+	</specialRules>
 
 	<player nr="1" id="teamHumanSkParity20Away1">
 		<name>Human Lineman 1</name>

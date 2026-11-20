@@ -62,5 +62,7 @@
       "position_id": "lizardman.skink"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Lustrian Superleague"
+  ]
 }

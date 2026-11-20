@@ -78,5 +78,10 @@
       "position_id": "snotling.snotling_lineman"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Badlands Brawl",
+    "Bribery and Corruption",
+    "Underworld Challenge",
+    "Low Cost Linemen"
+  ]
 }

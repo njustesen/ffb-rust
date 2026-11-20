@@ -78,5 +78,7 @@
       "position_id": "gnome.gnome_lineman"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Halfling Thimble Cup"
+  ]
 }

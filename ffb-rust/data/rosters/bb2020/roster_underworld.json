@@ -271,5 +271,9 @@
       ]
     }
   ],
-  "max_big_guys": 2
+  "max_big_guys": 2,
+  "special_rules": [
+    "Bribery and Corruption",
+    "Underworld Challenge"
+  ]
 }

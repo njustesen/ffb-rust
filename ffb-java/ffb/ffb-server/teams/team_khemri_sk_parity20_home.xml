@@ -15,7 +15,9 @@
 	<currentTeamValue>1150000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>0</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Sylvanian Spotlight</rule>
+	</specialRules>
 
 	<player nr="1" id="teamKhemriSkParity20Home1">
 		<name>Skeleton Lineman 1</name>

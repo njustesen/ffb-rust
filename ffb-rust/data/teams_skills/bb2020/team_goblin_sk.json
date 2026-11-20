@@ -86,7 +86,11 @@
       "position_id": "goblin.goblin"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Badlands Brawl",
+    "Bribery and Corruption",
+    "Underworld Challenge"
+  ],
   "skilled_from": "goblin",
   "skill_points": {
     "tier_assumed": 1,

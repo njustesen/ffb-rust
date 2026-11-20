@@ -69,7 +69,9 @@
       "position_id": "woodelf.lineman"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Elven Kingdoms League"
+  ],
   "skilled_from": "wood_elf",
   "skill_points": {
     "tier_assumed": 1,

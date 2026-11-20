@@ -15,7 +15,9 @@
 	<currentTeamValue>1150000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>0</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Elven Kingdoms League</rule>
+	</specialRules>
 
 	<player nr="1" id="teamElfSkParity20Home1">
 		<name>Lineman 1</name>

@@ -90,7 +90,9 @@
       "position_id": "gnome.gnome_lineman"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Halfling Thimble Cup"
+  ],
   "skilled_from": "gnome",
   "skill_points": {
     "tier_assumed": 1,

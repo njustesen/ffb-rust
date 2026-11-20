@@ -74,5 +74,9 @@
       "position_id": "goblin.goblin"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Badlands Brawl",
+    "Bribery and Corruption",
+    "Underworld Challenge"
+  ]
 }

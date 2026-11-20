@@ -15,7 +15,9 @@
 	<currentTeamValue>1145000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>5000</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Favoured of Chaos Undivided</rule>
+	</specialRules>
 
 	<player nr="1" id="teamChaosChaostrollSkParity20Home1">
 		<name>Beastman Runner Lineman 1</name>

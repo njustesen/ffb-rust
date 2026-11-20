@@ -82,7 +82,11 @@
       "position_id": "ogre.gnoblarlineman"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Badlands Brawl",
+    "Old World Classic",
+    "Low Cost Linemen"
+  ],
   "skilled_from": "ogre",
   "skill_points": {
     "tier_assumed": 1,

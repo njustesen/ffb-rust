@@ -78,5 +78,8 @@
       "position_id": "underworld.goblin"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Bribery and Corruption",
+    "Underworld Challenge"
+  ]
 }

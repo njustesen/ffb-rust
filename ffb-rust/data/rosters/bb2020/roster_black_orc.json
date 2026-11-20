@@ -104,5 +104,9 @@
         "Throw Team-mate"
       ]
     }
+  ],
+  "special_rules": [
+    "Badlands Brawl",
+    "Bribery and Corruption"
   ]
 }

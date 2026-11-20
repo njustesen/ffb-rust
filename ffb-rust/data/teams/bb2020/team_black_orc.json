@@ -66,5 +66,8 @@
       "position_id": "blackorc.black_orc"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Badlands Brawl",
+    "Bribery and Corruption"
+  ]
 }

@@ -62,5 +62,8 @@
       "position_id": "necromantic.zombie"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Sylvanian Spotlight",
+    "Masters of Undeath"
+  ]
 }

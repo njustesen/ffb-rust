@@ -66,5 +66,7 @@
       "position_id": "nurgle.rotter"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Favoured of Nurgle"
+  ]
 }

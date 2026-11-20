@@ -15,7 +15,11 @@
 	<currentTeamValue>1095000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>5000</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Badlands Brawl</rule>
+		<rule>Bribery and Corruption</rule>
+		<rule>Underworld Challenge</rule>
+	</specialRules>
 
 	<player nr="1" id="teamGoblinParity20Home1">
 		<name>Goblin Lineman 1</name>

@@ -62,5 +62,7 @@
       "position_id": "khorne.bloodborn_marauder_lineman"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Favoured of Khorne"
+  ]
 }

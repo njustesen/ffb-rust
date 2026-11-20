@@ -15,7 +15,9 @@
 	<currentTeamValue>1150000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>0</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Lustrian Superleague</rule>
+	</specialRules>
 
 	<player nr="1" id="teamAmazonSkParity20Away1">
 		<name>Eagle Warrior Linewoman 1</name>

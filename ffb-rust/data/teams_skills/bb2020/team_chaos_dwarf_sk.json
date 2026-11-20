@@ -78,7 +78,9 @@
       "position_id": "chaosdwarf.hobgoblin"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Badlands Brawl"
+  ],
   "skilled_from": "chaos_dwarf",
   "skill_points": {
     "tier_assumed": 1,

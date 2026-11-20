@@ -5,6 +5,7 @@
 	<reRollCost>70000</reRollCost>
 	<maxReRolls>8</maxReRolls>
 	<apothecary>false</apothecary>
+	<raisedPositionId>nurgle.rotter</raisedPositionId>
 	<position id="nurgle.rotter">
 		<quantity>12</quantity>
 		<name>Rotter Lineman</name>

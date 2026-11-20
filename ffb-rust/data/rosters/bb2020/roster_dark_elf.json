@@ -143,5 +143,8 @@
       ]
     }
   ],
-  "name_generator": "default"
+  "name_generator": "default",
+  "special_rules": [
+    "Elven Kingdoms League"
+  ]
 }

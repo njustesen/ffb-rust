@@ -175,5 +175,8 @@
       ]
     }
   ],
-  "name_generator": "default"
+  "name_generator": "default",
+  "special_rules": [
+    "Favoured of Chaos Undivided"
+  ]
 }

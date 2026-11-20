@@ -15,7 +15,9 @@
 	<currentTeamValue>1140000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>0</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Favoured of Khorne</rule>
+	</specialRules>
 
 	<player nr="1" id="teamNorseSkParity20Home1">
 		<name>Norse Raider Lineman 1</name>

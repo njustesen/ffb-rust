@@ -90,7 +90,12 @@
       "position_id": "snotling.snotling_lineman"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Badlands Brawl",
+    "Bribery and Corruption",
+    "Underworld Challenge",
+    "Low Cost Linemen"
+  ],
   "skilled_from": "snotling",
   "skill_points": {
     "tier_assumed": 1,

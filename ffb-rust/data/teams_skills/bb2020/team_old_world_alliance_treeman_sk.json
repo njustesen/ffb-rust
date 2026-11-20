@@ -78,7 +78,9 @@
       "position_id": "oldworldalliance.human_lineman"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Old World Classic"
+  ],
   "skilled_from": "old_world_alliance_treeman",
   "skill_points": {
     "tier_assumed": 1,

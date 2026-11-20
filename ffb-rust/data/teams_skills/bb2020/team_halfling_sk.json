@@ -95,7 +95,10 @@
       "advancement": "infamous_staff"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Old World Classic",
+    "Halfling Thimble Cup"
+  ],
   "skilled_from": "halfling",
   "skill_points": {
     "tier_assumed": 1,

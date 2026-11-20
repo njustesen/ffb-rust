@@ -185,5 +185,9 @@
       ]
     }
   ],
-  "name_generator": "default"
+  "name_generator": "default",
+  "special_rules": [
+    "Badlands Brawl",
+    "Favoured of Hashut"
+  ]
 }

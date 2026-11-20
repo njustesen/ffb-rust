@@ -74,7 +74,9 @@
       "position_id": "lizardman.skink"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Lustrian Superleague"
+  ],
   "skilled_from": "lizardman",
   "skill_points": {
     "tier_assumed": 1,

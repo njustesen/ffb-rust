@@ -316,6 +316,9 @@ def parse_team_page(path: Path, edition: str = "bb2025") -> dict:
     sr = re.search(r"### Special Rules\n(.*?)(\n### |\Z)", text, re.S)
     if sr:
         out["special_rules"] = re.findall(r"\* \[([^\]]+)\]", sr.group(1))
+        # bb2020 pages introduce a pick-one list with "Choose either:" (Chaos Chosen,
+        # Renegades, Norse); the team takes exactly ONE of the listed rules.
+        out["special_rules_choice"] = "Choose either" in sr.group(1)
     return out
 
 
@@ -446,6 +449,29 @@ def audit_bb2025(apply: bool) -> int:
 # Official BB2020 position name -> existing bb2020 JSON position id, where the
 # lineage is clear but automatic name matching fails.
 POSITION_ID_ALIASES_BB2020: dict[tuple[str, str], str] = {}
+
+# §M 2b(w), 2026-11-20: the pick for a bb2020 "Choose either:" special-rules list.
+# Same choice the bb2025 roster made for the race (bb2025 chaos/renegades "Favoured
+# of..." = Favoured of Chaos Undivided via gen_java_parity_data's alias; bb2025 norse
+# "Favoured of Khorne"). Every other bb2020 page lists its rules unconditionally.
+SPECIAL_RULE_CHOICE_BB2020: dict[str, str] = {
+    "chaos": "Favoured of Chaos Undivided",
+    "renegades": "Favoured of Chaos Undivided",
+    "norse": "Favoured of Khorne",
+}
+
+
+def expected_special_rules_bb2020(race: str, page: dict) -> list[str]:
+    """The bb2020 roster's special_rules as the page dictates (a pick-one list
+    resolves through SPECIAL_RULE_CHOICE_BB2020, which must name a listed rule)."""
+    rules = list(page.get("special_rules") or [])
+    if page.get("special_rules_choice"):
+        pick = SPECIAL_RULE_CHOICE_BB2020.get(race)
+        if pick not in rules:
+            raise SystemExit(f"bb2020 {race}: 'Choose either' list {rules} has no pick "
+                             f"in SPECIAL_RULE_CHOICE_BB2020 (got {pick!r})")
+        return [pick]
+    return rules
 
 
 def skill_key(entry) -> tuple[str, object]:
@@ -592,8 +618,12 @@ def diff_roster_bb2020(race: str, page: dict, cur: dict) -> tuple[list[str], lis
             if category_set(cur_cats.get(key)) != category_set(page_val):
                 real.append(f"  {pid}.categories.{key}: {cur_cats.get(key)} -> {page_val}")
 
-    if page["special_rules"] and "special_rules" not in cur:
-        cosmetic.append(f"  special_rules (page only, no JSON field): {page['special_rules']}")
+    # §M 2b(w): special_rules are a REAL field now -- bb2020 mechanics key off them
+    # (InjuryMechanic FAVOURED_OF_NURGLE / MASTERS_OF_UNDEATH, StepBuyCardsAndInducements
+    # BRIBERY_AND_CORRUPTION, the bb2020 InducementCollection availabilities).
+    want = expected_special_rules_bb2020(race, page)
+    if cur.get("special_rules") != want:
+        real.append(f"  special_rules: {cur.get('special_rules')} -> {want}")
     return real, cosmetic
 
 
@@ -643,6 +673,7 @@ def apply_bb2020(race: str, page: dict, cur: dict) -> dict:
     out = dict(cur)
     out["reroll_cost"] = page["reroll_cost"]
     out["apothecary"] = page["apothecary"]
+    out["special_rules"] = expected_special_rules_bb2020(race, page)
     out["positions"] = new_positions + stars
     rp = out.get("raised_position_id")
     if rp and not any(p["id"] == rp for p in new_positions):
@@ -679,7 +710,13 @@ def audit_bb2020(apply: bool, verbose: bool = False) -> int:
         for c in cosmetic:
             print(f"  [cosmetic]{c}")
         if real and apply:
-            new = apply_bb2020(race, page, cur)
+            if all(m.startswith("  special_rules:") for m in real):
+                # only the special rules differ: set that one field, keep every
+                # position byte-for-byte (apply_bb2020 rebuilds positions).
+                new = dict(cur)
+                new["special_rules"] = expected_special_rules_bb2020(race, page)
+            else:
+                new = apply_bb2020(race, page, cur)
             json_path.write_text(json.dumps(new, indent=2) + "\n", encoding="utf-8")
             print(f"  APPLIED -> {json_path.name}")
 
@@ -738,11 +775,21 @@ def selftest_bb2020() -> int:
     check("no unmatched JSON positions", orphans == [])
     check("pairing is 1:1", len({pid for _, pid in pairs}) == len(pairs) == len(existing))
 
-    print("known-bad (amazon reroll_cost 50k vs page 60k):")
-    apage, acur = load("amazon")
-    areal, _ = diff_roster_bb2020("amazon", apage, acur)
-    check("reroll_cost reported", any("reroll_cost" in m for m in areal))
-    check("50000 -> 60000 stated", any("50000 -> 60000" in m for m in areal))
+    # (The former known-bad "amazon reroll_cost 50k vs page 60k" was fixed in the data,
+    # so it no longer is one; the in-memory reroll_cost mutation below covers that field.)
+    print("known-bad (special_rules, mutated copies of real files):")
+    npage, ncur = load("nurgle")
+    check("nurgle clean as stored", diff_roster_bb2020("nurgle", npage, ncur)[0] == [])
+    nbad = dict(ncur)
+    nbad.pop("special_rules", None)
+    check("nurgle without Favoured of Nurgle reported",
+          any(m.startswith("  special_rules:") for m in diff_roster_bb2020("nurgle", npage, nbad)[0]))
+    cpage, ccur = load("chaos")
+    check("chaos page is a pick-one list", cpage.get("special_rules_choice") is True)
+    cbad = dict(ccur)
+    cbad["special_rules"] = ["Favoured of Chaos Undivided", "Favoured of Nurgle"]
+    check("chaos with two Favoured picks reported",
+          any(m.startswith("  special_rules:") for m in diff_roster_bb2020("chaos", cpage, cbad)[0]))
 
     print("known-bad (mutated copies of the known-good pair):")
     muts = [

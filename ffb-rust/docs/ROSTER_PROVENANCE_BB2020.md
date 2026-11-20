@@ -30,7 +30,7 @@ time of writing another workflow was concurrently writing `data/rosters/**` and
 | field | bb2025 | bb2020 | why |
 |---|---|---|---|
 | position `type` (Regular / Big Guy) | diffed | **not diffed** | the bb2025 pages carry a `_(Lineman, Big Guy)_` keyword parenthetical; the bb2020 pages have no keyword column at all, so there is no page-side truth. bb2020 marks its big guys only with a `*` footnote ("*An X team may include a single Big Guy*"). |
-| `special_rules` | diffed | **informational** | the bb2020 roster JSONs carry no `special_rules` key. The page's rules are printed as `[cosmetic]` so the data is visible without manufacturing 29 phantom mismatches. |
+| `special_rules` | diffed | **diffed (since 2026-11-20, §M 2b(w))** | was informational while the bb2020 roster JSONs had no `special_rules` key. bb2020 mechanics DO key off team special rules (InjuryMechanic FAVOURED_OF_NURGLE -> Plague Ridden and MASTERS_OF_UNDEATH -> raise dead, StepBuyCardsAndInducements BRIBERY_AND_CORRUPTION, InducementCollection availabilities), so `--apply` wrote the page's list into all 29 official rosters. A "Choose either:" list (Chaos Chosen, Renegades, Norse) resolves through `SPECIAL_RULE_CHOICE_BB2020` = the bb2025 roster's pick for the race (Favoured of Chaos Undivided / Undivided / Khorne). gen_java_parity_data.py then drops names Java's SpecialRule enum cannot resolve (Favoured of Hashut, Vampire Lord). |
 | `max_rerolls` | forced to 8 | untouched | not stated on the page. |
 | string skill values | diffed | **representation note** | see §3. |
 
@@ -204,7 +204,15 @@ Provenance of the roster *definition* is only one of the requirements in
 3. **`special_rules` are page-only.** The pages list them; the bb2020 roster
    JSONs have no such field (unlike bb2025's). Whether that matters depends on
    whether any bb2020 mechanic keys off a team special rule. Recorded, not
-   changed.
+   changed. **RESOLVED 2026-11-20 (§M 2b(w)):** it matters -- bb2020 Plague
+   Ridden could never fire without Favoured of Nurgle, bb2020 raise dead never
+   ran without Masters of Undeath. The rules are now in the JSONs and diffed
+   (see the scope table above; selftest has special_rules known-bad cases).
+   Same day: `roster_nurgle.json` `raised_position_id` was the LRB6 `nurgle.beast`
+   (not a bb2020 position, so no `<raisedPositionId>` was emitted and nothing could
+   be raised) -> `nurgle.rotter` per the bb2020 Plague Ridden text ("a new 'Rotter
+   Lineman'"). The audit does not cover `raised_position_id`; every other roster's
+   id was checked to resolve.
 4. **Three cosmetic data inconsistencies** are recorded in §3 and left alone:
    the dual `Bone Head`/`Bone head`, `Dump-Off`/`Dump-off`, `Jump Up`/`Jump up`
    spellings; the dual `Mutation`/`Mutations` category name; and Old World

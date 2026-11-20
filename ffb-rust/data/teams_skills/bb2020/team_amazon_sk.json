@@ -74,7 +74,9 @@
       "position_id": "amazon.linewoman"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Lustrian Superleague"
+  ],
   "skilled_from": "amazon",
   "skill_points": {
     "tier_assumed": 1,

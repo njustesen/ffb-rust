@@ -90,7 +90,10 @@
       "position_id": "underworld.goblin"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Bribery and Corruption",
+    "Underworld Challenge"
+  ],
   "skilled_from": "underworld_underworldtroll",
   "skill_points": {
     "tier_assumed": 1,

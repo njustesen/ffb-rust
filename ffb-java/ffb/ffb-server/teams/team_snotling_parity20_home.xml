@@ -15,7 +15,12 @@
 	<currentTeamValue>1020000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>20000</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Badlands Brawl</rule>
+		<rule>Bribery and Corruption</rule>
+		<rule>Underworld Challenge</rule>
+		<rule>Low Cost Linemen</rule>
+	</specialRules>
 
 	<player nr="1" id="teamSnotlingParity20Home1">
 		<name>Snotling Lineman 1</name>

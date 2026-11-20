@@ -15,7 +15,10 @@
 	<currentTeamValue>1095000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>5000</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Worlds Edge Superleague</rule>
+		<rule>Old World Classic</rule>
+	</specialRules>
 
 	<player nr="1" id="teamDwarfParity20Home1">
 		<name>Dwarf Blocker Lineman 1</name>

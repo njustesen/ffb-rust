@@ -15,7 +15,10 @@
 	<currentTeamValue>1155000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>5000</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Badlands Brawl</rule>
+		<rule>Bribery and Corruption</rule>
+	</specialRules>
 
 	<player nr="1" id="teamBlackOrcSkParity20Away1">
 		<name>Goblin Bruiser Lineman 1</name>

@@ -74,7 +74,9 @@
       "position_id": "norse.lineman"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Favoured of Khorne"
+  ],
   "skilled_from": "norse",
   "skill_points": {
     "tier_assumed": 1,

@@ -146,5 +146,9 @@
       ]
     }
   ],
-  "raised_position_id": "undead.zombie"
+  "raised_position_id": "undead.zombie",
+  "special_rules": [
+    "Sylvanian Spotlight",
+    "Masters of Undeath"
+  ]
 }

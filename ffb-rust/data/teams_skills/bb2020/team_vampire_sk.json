@@ -74,7 +74,9 @@
       "position_id": "vampire.thrall"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Sylvanian Spotlight"
+  ],
   "skilled_from": "vampire",
   "skill_points": {
     "tier_assumed": 1,

@@ -15,7 +15,9 @@
 	<currentTeamValue>1100000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>0</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Lustrian Superleague</rule>
+	</specialRules>
 
 	<player nr="1" id="teamLizardmanParity20Away1">
 		<name>Skink Runner Lineman 1</name>

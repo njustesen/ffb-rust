@@ -341,5 +341,8 @@
     }
   ],
   "name_generator": "chaos",
-  "max_big_guys": 3
+  "max_big_guys": 3,
+  "special_rules": [
+    "Favoured of Chaos Undivided"
+  ]
 }

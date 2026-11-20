@@ -74,7 +74,10 @@
       "position_id": "necromantic.zombie"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Sylvanian Spotlight",
+    "Masters of Undeath"
+  ],
   "skilled_from": "necromantic",
   "skill_points": {
     "tier_assumed": 1,

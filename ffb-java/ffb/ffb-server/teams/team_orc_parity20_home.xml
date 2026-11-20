@@ -15,7 +15,9 @@
 	<currentTeamValue>1090000</currentTeamValue>
 	<division>[X]</division>
 	<treasury>0</treasury>
-	<specialRules/>
+	<specialRules>
+		<rule>Badlands Brawl</rule>
+	</specialRules>
 
 	<player nr="1" id="teamOrcParity20Home1">
 		<name>Orc Lineman 1</name>

@@ -136,7 +136,7 @@
       ]
     }
   ],
-  "raised_position_id": "nurgle.beast",
+  "raised_position_id": "nurgle.rotter",
   "infamous_staff": [
     {
       "id": "47520",
@@ -163,5 +163,8 @@
         "Wrestle"
       ]
     }
+  ],
+  "special_rules": [
+    "Favoured of Nurgle"
   ]
 }

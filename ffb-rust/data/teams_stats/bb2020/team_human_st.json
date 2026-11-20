@@ -82,6 +82,8 @@
       "position_id": "human.blitzer"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Old World Classic"
+  ],
   "stat_increased_from": "human"
 }

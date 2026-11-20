@@ -70,5 +70,9 @@
       "position_id": "ogre.gnoblarlineman"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Badlands Brawl",
+    "Old World Classic",
+    "Low Cost Linemen"
+  ]
 }

@@ -74,7 +74,9 @@
       "position_id": "orc.bigun"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Badlands Brawl"
+  ],
   "skilled_from": "orc",
   "skill_points": {
     "tier_assumed": 1,

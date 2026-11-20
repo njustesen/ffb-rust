@@ -74,7 +74,9 @@
       "position_id": "human.blitzer"
     }
   ],
-  "special_rules": [],
+  "special_rules": [
+    "Old World Classic"
+  ],
   "skilled_from": "human",
   "skill_points": {
     "tier_assumed": 1,

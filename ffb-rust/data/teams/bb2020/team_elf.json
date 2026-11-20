@@ -62,5 +62,7 @@
       "position_id": "elf.lineman"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Elven Kingdoms League"
+  ]
 }

@@ -62,5 +62,7 @@
       "position_id": "imperialnobility.imperial_retainer_lineman"
     }
   ],
-  "special_rules": []
+  "special_rules": [
+    "Old World Classic"
+  ]
 }
