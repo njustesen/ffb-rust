@@ -132,7 +132,7 @@ fn ask_for_reroll_if_available_inner(
                     .contains(&ffb_model::model::property::named_properties::NamedProperties::CAN_REROLL_SINGLE_DIE_ONCE_PER_PERIOD))
         })
     };
-    let skill_source = reroll_skill.or_else(|| {
+    let skill_source = reroll_skill.clone().or_else(|| {
         single_die_skill.map(|id| {
             ffb_model::skill_touch::touch(id); // §M telemetry (observational only)
             ReRollSource::new(format!("{:?}", id))
@@ -153,17 +153,35 @@ fn ask_for_reroll_if_available_inner(
     // Thinking Man's Troll) with CLIENT_USE_SKILL before it looks at `teamReRollOption`, so a
     // skill-only bb2016/bb2020 offer is raised when that skill is the one listed; `team_re_roll_
     // option: false` tells every agent that does NOT use the skill to decline without a draw.
+    //
+    // BACKLOG §M phase 2b(v): bb2020 + bb2025 `StepHypnoticGaze` handle CLIENT_USE_SKILL THEMSELVES
+    // (`setReRollSource(skill.getRerollSource(HYPNOTIC_GAZE))`), so the dialog's action-keyed
+    // skill -- Mesmerizing Dance, the only skill registering a HYPNOTIC_GAZE re-roll source -- is
+    // answered with that skill too (ParityRunner.usesSingleDieSkillReRoll, same step + action
+    // gate). Every other action-keyed skill stays harness-invisible: its step has no such arm and
+    // Java would stall on the command. bb2016 StepHypnoticGaze has no arm either.
+    let gaze_skill: Option<ffb_model::enums::SkillId> = if rerolled_action == "HYPNOTIC_GAZE"
+        && game.rules != ffb_model::enums::Rules::Bb2016
+    {
+        reroll_skill.as_ref().and_then(|src| {
+            player_id.and_then(|pid| game.player(pid))
+                .and_then(|p| p.all_skill_ids().find(|id| format!("{:?}", id) == src.name))
+        })
+    } else {
+        None
+    };
+    let dialog_skill = single_die_skill.or(gaze_skill);
     if skill_source.is_some() {
         let is_bb2025 = game.rules == ffb_model::enums::Rules::Bb2025;
         let team_option = on_acting_team && team_re_roll_available(game, player_id);
-        if !is_bb2025 && !team_option && single_die_skill.is_none() {
+        if !is_bb2025 && !team_option && dialog_skill.is_none() {
             return None;
         }
         return Some(AgentPrompt::ReRollOffer {
             source: ReRollSource::new("TRR"),
             action: rerolled_action.to_owned(),
             team_id: acting_team_id,
-            re_roll_skill: single_die_skill,
+            re_roll_skill: dialog_skill,
             team_re_roll_option: is_bb2025 || team_option,
         });
     }
@@ -994,6 +1012,33 @@ mod tests {
             "a Catch-less catcher with an empty bank must be offered no re-roll, \
              regardless of what the thrower holds"
         );
+    }
+
+    /// BACKLOG §M 2b(v): bb2020/bb2025 `StepHypnoticGaze` handle CLIENT_USE_SKILL themselves, so
+    /// a failed gaze's dialog carries Mesmerizing Dance as the harness-usable `re_roll_skill`
+    /// (ParityRunner.usesSingleDieSkillReRoll) and is raised even with an empty bank -- Java's
+    /// `dialogShown` includes `reRollSkill != null`. bb2016 has no such arm (and no such skill in
+    /// play), and any other action-keyed skill (Dodge) stays harness-invisible.
+    #[test]
+    fn failed_gaze_offers_mesmerizing_dance_as_dialog_skill() {
+        let mut game = make_game();
+        game.rules = ffb_model::enums::Rules::Bb2020;
+        game.home_playing = true;
+        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.turn_data_home.rerolls = 0;
+        add_player_with_skill(&mut game, "eldril", SkillId::MesmerizingDance);
+        game.acting_player.player_id = Some("eldril".into());
+        match ask_for_reroll_if_available(&game, "HYPNOTIC_GAZE", 4, false) {
+            Some(AgentPrompt::ReRollOffer { re_roll_skill, team_re_roll_option, .. }) => {
+                assert_eq!(re_roll_skill, Some(SkillId::MesmerizingDance));
+                assert!(!team_re_roll_option);
+            }
+            other => panic!("expected a ReRollOffer carrying Mesmerizing Dance, got {:?}", other),
+        }
+        // Another action-keyed skill is NOT handed to the agent as a dialog skill.
+        add_player_with_skill(&mut game, "dodger", SkillId::Dodge);
+        game.acting_player.player_id = Some("dodger".into());
+        assert!(ask_for_reroll_if_available(&game, "DODGE", 3, false).is_none());
     }
 
     #[test]

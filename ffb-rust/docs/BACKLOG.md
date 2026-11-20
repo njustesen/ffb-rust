@@ -9716,14 +9716,15 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 
 ## §M — 2026-11-17: SKILL COVERAGE TIER — the agents use every skill (in progress)
 
-> **SUPERVISOR DIRECTIVE (2026-11-20 18:45) -- do this BEFORE any new skill work:** freeze the
-> current HEAD (exe + jar), run the FULL skill suite (`scripts/sksweep.py`, `SKSWEEP_DIRS=
-> teams_skills,teams_stats`, star_hires included, seeds 1-20, scale 1.0, cb 0, 4 workers, launched
-> detached + `.loop_wait.json`), and fix any red 1:1. Since cert6 (110/110) iterations 4-9 changed
-> every `_sk` squad's team value, StepEndTurn, foul assists, interception and the agents; only ~20
-> squads were gated. Record the result here, then delete this directive.
+> **Supervisor directive DONE (loop iteration 11, 2026-11-20 ~19:40):** full skill suite on HEAD
+> `42a4ac29c`, frozen `D:/ffb_star/bin/ffb-parity-sk7.exe` + `ffb-ai-sk7.jar` (fresh mvn package),
+> `SKSWEEP_DIRS=teams_skills,teams_stats` + star_hires, seeds 1-20, scale 1.0, cb 0, 4 workers,
+> affinity 0x7FF: **116/116 squads green, every one `parity=20/20 reports=20/20`**
+> (`D:/ffb_sksweep/sk7/results.txt`). The iteration 4-10 changes (TV, StepEndTurn, foul assists,
+> interception, agents, hires) are clean across the whole skill suite. Directive deleted.
 >
-> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 9), read this first (supersedes "Step 1" below).**
+> **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 11), read this first (supersedes "Step 1" below).**
+> **Nothing is running after iteration 11** (sweep PID 2188 exited; `.loop_wait.json` removed).
 > **State at 17:30: cert6 chain PID 11308 has EXITED (cert6 fully green, see iteration 3); only the
 > ledger PID 17496 still runs. The cert6 bullet below is history.**
 > The work is now driven by `scripts/skill_parity_loop.py` (goal = `scripts/skill_parity_check.py`
@@ -9827,7 +9828,21 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   20 Nobbla games); the star schedule simply fields Nobbla too rarely. The skill suite now hires
 >   Nobbla on bb2020 goblin_sk / skaven_sk / underworld_sk + bb2025 skaven_sk (`star_hires.json`);
 >   gated 4 x 20/20 steps + reports on the frozen sotl exe + jar, kickEmBlock in 6 + 1 green games.
-> - **Next for the loop (after iteration 10):** item (1) re-roll skill in the dialog (Mesmerizing
+> - **Loop iteration 11 (2026-11-20 ~19:45 local):** (1) supervisor directive DONE: full skill
+>   suite 116/116 green on HEAD 42a4ac29c (box above). (2) **Mesmerizing Dance re-roll DONE**
+>   (phase 2b (v)): the failed-gaze dialog now hands the agent the action-keyed skill and both
+>   harnesses USE it, draw-free; Eldril hired on bb2020 + bb2025 dark_elf_sk / high_elf_sk; gated
+>   4 x 20/20 steps + reports, MD re-roll in 5 green games. SLIP: an inline `python -c` with
+>   backticks inside a double-quoted bash string ran `ffb-parity-sk7.exe` with default args from
+>   the repo root (rewrote progress.html -> restored with git restore). Edit docs via a script
+>   FILE, never inline python with backticks.
+> - **Next for the loop (after iteration 11):** the 2b(e)/(f)/(g) ports (Gored/KICK_EM_BLITZ,
+>   Bounding Leap, Two for One), the rare-trigger stars (QuickBite, PlagueRidden, ASneakyPair --
+>   bench first, then skill-suite hires like 2b(t)/(u)), the bb2016 sourced rosters, then the
+>   final cert + ledger + manifest. Many checker items are STALE (ledger cert6_2b predates
+>   iterations 1-11): a fresh ledger on a post-iteration-11 exe should be run before the final
+>   cert to get the real remaining list.
+> - **Next for the loop (after iteration 10, MD DONE in iteration 11):** item (1) re-roll skill in the dialog (Mesmerizing
 >   Dance), the 2b(e)/(f)/(g) ports (Gored/KICK_EM_BLITZ, Bounding Leap, Two for One), the
 >   rare-trigger stars (QuickBite, PlagueRidden, ASneakyPair -- skill-suite hires like 2b(t)/(u),
 >   bench first), the bb2016 sourced rosters, then the final cert + ledger + manifest.
@@ -10349,6 +10364,24 @@ documented unreachable.
   20/20 reports**; Java's report stream carries `kickEmBlock` in bb2020 goblin_sk s6, skaven_sk
   s3/s16/s17, underworld_sk s9/s19 and bb2025 skaven_sk s1. Closes bb2020 KickEmWhileTheyReDown
   once a ledger runs on this tree.
+- **(v) Mesmerizing Dance (bb2020) / Mesmerising Dance (bb2025) re-roll -- DONE 2026-11-20 (loop
+  iteration 11).** The skill reached the failed-gaze RE_ROLL dialog as `reRollSkill` but both
+  harnesses used a listed skill only if `canRerollSingleDieOncePerPeriod`, so it was offered and
+  never taken. Java bb2020 + bb2025 `StepHypnoticGaze.handleCommand` handle CLIENT_USE_SKILL
+  themselves (`setReRollSource(skill.getRerollSource(HYPNOTIC_GAZE))`); bb2016 has no arm. Port:
+  ParityRunner `usesSingleDieSkillReRoll(skill, action, gameState)` also answers with the skill
+  when action == HYPNOTIC_GAZE, `skill.getRerollSource(action) != null` and the current step is a
+  bb2020/bb2025 StepHypnoticGaze (no other step has such an arm for an action-keyed skill -- Java
+  would stall); Rust `util_server_re_roll` puts the acting-player overload's action-keyed skill
+  in `ReRollOffer.re_roll_skill` under the same gate and raises the bb2020 offer without a team
+  re-roll (Java `dialogShown` includes `reRollSkill != null`); the driver's existing
+  `UseSkillReRoll -> command_re_roll_source` path spends it in `use_reroll`. Test
+  `failed_gaze_offers_mesmerizing_dance_as_dialog_skill`. Data: `star_hires.json` hires Eldril
+  Sidewinder on bb2020 + bb2025 dark_elf_sk / high_elf_sk (legality test green). **Gate** (frozen
+  `ffb-parity-md.exe` + `ffb-ai-md.jar`, `D:/ffb_scratch_it11/gate.py`, `g1/results.txt`): all four
+  **20/20 steps + 20/20 reports**; `reRoll` source Mesmerizing/Mesmerising Dance followed by a
+  re-rolled gaze in bb2020 high_elf_sk s17/s19/s20 and bb2025 dark_elf_sk s2/s16. Every star gate
+  fielding Eldril changes behaviour -> covered by the final cert.
 
 ### Phase 1 status (2026-11-18)
 

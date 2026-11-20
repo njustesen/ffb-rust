@@ -1617,7 +1617,7 @@ public class ParityRunner {
                         System.err.println("JRR action=" + rr.getReRolledAction() + " pid=" + rr.getPlayerId()
                             + " trr=" + rr.isTeamReRollOption());
                     }
-                    if (usesSingleDieSkillReRoll(rr.getReRollSkill(), gameState)) {
+                    if (usesSingleDieSkillReRoll(rr.getReRollSkill(), rr.getReRolledAction(), gameState)) {
                         comm.sendUseSkill(rr.getReRollSkill(), true, rr.getPlayerId(), rr.getReRolledAction());
                     } else {
                         comm.sendUseReRoll(rr.getReRolledAction(),
@@ -1626,7 +1626,7 @@ public class ParityRunner {
                 } else if (dialog instanceof com.fumbbl.ffb.dialog.DialogReRollPropertiesParameter) {
                     com.fumbbl.ffb.dialog.DialogReRollPropertiesParameter rp =
                         (com.fumbbl.ffb.dialog.DialogReRollPropertiesParameter) dialog;
-                    if (usesSingleDieSkillReRoll(rp.getReRollSkill(), gameState)) {
+                    if (usesSingleDieSkillReRoll(rp.getReRollSkill(), rp.getReRolledAction(), gameState)) {
                         comm.sendUseSkill(rp.getReRollSkill(), true, rp.getPlayerId(), rp.getReRolledAction());
                     } else {
                         comm.sendUseReRoll(rp.getReRolledAction(),
@@ -3728,15 +3728,30 @@ public class ParityRunner {
      * {@link #reRollSourceFor}, so the random contract and lower rungs keep their streams. Mirrored
      * by Rust {@code heuristic_agent} (ReRollOffer.re_roll_skill -> Action::UseSkillReRoll).
      */
-    private boolean usesSingleDieSkillReRoll(com.fumbbl.ffb.model.skill.Skill skill, GameState gameState) {
-        return heuristic != null
-            && heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.RE_ROLL_OFFER)
-            && skill != null
-            && skill.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canRerollSingleDieOncePerPeriod)
+    private boolean usesSingleDieSkillReRoll(com.fumbbl.ffb.model.skill.Skill skill,
+            com.fumbbl.ffb.ReRolledAction action, GameState gameState) {
+        if (heuristic == null
+            || !heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.RE_ROLL_OFFER)
+            || skill == null) {
+            return false;
+        }
+        com.fumbbl.ffb.server.step.IStep step = gameState.getCurrentStep();
+        if (skill.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canRerollSingleDieOncePerPeriod)
             // Only AbstractStepWithReRoll has the CLIENT_USE_SKILL arm that turns the skill into a
             // re-roll source; bb2025 StepApothecary / StepApothecaryMultiple extend AbstractStep and
             // would ignore it and stall (STUCK_STEP APOTHECARY). Rust strips the skill there.
-            && gameState.getCurrentStep() instanceof com.fumbbl.ffb.server.step.AbstractStepWithReRoll;
+            && step instanceof com.fumbbl.ffb.server.step.AbstractStepWithReRoll) {
+            return true;
+        }
+        // BACKLOG §M phase 2b(v): bb2020 + bb2025 StepHypnoticGaze handle CLIENT_USE_SKILL
+        // themselves (setReRollSource(skill.getRerollSource(HYPNOTIC_GAZE))), so the listed
+        // action-keyed skill (Mesmerizing Dance) is used too, draw-free. No other step has such an
+        // arm for an action-keyed skill (Java would stall); bb2016 StepHypnoticGaze has none.
+        // Mirrored by Rust util_server_re_roll (gaze_skill -> ReRollOffer.re_roll_skill).
+        return action == com.fumbbl.ffb.ReRolledActions.HYPNOTIC_GAZE
+            && skill.getRerollSource(action) != null
+            && (step instanceof com.fumbbl.ffb.server.step.bb2020.move.StepHypnoticGaze
+                || step instanceof com.fumbbl.ffb.server.step.bb2025.move.StepHypnoticGaze);
     }
 
     private com.fumbbl.ffb.ReRollSource reRollSourceFor(
