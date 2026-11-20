@@ -106,8 +106,28 @@ def run_one(exe, outdir, kind, key, ed, argv):
     return 'ok'
 
 
+def exe_sha256(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, 'rb') as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def cmd_run(a):
     exe = a.exe
+    # STAMP: which build produced this ledger. scripts/skill_parity_check.py only accepts a ledger
+    # whose exe is byte-identical to the certified one, and a resumed run must not mix builds.
+    os.makedirs(a.out, exist_ok=True)
+    stamp_path = os.path.join(a.out, 'STAMP.json')
+    sha = exe_sha256(exe)
+    if os.path.exists(stamp_path):
+        old = json.load(open(stamp_path))
+        if old.get('sha256') != sha:
+            sys.exit('%s was produced by a different exe (%s); use a fresh --out' % (a.out, old.get('exe')))
+    else:
+        json.dump({'exe': exe, 'sha256': sha}, open(stamp_path, 'w'), indent=1)
     todo = []
     for kind in a.kinds.split(','):
         os.makedirs(os.path.join(a.out, kind), exist_ok=True)

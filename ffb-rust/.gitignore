@@ -8,3 +8,8 @@ docs/decision_replay_deep.html
 
 # Heuristic-agent event dumps written by ffb-parity --out (default parity/heuristic)
 crates/ffb-parity/parity/
+
+# scripts/skill_parity_loop.py runtime files
+loop_logs/
+STOP_LOOP
+.loop_wait.json
