@@ -9716,6 +9716,13 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 
 ## §M — 2026-11-17: SKILL COVERAGE TIER — the agents use every skill (in progress)
 
+> **SUPERVISOR DIRECTIVE (2026-11-20 18:45) -- do this BEFORE any new skill work:** freeze the
+> current HEAD (exe + jar), run the FULL skill suite (`scripts/sksweep.py`, `SKSWEEP_DIRS=
+> teams_skills,teams_stats`, star_hires included, seeds 1-20, scale 1.0, cb 0, 4 workers, launched
+> detached + `.loop_wait.json`), and fix any red 1:1. Since cert6 (110/110) iterations 4-9 changed
+> every `_sk` squad's team value, StepEndTurn, foul assists, interception and the agents; only ~20
+> squads were gated. Record the result here, then delete this directive.
+>
 > **RESUME HERE -- UPDATED 2026-11-20 (loop iteration 9), read this first (supersedes "Step 1" below).**
 > **State at 17:30: cert6 chain PID 11308 has EXITED (cert6 fully green, see iteration 3); only the
 > ledger PID 17496 still runs. The cert6 bullet below is history.**
