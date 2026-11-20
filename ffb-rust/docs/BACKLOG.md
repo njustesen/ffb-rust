@@ -9776,6 +9776,18 @@ documented unreachable.
 
 - 14:30 cert6 remainder launched (`cert_chain.ps1 -suites starrest,skill -maxRun 4 -anytime`, user
   OK'd daytime for this run); 15 commits pushed (`47c023f5b`).
+- **Ledger re-run** (2b step 1): `scripts/skill_ledger.py run --out D:/ffb_ledger/cert6_2b --kinds
+  skill,mirror,cross,star --exe D:/ffb_star/bin/ffb-parity-2b2.exe` (8464 jobs; new `skill` kind =
+  the 110 squads, seeds 1-20). Then `report --out D:/ffb_ledger/cert6_2b` -> the measured list.
+- **(b) Forgo -- analysis, not coded:** legal in bb2025 parity games (ENABLE_STALLING_CHECK is TRUE
+  in both engines: Java's addOption is commented out -> factory default; Rust sets it). The client
+  offers FORGO to any non-prone player. Rust's engine already has the StepEndSelecting FORGO arm +
+  StepForgoneStalling; missing are `PlayerActionChoice::Forgo` and a trigger. Zero-draw trigger
+  candidate: Rust `choose_activation` returns EndTurn on `cands.is_empty()` with live players
+  (heuristic_agent.rs ~2911) == Java `ActivationChoice.choose` `out.isEmpty()` (:390); under
+  `--coverage-bias > 0` declare FORGO for the first canonical live player instead. CHECK REACH FIRST
+  (an empty plan list with live players may be ~never) -- if it is, a coverage-bias-only FORGO
+  candidate in the list (identical weight both sides) is the fallback.
 - **CERT6 CONTAMINATION WINDOW 14:40:12-14:41:32:** the in-repo harness jar was rebuilt WITH the
   2b(a) ParityRunner change while starrest ran (runner.rs resolves the in-repo jar unless
   `PARITY_CP` is set). Restored at 14:41:32 (frozen copy `D:/ffb_star/bin/ffb-ai-cert6.jar`; 2b dev

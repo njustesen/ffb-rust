@@ -42,11 +42,21 @@ SCHEDULES = {
     'mirror': os.path.join(ROOT, 'sweepjobs', 'w*.txt'),
     'cross': os.path.join(OUTER, 'crossjobs_cert2', 'w*.txt'),
     'star': os.path.join(OUTER, 'starjobs_full', 'w*.txt'),
+    # §M phase 2b: the skill-advancement squads (mirror games, as scripts/sksweep.py runs them).
+    'skill': os.path.join(ROOT, 'data', 'teams_skills', '*', 'team_*_sk.json'),
 }
 
 
 def jobs(kind):
     out = []
+    if kind == 'skill':
+        for path in sorted(glob.glob(SCHEDULES[kind])):
+            ed = os.path.basename(os.path.dirname(path))
+            sq = os.path.basename(path)[len('team_'):-len('.json')]
+            out.append(('%s_%s' % (ed, sq), ed,
+                        ['--home', sq, '--away', sq, '--edition', ed, '--seeds', '1-20',
+                         '--heur-scale', '1.0']))
+        return out
     for path in sorted(glob.glob(SCHEDULES[kind])):
         for line in open(path, encoding='utf-8'):
             f = line.split()
