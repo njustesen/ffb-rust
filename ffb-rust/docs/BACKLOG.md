@@ -9742,11 +9742,11 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   mirror ~328/330, cross + star not started.
 > - **Loop iteration 2 (2026-11-20 ~16:45):** (1) cert6 **starrest finished**: 3018/3023 green
 >   + the 5 reds (all in the 14:40 jar-contamination window, all `step=0`) re-gated GREEN on the
->   frozen cert6 exe + jar (`../starjobs_cert6/rest_regate.txt`, `scratch/sweep_g1.log`); the
->   ~94 gates that RAN in the window are being re-gated the same way (`window_r{1,2,3}.txt` ->
->   `scratch/sweep_win{1,2,3}.log`; read them -- every line must be `n/n games match` +
->   `REPORTS: n/n ... 0 differ`). cert6 skill sweep was running at 16:45 (`D:/ffb_sksweep/cert6`,
->   bb2016 28/28 green so far). (2) bb2016 **Pro** now really fires (phase 2b (i) below). (3) the
+>   frozen cert6 exe + jar (`../starjobs_cert6/rest_regate.txt`, `scratch/sweep_g1.log`), and
+>   all 94 gates that RAN in the window re-gated the same way, **94/94 green**
+>   (`window_r{1,2,3}.txt` -> `scratch/sweep_win{1,2,3}.log`). => **cert6 star 4012/4012 green**
+>   on `e0f63037e` (w1-3 + r1-3 logs, last verdict per gate = g1/win logs where re-run). cert6
+>   skill sweep (110 `_sk`) was at 91/110, all 20/20, at ~17:15 (`D:/ffb_sksweep/cert6`). (2) bb2016 **Pro** now really fires (phase 2b (i) below). (3) the
 >   ledger now counts Java modifier names that differ from the skill's display name -- bb2016
 >   **Claw** registers "Claws" and was reported SILENT although it fires every game (2b (j)).
 > - **Next for the loop:** when PID 17496 exits, `report` it and take the next skill from the
@@ -9772,6 +9772,19 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   fix needs a re-freeze + re-run.
 > **Step 2 — phase 2b** (designed skill coverage, list below in the phase plan), starting with a
 > fresh skill-ledger run on the cert6 build. **Then phase 4.** 14 commits are unpushed (ask first).
+
+### QUESTION FOR THE USER (§M, open -- the loop keeps working on other items meanwhile)
+
+1. **(2026-11-20, loop iteration 2) bb2016 skills no roster carries.** Eight bb2016 EXTRAORDINARY
+   skills are NOT FIELDED and cannot be drafted (EXTRAORDINARY is no advancement category):
+   Disposable, FanFavourite, KickTeamMate, MonstrousMouth, Swarming, Swoop, Timmmber,
+   WeepingDagger. None appears in `data/rosters/bb2016/*` nor in any `ffb-server/rosters/*bb2016*`
+   XML (stars included). Java resolves them (the classes have behaviours), so they are not
+   "Java cannot resolve it" exemptions by the house rule -- the only way to make them fire is
+   NEW bb2016 roster data (FUMBBL's bb2016 Snotling / Spike! teams etc.), i.e. inventing scope
+   beyond the cleaned LRB6/CRP set (`docs/BB2016_DRAFTING_AND_ROSTERS.md`). Options: (a) exempt
+   them with reason "no bb2016 roster in this project carries it"; (b) add sourced bb2016 rosters
+   that carry them (needs a source of truth for the stats). Until answered the loop leaves them.
 
 **Goal (user, 2026-11-17):** "make the agent use all skills in the game. Ideally to play better
 but most importantly to reach better coverage." User decisions: (1) drafted teams MAY carry
@@ -9923,6 +9936,15 @@ documented unreachable.
   bb2016 `Claw` ("Claws": the armour modifier, named in every Claw armour report -- it was
   SILENT, now LIVE) and bb2025 `DwarvenScourge` ("DwarfenScourge"). Not a weaker gate: a report
   naming the modifier exists only when that skill's modifier applied.
+- **(k) exemptions (`data/agent/skill_exempt.json`), 2026-11-20:** the first two, both bb2025.
+  - `Insignificant`: `skill/bb2025/Insignificant.java` registers nothing (no property, modifier,
+    behaviour) and no other Java file names it -- it is a team-draft-list rule only.
+  - `Unsteady`: registers only `preventSecureTheBallAction`, which ffb-server never reads; its
+    one consumer is the client action menu (`LogicModule` :340), mirrored by both harnesses
+    (`ParityRunner` :4924, `legal_actions.rs` :688). The ledger's skill-touch counter is off
+    inside agent decisions by design, so the menu filter can never register; and no agent has
+    ever chosen SECURE_THE_BALL (0 in every ledger), so the filter has nothing observable to do.
+    If Secure the Ball ever gets an agent rule, revisit (the touch would then still be agent-side).
 
 ### Phase 1 status (2026-11-18)
 
