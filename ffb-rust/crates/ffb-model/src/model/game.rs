@@ -158,6 +158,14 @@ pub struct Game {
     /// Players are restored (unzapped) at end of drive/half.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub zapped_players: Vec<ZappedPlayer>,
+
+    /// The re-roll source a CLIENT_USE_SKILL answer chose (Java `AbstractStepWithReRoll`
+    /// CLIENT_USE_SKILL arm: `setReRollSource(skill.getRerollSource(SINGLE_DIE))`). Rust steps
+    /// record "TRR" when they raise the offer, so the driver sets this for the duration of ONE
+    /// `handle_command` call and `use_reroll` spends it in place of the step's recorded source.
+    /// Always `None` outside that call. BACKLOG §M phase 2b(a).
+    #[serde(skip)]
+    pub command_re_roll_source: Option<crate::enums::ReRollSource>,
 }
 
 impl Game {
@@ -216,6 +224,7 @@ impl Game {
             dialog_id: None,
             report_list: ReportList::new(),
             zapped_players: Vec::new(),
+            command_re_roll_source: None,
         }
     }
 

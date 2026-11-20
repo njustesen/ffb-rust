@@ -1268,7 +1268,22 @@ impl DriverGameState {
         // attribution gap as the Intercept die in ITER8 -- if a diagnostic only wraps one of the two
         // entry points, half the mutations are invisible.
         let rr_before_cmd = (self.game.turn_data_home.rerolls, self.game.turn_data_away.rerolls);
+        // Java `AbstractStepWithReRoll.handleCommand` CLIENT_USE_SKILL arm (:61-67): a used
+        // `canRerollSingleDieOncePerPeriod` skill sets the step's re-roll source to
+        // `skill.getRerollSource(SINGLE_DIE)` and EXECUTE_STEPs -- the same path as an accepted
+        // re-roll, with the skill as the source. Every Rust re-roll step records "TRR" when it
+        // raises the offer, so the skill source rides on the game for exactly this one call and
+        // `use_reroll` spends it instead (BACKLOG §M phase 2b(a)).
+        let action = match action {
+            Action::UseSkillReRoll { skill_id } => {
+                self.game.command_re_roll_source =
+                    Some(ffb_model::enums::ReRollSource::new(format!("{:?}", skill_id)));
+                Action::UseReRoll { use_reroll: true }
+            }
+            other => other,
+        };
         let mut outcome = entry.step.handle_command(&action, &mut self.game, &mut self.rng);
+        self.game.command_re_roll_source = None;
         if std::env::var_os("FFB_RR_STEPS").is_some() {
             let rr_now = (self.game.turn_data_home.rerolls, self.game.turn_data_away.rerolls);
             if rr_now != rr_before_cmd {

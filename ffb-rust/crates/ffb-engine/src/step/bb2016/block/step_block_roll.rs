@@ -233,6 +233,7 @@ impl StepBlockRoll {
         ffb_model::prompts::AgentPrompt::ReRollOffer {
             source: ReRollSource::new("TRR"),
             action: "BLOCK".to_owned(),
+            re_roll_skill: None, team_re_roll_option: true,
             team_id: if game.home_playing {
                 game.team_home.id.clone()
             } else {

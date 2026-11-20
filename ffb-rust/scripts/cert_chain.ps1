@@ -17,6 +17,9 @@ $repo  = "C:\Users\Admin\niels\ffb-rust\ffb-rust"
 $outer = "C:\Users\Admin\niels\ffb-rust"
 $mask  = 2047
 $env:JAVA_TOOL_OPTIONS = "-Xmx1g -XX:+UseSerialGC"
+# Freeze the Java harness too: runner.rs otherwise resolves the IN-REPO jar, so any `mvn package`
+# during a cert silently swaps the oracle mid-run (happened 2026-11-20 14:40). Workers inherit this.
+$env:PARITY_CP = "D:/ffb_star/bin/ffb-ai-cert6.jar"
 try { (Get-Process -Id $PID).ProcessorAffinity = [IntPtr]$mask } catch {}
 
 function InWindow { if ($anytime) { return $true }; $h = (Get-Date).Hour; return ($h -ge 21 -or $h -lt 7) }

@@ -130,6 +130,11 @@ pub enum Action {
     UseSkill { skill_id: SkillId, use_skill: bool },
     /// Declare use / non-use of a re-roll.
     UseReRoll { use_reroll: bool },
+    /// Java `ClientCommandUseSkill(skill, true, playerId, reRolledAction)` sent from a re-roll
+    /// dialog's skill button (`DialogReRollHandler` :56-57) -- a `canRerollSingleDieOncePerPeriod`
+    /// skill (Halfling Luck, Thinking Man's Troll). The driver applies it as an accepted re-roll
+    /// whose source is that skill (`Game::command_re_roll_source`).
+    UseSkillReRoll { skill_id: SkillId },
     /// Use (or decline) the apothecary on an injured player.
     UseApothecary { player_id: PlayerId, use_apothecary: bool },
     /// Use a bribe to avoid ejection.

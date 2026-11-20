@@ -374,6 +374,7 @@ impl StepPass {
                 prompt = Some(ffb_model::prompts::AgentPrompt::ReRollOffer {
                     source: ReRollSource::new("TRR"),
                     action: "PASS".to_owned(),
+                    re_roll_skill: None, team_re_roll_option: true,
                     team_id,
                 });
             }

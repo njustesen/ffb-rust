@@ -309,7 +309,7 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
             Some(WireDialog::TricksterMove { player_id: player_id.clone(), squares: squares.clone() }),
         AgentPrompt::Pushback { attacker_id, defender_id, squares } =>
             Some(WireDialog::Pushback { attacker_id: attacker_id.clone(), defender_id: defender_id.clone(), squares: squares.clone() }),
-        AgentPrompt::ReRollOffer { source, action, team_id } =>
+        AgentPrompt::ReRollOffer { source, action, team_id, .. } =>
             Some(WireDialog::ReRollOffer { source: source.name.clone(), action: action.clone(), team_id: team_id.clone() }),
         AgentPrompt::ReRollForTargets {
             player_id, target_ids, minimum_rolls, re_rolled_action, re_roll_available_against,

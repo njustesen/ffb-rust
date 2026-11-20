@@ -4,6 +4,8 @@ use crate::enums::{PlayerAction, ReRollSource, SkillCategory, SkillId, Weather};
 use crate::model::player::PlayerId;
 use crate::types::FieldCoordinate;
 
+fn default_true() -> bool { true }
+
 /// The server's request for an agent decision (replaces 70+ Java Dialog*Parameter classes).
 ///
 /// The engine emits one of these whenever it needs an agent choice.
@@ -172,6 +174,17 @@ pub enum AgentPrompt {
         source: ReRollSource,
         action: String,
         team_id: String,
+        /// Java dialog `getReRollSkill()`, kept only when it is a `canRerollSingleDieOncePerPeriod`
+        /// skill (Halfling Luck, Thinking Man's Troll, bb2020 Consummate Professional) -- the only
+        /// kind `AbstractStepWithReRoll.handleCommand`'s CLIENT_USE_SKILL arm accepts. Answered
+        /// with `Action::UseSkillReRoll` (BACKLOG §M phase 2b(a)).
+        #[serde(default)]
+        re_roll_skill: Option<SkillId>,
+        /// The `teamReRollOption` the parity harness reads: bb2016/bb2020 pass the dialog's real
+        /// `isTeamReRollOption()`, bb2025 (`DialogReRollPropertiesParameter`) a hardcoded `true`.
+        /// `false` = the harness declines with zero draws unless it uses `re_roll_skill`.
+        #[serde(default = "default_true")]
+        team_re_roll_option: bool,
     },
     /// Java: `DialogReRollForTargetsParameter` (via `AbstractStepModifierMultipleBlock.
     /// decideNextStep`/`createDialogParameter`) — lets the coach pick which still-failing

@@ -272,6 +272,7 @@ impl StepIntercept {
             let prompt = AgentPrompt::ReRollOffer {
                 source: ReRollSource::new("TRR"),
                 action: "INTERCEPTION".to_owned(),
+                re_roll_skill: None, team_re_roll_option: true,
                 team_id: inactive_team_id,
             };
             return StepOutcome::cont().with_prompt(prompt);

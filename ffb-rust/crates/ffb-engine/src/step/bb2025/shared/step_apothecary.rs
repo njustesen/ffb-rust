@@ -140,7 +140,16 @@ impl StepApothecary {
                         && match crate::step::util_server_re_roll::ask_for_reroll_if_available_for(
                             game, Some(&defender_id), "REGENERATION", 4, false,
                         ) {
-                            Some(prompt) => {
+                            Some(mut prompt) => {
+                                // Java bb2025 StepApothecary extends AbstractStep, NOT
+                                // AbstractStepWithReRoll: it has no CLIENT_USE_SKILL arm, so a
+                                // Thinking Man's Troll answer would stall it. The harness answers
+                                // the skill only where the current step is AbstractStepWithReRoll
+                                // (ParityRunner.usesSingleDieSkillReRoll); strip it here to match
+                                // (ripper bb2025 elf vs goblin seeds 5/19: Java STUCK_STEP APOTHECARY).
+                                if let ffb_model::prompts::AgentPrompt::ReRollOffer { re_roll_skill, .. } = &mut prompt {
+                                    *re_roll_skill = None;
+                                }
                                 self.regen_reroll_pending = Some(defender_id.clone());
                                 let mut out = StepOutcome::cont().with_prompt(prompt);
                                 for ev in pending_events { out = out.with_event(ev); }

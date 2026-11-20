@@ -122,17 +122,21 @@ fn ask_for_reroll_if_available_inner(
     // Rust raised `ReRollOffer{source: Catch}` off the THROWER's Catch — Java offers nothing (the
     // catcher's own Catch is consumed by `CatchBehaviour`'s hook, and the bank was empty), bounces
     // the ball at d8 pos=104 and the two engines' dice split there.
+    let single_die_skill: Option<ffb_model::enums::SkillId> = if reroll_skill.is_some() {
+        None
+    } else {
+        player_id.and_then(|pid| game.player(pid)).and_then(|player| {
+            player.all_skill_ids()
+                .filter(|id| !player.used_skills.contains(id))
+                .find(|id| id.properties()
+                    .contains(&ffb_model::model::property::named_properties::NamedProperties::CAN_REROLL_SINGLE_DIE_ONCE_PER_PERIOD))
+        })
+    };
     let skill_source = reroll_skill.or_else(|| {
-        let pid = player_id?;
-        let player = game.player(pid)?;
-        player.all_skill_ids()
-            .filter(|id| !player.used_skills.contains(id))
-            .find(|id| id.properties()
-                .contains(&ffb_model::model::property::named_properties::NamedProperties::CAN_REROLL_SINGLE_DIE_ONCE_PER_PERIOD))
-            .map(|id| {
-                ffb_model::skill_touch::touch(id); // §M telemetry (observational only)
-                ReRollSource::new(format!("{:?}", id))
-            })
+        single_die_skill.map(|id| {
+            ffb_model::skill_touch::touch(id); // §M telemetry (observational only)
+            ReRollSource::new(format!("{:?}", id))
+        })
     });
     // Java shows ONE dialog carrying both the skill and `teamReRollOption`, and the parity coach
     // (`ParityRunner.reRollSourceFor`) answers it with `TEAM_RE_ROLL` or null — never with the
@@ -144,16 +148,23 @@ fn ask_for_reroll_if_available_inner(
     // identical candidates at the next activation, 515 vs 513 draws, different pick), and an
     // accepted offer consumed the skill where Java consumes the team re-roll. Same harness-level
     // gate as the Pro offer below.
+    //
+    // BACKLOG §M phase 2b(a): the harness now answers a listed single-die skill (Halfling Luck,
+    // Thinking Man's Troll) with CLIENT_USE_SKILL before it looks at `teamReRollOption`, so a
+    // skill-only bb2016/bb2020 offer is raised when that skill is the one listed; `team_re_roll_
+    // option: false` tells every agent that does NOT use the skill to decline without a draw.
     if skill_source.is_some() {
-        if game.rules != ffb_model::enums::Rules::Bb2025
-            && !(on_acting_team && team_re_roll_available(game, player_id))
-        {
+        let is_bb2025 = game.rules == ffb_model::enums::Rules::Bb2025;
+        let team_option = on_acting_team && team_re_roll_available(game, player_id);
+        if !is_bb2025 && !team_option && single_die_skill.is_none() {
             return None;
         }
         return Some(AgentPrompt::ReRollOffer {
             source: ReRollSource::new("TRR"),
             action: rerolled_action.to_owned(),
             team_id: acting_team_id,
+            re_roll_skill: single_die_skill,
+            team_re_roll_option: is_bb2025 || team_option,
         });
     }
 
@@ -170,6 +181,8 @@ fn ask_for_reroll_if_available_inner(
             source: ReRollSource::new("TRR"),
             action: rerolled_action.to_owned(),
             team_id: acting_team_id,
+            re_roll_skill: None,
+            team_re_roll_option: true,
         });
     }
     pro_offer(game, player_id, rerolled_action, acting_team_id)
@@ -248,6 +261,9 @@ fn pro_offer(
                     source: ReRollSource::new("TRR"),
                     action: rerolled_action.to_owned(),
                     team_id: acting_team_id,
+                    re_roll_skill: None,
+                    // bb2025's DialogReRollPropertiesParameter: the harness passes `true`.
+                    team_re_roll_option: true,
                 });
             }
         }
@@ -347,6 +363,10 @@ pub fn use_reroll_with_events(
     player_id: &str,
     rng: &mut GameRng,
 ) -> (bool, Vec<ffb_model::events::GameEvent>) {
+    // A CLIENT_USE_SKILL answer to the re-roll dialog chose a skill source (see
+    // `Game::command_re_roll_source`); Java's step holds that source, Rust's holds "TRR".
+    let chosen = game.command_re_roll_source.take();
+    let re_roll_source = chosen.as_ref().unwrap_or(re_roll_source);
     // Check if source is a team re-roll (TRR).
     // Java: ReRollSource.hasProperty(ReRollProperty.TRR) etc.
     if re_roll_source.name == "TRR"
@@ -487,6 +507,11 @@ pub fn use_reroll_with_events(
                 let tracked = id.usage_type_for(game.rules).track_outside_activation();
                 let successful = if tracked { !player.used_skills.contains(&id) } else { true };
                 player.used_skills.insert(id);
+                // Java :391-397: a tracked skill is `actingPlayer.markSkillUsed` when the roller
+                // IS the acting player (that also marks the player), else `player.markUsed`.
+                if tracked && game.acting_player.player_id.as_deref() == Some(player_id) {
+                    game.acting_player.used_skills.insert(id);
+                }
                 game.report_list.add(ffb_model::report::report_re_roll::ReportReRoll::new(
                     Some(player_id.to_string()),
                     ReRollSource::new(id.category_and_name_for(game.rules).1),

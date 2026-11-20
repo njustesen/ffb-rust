@@ -4091,6 +4091,19 @@ impl Agent for HeuristicAgent {
             );
         }
 
+        // BACKLOG §M phase 2b(a), mirrored by ParityRunner's RE_ROLL / RE_ROLL_PROPERTIES arms:
+        // a listed single-die skill re-roll (Halfling Luck, Thinking Man's Troll) is ALWAYS used
+        // ahead of the team re-roll -- it is free -- with ZERO sampler draws; an offer whose
+        // harness-visible `teamReRollOption` is false is declined, also draw-free.
+        if let AgentPrompt::ReRollOffer { re_roll_skill, team_re_roll_option, .. } = &prompt {
+            if let Some(skill_id) = re_roll_skill {
+                return Action::UseSkillReRoll { skill_id: *skill_id };
+            }
+            if !*team_re_roll_option {
+                return Action::UseReRoll { use_reroll: false };
+            }
+        }
+
         // §20.7 — build the feature block at most once per board position, then take it out of
         // `self` for the duration of the decision so the borrow checker stays satisfied without
         // any unsafe aliasing.

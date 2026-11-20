@@ -9772,6 +9772,43 @@ a PARAMETER to control randomness/coverage (`--heur-scale` already scales temper
 **Done:** every Java-resolvable skill and every PlayerAction fires on a green gate (~100+) or is
 documented unreachable.
 
+### Phase 2b status (2026-11-20, in progress)
+
+- 14:30 cert6 remainder launched (`cert_chain.ps1 -suites starrest,skill -maxRun 4 -anytime`, user
+  OK'd daytime for this run); 15 commits pushed (`47c023f5b`).
+- **CERT6 CONTAMINATION WINDOW 14:40:12-14:41:32:** the in-repo harness jar was rebuilt WITH the
+  2b(a) ParityRunner change while starrest ran (runner.rs resolves the in-repo jar unless
+  `PARITY_CP` is set). Restored at 14:41:32 (frozen copy `D:/ffb_star/bin/ffb-ai-cert6.jar`; 2b dev
+  jar `D:/ffb_star/bin/ffb-ai-2b.jar`). When starrest finishes: re-gate every `sw_r*.log` with mtime
+  14:39:30-14:42:30 (only Puggy/Ripper games could differ, but re-gate them all). From now on
+  `cert_chain.ps1` pins `PARITY_CP` to a frozen jar.
+- **(a) skill re-roll first -- design (from the Java; CODED 2026-11-20, not yet gated):**
+  - Java client answers a skill re-roll with **CLIENT_USE_SKILL** (skill, used=true, playerId,
+    reRolledAction), NOT CLIENT_USE_RE_ROLL (`DialogReRollHandler` :56-57). The base
+    `AbstractStepWithReRoll.handleCommand` :61-67 turns a used `canRerollSingleDieOncePerPeriod`
+    skill into `setReRolledAction(cmd action)` + `setReRollSource(skill.getRerollSource(SINGLE_DIE))`
+    + EXECUTE_STEP; `RollMechanic.useReRoll` then takes the skill branch (:383-398: report
+    `ReportReRoll(source, !isUsed, 0)`, markSkillUsed on the acting player / markUsed otherwise).
+  - Rust today: `ask_for_reroll_if_available_inner` records only "TRR" on the offer; bb2016/bb2020
+    raise NO prompt for a skill-only offer (mirrors the harness's `if (!teamReRollOption) return
+    null`). Only the block-roll steps handle the skill; 33 steps hold a `ReRollState`, the other
+    ~70 re-roll steps keep ad-hoc fields -> the base-class arm is missing almost everywhere.
+  - Port: `AgentPrompt::ReRollOffer` gains `re_roll_skill: Option<SkillId>` + `team_re_roll: bool`;
+    a `Step::re_roll_state_mut()` hook (default None) so the driver can apply Java's base arm to
+    every step that extends AbstractStepWithReRoll; the agent rule (both harnesses, zero draws,
+    only when the heuristic owns the `reroll` class): a listed skill is ALWAYS used before the team
+    re-roll (it costs nothing; not behind `--coverage-bias`). Java `ParityRunner` RE_ROLL /
+    RE_ROLL_PROPERTIES arms: `getReRollSkill() != null` -> `sendUseSkill(skill, true, pid, action)`.
+  - **DONE + gated (20 seeds, steps + reports identical, frozen `ffb-parity-2b2.exe` + jar
+    `ffb-ai-2b.jar`):** Ripper bb2020 (TMT fires 10/20 games) + bb2025 (14/20), Puggy bb2020 +
+    bb2025 (Halfling Luck 12/20), Griff bb2020. bb2016 has neither skill. Found on the way: Java
+    bb2025 `StepApothecary` / `StepApothecaryMultiple` extend AbstractStep, so a CLIENT_USE_SKILL
+    answer to the Regeneration re-roll STALLS Java (a real-client bug too); the harness now uses
+    the skill only when the current step `instanceof AbstractStepWithReRoll` (checked: the only
+    two of the 63 dialog-raising steps that are not), and Rust's bb2025 StepApothecary strips the
+    skill. Implementation is a driver adapter, not a 100-step port: `Action::UseSkillReRoll` ->
+    `Game::command_re_roll_source` for one `handle_command` call -> `use_reroll` spends it.
+
 ### Phase 1 status (2026-11-18)
 
 Driven, gated green (20-seed gates, steps + reports identical), pushed:

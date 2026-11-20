@@ -132,6 +132,16 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
             Some(ClientCommand::ClientUseReRoll(ClientUseReRoll { use_reroll }))
         }
 
+        // Java `DialogReRollHandler` :56-57: the skill button sends CLIENT_USE_SKILL.
+        Action::UseSkillReRoll { skill_id } => {
+            let pid = active_player_id.unwrap_or("").to_string();
+            Some(ClientCommand::ClientUseSkill(ClientUseSkill {
+                player_id: pid,
+                skill: format!("{skill_id:?}"),
+                use_skill: true,
+            }))
+        }
+
         Action::UseApothecary { player_id, use_apothecary } => {
             Some(ClientCommand::ClientUseApothecary(ClientUseApothecary {
                 player_id,

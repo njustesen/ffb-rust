@@ -1606,13 +1606,21 @@ public class ParityRunner {
                         System.err.println("JRR action=" + rr.getReRolledAction() + " pid=" + rr.getPlayerId()
                             + " trr=" + rr.isTeamReRollOption());
                     }
-                    comm.sendUseReRoll(rr.getReRolledAction(),
-                        reRollSourceFor(game, rr.getReRolledAction(), rr.isTeamReRollOption()));
+                    if (usesSingleDieSkillReRoll(rr.getReRollSkill(), gameState)) {
+                        comm.sendUseSkill(rr.getReRollSkill(), true, rr.getPlayerId(), rr.getReRolledAction());
+                    } else {
+                        comm.sendUseReRoll(rr.getReRolledAction(),
+                            reRollSourceFor(game, rr.getReRolledAction(), rr.isTeamReRollOption()));
+                    }
                 } else if (dialog instanceof com.fumbbl.ffb.dialog.DialogReRollPropertiesParameter) {
                     com.fumbbl.ffb.dialog.DialogReRollPropertiesParameter rp =
                         (com.fumbbl.ffb.dialog.DialogReRollPropertiesParameter) dialog;
-                    comm.sendUseReRoll(rp.getReRolledAction(),
-                        reRollSourceFor(game, rp.getReRolledAction(), true));
+                    if (usesSingleDieSkillReRoll(rp.getReRollSkill(), gameState)) {
+                        comm.sendUseSkill(rp.getReRollSkill(), true, rp.getPlayerId(), rp.getReRolledAction());
+                    } else {
+                        comm.sendUseReRoll(rp.getReRolledAction(),
+                            reRollSourceFor(game, rp.getReRolledAction(), true));
+                    }
                 } else {
                     game.setDialogParameter(null);
                     break;
@@ -3672,6 +3680,25 @@ public class ParityRunner {
      * is answered with the team re-roll, which is the source Rust's engine consumes for the
      * "TRR" ReRollSource its ask_for_reroll_if_available publishes.
      */
+    /**
+     * BACKLOG §M phase 2b(a): a re-roll dialog that lists a {@code canRerollSingleDieOncePerPeriod}
+     * skill (Halfling Luck, Thinking Man's Troll, bb2020 Consummate Professional) is answered with
+     * that skill -- CLIENT_USE_SKILL, as {@code DialogReRollHandler} sends it -- ahead of the team
+     * re-roll, with ZERO sampler draws. Only when the heuristic owns the re-roll class, exactly like
+     * {@link #reRollSourceFor}, so the random contract and lower rungs keep their streams. Mirrored
+     * by Rust {@code heuristic_agent} (ReRollOffer.re_roll_skill -> Action::UseSkillReRoll).
+     */
+    private boolean usesSingleDieSkillReRoll(com.fumbbl.ffb.model.skill.Skill skill, GameState gameState) {
+        return heuristic != null
+            && heuristic.handles(com.fumbbl.ffb.ai.parity.heuristic.PromptClass.RE_ROLL_OFFER)
+            && skill != null
+            && skill.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.canRerollSingleDieOncePerPeriod)
+            // Only AbstractStepWithReRoll has the CLIENT_USE_SKILL arm that turns the skill into a
+            // re-roll source; bb2025 StepApothecary / StepApothecaryMultiple extend AbstractStep and
+            // would ignore it and stall (STUCK_STEP APOTHECARY). Rust strips the skill there.
+            && gameState.getCurrentStep() instanceof com.fumbbl.ffb.server.step.AbstractStepWithReRoll;
+    }
+
     private com.fumbbl.ffb.ReRollSource reRollSourceFor(
             Game game, com.fumbbl.ffb.ReRolledAction action, boolean teamReRollOption) {
         if (heuristic == null
