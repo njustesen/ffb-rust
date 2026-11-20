@@ -9809,6 +9809,12 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
    beyond the cleaned LRB6/CRP set (`docs/BB2016_DRAFTING_AND_ROSTERS.md`). Options: (a) exempt
    them with reason "no bb2016 roster in this project carries it"; (b) add sourced bb2016 rosters
    that carry them (needs a source of truth for the stats). Until answered the loop leaves them.
+   **ANSWERED (user, 2026-11-20 ~16:50): (b) ADD SOURCED ROSTERS.** Add bb2016 rosters/stars that
+   carry these skills from a real source (FUMBBL's bb2016-era team/star definitions, or Java data
+   already in `ffb-java/` -- never `C:/Users/Admin/niels/ffb`), cite the source per position in
+   `docs/BB2016_DRAFTING_AND_ROSTERS.md`, run `gen_java_parity_data.py`, keep them out of the
+   certified data/teams sets unless the schedule is extended deliberately, and gate them like any
+   other squad (every skill must FIRE on a green gate). Do NOT exempt them.
 
 **Goal (user, 2026-11-17):** "make the agent use all skills in the game. Ideally to play better
 but most importantly to reach better coverage." User decisions: (1) drafted teams MAY carry
