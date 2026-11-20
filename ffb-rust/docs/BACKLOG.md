@@ -9730,7 +9730,10 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 >   For dev gates patch a jar copy instead: `javac -cp D:/ffb_star/bin/ffb-ai-cert6.jar -d <dir>
 >   ParityRunner.java` + `jar uf <copy> -C <dir> com/fumbbl/ffb/ai/parity`, run with `PARITY_CP=<copy>`.
 >   When it exits: re-gate the 14:39:30-14:42:30 contamination window (see Phase 2b status).
-> - skill ledger, PID 17496 (`skill_ledger.py run --out D:/ffb_ledger/cert6_2b`, exe
+> - **[DONE ~18:00: ledger + report written, 376/420 fire, 41 missing. It was built on the 2b2 exe,
+>   i.e. BEFORE loop iterations 1-4: stat increases, bb2016 Pro, Bugman's, Keen Player and Team
+>   Captain show as gaps there but are already done -- check BACKLOG before redoing anything.]**
+>   skill ledger, PID 17496 (`skill_ledger.py run --out D:/ffb_ledger/cert6_2b`, exe
 >   `D:/ffb_star/bin/ffb-parity-2b2.exe`, no STAMP -> progress only). When it exits run
 >   `python -I scripts/skill_ledger.py report --out D:/ffb_ledger/cert6_2b`; the checker's progress
 >   view then uses it instead of the stale 11-17 `base` ledger.
