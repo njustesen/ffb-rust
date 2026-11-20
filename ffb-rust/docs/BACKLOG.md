@@ -9859,3 +9859,25 @@ Deferred, with the reason (each needs a design decision or a larger port):
   does not set TurnMode.KICKOFF where the shared Rust step does (not observable so far).
 - Next: phase 4 (skill-aware value model, A/B), then phase 5 re-cert -- which now MUST include
   the base matrices (see the phase 3 caution) plus this skill sweep.
+
+### Phase 5 status (2026-11-19) — base re-certification on the phase-3 policy
+- **cert5** (frozen `67ba197dc`, overnight 11-18/19): cross 4012/4012 clean; mirror 9 red cells
+  (15 seeds) + 9 coverage-MISSING trailers (= PASS, identical in cert4); star 3993/4012 (19 reds).
+- **All 34 red gates fixed 1:1** in `8a08ef736` (families listed in its commit message: Primal
+  Savagery lash-out spends the delivered path, Incorporeal per edition, Strong Passing Game no
+  re-spend, bb2025 Slayer = Big Guy keyword, StepPass no action-keyed re-roll skill, Bribes no
+  argue for a casualty, StepPro publishes only in Java's else arm, usage types, harness blitz
+  victim on pitch, StepPlaceBall setTurnMode semantics, bb2016 dump-off TZ, bb2020 BlitzBlock).
+  Pre-run audit of every `last_turn_mode` reader added `e0f63037e` (StepInitBlocking).
+- **Known usage-type mismatches left alone** (Java usage type vs Rust `usage_type_for`, found by a
+  class-by-class diff; every path involved has certified green repeatedly, so none is observable
+  yet): Dodge, Pro, Leader, Sure Feet, Swoop in bb2016/bb2020; Blast It bb2025; Two for One
+  (Special). Fix 1:1 when a sweep reaches one.
+- **cert6** (frozen `e0f63037e`): the 21:00 launch was killed by Claude Code's low-memory reaper
+  (an unrelated app held ~23 GB commit); relaunched 22:23 with at most 4 workers and the JVM heap
+  capped at 1 GB. Dirs: `mirror_cert6b`, `cross_cert6`, `starjobs_cert6`, `D:/ffb_sksweep/cert6`.
+- **cert6 result (2026-11-20 04:22):** mirror **330/330** (100 games each; 9 coverage-MISSING
+  trailers = PASS, same cells as cert5); cross **4012/4012** gates = 12,036/12,036 games, steps and
+  reports identical. Star was moved into a parallel controller at 02:25 to fit the window; the
+  reaper killed that controller (and its workers) ~03:10 after **989/4012 gates, all green**. The
+  star remainder and the skill sweep (`D:/ffb_sksweep/cert6`) still need a run; 0 reds anywhere.
