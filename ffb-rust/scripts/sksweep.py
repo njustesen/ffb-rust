@@ -16,7 +16,9 @@ if os.path.exists(res_path):
 # SKSWEEP_DIRS=teams_skills,teams_stats (cert_chain.ps1 does; skill_ledger.jobs('skill') = both).
 DIRS = os.environ.get("SKSWEEP_DIRS", "teams_skills").split(",")
 import json
-jobs = [(ed, os.path.basename(f)[5:-5], seeds) for ed in ["bb2016", "bb2020", "bb2025"] for d in DIRS
+# Editions (comma list); default all three. A re-gate of one edition sets SKSWEEP_EDITIONS=bb2020.
+EDS = os.environ.get("SKSWEEP_EDITIONS", "bb2016,bb2020,bb2025").split(",")
+jobs = [(ed, os.path.basename(f)[5:-5], seeds) for ed in EDS for d in DIRS
         for f in sorted(glob.glob(f"{ROOT}/data/{d}/{ed}/team_*.json"))]
 # §M 2b(y): hunted seeds (data/teams_skills/seed_hunts.json) -- extra games of a squad that are
 # known to exercise a rare skill; reported as "<ed> <squad>@<range>" so each is its own gate.

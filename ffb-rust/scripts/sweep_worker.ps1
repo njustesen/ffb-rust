@@ -16,7 +16,9 @@ param(
   [Parameter(Mandatory=$true)][string]$scratch,
   [string]$root = "D:/ffb_sweep",
   # A frozen copy of the binary, so a certification never runs whatever target/release holds.
-  [string]$exe = ""
+  [string]$exe = "",
+  # Seed range per gate; the mirror cert is 1-100, re-gates (e.g. a §M supervisor directive) use 1-20.
+  [string]$seeds = "1-100"
 )
 $repo = "C:\Users\Admin\niels\ffb-rust\ffb-rust"
 if (-not $exe) { $exe = Join-Path $repo "target\release\ffb-parity.exe" }
@@ -36,7 +38,7 @@ foreach ($line in (Get-Content $jobfile)) {
   $t0 = Get-Date
   $p = Start-Process -FilePath $exe -WorkingDirectory $repo `
      -NoNewWindow -PassThru -ArgumentList @("--home",$race,"--away",$race,"--edition",$ed,"--tier","3",
-       "--seeds","1-100","--no-abort","--agent","heuristic","--heur-scale",$sc,"--heur-classes","all") `
+       "--seeds",$seeds,"--no-abort","--agent","heuristic","--heur-scale",$sc,"--heur-classes","all") `
      -RedirectStandardOutput $out -RedirectStandardError "$out.err"
   Start-Sleep -Milliseconds 300
   try { $p.ProcessorAffinity = [IntPtr]$mask } catch {}
