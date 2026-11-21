@@ -166,6 +166,81 @@ public class FumbblReplayParser {
         System.out.printf("Done. Parsed %d/%d files, %d decision records written to %s%n",
             parsedFiles, files.size(), totalRecords, outFile.getName());
         if (failedFiles > 0) System.out.printf("  (%d files failed)%n", failedFiles);
+        System.out.printf("  model syncs parsed: %d, failed to parse (skipped): %d%n", SYNC_FAILURES[1], SYNC_FAILURES[0]);
+        System.out.println("  record-building errors per report kind: " + REPORT_ERRORS);
+        System.out.println("  unknown model changes dropped: " + UNKNOWN_MODEL_CHANGES);
+    }
+
+    /** [0] model syncs that failed to parse (skipped), [1] parsed -- over all files. */
+    static final int[] SYNC_FAILURES = new int[2];
+    /** Exceptions thrown while turning a report into a record, per report kind. */
+    static final java.util.Map<String, Integer> REPORT_ERRORS = new java.util.TreeMap<>();
+    /** Model-change ids unknown to this engine version, dropped from the syncs (counted). */
+    static final java.util.Map<String, Integer> UNKNOWN_MODEL_CHANGES = new java.util.TreeMap<>();
+    static final java.util.Set<String> KNOWN_MODEL_CHANGES = new java.util.HashSet<>();
+    static {
+        for (com.fumbbl.ffb.model.change.ModelChangeId id : com.fumbbl.ffb.model.change.ModelChangeId.values()) {
+            KNOWN_MODEL_CHANGES.add(id.getName());
+        }
+    }
+
+    /**
+     * Start-of-game position from the replay's END-of-game {@link Game}: a 1:1 copy of
+     * {@code ClientReplayer.createGame} + {@code addTeam} (ffb-client-logic).
+     */
+    static Game startOfGame(Game oldGame) {
+        Game game = new Game(oldGame.getApplicationSource(), oldGame.getRules().getFactoryManager());
+        game.setId(oldGame.getId());
+        game.setTurnTime(oldGame.getTurnTime());
+        game.setGameTime(oldGame.getGameTime());
+        game.setHomePlaying(true);
+        game.setTurnMode(TurnMode.START_GAME);
+        game.setDialogParameter(new com.fumbbl.ffb.dialog.DialogStartGameParameter());
+        game.getFieldModel().setWeather(com.fumbbl.ffb.Weather.NICE);
+        game.getOptions().init(oldGame.getOptions());
+        com.fumbbl.ffb.model.GameResult oldGameResult = oldGame.getGameResult();
+        addTeam(game, oldGame.getTeamHome(), oldGameResult.getTeamResultHome(), true);
+        addTeam(game, oldGame.getTeamAway(), oldGameResult.getTeamResultAway(), false);
+        com.fumbbl.ffb.factory.IFactorySource factorySource =
+            oldGame.getRules().forContext(com.fumbbl.ffb.FactoryType.FactoryContext.GAME);
+        game.getTurnDataHome().getInducementSet().initFrom(factorySource, new com.fumbbl.ffb.model.InducementSet().toJsonValue());
+        game.getTurnDataAway().getInducementSet().initFrom(factorySource, new com.fumbbl.ffb.model.InducementSet().toJsonValue());
+        game.initializeRules();
+        return game;
+    }
+
+    private static void addTeam(Game pGame, Team pTeam, com.fumbbl.ffb.model.TeamResult pOldTeamResult, boolean pHomeTeam) {
+        Player<?>[] players = pTeam.getPlayers();
+        if (pHomeTeam) {
+            pGame.getFieldModel().remove(pGame.getTeamHome());
+            pGame.setTeamHome(pTeam);
+        } else {
+            pGame.getFieldModel().remove(pGame.getTeamAway());
+            pGame.setTeamAway(pTeam);
+        }
+        com.fumbbl.ffb.model.FieldModel fieldModel = pGame.getFieldModel();
+        for (Player<?> player : players) {
+            // remove mercs, stars and raised players, they will be added via command later
+            com.fumbbl.ffb.PlayerType playerType = player.getPlayerType();
+            if ((playerType == null) || (playerType == com.fumbbl.ffb.PlayerType.MERCENARY)
+                || (playerType == com.fumbbl.ffb.PlayerType.RAISED_FROM_DEAD)) {
+                fieldModel.remove(player);
+                pTeam.removePlayer(player);
+            } else {
+                com.fumbbl.ffb.model.PlayerResult playerResult = pGame.getGameResult().getPlayerResult(player);
+                if (player.getRecoveringInjury() != null) {
+                    fieldModel.setPlayerState(player, new PlayerState(PlayerState.MISSING));
+                    playerResult.setSendToBoxReason(com.fumbbl.ffb.SendToBoxReason.MNG);
+                } else {
+                    fieldModel.setPlayerState(player, new PlayerState(PlayerState.RESERVE));
+                }
+                playerResult.setSeriousInjury(null);
+                playerResult.setSeriousInjuryDecay(null);
+                player.getEnhancementSources().forEach(player::removeEnhancements);
+                playerResult.setCurrentSpps(pOldTeamResult.getPlayerResult(player).getCurrentSpps());
+                com.fumbbl.ffb.util.UtilBox.putPlayerIntoBox(pGame, player);
+            }
+        }
     }
 
     // ── File parsing ──────────────────────────────────────────────────────────
@@ -196,6 +271,10 @@ public class FumbblReplayParser {
             }
         }
         if (game == null) return 0;
+        // The replay's serverGameState is the END-of-game state (half 2, endGame, final score).
+        // Rebuild the start-of-game position exactly as the real client does before replaying
+        // (ClientReplayer.createGame/addTeam); without this every record carries the final board.
+        game = startOfGame(game);
 
         int recordCount = 0;
 
@@ -267,11 +346,26 @@ public class FumbblReplayParser {
             JsonObject cmdObj = commandArray.get(i).asObject();
             if (!"serverModelSync".equals(cmdObj.getString("netCommandId", ""))) continue;
 
+            // A newer FUMBBL server emits model changes this engine does not know (e.g. bb2025
+            // actingPlayerSetInitialAdjacentPartnerIds on EVERY activation). One unknown entry
+            // used to make the whole sync unparsable, dropping the activation with it. Drop only
+            // the unknown entries (they carry state this engine version has no field for).
+            JsonValue mcl = cmdObj.get("modelChangeList");
+            if (mcl != null && mcl.isObject() && mcl.asObject().get("modelChangeArray") != null) {
+                JsonArray kept = new JsonArray();
+                for (JsonValue mc : mcl.asObject().get("modelChangeArray").asArray()) {
+                    String id = mc.isObject() ? mc.asObject().getString("modelChangeId", "") : "";
+                    if (KNOWN_MODEL_CHANGES.contains(id)) kept.add(mc);
+                    else UNKNOWN_MODEL_CHANGES.merge(id, 1, Integer::sum);
+                }
+                mcl.asObject().set("modelChangeArray", kept);
+            }
             ServerCommandModelSync syncCmd;
             try {
                 syncCmd = (ServerCommandModelSync) factory.forJsonValue(game.getRules(), commandArray.get(i));
-            } catch (Exception e) { continue; }
-            if (syncCmd == null) continue;
+            } catch (Exception e) { SYNC_FAILURES[0]++; continue; }
+            if (syncCmd == null) { SYNC_FAILURES[0]++; continue; }
+            SYNC_FAILURES[1]++;
 
             IReport[] reports = syncCmd.getReportList().getReports();
 
@@ -638,7 +732,15 @@ public class FumbblReplayParser {
                         default:
                             break;
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    // Previously swallowed silently; count per report kind, show the first of each.
+                    String k = String.valueOf(report.getId());
+                    if (REPORT_ERRORS.merge(k, 1, Integer::sum) == 1) {
+                        System.err.println("  first error on report " + k + ": " + e);
+                        StackTraceElement[] st = e.getStackTrace();
+                        for (int s = 0; s < Math.min(6, st.length); s++) System.err.println("      at " + st[s]);
+                    }
+                }
 
                 if (rec != null) {
                     try { writer.write(rec.toString()); writer.newLine(); recordCount++; }
