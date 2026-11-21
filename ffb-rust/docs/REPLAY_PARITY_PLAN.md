@@ -40,6 +40,18 @@ Evidence: 18 real replays (10 finished games in `D:/ffb_replays/fumbbl`, 5 unfin
 | Java shuffles | 11 `Collections.shuffle` sites; FUMBBL's are unseeded. | Needs a permutation record on the tape (inferred from the outcome). |
 | Rust consumer | **No Java-JSON loader** (L). **Team holds no Roster**, and the engine re-reads static rosters at about 6 sites, so a FUMBBL inline roster is never found (needs a runtime roster registry, M). **No recorded-decision agent, and no ClientCommand→Action map** (TapeAgent L; record in ParityRunner's prompt vocabulary, which already pairs 1:1 with `AgentPrompt`). **No concession / illegal-procedure handling** (M). bb2025 star/merc/staff purchases unsupported (L, avoided by starting after the pregame). `askForKickAfterRoll` never wired (S). Replay mode must use **factory defaults + the replay's options, not `BASELINE_SETUP_OPTIONS`** (S). Dice tape S; shuffle tape S-M; raw stats (don't re-apply +MA/+AG) S. Skills: bb2020 89/89 resolve in both engines; bb2025 needs a Java-matching name filter (Consummate Professional, Dwarfen Grit, I'll Carry You). | Work, no wall |
 
+**Found while trying BC on the 10 replays (2026-11-21):**
+- The replay's `serverGameState` is the **END-of-game** state: half 2, `endGame`, final score.
+  The start state must be rebuilt exactly as `ClientReplayer.createGame`/`addTeam` does:
+  - mercenaries, stars and raised players removed (they arrive by command later);
+  - everyone in reserve, or MISSING if recovering from an injury;
+  - in-game injuries and enhancements cleared.
+
+  `FumbblReplayParser.startOfGame` now does this, and N1 must do the same.
+- A newer server's unknown model change (`actingPlayerSetInitialAdjacentPartnerIds`) made the
+  whole sync unparsable, so ~100% of BB2025 activation syncs were silently dropped. The parser now
+  drops only the unknown entries. A follower must do the same, and note what it dropped.
+
 **Design changes this forces (supersede the sketch below where they differ):**
 1. **Replay window:** pick replays from 2026-03-22 to about 04-01 (`fetch_fumbbl_replays.py --start-id`
    around 1,881,000; ids run about 250-350/day). Before N1, verify the window with the follower's
