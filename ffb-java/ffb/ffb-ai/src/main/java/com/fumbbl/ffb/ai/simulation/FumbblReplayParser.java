@@ -150,7 +150,24 @@ public class FumbblReplayParser {
                 new OutputStreamWriter(Files.newOutputStream(outFile.toPath()), StandardCharsets.UTF_8))) {
             for (File f : files) {
                 try {
-                    int count = parseFile(f, server, writer);
+                    // Parse into a buffer, then tag every record with the replay it came from, its
+                    // order inside that replay and the final score (records carried no game id, so a
+                    // shard could not be split by game or weighted by outcome).
+                    java.io.StringWriter buf = new java.io.StringWriter();
+                    int count;
+                    try (BufferedWriter bw = new BufferedWriter(buf)) {
+                        count = parseFile(f, server, bw);
+                    }
+                    String replayId = f.getName().replaceFirst("\\.ffbr$", "");
+                    int seq = 0;
+                    for (String line : buf.toString().split("\n")) {
+                        line = line.trim();
+                        if (!line.startsWith("{")) continue;
+                        writer.write("{\"replay_id\":\"" + replayId + "\",\"seq\":" + (seq++)
+                            + ",\"final_score_home\":" + LAST_END_SCORE[0] + ",\"final_score_away\":" + LAST_END_SCORE[1]
+                            + (line.length() > 2 ? "," : "") + line.substring(1));
+                        writer.newLine();
+                    }
                     totalRecords += count;
                     parsedFiles++;
                     if (parsedFiles % 10 == 0 || parsedFiles == files.size()) {
@@ -173,6 +190,8 @@ public class FumbblReplayParser {
 
     /** [0] model syncs that failed to parse (skipped), [1] parsed -- over all files. */
     static final int[] SYNC_FAILURES = new int[2];
+    /** Final score (home, away) of the replay parsed last; tags its records. */
+    static final int[] LAST_END_SCORE = new int[2];
     /** Exceptions thrown while turning a report into a record, per report kind. */
     static final java.util.Map<String, Integer> REPORT_ERRORS = new java.util.TreeMap<>();
     /** Model-change ids unknown to this engine version, dropped from the syncs (counted). */
@@ -274,6 +293,7 @@ public class FumbblReplayParser {
         // The replay's serverGameState is the END-of-game state (half 2, endGame, final score).
         // Rebuild the start-of-game position exactly as the real client does before replaying
         // (ClientReplayer.createGame/addTeam); without this every record carries the final board.
+        Game endGame = game;
         game = startOfGame(game);
 
         int recordCount = 0;
@@ -941,6 +961,18 @@ public class FumbblReplayParser {
                 }
             } catch (Exception ignored) {}
         }
+
+        // End-of-replay check: the start-of-game rebuild plus every applied model change must land
+        // on the replay's own end state (score, half, turn). A mismatch means lost/misapplied syncs.
+        int[] got = {game.getGameResult().getTeamResultHome().getScore(), game.getGameResult().getTeamResultAway().getScore(),
+            game.getHalf(), game.getTurnDataHome().getTurnNr(), game.getTurnDataAway().getTurnNr()};
+        int[] want = {endGame.getGameResult().getTeamResultHome().getScore(), endGame.getGameResult().getTeamResultAway().getScore(),
+            endGame.getHalf(), endGame.getTurnDataHome().getTurnNr(), endGame.getTurnDataAway().getTurnNr()};
+        LAST_END_SCORE[0] = want[0];
+        LAST_END_SCORE[1] = want[1];
+        System.out.printf("  %s end check %s: replayed score %d-%d half %d turns %d/%d, replay end %d-%d half %d turns %d/%d%n",
+            file.getName(), java.util.Arrays.equals(got, want) ? "OK" : "MISMATCH",
+            got[0], got[1], got[2], got[3], got[4], want[0], want[1], want[2], want[3], want[4]);
 
         return recordCount;
     }

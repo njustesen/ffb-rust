@@ -40,12 +40,19 @@ print('  dialog kinds opened:', ', '.join('%s=%d' % (k[7:], n) for k, n in truth
 
 # ---- state sanity
 print('\n== state sanity ==')
-games, cur = [], []
-for r in recs:
-    if r['type'] == 'dialog' and r['dialog_id'] == 'COIN_CHOICE' and cur:
-        games.append(cur); cur = []
-    cur.append(r)
-games.append(cur)
+games = []
+if recs and 'replay_id' in recs[0]:
+    by = collections.OrderedDict()
+    for r in recs:
+        by.setdefault(r['replay_id'], []).append(r)
+    games = [sorted(g, key=lambda r: r['seq']) for g in by.values()]
+else:  # older shards without replay ids: split at each coin choice
+    cur = []
+    for r in recs:
+        if r['type'] == 'dialog' and r['dialog_id'] == 'COIN_CHOICE' and cur:
+            games.append(cur); cur = []
+        cur.append(r)
+    games.append(cur)
 bad_first = backwards = 0
 sel_total = sel_onpitch = 0
 for g in games:
