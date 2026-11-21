@@ -25,6 +25,33 @@ harness (`ffb-ai`, including the new replay code) is ours.
   `kickoffResult.kickoffRoll`, `weather.weatherRoll`, `cheeringFans.rollHome/rollAway`, and so on.
   Some dice appear only as an outcome: `coinThrow` has heads/tails, not a die.
 
+## Feasibility analysis (2026-11-21): FEASIBLE, with three design changes
+
+Evidence: 18 real replays (10 finished games in `D:/ffb_replays/fumbbl`, 5 unfinished in `partial/`,
+3 from April 2026 in `window/`), a ground-truth dice experiment on 6 of our own Java games
+(1,398 die calls), and two read-only code audits (decision inference; Rust gaps).
+
+| Question | Finding | Verdict |
+|---|---|---|
+| Can we get replays? | WebSocket downloader works; about 10-15 s per replay at the 10 s courtesy delay. FUMBBL today is about 99% BB2025 (BB2020 about 1 per 100 ids, BB2016 not seen). The newest ids are games still running: drop them (fetch script checks for `fumbblResultUpload`). Replays from 2025 and April 2026 still download. | YES |
+| Engine version drift | Our oracle is **stock upstream 3.2.0 (2026-03-21)**: 6 engine files compared byte-for-byte all match upstream as of Feb/Mar 2026. Live FUMBBL now runs **3.4/3.5**, about 330 server and 140 common commits ahead. November replays carry a model change our Java lacks (`actingPlayerSetInitialAdjacentPartnerIds`, about 250 per game) plus 3 unknown options, and the Rules changes include e.g. Really Stupid (11-19) and Jump Up (11-21). **April 2026 replays carry no unknown report or model-change id**, but sit after about 27 narrow server commits (Weather Mage duration, confusion on stand-up, B&C bombs, touchback edge cases, timeout option). | **Use replays from 2026-03-22 to about 04-01** (closest to our engine; the fidelity check measures the residue). Current games need an upstream re-sync, which would be a separate campaign. |
+| Decisions recoverable? | The replay records **every server dialog** (`gameSetDialogParameter`, 26 kinds) and every move square. About 99% of 600-900 decisions per game are mechanically recoverable. Rule-derived mappings are needed for the re-roll source (a report says "Leader" after a failed MASCOT), prayer counts and apothecary type. Wizard fireball centre is only an equivalence class. Timeouts are timer-driven. | YES |
+| Dice recoverable? | Ground truth: **98.8%** of die values appear in the reports (unordered upper bound). A naive flat "next report die" stream gets only **69%**: report order is not roll order, and echo fields repeat dice (`blockChoice.blockRoll`). A **source-to-field table** (DiceRoller method + step → report field), learned automatically and cross-validated across matchups, gets **94.8% strict**. The rest is table detail (StepModifier lumps several skills; Team Captain, Argue the Call) plus outcome-only randomness (MVP pick, random-player events, prayer, cheering shuffle), which can be inverted from the reported outcome. | YES, with a hand-written extraction table plus outcome inversion. Never a flat stream. |
+| Java shuffles | 11 `Collections.shuffle` sites; FUMBBL's are unseeded. | Needs a permutation record on the tape (inferred from the outcome). |
+| Rust consumer | **No Java-JSON loader** (L). **Team holds no Roster**, and the engine re-reads static rosters at about 6 sites, so a FUMBBL inline roster is never found (needs a runtime roster registry, M). **No recorded-decision agent, and no ClientCommand→Action map** (TapeAgent L; record in ParityRunner's prompt vocabulary, which already pairs 1:1 with `AgentPrompt`). **No concession / illegal-procedure handling** (M). bb2025 star/merc/staff purchases unsupported (L, avoided by starting after the pregame). `askForKickAfterRoll` never wired (S). Replay mode must use **factory defaults + the replay's options, not `BASELINE_SETUP_OPTIONS`** (S). Dice tape S; shuffle tape S-M; raw stats (don't re-apply +MA/+AG) S. Skills: bb2020 89/89 resolve in both engines; bb2025 needs a Java-matching name filter (Consummate Professional, Dwarfen Grit, I'll Carry You). | Work, no wall |
+
+**Design changes this forces (supersede the sketch below where they differ):**
+1. **Replay window:** pick replays from 2026-03-22 to about 04-01 (`fetch_fumbbl_replays.py --start-id`
+   around 1,881,000; ids run about 250-350/day). Before N1, verify the window with the follower's
+   fidelity check on 2-3 of them.
+2. **Dice:** the follower serves each die from a **per-source queue** (`DiceRoller` method + calling step
+   → report kind + field), not a flat report stream, plus an outcome-inversion rule per random pick
+   or shuffle. The tape records what was actually served. The experiment scripts are in
+   `scripts/replay_feasibility/`.
+3. **Start after the pregame** for the first slice: the tape begins at the first kick-off. Pregame
+   purchases, stars and mercenaries are a later slice. Skip replays that end in a concession until
+   Rust has concession handling.
+
 ## Architecture: Java follows the replay; Rust follows Java's tapes
 
 One component interprets FUMBBL data, and it lives on the Java side. Rust never reads a FUMBBL

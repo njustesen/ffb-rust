@@ -56,6 +56,21 @@ def run(jar, args, delay, timeout):
     return p.returncode, meta
 
 
+def is_complete(path):
+    """A finished game ends with the FUMBBL result upload (or at least sets `finished`)."""
+    import gzip
+    with open(path, 'rb') as f:
+        cmds = json.loads(gzip.decompress(f.read()))['commandArray']
+    for c in cmds[-40:]:
+        for r in (c.get('reportList') or {}).get('reports', []):
+            if r.get('reportId') == 'fumbblResultUpload':
+                return True
+        for m in (c.get('modelChangeList') or {}).get('modelChangeArray', []):
+            if m.get('modelChangeId') == 'gameSetFinished' and m.get('modelChangeValue'):
+                return True
+    return False
+
+
 def probe(jar, rid, delay):
     code, _ = run(jar, ['--probe-only', str(rid)], delay, 30)
     return code == 0
@@ -117,6 +132,11 @@ def main():
             path = os.path.join(a.out, '%d.ffbr' % rid)
             code, meta = run(a.jar, [str(rid), path, '--rules', rules], a.delay, 600)
             print('id', rid, rules, 'exit', code, meta or '', flush=True)
+            if code == 0 and meta and not is_complete(path):
+                # a game still being played (the newest ids): the replay is a prefix -- drop it
+                print('  incomplete (game still running?) -- discarded', flush=True)
+                os.remove(path)
+                break
             if code == 0 and meta:
                 have[rules] += 1
                 with open(manifest, 'a', encoding='utf-8') as f:
