@@ -9732,6 +9732,30 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > and **all 46 bb2020 skill gates green** (40 `_sk` + 2 `_st` 20/20, 4 seed hunts 1/1, steps +
 > reports; `D:/ffb_regate/d20/skill/results.txt`). No red. Directive deleted.
 >
+> **SUPERVISOR DIRECTIVE (2026-11-21 ~16:00) -- goal redefined: NO exempt list.**
+> User: "there should be no exempt list. There should be rosters that match each ruleset and have
+> skill coverage for all skills within that ruleset." `skill_parity_check.py` now counts only each
+> RULESET's skills (`ruleset_universe()`: the edition's own roster positions + Infamous Staff +
+> stars + roster special rules + advancement categories / STAT_INCREASE, minus Java
+> `eligible()==false`; bb2016 = CRP/LRB6 without the §2.2 FUMBBL-legacy rosters).
+> `data/agent/skill_exempt.json` is deleted. Result on the cert8 ledger: **409/411**. The 9 former
+> exemptions bb2016 x8 + bb2020 PilingOn are simply not in any ruleset (no carrier, not learnable).
+> bb2025 Insignificant is covered by its draft rule (`DRAFT_RULES`: every bb2025 team obeys the
+> limit, 22 fielded). **Two ruleset skills are open:**
+> 1. **bb2025 Unsteady** (Bull Centaur, Saurus, Zombie...): its only rule bars the Secure the Ball
+>    action. Both harnesses already apply it (ParityRunner :4924 / legal_actions.rs :688), so action
+>    parity covers it, but the Rust skill-touch counter ignores agent decisions. Make it COUNT:
+>    record a skill touch in Rust exactly where Unsteady removes Secure the Ball from a player's
+>    legal actions (the ball is loose, the player could otherwise take it), add a unit test, find a
+>    seed where it happens, and gate the touch on a green gate. No game-behaviour change.
+> 2. **bb2025 TheBallista** (Morg 'n' Thorg): Java bb2025 never offers it (see QUESTION 3). Do NOT
+>    work on it until the user answers.
+> Unsteady changes the exe, so cert8 cannot be the final proof: the supervisor stopped the cert8
+> driver (PID 21156, it was asleep until 21:00; its mirror 330 + cross 2454 verdicts are history
+> only). Do Unsteady now, then freeze cert9 (exe + jar) from that HEAD and launch
+> `final_cert.ps1 -name cert9` for tonight's 21:00 window, unless QUESTION 3 is answered with a
+> Java fix by then -- in that case include it before the freeze. Delete this block when cert9 runs.
+>
 > **RESUME HERE -- UPDATED 2026-11-21 07:10 (loop iteration 19), read this first (supersedes everything below).**
 > **cert8 window 1 (02:01-07:01) result:** ledger done early (`D:/ffb_ledger/cert8`; checker: 408/420
 > fire, 12 exempt, **missing 0**); **mirror 330/330 green** (steps + reports; the usual 10
@@ -10154,6 +10178,16 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
    scope (no team/star of the bb2016 LRB6/CRP set carries them; supervisor wrote the entries in
    data/agent/skill_exempt.json). The same principle applies everywhere: draft/hire only what the
    edition's own rosters and advancement rules allow.
+   **SUPERSEDED (user, 2026-11-21): no exempt list at all** -- the checker now counts only the
+   skills of each ruleset, and these 8 are not bb2016 (CRP/LRB6) skills. See the directive above.
+
+3. **(2026-11-21, supervisor) bb2025 The Ballista.** The rules give Morg 'n' Thorg a re-roll of a
+   failed Pass or Throw Team-Mate. Java bb2025 never offers it: StepPass :251 and
+   ThrowTeamMateBehaviour :113 call askForReRollIfAvailable with the PLAYER overload and
+   reRollSkill=null, so RollMechanic (bb2025 :272-278) only adds canRerollSingleDieOncePerPeriod
+   skills. Both engines therefore ignore it -- parity holds but the skill is never exercised.
+   Options: (a) fix the Java engine (deliberate oracle change) and port 1:1 to Rust; (b) record it
+   as a Java defect in JAVA_DEFECTS.md and count it as covered by that record. **Open.**
 
 **Goal (user, 2026-11-17):** "make the agent use all skills in the game. Ideally to play better
 but most importantly to reach better coverage." User decisions: (1) drafted teams MAY carry

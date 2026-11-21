@@ -57,9 +57,11 @@ How to work:
 - Take the most valuable open item and finish ONE coherent unit of work: e.g. make a missing skill
   fire (agent rule in BOTH harnesses, squad data, or a 1:1 engine port), gate it (20 seeds, steps
   AND reports identical, every edition that has the skill), commit with explicit paths.
-- A skill that genuinely cannot fire (no player can carry it, or Java itself cannot resolve it)
-  goes into ffb-rust/data/agent/skill_exempt.json with a reason of >= 40 chars traced to the Java
-  source; record the same in BACKLOG. Never exempt something merely hard.
+- There is NO exemption list (user, 2026-11-21). The checker counts only the skills a player of
+  each ruleset can hold (its own rosters, Infamous Staff, stars, special rules, advancement). Every
+  one of them must fire. Never field a team, star or skill that does not belong to the edition to
+  make something fire. If a ruleset skill truly cannot fire, write it under "QUESTION FOR THE USER"
+  with the Java trace, and work on something else.
 - The proof at the end: freeze one exe + jar, run the full cert (scripts/cert_chain.ps1, all four
   suites, PARITY_CP pinned), fix every red 1:1 and re-run, run scripts/skill_ledger.py run+report
   with that SAME exe, then write ffb-rust/docs/cert_manifest.json. Never write a manifest that
@@ -176,7 +178,8 @@ def main():
         log('iteration %d: starting session (%s)' % (it, check.splitlines()[-1]))
         t0 = time.time()
         p = subprocess.run(cmd, cwd=OUTER, capture_output=True, text=True, errors='replace')
-        out_path = os.path.join(LOGS, 'iter_%03d.json' % it)
+        out_path = os.path.join(LOGS, 'iter_%s_%03d.json' % (
+            datetime.datetime.now().strftime('%Y%m%d_%H%M%S'), it))
         with open(out_path, 'w', encoding='utf-8') as fh:
             fh.write(p.stdout or '')
             if p.stderr:
