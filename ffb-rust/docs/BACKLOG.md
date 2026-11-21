@@ -9732,7 +9732,26 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > and **all 46 bb2020 skill gates green** (40 `_sk` + 2 `_st` 20/20, 4 seed hunts 1/1, steps +
 > reports; `D:/ffb_regate/d20/skill/results.txt`). No red. Directive deleted.
 >
-> **RESUME HERE -- UPDATED 2026-11-21 02:05 (loop iteration 18), read this first (supersedes everything below).**
+> **RESUME HERE -- UPDATED 2026-11-21 07:10 (loop iteration 19), read this first (supersedes everything below).**
+> **cert8 window 1 (02:01-07:01) result:** ledger done early (`D:/ffb_ledger/cert8`; checker: 408/420
+> fire, 12 exempt, **missing 0**); **mirror 330/330 green** (steps + reports; the usual 10
+> coverage-short gates, `but required coverage items are MISSING`, are not parity reds); **cross
+> 2454/4012 judged, 0 red** (w1-4 STOPPED at 07:00; w5/w6 not started); star + skill not started.
+> **WAITING (launched 07:05, detached): driver PID 21156** = `final_cert.ps1 -name cert8 -skipLedger`
+> (self-pinned 0x7FF; sleeps until 21:00, then `cert_chain.ps1 -name cert8`: mirror workers skip all
+> 330 judged cells, cross resumes the remaining 1558 gates, then star 4012, then skill 121).
+> `.loop_wait.json` holds PID 21156 until 2026-11-22 07:30. **Fixed this iteration:** a resumed
+> chain would have died silently -- `cert_chain.ps1` never removed the 07:00 `STOP_SWEEP` marker, so
+> every resumed worker hit it before its first gate and exited, and the suite "finished" unjudged.
+> It now deletes `STOP_SWEEP` at the start of each non-skill suite (script-only; exe+jar untouched).
+> **The session that wakes then:** count verdicts (`grep -c PARITY:` on `../cross_cert8/scratch/sweep_w*.log`
+> must total 4012, `../starjobs_cert8/scratch/sweep_w*.log` 4012, `D:/ffb_sksweep/cert8/results.txt`
+> 121) and list non-green lines with
+> `grep -hvE "PARITY: ([0-9]+)/\1 games match.*REPORTS: \1/\1 games identical, 0 differ, 0 skipped\."`.
+> If incomplete and no red: relaunch the same driver again (launch form below, `-name cert8
+> -skipLedger`) + new `.loop_wait.json`. If all four are green: write `docs/cert_manifest.json`,
+> commit, push. Any red: fix 1:1 -> new freeze -> new cert (never mix builds).
+> **History -- iteration 18:**
 > **RUNNING (launched 02:01, detached): the cert8 FINAL-PROOF chain, driver PID 8732**
 > (`scripts/final_cert.ps1 -name cert8`, self-pinned mask 0x7FF, 4 workers). Frozen pair:
 > `D:/ffb_star/bin/ffb-parity-cert8.exe` (sha256 `a30dd145...`, release build of the iteration-18

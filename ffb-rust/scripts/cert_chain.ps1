@@ -48,6 +48,9 @@ foreach ($suite in $suites) {
     default { throw "unknown suite $suite" }
   }
   $procs = @()
+  # A resumed chain (next evening) must clear the previous window's 07:00 STOP_SWEEP first, or
+  # every worker sees it before its first gate and exits -- the suite then "finishes" unjudged.
+  if ($suite -ne "skill") { Remove-Item (Join-Path $scratch "STOP_SWEEP") -ErrorAction SilentlyContinue }
   if ($suite -eq "skill") {
     # §M 2b(h): the stat-increase squads (data/teams_stats) belong to the skill suite too.
     $env:SKSWEEP_DIRS = "teams_skills,teams_stats"
