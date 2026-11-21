@@ -172,8 +172,11 @@ def java_catalogue():
             cls = os.path.splitext(os.path.basename(path))[0]
             m = re.search(r'SkillCategory\.([A-Z_]+)', src)
             category = m.group(1) if m else '?'
-            m = re.search(r'super\(\s*"([^"]+)"', src)
-            display = m.group(1) if m else cls
+            # Java string literal incl. escaped quotes: bb2020/bb2025 ExcuseMeAreYouAZoat is
+            # super("\"Excuse Me, Are You a Zoat?\"", ...) -- the old "([^"]+)" captured a lone
+            # backslash, so the report value '"Excuse Me, Are You a Zoat?"' never matched.
+            m = re.search(r'super\(\s*"((?:[^"\\]|\\.)+)"', src)
+            display = m.group(1).replace('\\"', '"') if m else cls
             if pkg == 'common':
                 targets = eds
             elif pkg == 'mixed':

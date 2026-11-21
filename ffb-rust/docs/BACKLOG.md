@@ -9732,7 +9732,41 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > and **all 46 bb2020 skill gates green** (40 `_sk` + 2 `_st` 20/20, 4 seed hunts 1/1, steps +
 > reports; `D:/ffb_regate/d20/skill/results.txt`). No red. Directive deleted.
 >
-> **RESUME HERE -- UPDATED 2026-11-20 21:30 (loop iteration 17), read this first (supersedes everything below).**
+> **RESUME HERE -- UPDATED 2026-11-21 02:05 (loop iteration 18), read this first (supersedes everything below).**
+> **RUNNING (launched 02:01, detached): the cert8 FINAL-PROOF chain, driver PID 8732**
+> (`scripts/final_cert.ps1 -name cert8`, self-pinned mask 0x7FF, 4 workers). Frozen pair:
+> `D:/ffb_star/bin/ffb-parity-cert8.exe` (sha256 `a30dd145...`, release build of the iteration-18
+> commit) + `D:/ffb_star/bin/ffb-ai-cert8.jar` (fresh `mvn package` 02:01, sha256 `71371e62...`).
+> Order: skill ledger -> `D:/ffb_ledger/cert8` (python PID 9212, 8475 jobs, progress
+> `D:/ffb_ledger/cert8.run.log`, ~3-4 h) -> report -> `cert_chain.ps1 -name cert8` (mirror ->
+> cross -> star -> skill; log `D:/ffb_star/cert8.chain.log`; verdicts in `../mirror_cert8`,
+> `../cross_cert8`, `../starjobs_cert8` `scratch/sweep_w*.log`, `D:/ffb_sksweep/cert8/results.txt`).
+> The chain STOPS at 07:00. `.loop_wait.json` holds PID 8732 until 07:30. **The session that wakes
+> then:** run `python -I scripts/skill_parity_check.py` (it reads the cert8 ledger; expected:
+> missing 0 -- see iteration 18 below), then relaunch the chain for the next window with the
+> launch form below but `-name cert8 -skipLedger` (final_cert.ps1 sleeps until 21:00 by itself;
+> the workers skip already-judged gates), and write a new `.loop_wait.json` with the new PID and a
+> deadline of 2026-11-22 07:30. When all four suites are green on cert8 (fix any red 1:1 -> new
+> freeze -> new cert, never mix builds), write `docs/cert_manifest.json` (schema in the checker
+> docstring), commit, push.
+> **Iteration 18 (2026-11-21 ~01:50-02:05):** the cert7 ledger (first measured ledger since
+> cert6_2b) left exactly 2 non-exempt gaps, both MEASUREMENT gaps, not engine gaps:
+> (1) **bb2020 ExcuseMeAreYouAZoat**: Java reports `skill:"Excuse Me, Are You a Zoat?"` 25x in the
+> cert7 star jobs, but `skill_ledger.py`'s catalogue regex `super\(\s*"([^"]+)"` captured a lone
+> backslash for display names that start with an escaped quote (also bb2020 ThenIStartedBlastin,
+> bb2025 BlastinSolvesEverything + Zoat). Fixed (escape-aware regex); re-report of the cert7 data:
+> bb2020 Zoat named 31 -> THIN (fires). (2) **bb2020 Defensive**: its only live Java effect is the
+> Guard cancel in `ServerUtilPlayer.findBlockStrength` (`assistsFoulsInTacklezones` is read by no
+> Java code; the bb2025 touches came from the bb2025-only `cancelsCanAlwaysAssistFouls` foul
+> check). Rust implemented the cancel but `Player::has_skill_to_cancel_property_in` recorded no
+> skill touch. Now it touches like `has_skill_property_in`, and `find_block_strength` evaluates the
+> cancel lookup in Java's short-circuit order (only when `allowsCancellingGuard && acting team`),
+> same boolean result -> no behaviour change; unit test added. Probe (`D:/ffb_scratch_it18/probe.py`,
+> exe `ffb-parity-def.exe` = cert8 bytes, the 209 bb2020 cert7 ledger jobs that field Defensive):
+> **3812 touches in skill, mirror, cross and star jobs**. Because the exe changed, cert7 could no
+> longer be the manifest's proof: cert7 was STOPPED at 02:00 (mirror 330/330 green, cross 1709/1709
+> gates green so far -- information only) and cert8 launched on the new freeze.
+> **History -- iteration 17 (superseded):**
 > **RUNNING (launched 21:16, detached): the cert7 FINAL-PROOF chain, driver PID 26464**
 > (`scripts/final_cert.ps1 -name cert7 -maxRun 4`, self-pinned to mask 0x7FF; children inherit).
 > Frozen pair: `D:/ffb_star/bin/ffb-parity-cert7.exe` (= HEAD `2c4f4554d`, release build 21:14,

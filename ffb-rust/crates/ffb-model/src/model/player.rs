@@ -430,9 +430,19 @@ impl Player {
     /// property — the player need not have it. Java calls this at a dozen sites
     /// (`FoulAppearanceBehaviour`, `PilingOnBehaviour`, `StepEndBlocking`, `StepHypnoticGaze`,
     /// `StepJump`, `JumpModifierFactory`, `InjuryMechanic`, `UtilPassing`, …).
+    ///
+    /// Skill-touch telemetry (no game effect): like `has_skill_property_in`, a true answer records
+    /// a touch of every cancelling skill -- bb2020 Defensive's ONLY live effect is this check (the
+    /// Guard cancel in `ServerUtilPlayer.findBlockStrength`), so without it the ledger saw it SILENT.
     pub fn has_skill_to_cancel_property_in(&self, rules: crate::enums::Rules, property: &str) -> bool {
         let cancel = format!("cancels{}{}", property[..1].to_uppercase(), &property[1..]);
-        self.all_skill_ids().any(|id| id.properties_for(rules).contains(&cancel.as_str()))
+        let has = self.all_skill_ids().any(|id| id.properties_for(rules).contains(&cancel.as_str()));
+        if has {
+            crate::skill_touch::touch_all(
+                self.all_skill_ids().filter(|id| id.properties_for(rules).contains(&cancel.as_str())),
+            );
+        }
+        has
     }
 
     /// Java: getSkillWithProperty — returns the first SkillId that has the given property.

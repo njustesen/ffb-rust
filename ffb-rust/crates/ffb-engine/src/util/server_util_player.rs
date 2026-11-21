@@ -76,7 +76,7 @@ impl ServerUtilPlayer {
             if !state.map(|s| s.has_tacklezones()).unwrap_or(false) { continue; }
             if state.map(|s| s.is_eye_gouged()).unwrap_or(false) { continue; }
             let mut opponents_other_than_defender = 0i32;
-            let mut guard_is_canceled = false;
+            let mut defensive_assists: Vec<&str> = Vec::new();
             for (oid, &ocoord) in &game.field_model.player_coordinates {
                 let on_def_team = if def_team_home { game.team_home.has_player(oid) } else { game.team_away.has_player(oid) };
                 if !on_def_team { continue; }
@@ -91,14 +91,7 @@ impl ServerUtilPlayer {
                         if !defender_id.map(|d| d == oid).unwrap_or(false) {
                             opponents_other_than_defender += 1;
                         }
-                        // Java: `defensiveAssists ... anyMatch(skill.canCancel(assistsBlocksInTacklezones))`
-                        if game.player(oid)
-                            .map(|p| p.has_skill_to_cancel_property_in(game.rules,
-                                ffb_model::model::property::NamedProperties::ASSISTS_BLOCKS_IN_TACKLEZONES))
-                            .unwrap_or(false)
-                        {
-                            guard_is_canceled = true;
-                        }
+                        defensive_assists.push(oid.as_str());
                     }
                 }
             }
@@ -111,7 +104,10 @@ impl ServerUtilPlayer {
             let has_guard = game.player(id)
                 .map(|p| p.has_skill_property(ffb_model::model::property::NamedProperties::ASSISTS_BLOCKS_IN_TACKLEZONES))
                 .unwrap_or(false);
-            let guard_cancel_applies = guard_is_canceled && {
+            // Java evaluation order: `allowsCancellingGuard(turnMode) && actingTeam.hasPlayer(attacker)
+            // && defensiveAssists...anyMatch(canCancel(assistsBlocksInTacklezones))` -- the cancel
+            // lookup (which records the canceller's skill touch) runs only when the first two hold.
+            let guard_cancel_applies = {
                 use ffb_mechanics::skill_mechanic::SkillMechanic as SkillMechanicTrait;
                 let allows = match game.rules {
                     ffb_model::enums::Rules::Bb2016 =>
@@ -128,6 +124,10 @@ impl ServerUtilPlayer {
                     .map(|a| game.team_home.has_player(a) == game.home_playing)
                     .unwrap_or(false);
                 allows && attacker_on_acting_team
+                    && defensive_assists.iter().any(|oid| game.player(oid)
+                        .map(|p| p.has_skill_to_cancel_property_in(game.rules,
+                            ffb_model::model::property::NamedProperties::ASSISTS_BLOCKS_IN_TACKLEZONES))
+                        .unwrap_or(false))
             };
             if (has_guard && !guard_cancel_applies) || opponents_other_than_defender == 0 {
                 block_strength += 1;
@@ -251,6 +251,46 @@ mod tests {
         let s2 = ServerUtilPlayer::find_block_strength(
             &game, FieldCoordinate::new(12, 8), 3, FieldCoordinate::new(13, 7));
         assert_eq!(s2, 4, "marked Guard assister counts when nothing cancels it");
+    }
+
+    /// bb2020 Defensive's only live Java effect is the Guard cancel in findBlockStrength. The
+    /// cancel lookup runs (and records Defensive's skill touch) only where Java's short-circuit
+    /// `allowsCancellingGuard(turnMode) && actingTeam.hasPlayer(attacker) && anyMatch(...)`
+    /// reaches it: never on a Blitz turn (the ledger saw bb2020 Defensive SILENT, §M iter 18).
+    #[test]
+    fn bb2020_defensive_guard_cancel_records_touch_only_when_java_evaluates_it() {
+        use ffb_model::model::SkillWithValue;
+        use ffb_model::enums::{SkillId, TurnMode};
+        use ffb_model::skill_touch;
+        let mut game = make_game();
+        game.home_playing = true;
+        game.turn_mode = TurnMode::Regular;
+        game.team_home.players.push(make_player("atk", 1));
+        let mut guard = make_player("guard", 2);
+        guard.extra_skills.push(SkillWithValue::new(SkillId::Guard));
+        game.team_home.players.push(guard);
+        let mut def = make_player("def", 1);
+        def.extra_skills.push(SkillWithValue::new(SkillId::Defensive));
+        game.team_away.players.push(def);
+        game.team_away.players.push(make_player("marker", 2));
+        for (id, x, y) in [("atk", 12, 8), ("guard", 12, 6), ("def", 13, 7), ("marker", 13, 6)] {
+            game.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+            game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+        }
+        skill_touch::set_enabled(true);
+        let _ = skill_touch::take();
+        let s = ServerUtilPlayer::find_block_strength(
+            &game, FieldCoordinate::new(12, 8), 3, FieldCoordinate::new(13, 7));
+        let regular = skill_touch::take();
+        game.turn_mode = TurnMode::Blitz;
+        let s_blitz = ServerUtilPlayer::find_block_strength(
+            &game, FieldCoordinate::new(12, 8), 3, FieldCoordinate::new(13, 7));
+        let blitz = skill_touch::take();
+        skill_touch::set_enabled(false);
+        assert_eq!(s, 3, "bb2020 Defensive defender cancels the marked Guard assist");
+        assert!(regular.iter().any(|&(id, n)| id == SkillId::Defensive && n >= 1), "{regular:?}");
+        assert_eq!(s_blitz, 4, "Guard cannot be cancelled on a Blitz turn");
+        assert!(!blitz.iter().any(|&(id, _)| id == SkillId::Defensive), "{blitz:?}");
     }
 
     #[test]
