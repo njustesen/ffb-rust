@@ -10998,3 +10998,11 @@ Deferred, with the reason (each needs a design decision or a larger port):
   reports identical. Star was moved into a parallel controller at 02:25 to fit the window; the
   reaper killed that controller (and its workers) ~03:10 after **989/4012 gates, all green**. The
   star remainder and the skill sweep (`D:/ffb_sksweep/cert6`) still need a run; 0 reds anywhere.
+
+## §N — 2026-11-21: FUMBBL REPLAY PARITY (PLANNED; starts after §M cert8 closes)
+
+User goal: download real FUMBBL games (10 to start), drive Java and Rust through each, compare every
+state hash. Full plan, architecture (Java follows the replay and writes dice + decision tapes; Rust
+replays the tapes) and phases N0-N5: **docs/REPLAY_PARITY_PLAN.md**. N0 (fetch + inventory scripts,
+first 10 replays in D:/ffb_replays/fumbbl, outside git) done 2026-11-21. Rule: >= 10 s between every
+fumbbl.com contact. Do NOT start N1+ while the §M cert8 chain is running.
