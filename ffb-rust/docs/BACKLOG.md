@@ -9741,20 +9741,22 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > `data/agent/skill_exempt.json` is deleted. Result on the cert8 ledger: **409/411**. The 9 former
 > exemptions bb2016 x8 + bb2020 PilingOn are simply not in any ruleset (no carrier, not learnable).
 > bb2025 Insignificant is covered by its draft rule (`DRAFT_RULES`: every bb2025 team obeys the
-> limit, 22 fielded). **Two ruleset skills are open:**
-> 1. **bb2025 Unsteady** (Bull Centaur, Saurus, Zombie...): its only rule bars the Secure the Ball
->    action. Both harnesses already apply it (ParityRunner :4924 / legal_actions.rs :688), so action
->    parity covers it, but the Rust skill-touch counter ignores agent decisions. Make it COUNT:
->    record a skill touch in Rust exactly where Unsteady removes Secure the Ball from a player's
->    legal actions (the ball is loose, the player could otherwise take it), add a unit test, find a
->    seed where it happens, and gate the touch on a green gate. No game-behaviour change.
-> 2. **bb2025 TheBallista** (Morg 'n' Thorg): Java bb2025 never offers it (see QUESTION 3). Do NOT
->    work on it until the user answers.
-> Unsteady changes the exe, so cert8 cannot be the final proof: the supervisor stopped the cert8
-> driver (PID 21156, it was asleep until 21:00; its mirror 330 + cross 2454 verdicts are history
-> only). Do Unsteady now, then freeze cert9 (exe + jar) from that HEAD and launch
-> `final_cert.ps1 -name cert9` for tonight's 21:00 window, unless QUESTION 3 is answered with a
-> Java fix by then -- in that case include it before the freeze. Delete this block when cert9 runs.
+> limit, 22 fielded).
+> **UPDATE ~16:45 (user: "If the two engines agree on the skill, it is green. We only care about
+> parity right now. Java is the truth"):** bb2025 TheBallista and Unsteady are skills the JAVA
+> ENGINE never resolves (traces in the checker's `JAVA_NEVER_FIRES`); both are fielded in the
+> certified games and both engines agree, so they are green. **Checker on the cert8 ledger:
+> 411/411 ruleset skills; the ONLY open item is the cert manifest.**
+> **So cert8 IS the final proof again -- do NOT change the exe or jar.** The supervisor relaunched
+> the cert8 driver (PID 22272, `final_cert.ps1 -name cert8 -skipLedger`, sleeps until 21:00, then
+> resumes cross from 2454 -> star -> skill; `.loop_wait.json` until 2026-11-22 07:30). Iteration
+> 1's half-done Secure the Ball client-rule rework (it would have changed bb2025 agent play) was
+> taken OUT of the tree, unreviewed and ungated, into
+> `docs/secure_the_ball_client_rule_2026-11-21.patch` -- a coverage follow-up for after the cert,
+> not part of this proof. The session that wakes: count verdicts as in RESUME HERE below; if
+> incomplete and no red, relaunch the same cert8 driver; if all four suites are green, write
+> `docs/cert_manifest.json` pointing at the cert8 exe/jar/ledger, commit, push -> DONE.
+> Any red: fix 1:1 -> new freeze -> new cert. Delete this block once cert8 completes.
 >
 > **RESUME HERE -- UPDATED 2026-11-21 07:10 (loop iteration 19), read this first (supersedes everything below).**
 > **cert8 window 1 (02:01-07:01) result:** ledger done early (`D:/ffb_ledger/cert8`; checker: 408/420
@@ -10187,7 +10189,10 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
    reRollSkill=null, so RollMechanic (bb2025 :272-278) only adds canRerollSingleDieOncePerPeriod
    skills. Both engines therefore ignore it -- parity holds but the skill is never exercised.
    Options: (a) fix the Java engine (deliberate oracle change) and port 1:1 to Rust; (b) record it
-   as a Java defect in JAVA_DEFECTS.md and count it as covered by that record. **Open.**
+   as a Java defect in JAVA_DEFECTS.md and count it as covered by that record.
+   **ANSWERED (user, 2026-11-21): "If the two engines agree on the skill, it is green. We only care
+   about parity right now. Java is the truth."** -> no Java change; TheBallista (and Unsteady, same
+   principle) counted green via the checker's JAVA_NEVER_FIRES.
 
 **Goal (user, 2026-11-17):** "make the agent use all skills in the game. Ideally to play better
 but most importantly to reach better coverage." User decisions: (1) drafted teams MAY carry

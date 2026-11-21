@@ -27,6 +27,9 @@ DONE (exit 0) requires ALL of:
      §2.2) are not part of the ruleset.
      A skill whose ONLY rule is a team-draft restriction has nothing to fire in a game; it counts
      as covered when the edition's drafted teams obey it and at least one fields it (DRAFT_RULES).
+     A skill the Java engine itself never resolves (JAVA_NEVER_FIRES, Java trace required) is
+     covered when its carrier is fielded in the certified games: Java is the truth, and both
+     engines agreeing on it is parity.
 
 Because the ledger replays exactly the certified schedules (same seeds, scales, stars) on exactly
 the certified exe, a skill that fires in the ledger fires in green parity games.
@@ -148,6 +151,24 @@ def _insignificant_ok():
 
 DRAFT_RULES = {('bb2025', 'Insignificant'): _insignificant_ok}
 
+# A ruleset skill the JAVA ENGINE never resolves in a game. Java is the truth and the goal is
+# parity (user, 2026-11-21: "If the two engines agree on the skill, it is green. We only care about
+# parity right now. Java is the truth"), so it is covered when its carrier is FIELDED in the
+# certified games (ledger status SILENT, not NOT FIELDED): both engines then agree, game after
+# green game, that it does nothing. Each entry must trace the Java code path that never reaches it.
+JAVA_NEVER_FIRES = {
+    ('bb2025', 'TheBallista'):
+        'skill/bb2025/special/TheBallista registers PASS/THROW_TEAM_MATE/KICK_TEAM_MATE re-roll '
+        'sources, but bb2025 ThrowTeamMateBehaviour :113 and StepPass :251 call '
+        'askForReRollIfAvailable with reRollSkill=null and RollMechanic bb2025 :272-278 only adds '
+        'canRerollSingleDieOncePerPeriod skills, so no bb2025 re-roll dialog ever offers it.',
+    ('bb2025', 'Unsteady'):
+        'skill/bb2025/Unsteady only registers preventSecureTheBallAction, which ffb-server never '
+        'reads; its sole consumer is the client action menu (ffb-client-logic LogicModule :340), '
+        'mirrored in both harnesses (ParityRunner / legal_actions.rs), so the server engine never '
+        'resolves it.',
+}
+
 
 def suite_verdicts(kind, pattern):
     """{gate key: green?} using the LAST verdict per gate, plus the files read."""
@@ -257,6 +278,15 @@ def check(manifest_path):
             seen.add((r['edition'], r['skill']))
             if r['status'] in FIRES:
                 fired += 1
+                continue
+            if (r['edition'], r['skill']) in JAVA_NEVER_FIRES:
+                if r['status'] == 'SILENT':
+                    fired += 1
+                    info.append('java never fires %s %s; fielded in the certified games, both '
+                                'engines agree' % (r['edition'], r['skill']))
+                    continue
+                missing.append('%s %s (Java never fires it, but its carrier is %s -- field it)' % (
+                    r['edition'], r['skill'], r['status']))
                 continue
             rule = DRAFT_RULES.get((r['edition'], r['skill']))
             if rule:

@@ -1,0 +1,180 @@
+diff --git a/ffb-java/ffb/ffb-ai/src/main/java/com/fumbbl/ffb/ai/parity/ParityRunner.java b/ffb-java/ffb/ffb-ai/src/main/java/com/fumbbl/ffb/ai/parity/ParityRunner.java
+index 37b5d88d7..957eda2ae 100644
+--- a/ffb-java/ffb/ffb-ai/src/main/java/com/fumbbl/ffb/ai/parity/ParityRunner.java
++++ b/ffb-java/ffb/ffb-ai/src/main/java/com/fumbbl/ffb/ai/parity/ParityRunner.java
+@@ -4992,16 +4992,20 @@ public class ParityRunner {
+                     actions.add(PlayerAction.PUNT);
+                 }
+ 
+-                // SecureTheBall (BB2025 only): ball moving through this player's square.
+-                // Mirror Rust eligible_players_for_activation: a player with the Unsteady trait
+-                // (NamedProperties.preventSecureTheBallAction) may NOT Secure the Ball. Without this
+-                // the harness offered SecureTheBall to an Unsteady Flesh Golem that Rust omits, so
+-                // the two agents' eligible lists differed in size and the shared actionRng picked a
+-                // different action (necromantic seed 83 i=142: home_03 SECURE_THE_BALL vs HandOff).
++                // SecureTheBall (BB2025 only): the client's LogicModule.isSecureTheBallActionAvailable
++                // :332-343, term for term -- a loose ball (in play + moving), the team's Secure the
++                // Ball unspent, no preventSecureTheBallAction (Unsteady, No Ball, Ball & Chain), no
++                // Big Guy keyword, and no opposing STANDING non-Distracted player within 2 squares of
++                // the ball. Until §M (2026-11-21) the harness offered it only to a player standing ON
++                // the ball square, which heuristic play never reaches (0 offers in 1090 bb2025 games),
++                // so Unsteady's one rule was never consulted. Mirrored in Rust
++                // legal_activate_player_actions.
+                 if (isBb2025(game) && fm.isBallInPlay() && fm.isBallMoving()
+-                        && ballCoord != null && ballCoord.equals(coord)
+                         && !td.isSecureTheBallUsed()
+-                        && !p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.preventSecureTheBallAction)) {
++                        && !p.hasSkillProperty(com.fumbbl.ffb.model.property.NamedProperties.preventSecureTheBallAction)
++                        && !p.getPosition().getKeywords().contains(com.fumbbl.ffb.model.Keyword.BIG_GUY)
++                        && ballCoord != null
++                        && com.fumbbl.ffb.util.UtilPlayer.findPlayersWithTackleZonesTwoSquaresAway(game, opponent, ballCoord).length == 0) {
+                     actions.add(PlayerAction.SECURE_THE_BALL);
+                 }
+ 
+diff --git a/ffb-rust/crates/ffb-engine/src/legal_actions/mod.rs b/ffb-rust/crates/ffb-engine/src/legal_actions/mod.rs
+index 7b7518b56..bad471e88 100644
+--- a/ffb-rust/crates/ffb-engine/src/legal_actions/mod.rs
++++ b/ffb-rust/crates/ffb-engine/src/legal_actions/mod.rs
+@@ -14,6 +14,26 @@ pub enum TeamSide {
+     Away,
+ }
+ 
++/// Java `UtilPlayer.findPlayersWithTackleZonesTwoSquaresAway(game, team, coord).length > 0`:
++/// `findPlayersWithTackleZones(.., 2)` walks `findAdjacentCoordinates(coord, FIELD, 2, false)`
++/// (the 5x5 box minus its centre, clipped to the field) and keeps a `team` player whose base is
++/// exactly STANDING and who is not Distracted.
++fn opponent_standing_within_two(
++    game: &Game,
++    team: &ffb_model::model::team::Team,
++    coord: FieldCoordinate,
++) -> bool {
++    team.players.iter().any(|p| {
++        let Some(c) = game.field_model.player_coordinate(&p.id) else { return false };
++        let in_box = (c.x - coord.x).abs() <= 2 && (c.y - coord.y).abs() <= 2 && c != coord;
++        in_box
++            && (0..=25).contains(&c.x)
++            && (0..=14).contains(&c.y)
++            && game.field_model.player_state(&p.id)
++                .is_some_and(|s| s.base() == ffb_model::enums::PS_STANDING && !s.is_distracted())
++    })
++}
++
+ /// Returns all legal `ActivatePlayer` actions for the given side on their turn.
+ ///
+ /// This lists which players can be activated and with which action type.
+@@ -688,12 +708,21 @@ pub fn legal_activate_player_actions(game: &Game, side: TeamSide) -> Vec<Action>
+         // register. Testing the Unsteady SKILL alone offered the action to a Norse Beer Boar (No
+         // Ball) standing on a loose, still-moving kick — one extra activation option, and the
+         // uniform arm's next pick read a different index (norse bb2025 @1e6 seed 91 i=7).
++        //
++        // §M (2026-11-21): the terms are now the client's `LogicModule.isSecureTheBallActionAvailable`
++        // :332-343, in its order -- loose ball (in play + moving), Secure the Ball unspent, no
++        // preventSecureTheBallAction, no Big Guy keyword, and no opposing STANDING non-Distracted
++        // player within 2 squares of the ball (`UtilPlayer.findPlayersWithTackleZonesTwoSquaresAway`).
++        // The old harness rule (only a player standing ON the ball square) was never reached in
++        // heuristic play (0 offers in 1090 bb2025 games), so Unsteady's one rule was never consulted.
++        // ParityRunner.computeEligiblePlayers carries the same terms.
+         if game.rules == Rules::Bb2025
+             && game.field_model.ball_in_play
+             && game.field_model.ball_moving
+-            && ball_coord == Some(coord)
+             && !turn_data.secure_the_ball_used
+             && !player.has_skill_property(ffb_model::model::property::named_properties::NamedProperties::PREVENT_SECURE_THE_BALL_ACTION)
++            && !player.keywords.iter().any(|k| k.eq_ignore_ascii_case("Big Guy"))
++            && ball_coord.is_some_and(|b| !opponent_standing_within_two(game, opponent_team, b))
+         {
+             actions.push(Action::ActivatePlayer {
+                 player_id: pid.clone(),
+@@ -2484,6 +2513,64 @@ mod tests {
+         assert!(!has_action(&actions, "p1", PlayerActionChoice::SecureTheBall));
+     }
+ 
++    /// Client `LogicModule.isSecureTheBallActionAvailable`: any player, not only one on the ball
++    /// square, unless an opposing STANDING non-Distracted player is within 2 squares of the ball
++    /// (the ball square itself excluded), or the player is a Big Guy.
++    #[test]
++    fn secure_the_ball_follows_client_terms() {
++        let base = || {
++            let mut game = make_game(Rules::Bb2025);
++            add_player(&mut game, true, "p1", c(2, 2), PS_STANDING, vec![]);
++            game.field_model.ball_coordinate = Some(c(10, 7));
++            game.field_model.ball_in_play = true;
++            game.field_model.ball_moving = true;
++            game
++        };
++        // Far from the ball, nobody near it: offered.
++        let game = base();
++        assert!(has_action(&legal_activate_player_actions(&game, TeamSide::Home), "p1", PlayerActionChoice::SecureTheBall));
++        // A standing opponent two squares from the ball: not offered.
++        let mut game = base();
++        add_player(&mut game, false, "o1", c(12, 9), PS_STANDING, vec![]);
++        assert!(!has_action(&legal_activate_player_actions(&game, TeamSide::Home), "p1", PlayerActionChoice::SecureTheBall));
++        // Three squares away, or prone within two: offered.
++        let mut game = base();
++        add_player(&mut game, false, "o1", c(13, 7), PS_STANDING, vec![]);
++        add_player(&mut game, false, "o2", c(11, 7), PS_PRONE, vec![]);
++        assert!(has_action(&legal_activate_player_actions(&game, TeamSide::Home), "p1", PlayerActionChoice::SecureTheBall));
++        // A team-mate next to the ball does not block it.
++        let mut game = base();
++        add_player(&mut game, true, "p2", c(11, 7), PS_STANDING, vec![]);
++        assert!(has_action(&legal_activate_player_actions(&game, TeamSide::Home), "p1", PlayerActionChoice::SecureTheBall));
++        // Big Guy keyword: not offered.
++        let mut game = base();
++        game.team_home.players[0].keywords = vec!["Big Guy".into()];
++        assert!(!has_action(&legal_activate_player_actions(&game, TeamSide::Home), "p1", PlayerActionChoice::SecureTheBall));
++        // Ball held (not moving): not offered.
++        let mut game = base();
++        game.field_model.ball_moving = false;
++        assert!(!has_action(&legal_activate_player_actions(&game, TeamSide::Home), "p1", PlayerActionChoice::SecureTheBall));
++    }
++
++    /// §M: Unsteady's one rule is consulted (a skill touch) whenever the ball is loose and the
++    /// team's Secure the Ball is unspent -- the property is the client's first player term.
++    #[test]
++    fn unsteady_is_touched_when_the_ball_is_loose() {
++        let mut game = make_game(Rules::Bb2025);
++        add_player(&mut game, true, "p1", c(2, 2), PS_STANDING, vec![SkillId::Unsteady]);
++        game.field_model.ball_coordinate = Some(c(10, 7));
++        game.field_model.ball_in_play = true;
++        game.field_model.ball_moving = true;
++        let _lock = ffb_model::skill_touch::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
++        ffb_model::skill_touch::set_enabled(true);
++        let _ = ffb_model::skill_touch::take();
++        let actions = legal_activate_player_actions(&game, TeamSide::Home);
++        let touched = ffb_model::skill_touch::take();
++        ffb_model::skill_touch::set_enabled(false);
++        assert!(!has_action(&actions, "p1", PlayerActionChoice::SecureTheBall));
++        assert!(touched.iter().any(|&(id, n)| id == SkillId::Unsteady && n >= 1), "{touched:?}");
++    }
++
+     // ── legal_move_targets / legal_blitz_move_targets ─────────────────────────
+ 
+     #[test]
+diff --git a/ffb-rust/crates/ffb-engine/src/util/server_util_player.rs b/ffb-rust/crates/ffb-engine/src/util/server_util_player.rs
+index 835f8daf3..767de4890 100644
+--- a/ffb-rust/crates/ffb-engine/src/util/server_util_player.rs
++++ b/ffb-rust/crates/ffb-engine/src/util/server_util_player.rs
+@@ -277,6 +277,7 @@ mod tests {
+             game.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+             game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+         }
++        let _lock = skill_touch::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+         skill_touch::set_enabled(true);
+         let _ = skill_touch::take();
+         let s = ServerUtilPlayer::find_block_strength(
+diff --git a/ffb-rust/crates/ffb-model/src/skill_touch.rs b/ffb-rust/crates/ffb-model/src/skill_touch.rs
+index f644e6177..baaa9d1ce 100644
+--- a/ffb-rust/crates/ffb-model/src/skill_touch.rs
++++ b/ffb-rust/crates/ffb-model/src/skill_touch.rs
+@@ -26,6 +26,11 @@ thread_local! {
+     static SUPPRESS: Cell<u32> = const { Cell::new(0) };
+ }
+ 
++/// Tests that toggle the process-global [`set_enabled`] flag hold this so parallel tests in one
++/// binary cannot switch counting off under each other.
++#[doc(hidden)]
++pub static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
++
+ /// Turn counting on or off for the whole process.
+ pub fn set_enabled(on: bool) {
+     ENABLED.store(on, Ordering::Relaxed);
