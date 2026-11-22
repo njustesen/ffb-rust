@@ -86,7 +86,7 @@ impl Keyword {
             Keyword::VAMPIRE, Keyword::WEREWOLF, Keyword::WRAITH, Keyword::YHETEE,
             Keyword::ZOMBIE, Keyword::ALL, Keyword::UNKNOWN,
         ]
-        .iter().copied().find(|k| k.get_name().eq_ignore_ascii_case(name))
+        .iter().copied().find(|k| crate::util::java_json::java_equals_ignore_case(k.get_name(), name))
         .unwrap_or(Keyword::UNKNOWN)
     }
 }

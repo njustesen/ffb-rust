@@ -11442,19 +11442,42 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
 - Tools (outside git): `D:/ffb_replay_parity/tools/{team_census,team_nulls}.py` (censuses of the Java
   team dumps), `cargo_errors.py` (cargo with errors only -- no shell pipes needed).
 
+### O2 log — iteration 8 (2026-11-23 ~01:30): GameResult / TeamResult / PlayerResult gated
+- **Ported 1:1** in `ffb-model/src/model/game_result.rs` (the Rust structs live there; `team_result.rs`
+  / `player_result.rs` re-export): `PlayerResult::{init_from(rules, team, json) -> player id,
+  to_json_value(rules, player_id)}`, `TeamResult::{init_from(rules, team, json), to_json_value(rules,
+  Option<&Team>)}`, `GameResult::{init_from(rules, home, away, json), to_json_value(..)}`. New Java
+  field `PlayerResult.gained_hatred: Vec<Keyword>` (serde default, engine-invisible).
+- **Java semantics kept:** `TeamResult.toJsonValue` writes one result per `getTeam().getPlayers()`
+  (nr order) and `getPlayerResult` creates DEFAULT results lazily (Rust writes the default without
+  storing it -- identical content); `initFrom` clears the map and keys by `getPlayer().getId()` (a
+  result for a player the team does not hold NPEs -> `Err`); `stalling` only read when defined (old
+  value kept), `catchesWithAdditionalSpp`/`gainedHatred` likewise; `gainedHatred: null` -> NPE (`Err`);
+  `Keyword.forName` null/unknown -> UNKNOWN (now `equalsIgnoreCase`-exact); serious injuries via the
+  per-ruleset factory (unknown -> null); `penaltyScore` read as-is (Java's -1 default comes from JSON).
+  `Game.initFrom` decodes both teams IN PLACE before the result (the result's teams are the game's);
+  the `TeamState.SKELETON` branch REPLACES the team objects, so there the result would keep the old
+  empty teams -- check whether any corpus game is SKELETON when porting the Game scalars.
+- **Engine-side (no behaviour change for engine games):** both `SendToBoxReason` lookups
+  (`enums::team::SendToBoxReason::from_name`, `model::send_to_box_reason::for_name`) are now the Java
+  `SendToBoxReasonFactory.forName` (isProvided, equalsIgnoreCase, the `"wrestle"` -> BALL_AND_CHAIN
+  alias). Unit tests `game_result::tests::json_*`, `send_to_box_reason` wrestle test.
+- **start-check gameResult: 2,224/2,224** first run; teamHome/teamAway re-run 2,224/2,224. Non-vacuous
+  (`D:/ffb_replay_parity/tools/result_census.py`): 4,448 team results, 57,310 player results, 4,020
+  serious injuries over 12 names (incl. bb2016/2020/2025 names), 24,071 send-to-box reasons, 1,305
+  non-empty gainedHatred, 632 stalling, 135 conceded, 18 penalty scores. `cargo test --workspace` green.
+
 ### RESUME HERE
-**This iteration (2026-11-23 ~00:45, loop iteration 6 of this run):** see "O2 log — iteration 7":
-Team/Roster/RosterPosition/RosterPlayer JSON; `teamHome`/`teamAway` 2,224/2,224 (all earlier subtrees
-still 2,224). Nothing running; no `.loop_wait.json` needed.
+**This iteration (2026-11-23 ~01:30, loop iteration 7 of this run):** see "O2 log — iteration 8":
+GameResult/TeamResult/PlayerResult JSON; `gameResult` 2,224/2,224 (all earlier subtrees still 2,224).
+Nothing running; no `.loop_wait.json` needed.
 **Next:** O2(a) class by class, each = 1:1 port from the .java + unit tests + a `load_subtree` arm +
 `start-check <subtree>` 2,224/2,224 (binary: `cargo build --release -p ffb-parity --bin ffb-replay`;
 run `target/release/ffb-replay.exe start-check D:/ffb_replay_parity/start_all <subtree>
 D:/ffb_replays/fumbbl D:/ffb_replays/partial D:/ffb_replays/window
 D:/ffb_replays/fumbbl_night_20261122 D:/ffb_replays/fumbbl_night_20261122/partial`):
 (1) ~~`actingPlayer`~~ DONE; (2) ~~`turnDataHome`/`turnDataAway`~~ DONE; (3) ~~`teamHome`/`teamAway`~~
-DONE; (4) `gameResult` (needs both Teams: `PlayerResult` resolves its player through the team,
-`TeamResult.toJsonValue` creates default results lazily for every `team.getPlayers()`); (5)
-`fieldModel`; (6) `dialogParameter` (the corpus's dialog classes); (7) the whole `Game` (scalars + all
+DONE; (4) ~~`gameResult`~~ DONE; (5) `fieldModel` (next); (6) `dialogParameter` (the corpus's dialog classes); (7) the whole `Game` (scalars + all
 of the above) -> compare the full gs.json sha; then `startOfGame` vs `<id>.sog.json`. After O2(a):
 ModelChangeProcessor. Open follow-ups: ZappedPlayer JSON (`Err` today; zap/unzap commands occur in 15
 replays), skill-property sets in `temporaryPropertiesMap` (`Err` if non-empty), the prayer-name finding

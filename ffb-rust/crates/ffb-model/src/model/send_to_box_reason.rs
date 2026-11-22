@@ -98,8 +98,23 @@ impl SendToBoxReason {
         }
     }
 
+    /// Java: `SendToBoxReasonFactory.forName` -- `StringTool.isProvided`, `equalsIgnoreCase` on
+    /// `getName()`, plus the backward-compatibility alias `"wrestle"` -> `BALL_AND_CHAIN`.
     pub fn for_name(name: &str) -> Option<Self> {
-        Self::all().iter().copied().find(|v| v.get_name().eq_ignore_ascii_case(name))
+        if name.is_empty() {
+            return None;
+        }
+        if let Some(reason) = Self::all()
+            .iter()
+            .copied()
+            .find(|v| crate::util::java_json::java_equals_ignore_case(name, v.get_name()))
+        {
+            return Some(reason);
+        }
+        if name == "wrestle" {
+            return Some(SendToBoxReason::BALL_AND_CHAIN);
+        }
+        None
     }
 
     fn all() -> &'static [SendToBoxReason] {
@@ -130,6 +145,14 @@ mod tests {
     #[test]
     fn for_name_unknown_returns_none() {
         assert_eq!(SendToBoxReason::for_name("NOT_VALID"), None);
+        assert_eq!(SendToBoxReason::for_name(""), None);
+    }
+
+    #[test]
+    fn for_name_wrestle_alias_is_ball_and_chain() {
+        // SendToBoxReasonFactory: "backward compatibility (name change)", case-sensitive.
+        assert_eq!(SendToBoxReason::for_name("wrestle"), Some(SendToBoxReason::BALL_AND_CHAIN));
+        assert_eq!(SendToBoxReason::for_name("Wrestle"), None);
     }
 
 }

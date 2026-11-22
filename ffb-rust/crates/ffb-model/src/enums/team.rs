@@ -167,8 +167,23 @@ impl SendToBoxReason {
         }
     }
 
+    /// Java: `SendToBoxReasonFactory.forName` -- `StringTool.isProvided`, `equalsIgnoreCase` on
+    /// `getName()`, plus the backward-compatibility alias `"wrestle"` -> `BALL_AND_CHAIN`.
     pub fn from_name(name: &str) -> Option<Self> {
-        Self::all().iter().copied().find(|v| v.name().eq_ignore_ascii_case(name))
+        if name.is_empty() {
+            return None;
+        }
+        if let Some(reason) = Self::all()
+            .iter()
+            .copied()
+            .find(|v| crate::util::java_json::java_equals_ignore_case(name, v.name()))
+        {
+            return Some(reason);
+        }
+        if name == "wrestle" {
+            return Some(SendToBoxReason::BallAndChain);
+        }
+        None
     }
 
     fn all() -> &'static [Self] {

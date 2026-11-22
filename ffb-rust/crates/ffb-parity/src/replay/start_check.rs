@@ -50,6 +50,20 @@ fn load_subtree(subtree: &str, game: &mut Value) -> Result<Value, String> {
             team.init_from(rules, input)?;
             team.to_json_value(rules)
         }
+        "gameResult" => {
+            // Game.initFrom decodes both teams (in place) before the game result, whose
+            // TeamResults resolve their players through them.
+            let rules = options.rules_version()?;
+            let team = |key: &str| -> Result<ffb_model::model::team::Team, String> {
+                let mut team = ffb_model::model::team::Team::new();
+                team.init_from(rules, game.get(key).ok_or_else(|| format!("{key} missing in serverGameState"))?)?;
+                Ok(team)
+            };
+            let (team_home, team_away) = (team("teamHome")?, team("teamAway")?);
+            let mut game_result = ffb_model::model::game_result::GameResult::default();
+            game_result.init_from(rules, &team_home, &team_away, input)?;
+            game_result.to_json_value(rules, Some(&team_home), Some(&team_away))
+        }
         "gameOptions" => Ok(options.to_json_value()),
         "actingPlayer" => {
             let rules = options.rules_version()?;
