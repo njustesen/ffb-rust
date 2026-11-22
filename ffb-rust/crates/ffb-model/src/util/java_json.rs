@@ -90,6 +90,55 @@ pub fn get_array<'a>(obj: &'a JsonObject, key: &str) -> Result<Option<&'a Vec<Va
     }
 }
 
+/// `JsonStringArrayOption.getFrom`: absent or JSON null -> null; a JSON null element -> a null
+/// String; any other non-string element throws (`asString`).
+pub fn get_string_array(obj: &JsonObject, key: &str) -> Result<Option<Vec<Option<String>>>, String> {
+    match obj.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Array(a)) => a
+            .iter()
+            .map(|v| match v {
+                Value::Null => Ok(None),
+                Value::String(s) => Ok(Some(s.clone())),
+                other => Err(format!("{key}: asString on {other}")),
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some),
+        Some(v) => Err(format!("{key}: asArray on {v}")),
+    }
+}
+
+/// Java `String.equalsIgnoreCase` (`regionMatches(true, ..)`): per character, equal, or equal
+/// after `Character.toUpperCase`, or equal after `toLowerCase(toUpperCase(..))`. Java's
+/// `Character` mappings are the SIMPLE (one char) case mappings; a char whose Rust full mapping
+/// is not a single char keeps itself, as its simple mapping does.
+pub fn java_equals_ignore_case(a: &str, b: &str) -> bool {
+    fn upper(c: char) -> char {
+        let mut it = c.to_uppercase();
+        match (it.next(), it.next()) {
+            (Some(u), None) => u,
+            _ => c,
+        }
+    }
+    fn lower(c: char) -> char {
+        let mut it = c.to_lowercase();
+        match (it.next(), it.next()) {
+            (Some(l), None) => l,
+            _ => c,
+        }
+    }
+    if a.encode_utf16().count() != b.encode_utf16().count() {
+        return false;
+    }
+    a.chars().zip(b.chars()).all(|(x, y)| {
+        if x == y {
+            return true;
+        }
+        let (ux, uy) = (upper(x), upper(y));
+        ux == uy || lower(ux) == lower(uy)
+    })
+}
+
 /// `JsonValue.valueOf(String)` / `UtilJson.toJsonValue(INamedObject)`: null -> JSON null.
 pub fn string_or_null(value: Option<&str>) -> Value {
     value.map_or(Value::Null, |s| Value::String(s.to_string()))
@@ -124,5 +173,18 @@ mod tests {
         assert_eq!(get_string(&o, "n"), Ok(None));
         assert_eq!(get_string(&o, "s"), Ok(Some("x".to_string())));
         assert_eq!(get_player_state_id(&o, "i"), Ok(Some(7)));
+    }
+
+    #[test]
+    fn string_array_and_ignore_case_match_java() {
+        let o = obj(json!({ "a": ["x", null], "n": null, "bad": [1] }));
+        assert_eq!(get_string_array(&o, "a"), Ok(Some(vec![Some("x".to_string()), None])));
+        assert_eq!(get_string_array(&o, "n"), Ok(None));
+        assert_eq!(get_string_array(&o, "missing"), Ok(None));
+        assert!(get_string_array(&o, "bad").is_err());
+        assert!(java_equals_ignore_case("Iron Man", "iron MAN"));
+        assert!(!java_equals_ignore_case("Iron Man", "Iron Ma"));
+        // Java: Character.toUpperCase('ſ') == 'S', so the long s matches 's'.
+        assert!(java_equals_ignore_case("\u{17f}", "s"));
     }
 }

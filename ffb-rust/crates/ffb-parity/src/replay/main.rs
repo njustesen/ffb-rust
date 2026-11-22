@@ -12,6 +12,7 @@
 //!                                      `<id>.gs.json` (see start_check.rs)
 
 mod canonical;
+mod drop_rules;
 mod ffbr;
 mod start_check;
 

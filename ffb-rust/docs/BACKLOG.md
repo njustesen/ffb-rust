@@ -11367,18 +11367,55 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
   `mortuaryAssistant`), 16 prayer names, NO cards and NO starPlayerPositionIds at start; keys
   `rerollBrilliantCoachingOneDrive`/`rerollPumpUpTheCrowdOneDrive` are the JSON names.
 
+### O2 log — iteration 6 (2026-11-22 ~23:45): turnData + InducementSet gated
+- **Correction to iteration 5's scope note:** the three edition `InducementCollection`s were already in
+  Rust (`inducement/{bb2016,bb2020,bb2025}/inducement_collection.rs`), names identical to the Java ones
+  (checked against every `new InducementType("..")`). What was missing was the per-ruleset lookup.
+- `factory::inducement_type_factory::for_name_in(rules, name)` = Java
+  `getFactory(INDUCEMENT_TYPE).forName` (ruleset collection = base + edition sub-types,
+  `equalsIgnoreCase`, canonical `getName()` back). `factory::prayer_factory::for_name_in(rules, options,
+  name)` = the ruleset `PrayerFactory.forName`: **BB2020's factory holds the league-only prayers only
+  when `inducementPrayersUseLeagueTable` is on (default true)** -- a league prayer in an exhibition-table
+  game is unknown, as in Java; BB2016 has no prayer factory (`Err`). `display_name_in` = `getName()`.
+  `util::java_json::{get_string_array, java_equals_ignore_case}` (Java simple case mapping, UTF-16
+  length) -- use them for every later `forName`.
+- **Representation decision:** the Rust `InducementSet.prayers` keeps the ENUM-CONSTANT name
+  (`IRON_MAN`), the form the engine's prayer handlers already store and match on; JSON in = display name
+  -> `forName` -> enum name, JSON out = enum name -> `getName()`.
+- `Inducement::{init_from(rules,..), to_json_value}`, `InducementSet::{init_from(rules, options,..),
+  to_json_value(rules)}` (init ADDS like Java; cards -> `Err` until a card occurs -- none in the corpus's
+  start states; `starPlayerPositionIds` written only when non-empty), `TurnData::{init_from,
+  to_json_value}` (+ the Java field `home_data`; Java writes neither `singleUseReRolls` nor
+  `reRollShowStarOneDrive`; six booleans are null-safe, the other seven unbox -> `Err` when absent;
+  null leader state -> `Err`). Unit tests in each file.
+- **Harness drop rule ported:** `ffb-parity/src/replay/drop_rules.rs::drop_unknown_inducements` = the
+  parser's `dropUnknownInducements` 1:1 (keys `inducementArray=<name>`, `prayers=<name>` in the Java
+  order; prayers only when the ruleset has a prayer factory); `start-check` applies it to the
+  serverGameState JSON before every subtree decode, as the parser does before the Java decode.
+- **start-check: turnDataHome 2,224/2,224, turnDataAway 2,224/2,224** (gameOptions + actingPlayer still
+  2,224/2,224). Non-vacuous: 66 replays carry the prayer `Blessing of Nuffle` (iteration 2 census) and
+  some carry `dwarfenWisdom`/`josefBugman` inducements; the Rust loader returns `Err` for any of them
+  unless the drop rule removed them first (0 errors); 21 inducement types and 16 prayer names occur
+  (iteration 5 census).
+- **Finding (engine, NOT fixed, live path):** `ffb-model/src/factory/prayer_factory.rs`
+  `available_prayer_rolls` compares the DISPLAY name (`prayer_name` = `get_name()`) with
+  `InducementSet.has_prayer`, but the engine stores ENUM names there (`handled_prayer_name`, e.g.
+  `"FOULING_FRENZY"`). Live caller: `step/bb2020/step_prayers.rs:85` -> a BB2020 team that already holds
+  a prayer is not excluded from the next prayer roll's table (Java excludes it). Cert suites stayed green,
+  so the agents never reach two prayers in one game. Fix = compare `name()` (enum) -- needs a gate run;
+  queue it (it will also matter when the replay loader applies `inducementSetAddPrayer`).
+
 ### RESUME HERE
-**This iteration (2026-11-22 ~23:00, loop iteration 5):** see "O2 log — iteration 5": per-ruleset
-SkillFactory (generated from Java), java_json option helpers, `actingPlayer` 2,224/2,224, gameOptions
-2,224/2,224. Nothing running; no `.loop_wait.json` needed.
+**This iteration (2026-11-22 ~23:45, loop iteration 6):** see "O2 log — iteration 6": turnData +
+InducementSet + per-ruleset inducement/prayer factories + the harness `dropUnknownInducements` port;
+`turnDataHome`/`turnDataAway` 2,224/2,224 (gameOptions, actingPlayer still 2,224). Nothing running;
+no `.loop_wait.json` needed.
 **Next:** O2(a) class by class, each = 1:1 port from the .java + unit tests + a `load_subtree` arm +
 `start-check <subtree>` 2,224/2,224 (binary: `cargo build --release -p ffb-parity --bin ffb-replay`;
 run `target/release/ffb-replay.exe start-check D:/ffb_replay_parity/start_all <subtree>
 D:/ffb_replays/fumbbl D:/ffb_replays/partial D:/ffb_replays/window
 D:/ffb_replays/fumbbl_night_20261122 D:/ffb_replays/fumbbl_night_20261122/partial`):
-(1) ~~`actingPlayer`~~ DONE; (2) `turnDataHome`/`turnDataAway` with
-InducementSet (apply the parser's `dropUnknownInducements` to the raw JSON first -- port it into
-start_check/the loader exactly, keys `inducementArray=`/`prayers=`); (3) `teamHome`/`teamAway`
+(1) ~~`actingPlayer`~~ DONE; (2) ~~`turnDataHome`/`turnDataAway`~~ DONE; (3) `teamHome`/`teamAway`
 (Roster, RosterPosition, RosterPlayer/Player; unknown skills silently omitted, unknown keywords ->
 Unknown -- see the exact drop rule in iteration 2); (4) `gameResult`; (5) `fieldModel`; (6)
 `dialogParameter` (the corpus's dialog classes); (7) the whole `Game` (scalars + all of the above) ->

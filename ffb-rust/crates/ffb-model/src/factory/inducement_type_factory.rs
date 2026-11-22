@@ -31,9 +31,43 @@ impl<'a> InducementTypeFactory<'a> {
     }
 }
 
+/// Java: `game.getFactory(Factory.INDUCEMENT_TYPE).forName(name)` for a game of `rules` --
+/// `initialize(Game)` picks the ruleset's `InducementCollection` subclass (base types + that
+/// edition's sub-types), `forName` is `equalsIgnoreCase` and yields the type, whose `getName()`
+/// is the canonical spelling. `None` = Java null (also for `Rules::Common`, which has no
+/// collection subclass).
+pub fn for_name_in(rules: crate::enums::Rules, name: &str) -> Option<InducementTypeEntry> {
+    use crate::enums::Rules;
+    use crate::util::java_json::java_equals_ignore_case;
+    let find = |types: Vec<&InducementTypeEntry>| {
+        types.into_iter().find(|entry| java_equals_ignore_case(&entry.id, name)).cloned()
+    };
+    match rules {
+        Rules::Bb2016 => find(crate::inducement::bb2016::inducement_collection::InducementCollection::new().get_all_types()),
+        Rules::Bb2020 => find(crate::inducement::bb2020::inducement_collection::InducementCollection::new().get_all_types()),
+        Rules::Bb2025 => find(crate::inducement::bb2025::inducement_collection::InducementCollection::new().get_all_types()),
+        Rules::Common => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn for_name_in_is_per_ruleset_and_returns_the_canonical_name() {
+        use crate::enums::Rules;
+        // `igor` exists only in the BB2016 collection, `prayers` only in BB2020/BB2025.
+        assert_eq!(for_name_in(Rules::Bb2016, "IGOR").map(|t| t.id), Some("igor".to_string()));
+        assert!(for_name_in(Rules::Bb2025, "igor").is_none());
+        assert!(for_name_in(Rules::Bb2016, "prayers").is_none());
+        assert_eq!(for_name_in(Rules::Bb2020, "Prayers").map(|t| t.id), Some("prayers".to_string()));
+        // base types are in every edition
+        assert!(for_name_in(Rules::Bb2025, "wanderingApothecaries").is_some());
+        // newer-server types are unknown (the harness drops them before decoding)
+        assert!(for_name_in(Rules::Bb2025, "dwarfenWisdom").is_none());
+        assert!(for_name_in(Rules::Bb2025, "josefBugman").is_none());
+    }
 
     #[test]
     fn for_name_finds_extra_team_training() {

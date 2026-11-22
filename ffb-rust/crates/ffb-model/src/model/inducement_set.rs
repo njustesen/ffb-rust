@@ -256,6 +256,88 @@ impl InducementSet {
             .sum();
         inducement_total + self.get_all_cards().len() as i32
     }
+
+    // ---- JSON serialization (BACKLOG §O replay loader) ---------------------
+
+    /// Java: `InducementSet.toJsonValue()` -- `inducementArray`, the three card-name arrays
+    /// (always written, possibly empty), `starPlayerPositionIds` only when provided (non-empty),
+    /// `prayers` as `Prayer.getName()`. Java iterates HashMaps/HashSets, so every array here is
+    /// unordered state (the canonical form sorts them; `UNORDERED_ARRAY`). `Err` for a prayer the
+    /// ruleset's `Prayer` enum does not have (Java could not hold it).
+    pub fn to_json_value(&self, rules: crate::enums::Rules) -> Result<serde_json::Value, String> {
+        use serde_json::Value;
+        let names = |v: Vec<&str>| Value::Array(v.into_iter().map(|s| Value::String(s.to_string())).collect());
+        let mut obj = serde_json::Map::new();
+        obj.insert(
+            "inducementArray".to_string(),
+            Value::Array(self.inducements.values().map(Inducement::to_json_value).collect()),
+        );
+        obj.insert("cardsAvailable".to_string(), names(self.get_available_cards()));
+        obj.insert("cardsActive".to_string(), names(self.get_active_cards()));
+        obj.insert("cardsDeactivated".to_string(), names(self.get_deactivated_cards()));
+        if !self.star_player_position_ids.is_empty() {
+            obj.insert("starPlayerPositionIds".to_string(), names(self.get_star_player_position_ids()));
+        }
+        let prayers = self
+            .prayers
+            .iter()
+            .map(|p| {
+                crate::factory::prayer_factory::display_name_in(rules, p)
+                    .map(|n| Value::String(n.to_string()))
+                    .ok_or_else(|| format!("InducementSet.toJsonValue: prayer {p:?} unknown in {rules:?}"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        obj.insert("prayers".to_string(), Value::Array(prayers));
+        Ok(Value::Object(obj))
+    }
+
+    /// Java: `InducementSet.initFrom(IFactorySource, JsonValue)` in a game of `rules` (ADDS to
+    /// this set, as Java does): each `inducementArray` element through `Inducement.initFrom` +
+    /// `addInducement` (a later element of the same type replaces the earlier one), the star
+    /// player position ids, the prayers through the ruleset's `PrayerFactory.forName`.
+    /// `Err` where Java would put null into a container (unknown inducement type / prayer --
+    /// the harness drops those from the replay JSON first) or where the Rust port is not done:
+    /// cards (BB2016 `CardFactory`; no card occurs in the corpus's start states).
+    pub fn init_from(
+        &mut self,
+        rules: crate::enums::Rules,
+        options: &crate::model::game_options::GameOptions,
+        json: &serde_json::Value,
+    ) -> Result<(), String> {
+        use crate::util::java_json::{get_array, get_string_array, to_json_object};
+        let obj = to_json_object(json)?;
+        if let Some(inducements) = get_array(obj, "inducementArray")? {
+            for element in inducements {
+                let mut inducement = Inducement::default();
+                inducement.init_from(rules, element)?;
+                self.add_inducement(inducement);
+            }
+        }
+        for key in ["cardsAvailable", "cardsActive", "cardsDeactivated"] {
+            // ArrayTool.isProvided: non-null and length > 0
+            if get_string_array(obj, key)?.is_some_and(|cards| !cards.is_empty()) {
+                return Err(format!("InducementSet.initFrom: {key} -- CardFactory not ported for replay JSON"));
+            }
+        }
+        if let Some(ids) = get_string_array(obj, "starPlayerPositionIds")? {
+            for id in ids {
+                // Arrays.asList(..) into a HashSet<String>: a null id is a null element.
+                let id = id.ok_or("InducementSet.initFrom: null starPlayerPositionId")?;
+                self.star_player_position_ids.insert(id);
+            }
+        }
+        if let Some(prayers) = get_string_array(obj, "prayers")? {
+            if !prayers.is_empty() {
+                for name in prayers {
+                    let name = name.ok_or("InducementSet.initFrom: null prayer name")?;
+                    let prayer = crate::factory::prayer_factory::for_name_in(rules, options, &name)?
+                        .ok_or_else(|| format!("InducementSet.initFrom: prayer {name:?} unknown in {rules:?}"))?;
+                    self.prayers.insert(prayer.to_string());
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

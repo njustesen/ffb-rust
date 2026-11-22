@@ -5,6 +5,9 @@ use crate::model::inducement_set::InducementSet;
 /// Per-team per-half turn state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TurnData {
+    /// Java: `fHomeData` -- which team this turn data belongs to (written into the JSON).
+    #[serde(default)]
+    pub home_data: bool,
     pub turn_nr: i32,
     pub first_turn_after_kickoff: bool,
     pub turn_started: bool,
@@ -47,6 +50,7 @@ pub struct TurnData {
 impl TurnData {
     pub fn new() -> Self {
         TurnData {
+            home_data: false,
             turn_nr: 0,
             first_turn_after_kickoff: false,
             turn_started: false,
@@ -114,6 +118,90 @@ impl TurnData {
     }
 }
 
+impl TurnData {
+    /// Java: `TurnData.toJsonValue()` (BACKLOG §O). Java writes neither `singleUseReRolls` nor
+    /// `reRollShowStarOneDrive`; the leader state as `LeaderState.getName()`.
+    pub fn to_json_value(&self, rules: crate::enums::Rules) -> Result<serde_json::Value, String> {
+        Ok(serde_json::json!({
+            "homeData": self.home_data,
+            "turnStarted": self.turn_started,
+            "turnNr": self.turn_nr,
+            "firstTurnAfterKickoff": self.first_turn_after_kickoff,
+            "reRolls": self.rerolls,
+            "rerollBrilliantCoachingOneDrive": self.rerolls_brilliant_coaching_one_drive,
+            "apothecaries": self.apothecaries,
+            "blitzUsed": self.blitz_used,
+            "foulUsed": self.foul_used,
+            "reRollUsed": self.reroll_used,
+            "handOverUsed": self.hand_over_used,
+            "passUsed": self.pass_used,
+            "coachBanned": self.coach_banned,
+            "ktmUsed": self.ktm_used,
+            "bombUsed": self.bomb_used,
+            "secureTheBallUsed": self.secure_the_ball_used,
+            "leaderState": self.leader_state.name(),
+            "inducementSet": self.inducement_set.to_json_value(rules)?,
+            "wanderingApothecaries": self.wandering_apothecaries,
+            "rerollPumpUpTheCrowdOneDrive": self.rerolls_pump_up_the_crowd_one_drive,
+            "plagueDoctors": self.plague_doctors,
+            "ttmUsed": self.ttm_used,
+            "puntUsed": self.punt_used,
+        }))
+    }
+
+    /// Java: `TurnData.initFrom(IFactorySource, JsonValue)` in a game of `rules` (BACKLOG §O).
+    /// Primitive booleans unboxed from `JsonBooleanOption` (`Err` when absent, as Java's NPE);
+    /// `ktmUsed`/`bombUsed`/`coachBanned`/`secureTheBallUsed`/`ttmUsed`/`puntUsed` are null-safe;
+    /// ints absent -> 0; a NEW `InducementSet` initialised from `inducementSet`. Fields Java does
+    /// not read keep their value. `Err` for a null leader state (`LeaderStateFactory.forName`
+    /// null / absent), which the Rust field cannot hold.
+    pub fn init_from(
+        &mut self,
+        rules: crate::enums::Rules,
+        options: &crate::model::game_options::GameOptions,
+        json: &serde_json::Value,
+    ) -> Result<(), String> {
+        use crate::util::java_json::{
+            get_boolean, get_boolean_object, get_enum_name, get_int, java_equals_ignore_case, to_json_object,
+        };
+        let obj = to_json_object(json)?;
+        self.home_data = get_boolean(obj, "homeData")?;
+        self.turn_started = get_boolean(obj, "turnStarted")?;
+        self.turn_nr = get_int(obj, "turnNr")?;
+        self.first_turn_after_kickoff = get_boolean(obj, "firstTurnAfterKickoff")?;
+        self.rerolls = get_int(obj, "reRolls")?;
+        self.rerolls_brilliant_coaching_one_drive = get_int(obj, "rerollBrilliantCoachingOneDrive")?;
+        self.rerolls_pump_up_the_crowd_one_drive = get_int(obj, "rerollPumpUpTheCrowdOneDrive")?;
+        self.apothecaries = get_int(obj, "apothecaries")?;
+        self.blitz_used = get_boolean(obj, "blitzUsed")?;
+        self.foul_used = get_boolean(obj, "foulUsed")?;
+        self.reroll_used = get_boolean(obj, "reRollUsed")?;
+        self.hand_over_used = get_boolean(obj, "handOverUsed")?;
+        self.pass_used = get_boolean(obj, "passUsed")?;
+
+        self.ktm_used = get_boolean_object(obj, "ktmUsed")? == Some(true);
+        self.bomb_used = get_boolean_object(obj, "bombUsed")? == Some(true);
+        self.coach_banned = get_boolean_object(obj, "coachBanned")? == Some(true);
+        self.secure_the_ball_used = get_boolean_object(obj, "secureTheBallUsed")? == Some(true);
+        self.ttm_used = get_boolean_object(obj, "ttmUsed")? == Some(true);
+        self.punt_used = get_boolean_object(obj, "puntUsed")? == Some(true);
+
+        let leader_name = get_enum_name(obj, "leaderState")?;
+        self.leader_state = [LeaderState::None, LeaderState::Available, LeaderState::Used]
+            .into_iter()
+            .find(|s| leader_name.is_some_and(|n| java_equals_ignore_case(s.name(), n)))
+            .ok_or_else(|| format!("TurnData.initFrom: leaderState {leader_name:?} is null"))?;
+        let mut inducement_set = InducementSet::new();
+        // IJsonOption.INDUCEMENT_SET.getFrom -> UtilJson.toJsonObject(null) throws when absent
+        inducement_set.init_from(rules, options, obj.get("inducementSet").unwrap_or(&serde_json::Value::Null))?;
+        self.inducement_set = inducement_set;
+
+        self.wandering_apothecaries = get_int(obj, "wanderingApothecaries")?;
+        self.plague_doctors = get_int(obj, "plagueDoctors")?;
+        Ok(())
+    }
+}
+
 impl Default for TurnData {
     fn default() -> Self {
         Self::new()
@@ -123,6 +211,42 @@ impl Default for TurnData {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn java_json_round_trip() {
+        use crate::enums::Rules;
+        use crate::model::game_options::GameOptions;
+        let input = serde_json::json!({
+            "homeData": true, "turnStarted": false, "turnNr": 3, "firstTurnAfterKickoff": true,
+            "reRolls": 2, "rerollBrilliantCoachingOneDrive": 1, "apothecaries": 1,
+            "blitzUsed": true, "foulUsed": false, "reRollUsed": false, "handOverUsed": false,
+            "passUsed": false, "leaderState": "AVAILABLE",
+            "inducementSet": {
+                "inducementArray": [{"inducementType": "bribes", "value": 2, "uses": 1}],
+                "cardsAvailable": [], "cardsActive": [], "cardsDeactivated": [],
+                "prayers": ["iron man"]
+            },
+            "wanderingApothecaries": 1, "plagueDoctors": 0, "ktmUsed": true,
+            "initialAdjacentPartnerIds": ["ignored"]
+        });
+        let mut td = TurnData::new();
+        td.init_from(Rules::Bb2025, &GameOptions::new(), &input).unwrap();
+        assert_eq!(td.leader_state, LeaderState::Available);
+        assert!(td.inducement_set.has_prayer("IRON_MAN"));
+        let out = td.to_json_value(Rules::Bb2025).unwrap();
+        // Java defaults for the null-safe booleans; absent ints -> 0; names canonical.
+        assert_eq!(out["leaderState"], "available");
+        assert_eq!(out["coachBanned"], false);
+        assert_eq!(out["ktmUsed"], true);
+        assert_eq!(out["rerollPumpUpTheCrowdOneDrive"], 0);
+        assert_eq!(out["inducementSet"]["prayers"], serde_json::json!(["Iron Man"]));
+        assert_eq!(out["inducementSet"]["inducementArray"][0]["inducementType"], "bribes");
+        assert!(out["inducementSet"].get("starPlayerPositionIds").is_none());
+        // a missing primitive boolean is a Java NPE
+        let mut bad = input.clone();
+        bad.as_object_mut().unwrap().remove("passUsed");
+        assert!(TurnData::new().init_from(Rules::Bb2025, &GameOptions::new(), &bad).is_err());
+    }
 
     #[test]
     fn reset_clears_flags() {

@@ -27,13 +27,23 @@ pub fn game_state_json(path: &Path) -> Result<Value, String> {
 }
 
 /// Rust `init_from` -> `to_json_value` of the model class at `subtree` of the Game JSON.
-fn load_subtree(subtree: &str, game: &Value) -> Result<Value, String> {
-    let input = game.get(subtree).ok_or_else(|| format!("{subtree} missing in serverGameState"))?;
+fn load_subtree(subtree: &str, game: &mut Value) -> Result<Value, String> {
     // Game.initFrom parses the options first and initialises the rules from them; every other
     // class is decoded with that ruleset's factories.
     let mut options = ffb_model::model::game_options::GameOptions::new();
     options.init_from(game.get("gameOptions").ok_or("gameOptions missing in serverGameState")?)?;
+    // The parser's drop rules on the serverGameState JSON, as before the Java decode.
+    if let Ok(rules) = options.rules_version() {
+        super::drop_rules::drop_unknown_inducements(rules, &options, game)?;
+    }
+    let input = game.get(subtree).ok_or_else(|| format!("{subtree} missing in serverGameState"))?;
     match subtree {
+        "turnDataHome" | "turnDataAway" => {
+            let rules = options.rules_version()?;
+            let mut turn_data = ffb_model::model::turn_data::TurnData::new();
+            turn_data.init_from(rules, &options, input)?;
+            turn_data.to_json_value(rules)
+        }
         "gameOptions" => Ok(options.to_json_value()),
         "actingPlayer" => {
             let rules = options.rules_version()?;
@@ -59,8 +69,8 @@ pub fn start_check(java_dir: &Path, subtree: &str, inputs: &[PathBuf]) -> i32 {
     let mut shown = 0;
     for (id, path) in &replays {
         let result = (|| -> Result<(String, String), String> {
-            let game = game_state_json(path)?;
-            let rust = load_subtree(subtree, &game)?;
+            let mut game = game_state_json(path)?;
+            let rust = load_subtree(subtree, &mut game)?;
             let rust_text = canonical::canonical_copy(&rust, Some(subtree))?.to_json_string();
             let java_file = java_dir.join(format!("{id}.gs.json"));
             let java_text = std::fs::read_to_string(&java_file).map_err(|e| format!("{}: {e}", java_file.display()))?;
