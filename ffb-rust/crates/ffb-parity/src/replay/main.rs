@@ -9,7 +9,9 @@
 //!   start-check <java_dir> <subtree> <dir|file>...
 //!                                      Rust init_from -> to_json_value of one Game subtree of every
 //!                                      replay's serverGameState vs the Java `ReplayStartDump`
-//!                                      `<id>.gs.json` (see start_check.rs)
+//!                                      `<id>.gs.json` (see start_check.rs); subtree `game` = the
+//!                                      whole Game, `startOfGame` = the harness's startOfGame of
+//!                                      it vs `<id>.sog.json` (both also vs start_hashes.txt)
 //!   dialog-check <dialog.tsv> [dialogId...]
 //!                                      Rust dialog-parameter JSON vs the Java `ReplayDialogDump`
 //!                                      (every distinct dialog parameter; see dialog_check.rs)
@@ -19,6 +21,7 @@ mod dialog_check;
 mod drop_rules;
 mod ffbr;
 mod start_check;
+mod start_of_game;
 
 use serde_json::Value;
 use std::collections::BTreeMap;

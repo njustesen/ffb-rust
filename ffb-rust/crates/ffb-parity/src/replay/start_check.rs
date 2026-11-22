@@ -107,21 +107,22 @@ fn load_dialog_parameter(game: &mut Value) -> Result<Option<Value>, String> {
     }
 }
 
-/// The `<sha gs>` column of `start_hashes.txt` for one replay (read once per process).
-fn java_start_sha(java_dir: &Path, id: &str) -> Result<Option<String>, String> {
+/// The `<sha gs>` (or, with `start`, the `<sha sog>`) column of `start_hashes.txt` for one replay
+/// (the file is read once per process).
+fn java_start_sha(java_dir: &Path, id: &str, start: bool) -> Result<Option<String>, String> {
     use std::collections::HashMap;
     use std::sync::OnceLock;
-    static HASHES: OnceLock<HashMap<String, String>> = OnceLock::new();
+    static HASHES: OnceLock<HashMap<String, (String, String)>> = OnceLock::new();
     let hashes = HASHES.get_or_init(|| {
         let text = std::fs::read_to_string(java_dir.join("start_hashes.txt")).unwrap_or_default();
         text.lines()
             .filter_map(|line| {
                 let mut parts = line.split_whitespace();
-                Some((parts.next()?.to_string(), parts.next()?.to_string()))
+                Some((parts.next()?.to_string(), (parts.next()?.to_string(), parts.next()?.to_string())))
             })
             .collect()
     });
-    Ok(hashes.get(id).cloned())
+    Ok(hashes.get(id).map(|(gs, sog)| if start { sog.clone() } else { gs.clone() }))
 }
 
 /// First differing byte offset with a little context, for the report.
@@ -142,19 +143,29 @@ pub fn start_check(java_dir: &Path, subtree: &str, inputs: &[PathBuf]) -> i32 {
             let java_file = java_dir.join(format!("{id}.gs.json"));
             let java_text = std::fs::read_to_string(&java_file).map_err(|e| format!("{}: {e}", java_file.display()))?;
             let java: Value = serde_json::from_str(&java_text).map_err(|e| format!("java json: {e}"))?;
-            if subtree == "game" {
+            if subtree == "game" || subtree == "startOfGame" {
                 // The whole Game: Java `new Game().initFrom(json)` -> `toJsonValue` -> canonical,
                 // compared with the full dump AND with its sha in start_hashes.txt (the dump's own
-                // text is a pretty-free canonical copy, so both must agree).
+                // text is a pretty-free canonical copy, so both must agree). `startOfGame` = the
+                // same decode, then the harness's startOfGame, vs `<id>.sog.json`.
+                let start = subtree == "startOfGame";
                 let mut options = ffb_model::model::game_options::GameOptions::new();
                 options.init_from(game.get("gameOptions").ok_or("gameOptions missing in serverGameState")?)?;
                 if let Ok(rules) = options.rules_version() {
                     super::drop_rules::drop_unknown_inducements(rules, &options, &mut game)?;
                 }
-                let rust_game = ffb_model::model::game::Game::from_java_json(&game)?;
+                let mut rust_game = ffb_model::model::game::Game::from_java_json(&game)?;
+                let java = if start {
+                    rust_game = super::start_of_game::start_of_game(rust_game)?;
+                    let file = java_dir.join(format!("{id}.sog.json"));
+                    let text = std::fs::read_to_string(&file).map_err(|e| format!("{}: {e}", file.display()))?;
+                    serde_json::from_str(&text).map_err(|e| format!("java sog json: {e}"))?
+                } else {
+                    java
+                };
                 let rust_text = canonical::canonical_game_json(&rust_game.to_json_value()?)?;
                 let java_text = canonical::canonical_game_json(&java)?;
-                let sha = java_start_sha(java_dir, id)?.ok_or_else(|| format!("{id} not in start_hashes.txt"))?;
+                let sha = java_start_sha(java_dir, id, start)?.ok_or_else(|| format!("{id} not in start_hashes.txt"))?;
                 let rust_sha = canonical::sha256_hex(rust_text.as_bytes());
                 if rust_sha != sha && rust_text == java_text {
                     return Err(format!("text identical but sha {rust_sha} != start_hashes {sha}"));

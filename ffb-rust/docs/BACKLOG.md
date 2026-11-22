@@ -11531,25 +11531,62 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
   opponentBlockSelection(+Properties), pilingOn, reRollBlockForTargets, reRollForTargets,
   reRollRegenerationMultiple, teamSetup, useChainsaw, useIgor(s), useMortuaryAssistant(s).
 
+### O2 log — iteration 12 (2026-11-23): the whole Game + startOfGame gated -- O2(a) COMPLETE
+- **`Game::{init_from(json), to_json_value(), from_java_json(json)}`** (`ffb-model/src/model/game.rs`)
+  = Java `Game.initFrom` / `toJsonValue` 1:1: options first (they pick the ruleset), the 23 scalars,
+  teamState, teams away-then-home IN PLACE, turn data, field model, acting player, game result, dialog
+  parameter (`DialogParameterFactory`; `dialog_id` kept in step), `concededLegally` null-safe,
+  `lastDefenderId` only when defined. New Java fields on Game: `turn_time`, `game_time` (serde default),
+  `dialog_parameter` (serde skip). `java_json::{get_long, get_date}` = `JsonLongOption` /
+  `JsonDateOption` (absent date -> `Err` = Java's `toDate(null)` NPE; JSON null / non-string -> null;
+  the STRING is kept and only the exact in-range `yyyy-MM-dd'T'HH:mm:ss.SSS` form is accepted, anything
+  the lenient SimpleDateFormat would normalise is `Err`). `Err` stubs: null `turnMode` (Rust `TurnMode`
+  is not optional -- **an unknown `gameSetTurnMode` value such as `dwarfenWisdom` sets it to null in
+  Java, so the ModelChangeProcessor will need a nullable turn mode, e.g. a `turn_mode_null` flag**),
+  teamState SKELETON (`TeamSkeleton` not ported; census: all 2,224 start states are FULL).
+- Corpus census of the scalars (Java dumps): turnMode endGame 2,181 / regular 27 / setup 13 /
+  startGame 2 / selectBlitzTarget 1; lastTurnMode null 2; scheduled null 682; finished null 44;
+  thrower/defender set in 2; concededLegally true 1; timeouts/concession set in a few.
+- **`start-check game`: 2,224/2,224** -- the full canonical Game text vs `<id>.gs.json` AND its sha vs
+  `start_hashes.txt`, first run.
+- **`replay/start_of_game.rs`** = the harness's `startOfGame` + `addTeam` 1:1 (`ClientReplayer.createGame`):
+  a Java `new Game` (half 0, homeFirstOffense false, null turn modes, `TeamResult.penaltyScore -1`),
+  id/turnTime/gameTime, START_GAME + `DialogStartGameParameter`, weather NICE, options copied, the old
+  teams MOVED in, MERCENARY/RAISED_FROM_DEAD players removed (the code does NOT remove stars despite its
+  comment), every other player RESERVE (MISSING + `mng` when recovering), boxed by `UtilBox`, its new
+  result's SI/decay cleared + old currentSpps, ALL enhancement sources removed from the three temporary
+  maps; fresh inducement sets. Unit test from the Java.
+  **`start-check startOfGame`: 2,224/2,224** vs `<id>.sog.json` + the sog sha, first run. Non-vacuous:
+  144 players removed in 142 replays, 1,276 MNG players, 1,803 players with temporary maps cleared,
+  25,329 non-zero SPP carries.
+- `cargo test --workspace` green.
+
 ### RESUME HERE
-**This iteration (2026-11-23, loop iteration 10 of this run):** see "O2 log — iterations 10-11":
-dialog parameters, `dialog-check` 171,048/0 and `start-check dialogParameter` 2,224/2,224 (iteration 10
-of the loop had left this port uncommitted; iteration 11 finished the last 10 classes, fixed the test
-modules and committed). Nothing running; no `.loop_wait.json` needed.
-**Next:** (7) the whole `Game`: Game scalars (`turnTime`, `gameTime`, `teamState` -- check SKELETON,
-`dialogParameter` field on Game, ...) + all gated subtrees -> `Game::init_from/to_json_value` ->
-compare the full `<id>.gs.json` sha on all 2,224; then `startOfGame` vs `<id>.sog.json`; then
-ModelChangeProcessor (O2(b)) -- the dialog-check tsv already covers every `gameSetDialogParameter`
-value. Previous list for reference:
+**This iteration (2026-11-23, loop iteration 12):** O2(a) is COMPLETE -- see "O2 log — iteration 12":
+`start-check game` and `start-check startOfGame` both 2,224/2,224. Nothing running; no
+`.loop_wait.json` needed.
+**Next: O2(b) ModelChangeProcessor.** Java `ffb-common/.../model/change/ModelChangeProcessor.java`
+(757 lines) + `ModelChange`/`ModelChangeList` JSON decode (the value type per `ModelChangeId`); the Rust
+`ModelChangeProcessor` is a 6-line stub. Port it 1:1 for the 145 known ids the corpus uses (`ffb-replay
+scan` lists them), plus the parser's `dropUnknownValues` (already in `drop_rules.rs`), unknown-id drop,
+`IGNORE_PLAYER_MARKER`, `resetInducements` after a DialogCoinChoiceParameter sync, and the
+serverAddPlayer/Zap/Unzap handlers (ZappedPlayer JSON is still `Err`). Gate = the per-sync state
+hashes of run5 (`D:/ffb_replay_parity/run5_java/<id>.states`): add `ffb-replay states <out> <corpus>`
+writing `<id>.states` the Java way (`<commandArray index> <sha256>` after every applied model sync,
+starting from `start_of_game`), then diff against run5 -- first on the 10 replays of
+`D:/ffb_replays/fumbbl`, then all; `FFB_REPLAY_STATE_DUMP` gives the Java JSON of a diverging sync.
+Watch-outs: null turnMode (above), `Team.fPlayerById` still holding a same-nr-replaced player
+(iteration 9), FieldModel cards/card effects (`Err` today), skill-property sets in
+`temporaryPropertiesMap` (`Err` if non-empty), the prayer-name finding (iteration 6).
+Previous list for reference:
 O2(a) class by class, each = 1:1 port from the .java + unit tests + a `load_subtree` arm +
 `start-check <subtree>` 2,224/2,224 (binary: `cargo build --release -p ffb-parity --bin ffb-replay`;
 run `target/release/ffb-replay.exe start-check D:/ffb_replay_parity/start_all <subtree>
 D:/ffb_replays/fumbbl D:/ffb_replays/partial D:/ffb_replays/window
 D:/ffb_replays/fumbbl_night_20261122 D:/ffb_replays/fumbbl_night_20261122/partial`):
 (1) ~~`actingPlayer`~~ DONE; (2) ~~`turnDataHome`/`turnDataAway`~~ DONE; (3) ~~`teamHome`/`teamAway`~~
-DONE; (4) ~~`gameResult`~~ DONE; (5) ~~`fieldModel`~~ DONE; (6) ~~`dialogParameter`~~ DONE; (7) the whole
-`Game` (scalars + all of the above) -> compare the full gs.json sha; then `startOfGame` vs
-`<id>.sog.json`. After O2(a): ModelChangeProcessor. Open follow-ups: ZappedPlayer JSON (`Err` today;
+DONE; (4) ~~`gameResult`~~ DONE; (5) ~~`fieldModel`~~ DONE; (6) ~~`dialogParameter`~~ DONE; (7) ~~the whole
+`Game` + `startOfGame`~~ DONE (iteration 12). After O2(a): ModelChangeProcessor. Open follow-ups: ZappedPlayer JSON (`Err` today;
 zap/unzap commands occur in 15 replays), skill-property sets in `temporaryPropertiesMap` (`Err` if
 non-empty), FieldModel cards/card effects (`Err`, see iteration 9), the prayer-name finding above.
 
