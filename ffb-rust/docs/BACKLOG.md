@@ -11074,3 +11074,82 @@ state hash. Full plan, architecture (Java follows the replay and writes dice + d
 replays the tapes) and phases N0-N5: **docs/REPLAY_PARITY_PLAN.md**. N0 (fetch + inventory scripts,
 first 10 replays in D:/ffb_replays/fumbbl, outside git) done 2026-11-21. Rule: >= 10 s between every
 fumbbl.com contact. Do NOT start N1+ while the §M cert8 chain is running.
+
+
+## §O — 2026-11-22: REPLAY PROCESSING PARITY — every downloaded replay, all states + actions, Rust == Java (ACTIVE)
+
+**Goal (user, 2026-11-22, after §M closed):** "check all the downloaded replays and make sure we can
+process all of them; get all states and actions. Make sure Rust engine does the same as Java in that
+respect. That is the next phase."
+
+**Done = `python -I scripts/replay_parity_check.py` prints DONE** (read its docstring; do not edit it
+or weaken it). It requires, over EVERY `.ffbr` in the five corpus directories (2,224 unique replays,
+finished and unfinished):
+1. Java processes every replay completely: no exception, 0 skipped model syncs, 0 record-building
+   errors, end check OK.
+2. Rust processes every replay and produces the SAME state sequence (sha256 of the canonical full
+   `Game.toJsonValue()` JSON, keys sorted, after every applied model sync) and the SAME action
+   records, byte for byte.
+3. Both outputs come from the tools named in `docs/replay_manifest.json` (sha256-stamped).
+Model-change ids that the in-repo engine does not know (a newer FUMBBL server:
+`actingPlayerSetInitialAdjacentPartnerIds`, `turnDataSetCheeringFansBlockAssist`) are dropped on both
+sides and reported, never "implemented" in the Java engine.
+
+**This replaces §N's tape/follower design as the next phase.** §N (Java *re-simulates* the replay with
+dice + decision tapes, Rust replays the tapes) stays a later tier; §O is the foundation it needs
+anyway: a Rust Java-JSON `Game` loader, Rust model-change application and Rust action extraction.
+
+### Baseline (2026-11-22 ~13:00, `FumbblReplayParser` on the 2,178 night replays)
+2178/2178 files parsed, **1,125,356 action records**, 6,554,910 model syncs applied. Open on the Java
+side: **3 syncs failed to parse** (skipped); **2,182 record-building errors** (PLAYER_ACTION 1476,
+BLOCK_CHOICE 483, SKILL_USE 77, PUSHBACK 37, INJURY 32, KICKOFF_SCATTER 24, FOUL 21, PASS_ROLL 9,
+HAND_OVER 7, COIN_THROW 6, RECEIVE_CHOICE 6, ARGUE_THE_CALL 3); **100 end-check MISMATCHes**, the
+common shape "replayed half 1 turns 8/8, replay end half 2 turns 8/8" (the second half never
+reached -- find out why before assuming drift). Unknown model changes dropped:
+actingPlayerSetInitialAdjacentPartnerIds 535,307, turnDataSetCheeringFansBlockAssist 2,492.
+Log: the session's task output; records `D:/ffb_replays/parse_baseline/shard_fumbbl_0.jsonl`.
+
+### Architecture
+```
+ .ffbr --> Java ReplayProcessor (ffb-ai, harness)   --> <out>/java/<id>.{states,actions.jsonl,status.json}
+ .ffbr --> Rust ffb-replay (new bin, ffb-parity)     --> <out>/rust/<id>.{states,actions.jsonl,status.json}
+                                                          scripts/replay_parity_check.py diffs them
+```
+Both read the SAME `.ffbr` independently. Java = `FumbblReplayParser`'s pipeline (NetCommandFactory
+decode, `startOfGame` = ClientReplayer.createGame 1:1, unknown-model-change drop, model sync apply,
+record extraction) plus a per-sync state line. Rust = a 1:1 port of exactly that pipeline.
+
+### Phases
+- **O1 Java complete (harness only; the engine is the oracle and is never edited).** Add the
+  per-replay outputs + `run_info.json` (`tool_sha256` = sha256 of the jar the run used) to the Java
+  side (a `ReplayProcessor` main, or flags on `FumbblReplayParser`). State line = sync index + sha256
+  of `Game.toJsonValue()` with keys sorted recursively. Then drive the baseline's three open counts to
+  0: skipped syncs, record errors, end-check mismatches. Each fix is a harness fix with a reason; a
+  replay that truly cannot be processed by the in-repo engine is a QUESTION FOR THE USER (no
+  exemption list, same rule as §M).
+- **O2 Rust states.** 1:1 ports, in this order, each with unit tests from Java behaviour:
+  (a) Java-JSON `initFrom`/`toJsonValue` for the whole `Game` graph (Game, GameOptions, Team, Roster,
+  RosterPosition, Player/RosterPlayer, FieldModel, TurnData, InducementSet, GameResult/TeamResult/
+  PlayerResult, ActingPlayer, dialog parameter, ...) -- round-trip test on every corpus replay's
+  `serverGameState`; (b) `ModelChangeList`/`ModelChange` JSON decode + `ModelChangeProcessor` 1:1
+  (757 Java lines; the Rust file today is a 6-line trait stub); (c) `ServerCommandModelSync` decode
+  (reports already have `init_from`); (d) `startOfGame`; (e) bin `ffb-replay` writing the outputs.
+  Gate: states identical on the 10 in `D:/ffb_replays/fumbbl`, then on all.
+- **O3 Rust actions.** Port the record extraction (`FumbblReplayParser.parseFile` record logic,
+  `GameStateSerializer`, the builders) 1:1. Gate: actions identical on the 10, then on all.
+- **O4 Proof.** Freeze the jar + exe (copies under `D:/ffb_replay_parity/bin/`), run both over the
+  whole corpus, write `docs/replay_manifest.json`, checker DONE, BACKLOG + memory, push.
+
+### Rules for this phase
+- Light work: one JVM or one Rust process at a time over the corpus. The user lifted the
+  21:00-07:00 window until Mon 2026-11-23 08:00; after that, corpus-wide runs go in the night window.
+- Never contact fumbbl.com from this phase (the corpus is fixed); any new download follows the
+  >= 10 s rule and stops only on a server rejection.
+- Replays and outputs stay OUTSIDE git (coach and team names).
+- Java build for the harness: never `mvn package` over a frozen jar; compile harness classes into a
+  private dir (`javac -cp D:/ffb_replays/ffb-ai-replay.jar -d <dir>`) or build a private jar copy.
+- Canonical JSON: sort object keys recursively on both sides; integers print as integers; if a float
+  ever appears, compare Java's `Double.toString` form and record the rule here.
+
+### RESUME HERE
+Nothing built yet. Start with O1: the Java outputs + run_info, then the three open counts.
