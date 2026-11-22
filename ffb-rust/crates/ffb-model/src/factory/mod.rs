@@ -20,5 +20,6 @@ pub mod re_roll_source_factory;
 pub mod serious_injury_factory;
 pub mod skill_category_factory;
 pub mod skill_factory;
+pub mod ruleset_skill_names;
 pub mod sound_id_factory;
 pub mod weather_factory;

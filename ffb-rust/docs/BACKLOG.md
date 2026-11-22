@@ -11337,12 +11337,46 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
   forName, `skillsGrantedBy` map), `turnData{Home,Away}` (+ InducementSet, needs the rules for
   inducement types/cards/prayers), the Game scalars.
 
+### O2 log — iteration 5 (2026-11-22 ~23:00): per-ruleset SkillFactory, ActingPlayer gated
+- **Java `SkillFactory` per ruleset, 1:1** (`ffb-model/src/factory/ruleset_skill_names.rs`, GENERATED
+  by `scripts/gen_ruleset_skill_names.py` from the Java skill classes: every CONCRETE `Skill` subclass,
+  its `@RulesCollection` set (COMMON = all), its `getName()` -- own `super("..")` or, for the stat
+  increases, the abstract base's). BB2016 86 / BB2020 164 / BB2025 176 names; the script fails on a
+  duplicate key per ruleset or a Java class with no Rust `SkillId` (only `Bloodlust`->`BloodLust`,
+  `Claws`->`Claw` are aliased). `SkillFactory::for_name_in(rules, name)` = Java `forName` (exact
+  lower-case match + the Ball & Chain alias, NO normalisation -- the old `for_name`/`from_class_name`
+  are lenient and must not be used for replay JSON); `name_in(rules, id)` = `getName()`. **Every later
+  class with skills (RosterPosition, Player, PlayerResult, FieldModel enhancements, dialogs) uses these.**
+- `ffb-model/src/util/java_json.rs`: the `Json*Option` read semantics (missing/`null` per option type,
+  `Err` where Java throws: a primitive `boolean` from an absent Boolean, `asBoolean`/`asInt` on the
+  wrong type) -- reuse it for every class.
+- `GameOptions::rules_version()` (= `Game.initializeRules` input); `start-check` now decodes the
+  options first for every subtree, as `Game.initFrom` does.
+- **`ActingPlayer::init_from(rules, json)` / `to_json_value(rules)`** 1:1 (`isDefinedIn` fields keep
+  their old value; unknown `playerAction` -> null; `Err` for what the Rust struct cannot hold: an
+  unknown skill name, a `skillsGrantedBy` list that is absent/empty, which Java stores as `null`).
+  2 unit tests. **start-check actingPlayer: 2,224/2,224** (9 replays end mid-activation: playerId,
+  blitz/blitzMove/block/gazeMove/move, playerStateOld 257, currentMove 2-5 -- not vacuous, but thin;
+  model changes will exercise the rest). gameOptions still 2,224/2,224.
+- **Scope found for turnData (next):** the Rust `InducementCollection` is only the 5-type common base;
+  Java has `inducement/{bb2016,bb2020,bb2025}/InducementCollection.java` (78/135/141 lines) -- port them
+  (names + usages per ruleset) first, then the per-ruleset `PrayerFactory` (`factory/{bb2020,bb2025}`,
+  base `PrayerFactory.java` for bb2016), `LeaderState` names, then `Inducement`/`InducementSet`/
+  `TurnData` JSON. Corpus census of the Java turnData dumps: 21 inducement types occur
+  (bribes, teamMascot, tempCheerleader, starPlayers, briberyAndCorruption, ... `plagueDoctor`,
+  `mortuaryAssistant`), 16 prayer names, NO cards and NO starPlayerPositionIds at start; keys
+  `rerollBrilliantCoachingOneDrive`/`rerollPumpUpTheCrowdOneDrive` are the JSON names.
+
 ### RESUME HERE
-**This iteration (2026-11-22 ~22:00, loop iteration 4):** see "O2 log — iteration 4": run5 2,224/2,224
-(Java side done), start-state oracle `D:/ffb_replay_parity/start_all` for all 2,224, `start-check`
-gate, `GameOptions` 2,224/2,224. Nothing running; no `.loop_wait.json` needed.
+**This iteration (2026-11-22 ~23:00, loop iteration 5):** see "O2 log — iteration 5": per-ruleset
+SkillFactory (generated from Java), java_json option helpers, `actingPlayer` 2,224/2,224, gameOptions
+2,224/2,224. Nothing running; no `.loop_wait.json` needed.
 **Next:** O2(a) class by class, each = 1:1 port from the .java + unit tests + a `load_subtree` arm +
-`start-check <subtree>` 2,224/2,224: (1) `actingPlayer`; (2) `turnDataHome`/`turnDataAway` with
+`start-check <subtree>` 2,224/2,224 (binary: `cargo build --release -p ffb-parity --bin ffb-replay`;
+run `target/release/ffb-replay.exe start-check D:/ffb_replay_parity/start_all <subtree>
+D:/ffb_replays/fumbbl D:/ffb_replays/partial D:/ffb_replays/window
+D:/ffb_replays/fumbbl_night_20261122 D:/ffb_replays/fumbbl_night_20261122/partial`):
+(1) ~~`actingPlayer`~~ DONE; (2) `turnDataHome`/`turnDataAway` with
 InducementSet (apply the parser's `dropUnknownInducements` to the raw JSON first -- port it into
 start_check/the loader exactly, keys `inducementArray=`/`prayers=`); (3) `teamHome`/`teamAway`
 (Roster, RosterPosition, RosterPlayer/Player; unknown skills silently omitted, unknown keywords ->

@@ -91,6 +91,18 @@ impl GameOptions {
         self.options.insert(option.get_id().to_string(), option.get_value_as_string());
     }
 
+    /// The rules `Game.initializeRules()` picks from the `rulesVersion` option (`Rules.valueOf`);
+    /// `Err` where `valueOf` would throw.
+    pub fn rules_version(&self) -> Result<crate::enums::Rules, String> {
+        use crate::enums::Rules;
+        match self.get(GameOptionEnum::RULESVERSION.get_name()) {
+            Some("BB2016") => Ok(Rules::Bb2016),
+            Some("BB2020") => Ok(Rules::Bb2020),
+            Some("BB2025") => Ok(Rules::Bb2025),
+            other => Err(format!("rulesVersion {other:?} is not a game ruleset")),
+        }
+    }
+
     /// Java: `GameOptions.toJsonValue()` -- `{"gameOptionArray":[{"gameOptionId","gameOptionValue"}...]}`
     /// (`GameOptionAbstract.toJsonValue`). Java iterates a HashMap, so the array order is not
     /// model state; this one is sorted by id.

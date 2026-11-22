@@ -29,11 +29,17 @@ pub fn game_state_json(path: &Path) -> Result<Value, String> {
 /// Rust `init_from` -> `to_json_value` of the model class at `subtree` of the Game JSON.
 fn load_subtree(subtree: &str, game: &Value) -> Result<Value, String> {
     let input = game.get(subtree).ok_or_else(|| format!("{subtree} missing in serverGameState"))?;
+    // Game.initFrom parses the options first and initialises the rules from them; every other
+    // class is decoded with that ruleset's factories.
+    let mut options = ffb_model::model::game_options::GameOptions::new();
+    options.init_from(game.get("gameOptions").ok_or("gameOptions missing in serverGameState")?)?;
     match subtree {
-        "gameOptions" => {
-            let mut options = ffb_model::model::game_options::GameOptions::new();
-            options.init_from(input)?;
-            Ok(options.to_json_value())
+        "gameOptions" => Ok(options.to_json_value()),
+        "actingPlayer" => {
+            let rules = options.rules_version()?;
+            let mut acting_player = ffb_model::model::acting_player::ActingPlayer::new();
+            acting_player.init_from(rules, input)?;
+            acting_player.to_json_value(rules)
         }
         other => Err(format!("no Rust loader for subtree {other} yet")),
     }

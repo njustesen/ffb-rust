@@ -12,7 +12,8 @@
 ///                            deserialization where the wire format carries the class name).
 use std::collections::HashMap;
 
-use crate::enums::SkillId;
+use crate::enums::{Rules, SkillId};
+use crate::factory::ruleset_skill_names::RULESET_SKILL_NAMES;
 
 /// All `SkillId` variants in declaration order.  Every new variant added to the enum
 /// **must** also appear here so the factory map stays complete.
@@ -276,6 +277,34 @@ impl SkillFactory {
         self.skills.get(name).copied()
     }
 
+    /// Java: `SkillFactory.forName(String)` on the factory of a game with `rules` -- 1:1 with the
+    /// Java registry (`ruleset_skill_names.rs`, generated from the Java skill classes): an EXACT
+    /// lower-case match on `Skill.getName()` among the skills whose `@RulesCollection` covers the
+    /// rules, then the "Ball & Chain" alias; anything else is `None` (Java `null`). Unlike
+    /// [`Self::for_name`], no normalisation: "BoneHead" or a skill of another edition is `None`.
+    pub fn for_name_in(rules: Rules, name: &str) -> Option<SkillId> {
+        let lower = name.to_lowercase();
+        let find = |key: &str| {
+            RULESET_SKILL_NAMES
+                .iter()
+                .find(|(r, n, _)| *r == rules && n.to_lowercase() == key)
+                .map(|(_, _, id)| *id)
+        };
+        if let Some(id) = find(&lower) {
+            return Some(id);
+        }
+        if "Ball & Chain".eq_ignore_ascii_case(&lower) || "Ball &amp; Chain".eq_ignore_ascii_case(&lower) {
+            return find("ball and chain");
+        }
+        None
+    }
+
+    /// Java: `skill.getName()` of the `rules` factory's instance of `id`; `None` if the ruleset has
+    /// no such skill (Java could not hold that skill object in the first place).
+    pub fn name_in(rules: Rules, id: SkillId) -> Option<&'static str> {
+        RULESET_SKILL_NAMES.iter().find(|(r, _, s)| *r == rules && *s == id).map(|(_, n, _)| *n)
+    }
+
     /// Returns an iterator over every registered `SkillId`.
     ///
     /// Mirrors `SkillFactory.getSkills()` which returns `skills.values()`.
@@ -430,6 +459,34 @@ mod tests {
                 "for_class_name(\"{name}\") did not return {id:?}"
             );
         }
+    }
+
+    // ── for_name_in / name_in: the per-ruleset Java registry ─────────────
+
+    #[test]
+    fn for_name_in_is_exact_and_per_ruleset() {
+        // bb2016 spells it "Bone-Head"; bb2020+ "Bone Head" (the slann_fumbbl divergence).
+        assert_eq!(SkillFactory::for_name_in(Rules::Bb2016, "bone-head"), Some(SkillId::BoneHead));
+        assert_eq!(SkillFactory::for_name_in(Rules::Bb2016, "Bone Head"), None);
+        assert_eq!(SkillFactory::for_name_in(Rules::Bb2025, "Bone Head"), Some(SkillId::BoneHead));
+        // no normalisation: the class name is not a skill name
+        assert_eq!(SkillFactory::for_name_in(Rules::Bb2025, "BoneHead"), None);
+        // a bb2020-only special skill is unknown to a bb2025 game (Java null -> silently omitted)
+        assert_eq!(SkillFactory::for_name_in(Rules::Bb2020, "Consummate Professional"), Some(SkillId::ConsummateProfessional));
+        assert_eq!(SkillFactory::for_name_in(Rules::Bb2025, "Consummate Professional"), None);
+        assert_eq!(SkillFactory::for_name_in(Rules::Bb2025, "Ball & Chain"), Some(SkillId::BallAndChain));
+        assert_eq!(SkillFactory::for_name_in(Rules::Bb2025, "+ST"), Some(SkillId::StrengthIncrease));
+    }
+
+    #[test]
+    fn name_in_round_trips_every_registered_skill() {
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            for (r, name, id) in RULESET_SKILL_NAMES.iter().filter(|(r, _, _)| *r == rules) {
+                assert_eq!(SkillFactory::name_in(*r, *id), Some(*name), "{rules:?} {id:?} has two names");
+                assert_eq!(SkillFactory::for_name_in(*r, name), Some(*id));
+            }
+        }
+        assert_eq!(SkillFactory::name_in(Rules::Bb2016, SkillId::Sidestep), None);
     }
 
     // ── coverage / count ──────────────────────────────────────────────────

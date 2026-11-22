@@ -226,6 +226,126 @@ impl ActingPlayer {
             players.push(id);
         }
     }
+
+    /// Java: `ActingPlayer.toJsonValue()`. `rules` = the game's rules (`fGame.getRules()`), whose
+    /// `SkillFactory` instance of each skill supplies `getName()`. `Err` for a skill the ruleset
+    /// has no class for (Java could not hold such a skill object).
+    pub fn to_json_value(&self, rules: crate::enums::Rules) -> Result<serde_json::Value, String> {
+        use crate::factory::skill_factory::SkillFactory;
+        use crate::util::java_json::{player_state_or_null, string_or_null};
+        use serde_json::Value;
+        let skill_name = |id: SkillId| {
+            SkillFactory::name_in(rules, id).ok_or_else(|| format!("ActingPlayer: {id:?} is not a {} skill", rules.name()))
+        };
+        let mut o = serde_json::Map::new();
+        o.insert("playerId".into(), string_or_null(self.player_id.as_deref()));
+        o.insert("currentMove".into(), Value::from(self.current_move));
+        o.insert("goingForIt".into(), Value::Bool(self.goes_for_it));
+        o.insert("hasBlocked".into(), Value::Bool(self.has_blocked));
+        o.insert("hasFed".into(), Value::Bool(self.has_fed));
+        o.insert("hasFouled".into(), Value::Bool(self.has_fouled));
+        o.insert("hasMoved".into(), Value::Bool(self.has_moved));
+        o.insert("hasPassed".into(), Value::Bool(self.has_passed));
+        o.insert("playerAction".into(), string_or_null(self.player_action.map(PlayerAction::name)));
+        o.insert("standingUp".into(), Value::Bool(self.standing_up));
+        o.insert("sufferingAnimosity".into(), Value::Bool(self.suffering_animosity));
+        o.insert("sufferingBloodlust".into(), Value::Bool(self.suffering_blood_lust));
+        o.insert("fumblerooskiePending".into(), Value::Bool(self.fumblerooskie_pending));
+        o.insert("jumpsWithoutModifiers".into(), Value::Bool(self.jumps_without_modifiers));
+        // Java iterates a HashSet: the order is not model state (canonical form sorts this array).
+        let mut used: Vec<Value> = Vec::with_capacity(self.used_skills.len());
+        for id in &self.used_skills {
+            used.push(Value::String(skill_name(*id)?.to_string()));
+        }
+        o.insert("usedSkills".into(), Value::Array(used));
+        // JsonStringListMapOption.addTo: one JsonStringArrayOption per entry.
+        let mut granted = serde_json::Map::new();
+        for (id, players) in &self.skills_granted_by {
+            let list = players.iter().map(|p| Value::String(p.clone())).collect();
+            granted.insert(skill_name(*id)?.to_string(), Value::Array(list));
+        }
+        o.insert("skillsGrantedBy".into(), Value::Object(granted));
+        o.insert(
+            "playerStateOld".into(),
+            player_state_or_null(self.old_player_state.map(|s| s.0 as i32)),
+        );
+        o.insert("heldInPlace".into(), Value::Bool(self.held_in_place));
+        o.insert("mustCompleteAction".into(), Value::Bool(self.must_complete_action));
+        o.insert("fellFromRush".into(), Value::Bool(self.fell_from_rush));
+        o.insert("hasTriggeredEffect".into(), Value::Bool(self.has_triggered_effect));
+        Ok(Value::Object(o))
+    }
+
+    /// Java: `ActingPlayer.initFrom(IFactorySource, JsonValue)`, 1:1 (fields Java only sets when
+    /// the key `isDefinedIn` keep their value otherwise). `Err` where Java throws (a missing
+    /// primitive boolean, a wrong JSON type) and where the Java result is not representable here:
+    /// an unknown skill name (Java adds `null` to the set / keeps a raw string key) or a
+    /// `skillsGrantedBy` entry whose list is absent or empty (Java stores `null`).
+    pub fn init_from(&mut self, rules: crate::enums::Rules, json: &serde_json::Value) -> Result<(), String> {
+        use crate::factory::skill_factory::SkillFactory;
+        use crate::util::java_json as j;
+        let o = j::to_json_object(json)?;
+        let skill = |name: &str| {
+            SkillFactory::for_name_in(rules, name)
+                .ok_or_else(|| format!("ActingPlayer.initFrom: skill {name:?} unknown to {} (Java null)", rules.name()))
+        };
+        self.player_id = j::get_string(o, "playerId")?;
+        self.current_move = j::get_int(o, "currentMove")?;
+        self.goes_for_it = j::get_boolean(o, "goingForIt")?;
+        self.has_blocked = j::get_boolean(o, "hasBlocked")?;
+        self.has_fed = j::get_boolean(o, "hasFed")?;
+        self.has_fouled = j::get_boolean(o, "hasFouled")?;
+        self.has_moved = j::get_boolean(o, "hasMoved")?;
+        self.has_passed = j::get_boolean(o, "hasPassed")?;
+        self.player_action = j::get_enum_name(o, "playerAction")?.and_then(PlayerAction::from_name);
+        self.standing_up = j::get_boolean(o, "standingUp")?;
+        self.suffering_animosity = j::get_boolean(o, "sufferingAnimosity")?;
+        self.suffering_blood_lust = j::get_boolean(o, "sufferingBloodlust")?;
+        self.fumblerooskie_pending = j::get_boolean_object(o, "fumblerooskiePending")? == Some(true);
+        if j::is_defined_in(o, "jumpsWithoutModifiers") {
+            self.jumps_without_modifiers = j::get_boolean(o, "jumpsWithoutModifiers")?;
+        }
+        self.used_skills.clear();
+        if let Some(used) = j::get_array(o, "usedSkills")? {
+            for element in used {
+                let name = element.as_str().ok_or_else(|| format!("usedSkills: element {element}"))?;
+                self.used_skills.insert(skill(name)?);
+            }
+        }
+        if j::is_defined_in(o, "skillsGrantedBy") {
+            self.skills_granted_by.clear();
+            // JsonStringListMapOption.getFrom: a non-object value yields an empty map.
+            if let Some(map) = o.get("skillsGrantedBy").and_then(serde_json::Value::as_object) {
+                for (name, list) in map {
+                    let players = list
+                        .as_array()
+                        .filter(|a| !a.is_empty())
+                        .ok_or_else(|| format!("skillsGrantedBy.{name}: {list} (Java stores null)"))?;
+                    let players = players
+                        .iter()
+                        .map(|p| p.as_str().map(str::to_string).ok_or_else(|| format!("skillsGrantedBy.{name}: element {p}")))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    self.skills_granted_by.insert(skill(name)?, players);
+                }
+            }
+        }
+        self.old_player_state = j::get_player_state_id(o, "playerStateOld")?
+            .map(|id| u32::try_from(id).map(PlayerState).map_err(|_| format!("playerStateOld {id}")))
+            .transpose()?;
+        if j::is_defined_in(o, "heldInPlace") {
+            self.held_in_place = j::get_boolean(o, "heldInPlace")?;
+        }
+        if j::is_defined_in(o, "mustCompleteAction") {
+            self.must_complete_action = j::get_boolean(o, "mustCompleteAction")?;
+        }
+        if j::is_defined_in(o, "fellFromRush") {
+            self.fell_from_rush = j::get_boolean(o, "fellFromRush")?;
+        }
+        if j::is_defined_in(o, "hasTriggeredEffect") {
+            self.has_triggered_effect = j::get_boolean(o, "hasTriggeredEffect")?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -307,6 +427,49 @@ mod tests {
             ap.skills_granted_by.get(&SkillId::WisdomOfTheWhiteDwarf).map(|v| v.as_slice()),
             Some(["p1".to_string(), "p2".to_string()].as_slice())
         );
+    }
+
+    #[test]
+    fn init_from_to_json_value_round_trip_java_shape() {
+        use crate::enums::{Rules, SkillId};
+        // The shape of ActingPlayer.toJsonValue() in a real replay serverGameState (1965890-like),
+        // with a used skill and a granted skill added.
+        let java = serde_json::json!({
+            "playerId": "18160488", "currentMove": 4, "goingForIt": true, "hasBlocked": false,
+            "hasFed": false, "hasFouled": false, "hasMoved": true, "hasPassed": false,
+            "playerAction": "blitzMove", "standingUp": false, "sufferingAnimosity": false,
+            "sufferingBloodlust": false, "fumblerooskiePending": false, "jumpsWithoutModifiers": false,
+            "usedSkills": ["Bone Head"], "skillsGrantedBy": { "Wisdom of the White Dwarf": ["p1", "p2"] },
+            "playerStateOld": 257, "heldInPlace": false, "mustCompleteAction": false,
+            "fellFromRush": false, "hasTriggeredEffect": false
+        });
+        let mut ap = ActingPlayer::new();
+        ap.init_from(Rules::Bb2020, &java).unwrap();
+        assert_eq!(ap.player_action, Some(PlayerAction::BlitzMove));
+        assert!(ap.used_skills.contains(&SkillId::BoneHead));
+        assert_eq!(ap.old_player_state, Some(PlayerState(257)));
+        assert_eq!(ap.to_json_value(Rules::Bb2020).unwrap(), java);
+        // bb2016 spells Bone Head "Bone-Head": Java's forName returns null for the bb2020 spelling.
+        assert!(ActingPlayer::new().init_from(Rules::Bb2016, &java).is_err());
+    }
+
+    #[test]
+    fn init_from_follows_java_option_rules() {
+        use crate::enums::Rules;
+        let mut java = serde_json::json!({
+            "playerId": null, "currentMove": 0, "goingForIt": false, "hasBlocked": false,
+            "hasFed": false, "hasFouled": false, "hasMoved": false, "hasPassed": false,
+            "playerAction": "noSuchAction", "standingUp": false, "sufferingAnimosity": false,
+            "sufferingBloodlust": false, "usedSkills": [], "playerStateOld": null
+        });
+        let mut ap = ActingPlayer::new();
+        ap.held_in_place = true; // not defined in the JSON -> Java keeps the old value
+        ap.init_from(Rules::Bb2025, &java).unwrap();
+        assert_eq!(ap.player_action, None); // PlayerActionFactory.forName -> null
+        assert!(ap.held_in_place);
+        assert!(!ap.fumblerooskie_pending); // absent Boolean -> false
+        java.as_object_mut().unwrap().remove("hasFed"); // primitive from a null Boolean -> NPE
+        assert!(ActingPlayer::new().init_from(Rules::Bb2025, &java).is_err());
     }
 
     #[test]
