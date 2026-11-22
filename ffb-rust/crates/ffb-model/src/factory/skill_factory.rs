@@ -305,6 +305,18 @@ impl SkillFactory {
         RULESET_SKILL_NAMES.iter().find(|(r, _, s)| *r == rules && *s == id).map(|(_, n, _)| *n)
     }
 
+    /// Java: `skill.getDefaultSkillValue()` of the `rules` factory's instance of `id` (generated);
+    /// `None` if the ruleset has no such skill.
+    pub fn default_skill_value_in(rules: Rules, id: SkillId) -> Option<i32> {
+        Self::name_in(rules, id)?;
+        Some(
+            crate::factory::ruleset_skill_names::RULESET_SKILL_DEFAULT_VALUE
+                .iter()
+                .find(|(r, s, _)| *r == rules && *s == id)
+                .map_or(0, |(_, _, v)| *v),
+        )
+    }
+
     /// Java: `skill.getSkillUsageType()` of the `rules` factory's instance of `id` (generated from
     /// the Java classes, `ruleset_skill_names.rs`); `None` if the ruleset has no such skill. NOTE:
     /// the engine's hand-kept `SkillId::usage_type_for` gives BB2016/BB2020 skills their BB2025

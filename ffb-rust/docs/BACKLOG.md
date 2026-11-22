@@ -11604,23 +11604,32 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
   whole corpus takes ~3.5 h at ~10 replays/min): **0 DIFF**; stops: fieldModelAddHatred 18, serverAddPlayer 15,
   fieldModelAddPrayer 7, fieldModelAddEnhancements 7, fieldModelAddIntensiveTraining 2.
 - `cargo test --workspace` green. Commit `83cffd2cb`.
+- **Addendum (same session): the enhancement family.** Corpus census of the values
+  (`D:/ffb_replay_parity/tools/mc_value_census.py <ids> <dirs>`): fieldModelAddEnhancements is ONLY
+  `"Dodgy Snack"` (422, bb2025 kick-off result: AV-1 + MA-1); AddPrayer = the six prayers with
+  enhancements + `BLESSING_OF_NUFFLE` (dropped by the drop rule); AddHatred 1,305 over 29 keywords (incl.
+  unknown `squig`/`Zoat` -> UNKNOWN); AddSkillEnhancements = `"Frenzied Rush"` (3); IntensiveTraining 67;
+  AddWisdom 1 (`Dauntless`); RemovePrayer = bb2020 `STILETTO` (14). Ported 1:1 (`java_add_enhancement` =
+  `Player.addEnhancement`: no-op while the source is active in ANY of the three maps, else all three
+  source keys are created -- empty sets included -- and elements appended, engine caches mirrored):
+  addPrayerEnhancements / removePrayerEnhancements (source = `prayer.getName()`, the 6 Prayer overrides,
+  every other prayer = EMPTY enhancements), addHatred (bb2025 only: Hatred with the keyword name under
+  `"Getting Even <keyword>"`, + `PlayerResult.addGainedHatred`), addEnhancements (registry: prayer names +
+  bb2025 Dodgy Snack; other kick-off names `Err` until seen), addSkillEnhancements (per-(rules, skill)
+  `getEnhancements()` table from the classes' `postConstruct`; property-only ones `Err`),
+  addIntensiveTrainingSkill (source "Intensive Training", value = `getDefaultSkillValue()` as text -- the
+  generator now also emits `RULESET_SKILL_DEFAULT_VALUE`, `SkillFactory::default_skill_value_in`; no
+  active check). Still `Err`: fieldModelAddWisdom (1), cards, gameOptionsAddOption.
+  **Result: `fumbbl/` 6/10 identical, 0 different, 4 stop at serverAddPlayer; 9 night replays chosen for
+  Dodgy Snack / Intensive Training / prayers: 8 identical, 1 stops at serverAddPlayer.**
 
 ### RESUME HERE
 **This iteration (2026-11-23, loop iteration 13):** O2(b) started -- ModelChangeProcessor + `ffb-replay states`
 gate (see "O2 log — iteration 13"). Nothing running; no `.loop_wait.json`.
 **Next, in this order (each = 1:1 port from the .java + unit tests + `ffb-replay states` on `D:/ffb_replays/fumbbl`,
 then a wider sample):**
-1. **The enhancement family** in `model_change_processor.rs` (most common stop): `FieldModel.addHatred`
-   (`skillFactory.forProperty(canBeGainedByGettingEven)` + `Player.addEnhancement("Getting Even " + keyword, ..)`,
-   plus `PlayerResult.addGainedHatred`), `addPrayerEnhancements` (`prayer.enhancements(StatsMechanic)` per ruleset
-   Prayer enum, source = `prayer.getName()`), `addEnhancements` (`game.getEnhancementRegistry().forName(name)`),
-   `addSkillEnhancements` (`skill.getEnhancements()`), `addIntensiveTrainingSkill` (source
-   `PrayerFactory.intensivePrayer().getName()`, value = default skill value), `addWisdomSkill`
-   (`Constant.getGrantAbleSkills`), `removePrayerEnhancements`. All write the Player's
-   `temporary_{skills,modifiers,properties}_map` (Java HashMap<String, HashSet>; `addEnhancement` is a no-op when the
-   source is already active; `SkillWithValue` equality = check the .java) + the engine caches. Modifier names =
-   `<STAT>-<class>` (TemporaryStatModifierFactory); property names = `ISkillProperty.getName()`? (check the
-   JSON option) -- non-empty property sets are `Err` in `Player::init_from` today, port the factory.
+1. ~~The enhancement family~~ DONE (iteration 13 addendum) except fieldModelAddWisdom (1 change:
+   `Constant.getGrantAbleSkills` + `enhancementSourceName()` of Wisdom of the White Dwarf).
 2. **`serverAddPlayer`** handler (546 replays): `ServerCommandAddPlayer.initFrom` (RosterPlayer JSON already
    ported), `Team.addPlayer` (fPlayerByNr REPLACES a same-nr player while fPlayerById keeps it -- `Err` if it
    happens), `RosterPlayer.updatePosition(position, updateStats=TRUE, ..)` (position stats, `addSkill` of the

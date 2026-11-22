@@ -367,6 +367,141 @@ fn java_remove_enhancements(player: &mut Player, source: &str) {
     player.remove_enhancements(source);
 }
 
+/// Java `TemporaryEnhancements`, by name: stat modifiers as `TemporaryStatModifier.getName()`
+/// (`<STAT>-<class>`), properties as names, skills as (skill, value).
+#[derive(Debug, Default, Clone)]
+struct JavaEnhancements {
+    modifiers: Vec<&'static str>,
+    properties: Vec<&'static str>,
+    skills: Vec<(SkillId, Option<String>)>,
+}
+
+const AV_INCREMENTER: &str = "AV-com.fumbbl.ffb.modifiers.TemporaryStatIncrementer";
+const MA_DECREMENTER: &str = "MA-com.fumbbl.ffb.modifiers.TemporaryStatDecrementer";
+
+/// Java `Prayer.enhancements(StatsMechanic)` of the bb2020 / bb2025 `Prayer` enum constant
+/// `enum_name` (both enums override it for the same six prayers; every other prayer inherits
+/// `EnhancementProvider`'s empty `TemporaryEnhancements`).
+fn java_prayer_enhancements(enum_name: &str) -> JavaEnhancements {
+    let skills = |id: SkillId, value: Option<&str>| JavaEnhancements {
+        skills: vec![(id, value.map(str::to_string))],
+        ..Default::default()
+    };
+    match enum_name {
+        "STILETTO" => skills(SkillId::Stab, None),
+        "IRON_MAN" => JavaEnhancements { modifiers: vec![AV_INCREMENTER], ..Default::default() },
+        "KNUCKLE_DUSTERS" => skills(SkillId::MightyBlow, None),
+        "BAD_HABITS" => skills(SkillId::Loner, Some("2")),
+        "GREASY_CLEATS" => JavaEnhancements { modifiers: vec![MA_DECREMENTER], ..Default::default() },
+        "BLESSED_STATUE_OF_NUFFLE" => skills(SkillId::Pro, None),
+        _ => JavaEnhancements::default(),
+    }
+}
+
+/// Java `Player.getEnhancementSources().contains(name)` (= `hasActiveEnhancement`): the key sets
+/// of the three temporary maps, empty-set sources included.
+fn java_has_active_enhancement(player: &Player, name: &str) -> bool {
+    player.temporary_modifiers_map.iter().any(|(s, _)| s == name)
+        || player.temporary_skills_map.iter().any(|(s, _)| s == name)
+        || player.temporary_properties_map.iter().any(|(s, _)| s == name)
+}
+
+/// Java `Player.addEnhancement(name, enhancements, factory)`: a no-op while `name` is active,
+/// else `addTemporaryModifiers` / `addTemporaryProperties` / `addTemporarySkills` -- each creates
+/// the source key (even for an EMPTY set) and adds the elements (no equals on the elements: every
+/// add is a new element). The engine caches follow (`temporary_stat_mods` with the edition limit,
+/// `temporary_properties`, `temporary_skills`).
+fn java_add_enhancement(player: &mut Player, rules: crate::enums::Rules, name: &str, e: &JavaEnhancements) -> Result<(), String> {
+    use crate::factory::skill_factory::SkillFactory;
+    use crate::model::skill_def::SkillWithValue;
+    if java_has_active_enhancement(player, name) {
+        return Ok(());
+    }
+    for (id, _) in &e.skills {
+        // factory.forClass(cls): a skill the ruleset has no class for is null (NPE on write).
+        SkillFactory::name_in(rules, *id).ok_or_else(|| format!("addEnhancement {name}: {id:?} is not a {rules:?} skill"))?;
+    }
+    fn entry<'a, T>(map: &'a mut Vec<(String, Vec<T>)>, name: &str) -> &'a mut Vec<T> {
+        if let Some(pos) = map.iter().position(|(s, _)| s == name) {
+            &mut map[pos].1
+        } else {
+            map.push((name.to_string(), Vec::new()));
+            &mut map.last_mut().expect("just pushed").1
+        }
+    }
+    let modifiers = entry(&mut player.temporary_modifiers_map, name);
+    modifiers.extend(e.modifiers.iter().map(|m| m.to_string()));
+    for m in &e.modifiers {
+        let (stat, delta) = Player::temporary_stat_modifier_for_name(m)?;
+        player.add_temporary_stat_mod_limited(name, stat, delta, crate::model::player::stat_limit(rules, stat));
+    }
+    entry(&mut player.temporary_properties_map, name).extend(e.properties.iter().map(|p| p.to_string()));
+    player.add_temporary_properties(name, &e.properties);
+    let skills = entry(&mut player.temporary_skills_map, name);
+    skills.extend(e.skills.iter().map(|(id, value)| SkillWithValue { skill_id: *id, value: value.clone() }));
+    for (id, value) in &e.skills {
+        player.add_prayer_skill(name, *id, value.clone());
+    }
+    Ok(())
+}
+
+/// Java `skill.getEnhancements()` of the `rules` class of `skill` (`setEnhancements` in the
+/// class's `postConstruct`; null when the class sets none -> `addEnhancement` NPEs = `Err`).
+/// Property-only enhancements (bb2025 Incorporeal, Baleful Hex) are `Err` until the
+/// skill-property names are ported.
+fn java_skill_enhancements(rules: crate::enums::Rules, skill: SkillId) -> Result<JavaEnhancements, String> {
+    use crate::enums::Rules;
+    let one = |id: SkillId, value: Option<&str>| {
+        Ok(JavaEnhancements { skills: vec![(id, value.map(str::to_string))], ..Default::default() })
+    };
+    match (skill, rules) {
+        (SkillId::FrenziedRush, Rules::Bb2020 | Rules::Bb2025) => one(SkillId::Frenzy, None),
+        (SkillId::ExcuseMeAreYouAZoat, Rules::Bb2020) => one(SkillId::HypnoticGaze, None),
+        (SkillId::TwoForOne, Rules::Bb2020) => one(SkillId::Loner, Some("2")),
+        (SkillId::SlashingNails, Rules::Bb2025) => one(SkillId::Claw, None),
+        (SkillId::ShotToNothing, Rules::Bb2020 | Rules::Bb2025) => one(SkillId::HailMaryPass, None),
+        (SkillId::Incorporeal | SkillId::BalefulHex, _) => {
+            Err(format!("{skill:?}.getEnhancements(): skill-property enhancements not ported yet"))
+        }
+        _ => Err(format!("{skill:?}.getEnhancements() is null in {rules:?} (NPE)")),
+    }
+}
+
+/// Java `game.getEnhancementRegistry().forName(name)`: the game's prayers (`allPrayerRolls`, by
+/// `getName()`) and kick-off results (by `getName()`) -> their `enhancements(mechanic)`. Only the
+/// names the corpus uses are ported: prayer names, and bb2025 "Dodgy Snack" (AV-1, MA-1); any other
+/// name is `Err` (kick-off results map to EMPTY enhancements in Java, which still add the sources).
+fn java_registry_enhancements(game: &Game, name: &str) -> Result<JavaEnhancements, String> {
+    use crate::enums::Rules;
+    if game.rules == Rules::Bb2025 && name == "Dodgy Snack" {
+        return Ok(JavaEnhancements {
+            modifiers: vec!["AV-com.fumbbl.ffb.modifiers.TemporaryStatDecrementer", MA_DECREMENTER],
+            ..Default::default()
+        });
+    }
+    if matches!(game.rules, Rules::Bb2020 | Rules::Bb2025) {
+        if let Some(enum_name) = crate::factory::prayer_factory::for_name_in(game.rules, &game.options, name)? {
+            if java_prayer_value_of(game.rules, enum_name)? == name {
+                return Ok(java_prayer_enhancements(enum_name));
+            }
+        }
+    }
+    Err(format!("EnhancementRegistry.forName({name:?}) not ported yet"))
+}
+
+/// The game's `PrayerFactory.valueOf(name)` (the ruleset's `Prayer` enum constant) -> its
+/// `getName()`. BB2016 games have no prayer enum (`Err`); an unknown constant is dropped by the
+/// harness's `dropUnknownValues` before decode.
+fn java_prayer_value_of(rules: crate::enums::Rules, enum_name: &str) -> Result<&'static str, String> {
+    use crate::enums::Rules;
+    match rules {
+        Rules::Bb2020 => crate::inducement::bb2020::prayer::Prayer::for_enum_name(enum_name).map(|p| p.get_name()),
+        Rules::Bb2025 => crate::inducement::bb2025::prayer::Prayer::for_enum_name(enum_name).map(|p| p.get_name()),
+        _ => None,
+    }
+    .ok_or_else(|| format!("PrayerFactory.valueOf({enum_name:?}) throws in {rules:?}"))
+}
+
 // ── Game (Java setters with side effects) ───────────────────────────────────
 
 /// Java: `Game.setLastTurnMode`.
@@ -592,13 +727,7 @@ impl ModelChangeProcessor {
             | Id::FieldModelKeepDeactivatedCard
             | Id::FieldModelRemoveCard
             | Id::FieldModelRemoveCardEffect
-            | Id::FieldModelAddEnhancements
-            | Id::FieldModelAddHatred
-            | Id::FieldModelAddIntensiveTraining
-            | Id::FieldModelAddPrayer
-            | Id::FieldModelAddSkillEnhancements
             | Id::FieldModelAddWisdom
-            | Id::FieldModelRemovePrayer
             | Id::GameOptionsAddOption
             | Id::InducementSetActivateCard
             | Id::InducementSetAddAvailableCard
@@ -606,6 +735,81 @@ impl ModelChangeProcessor {
             | Id::InducementSetDeactivateCard
             | Id::InducementSetRemoveAvailableCard => {
                 return Err(format!("{}: model change not ported yet", change.change_id.get_name()));
+            }
+
+            // FieldModel.addPrayerEnhancements(player, prayerFactory.valueOf(name)):
+            // player.addEnhancement(prayer.getName(), prayer.enhancements(mechanic), factory).
+            Id::FieldModelAddPrayer => {
+                let enum_name = opt_string(change)?.ok_or("fieldModelAddPrayer: valueOf(null) (NPE)")?;
+                let source = java_prayer_value_of(game.rules, &enum_name)?;
+                let rules = game.rules;
+                java_add_enhancement(require_player(game, change)?, rules, source, &java_prayer_enhancements(&enum_name))?;
+            }
+            // FieldModel.addEnhancements(player, name): the registry's enhancements, if any, under name.
+            Id::FieldModelAddEnhancements => {
+                let name = opt_string(change)?.ok_or("fieldModelAddEnhancements: null name")?;
+                let enhancements = java_registry_enhancements(game, &name)?;
+                let rules = game.rules;
+                java_add_enhancement(require_player(game, change)?, rules, &name, &enhancements)?;
+            }
+            // FieldModel.addSkillEnhancements(player, skillFactory.forName(name)):
+            // player.addEnhancement(skill.getName(), skill.getEnhancements(), factory).
+            Id::FieldModelAddSkillEnhancements => {
+                let name = opt_string(change)?.ok_or("fieldModelAddSkillEnhancements: forName(null)")?;
+                let rules = game.rules;
+                let skill = crate::factory::skill_factory::SkillFactory::for_name_in(rules, &name)
+                    .ok_or_else(|| format!("fieldModelAddSkillEnhancements: skill {name:?} is null (NPE)"))?;
+                let enhancements = java_skill_enhancements(rules, skill)?;
+                let source = crate::factory::skill_factory::SkillFactory::name_in(rules, skill).unwrap_or_default();
+                java_add_enhancement(require_player(game, change)?, rules, source, &enhancements)?;
+            }
+            // FieldModel.addIntensiveTrainingSkill(key, skill): player.addTemporarySkills(
+            // prayerFactory.intensivePrayer().getName(), {new SkillWithValue(skill, "" + default)}) --
+            // no active-source check, every call adds a new element.
+            Id::FieldModelAddIntensiveTraining => {
+                use crate::enums::Rules;
+                let skill = opt_skill(change)?.ok_or("fieldModelAddIntensiveTraining: null skill (NPE)")?;
+                let rules = game.rules;
+                let source = match rules {
+                    Rules::Bb2020 => crate::inducement::bb2020::prayer::Prayer::INTENSIVE_TRAINING.get_name(),
+                    Rules::Bb2025 => crate::inducement::bb2025::prayer::Prayer::INTENSIVE_TRAINING.get_name(),
+                    other => return Err(format!("fieldModelAddIntensiveTraining: no PrayerFactory in {other:?} (NPE)")),
+                };
+                let default = crate::factory::skill_factory::SkillFactory::default_skill_value_in(rules, skill)
+                    .ok_or_else(|| format!("fieldModelAddIntensiveTraining: {skill:?} is not a {rules:?} skill"))?;
+                let player = require_player(game, change)?;
+                let value = Some(default.to_string());
+                match player.temporary_skills_map.iter_mut().find(|(s, _)| s == source) {
+                    Some((_, set)) => set.push(crate::model::skill_def::SkillWithValue { skill_id: skill, value: value.clone() }),
+                    None => player.temporary_skills_map.push((
+                        source.to_string(),
+                        vec![crate::model::skill_def::SkillWithValue { skill_id: skill, value: value.clone() }],
+                    )),
+                }
+                player.add_prayer_skill(source, skill, value);
+            }
+            // FieldModel.removePrayerEnhancements: player.removeEnhancements(prayer) (= by getName()).
+            Id::FieldModelRemovePrayer => {
+                let enum_name = opt_string(change)?.ok_or("fieldModelRemovePrayer: valueOf(null) (NPE)")?;
+                let source = java_prayer_value_of(game.rules, &enum_name)?;
+                java_remove_enhancements(require_player(game, change)?, source);
+            }
+            // PlayerResult.addGainedHatred(keyword), then FieldModel.addHatred: the ruleset's skill
+            // with canBeGainedByGettingEven (only bb2025 Hatred) under "Getting Even <keyword>".
+            Id::FieldModelAddHatred => {
+                let name = opt_string(change)?.ok_or("fieldModelAddHatred: Keyword.forName(null)")?;
+                let keyword = crate::model::keyword::Keyword::for_name(&name);
+                player_result_mut(game, change)?.gained_hatred.push(keyword);
+                if game.rules != crate::enums::Rules::Bb2025 {
+                    return Err(format!("fieldModelAddHatred: no canBeGainedByGettingEven skill in {:?} (NPE)", game.rules));
+                }
+                let enhancements = JavaEnhancements {
+                    skills: vec![(SkillId::Hatred, Some(keyword.get_name().to_string()))],
+                    ..Default::default()
+                };
+                let rules = game.rules;
+                let source = format!("Getting Even {}", keyword.get_name());
+                java_add_enhancement(require_player(game, change)?, rules, &source, &enhancements)?;
             }
 
             Id::GameSetConcededLegally => game.conceded_legally = unbox_bool(change)?,
@@ -892,6 +1096,66 @@ mod tests {
         assert_eq!(g.field_model.move_squares[&FieldCoordinate::new(3, 3)].minimum_roll_dodge, 2);
         apply(&mut g, "fieldModelRemoveMoveSquare", None, json!({"coordinate": [3, 3], "minimumRollDodge": 9, "minimumRollGfi": 0})).unwrap();
         assert!(g.field_model.move_squares.is_empty());
+    }
+
+    fn skills_of<'a>(p: &'a Player, source: &str) -> Option<&'a Vec<crate::model::skill_def::SkillWithValue>> {
+        p.temporary_skills_map.iter().find(|(s, _)| s == source).map(|(_, v)| v)
+    }
+
+    #[test]
+    fn prayer_enhancements_create_all_three_sources_once() {
+        let mut g = game();
+        g.rules = Rules::Bb2025;
+        apply(&mut g, "fieldModelAddPrayer", Some("h1"), json!("BAD_HABITS")).unwrap();
+        apply(&mut g, "fieldModelAddPrayer", Some("h1"), json!("BAD_HABITS")).unwrap(); // active: no-op
+        let p = g.team_home.player("h1").unwrap();
+        let skills = skills_of(p, "Bad Habits").unwrap();
+        assert_eq!(skills.len(), 1);
+        assert_eq!((skills[0].skill_id, skills[0].value.as_deref()), (SkillId::Loner, Some("2")));
+        // addTemporaryModifiers/Properties with EMPTY sets still create the keys
+        assert!(p.temporary_modifiers_map.iter().any(|(s, m)| s == "Bad Habits" && m.is_empty()));
+        assert!(p.temporary_properties_map.iter().any(|(s, m)| s == "Bad Habits" && m.is_empty()));
+        // a prayer with no enhancements: three empty sources
+        apply(&mut g, "fieldModelAddPrayer", Some("h1"), json!("FOULING_FRENZY")).unwrap();
+        let p = g.team_home.player("h1").unwrap();
+        assert!(skills_of(p, "Fouling Frenzy").is_some_and(|s| s.is_empty()));
+        // Iron Man: one AV modifier, mirrored into the engine cache
+        apply(&mut g, "fieldModelAddPrayer", Some("a1"), json!("IRON_MAN")).unwrap();
+        let p = g.team_away.player("a1").unwrap();
+        assert!(p.temporary_modifiers_map.iter().any(|(s, m)| s == "Iron Man" && m == &vec![AV_INCREMENTER.to_string()]));
+        assert_eq!(p.temporary_stat_mods.len(), 1);
+        // removePrayerEnhancements removes the source from all three maps
+        apply(&mut g, "fieldModelRemovePrayer", Some("a1"), json!("IRON_MAN")).unwrap();
+        let p = g.team_away.player("a1").unwrap();
+        assert!(!java_has_active_enhancement(p, "Iron Man"));
+        assert!(p.temporary_stat_mods.is_empty());
+    }
+
+    #[test]
+    fn hatred_dodgy_snack_and_intensive_training() {
+        let mut g = game();
+        g.rules = Rules::Bb2025;
+        apply(&mut g, "fieldModelAddHatred", Some("h1"), json!("Elf")).unwrap();
+        let p = g.team_home.player("h1").unwrap();
+        let skills = skills_of(p, "Getting Even Elf").unwrap();
+        assert_eq!((skills[0].skill_id, skills[0].value.as_deref()), (SkillId::Hatred, Some("Elf")));
+        assert_eq!(g.game_result.home.player_results["h1"].gained_hatred.len(), 1);
+        // an unknown keyword is UNKNOWN (Keyword.forName)
+        apply(&mut g, "fieldModelAddHatred", Some("h1"), json!("squig")).unwrap();
+        assert!(skills_of(g.team_home.player("h1").unwrap(), "Getting Even Unknown").is_some());
+        apply(&mut g, "fieldModelAddEnhancements", Some("a1"), json!("Dodgy Snack")).unwrap();
+        let p = g.team_away.player("a1").unwrap();
+        assert!(p.temporary_modifiers_map.iter().any(|(s, m)| s == "Dodgy Snack" && m.len() == 2));
+        // intensive training: value = the default skill value, no active check (two adds = two elements)
+        apply(&mut g, "fieldModelAddIntensiveTraining", Some("a1"), json!("Mighty Blow")).unwrap();
+        apply(&mut g, "fieldModelAddIntensiveTraining", Some("a1"), json!("Block")).unwrap();
+        let skills = skills_of(g.team_away.player("a1").unwrap(), "Intensive Training").unwrap();
+        assert_eq!(skills.len(), 2);
+        assert_eq!(skills[0].value.as_deref(), Some("1"));
+        assert_eq!(skills[1].value.as_deref(), Some("0"));
+        // bb2020 has no Getting Even skill: Java NPE
+        let mut g = game();
+        assert!(apply(&mut g, "fieldModelAddHatred", Some("h1"), json!("Elf")).is_err());
     }
 
     #[test]

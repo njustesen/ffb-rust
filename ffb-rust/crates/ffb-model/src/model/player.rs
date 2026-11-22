@@ -933,7 +933,7 @@ impl Player {
     /// `TemporaryStatModifier` subclasses are the incrementer (+1) and the decrementer (-1); any other
     /// class, a bad key or a missing separator throws in Java. Returns (stat code, delta); the name
     /// itself is what `getName()` writes back.
-    fn temporary_stat_modifier_for_name(name: &str) -> Result<(u8, i32), String> {
+    pub(crate) fn temporary_stat_modifier_for_name(name: &str) -> Result<(u8, i32), String> {
         let parts: Vec<&str> = name.split('-').collect();
         let class = parts.get(1).ok_or_else(|| format!("TemporaryStatModifierFactory: {name:?} has no class part"))?;
         let delta = match *class {

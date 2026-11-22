@@ -864,3 +864,15 @@ pub const RULESET_SKILL_USAGE: &[(Rules, SkillId, SkillUsageType)] = &[
     (Rules::Bb2025, SkillId::Wrestle, SkillUsageType::Regular),
     (Rules::Bb2025, SkillId::Yoink, SkillUsageType::OncePerGame),
 ];
+
+/// Java `Skill.getDefaultSkillValue()` of the ruleset's class, where it is not 0 (the int its
+/// constructor passes after the category): (rules, SkillId, default value).
+pub const RULESET_SKILL_DEFAULT_VALUE: &[(Rules, SkillId, i32)] = &[
+    (Rules::Bb2020, SkillId::BloodLust, 2),
+    (Rules::Bb2020, SkillId::DirtyPlayer, 1),
+    (Rules::Bb2020, SkillId::Loner, 4),
+    (Rules::Bb2020, SkillId::MightyBlow, 1),
+    (Rules::Bb2025, SkillId::BloodLust, 2),
+    (Rules::Bb2025, SkillId::Loner, 4),
+    (Rules::Bb2025, SkillId::MightyBlow, 1),
+];

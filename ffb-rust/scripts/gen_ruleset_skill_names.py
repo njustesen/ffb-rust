@@ -36,6 +36,12 @@ def usage_type(text: str):
     return m.group(1) if m else "REGULAR"
 
 
+def default_value(text: str) -> int:
+    """Skill.getDefaultSkillValue(): the int the constructor passes after the category (0 if none)."""
+    m = re.search(r'super\(\s*"(?:[^"\\]|\\.)*"\s*,\s*SkillCategory\.\w+\s*,\s*(\d+)', text)
+    return int(m.group(1)) if m else 0
+
+
 def camel(const: str) -> str:
     return "".join(p.capitalize() for p in const.lower().split("_"))
 
@@ -47,6 +53,7 @@ def main() -> int:
     class_to_variant = {cls: var for var, cls in re.findall(r'SkillId::(\w+) => "([^"]+)"', body)}
     rows = {}
     usages = {}
+    defaults = {}
     errors = 0
     for f in sorted(SKILL_DIR.rglob("*.java")):
         text = f.read_text(encoding="utf-8", errors="replace")
@@ -83,6 +90,7 @@ def main() -> int:
                 errors += 1
             rows[key] = (name, variant)
             usages[(r, variant)] = usage_type(text)
+            defaults[(r, variant)] = default_value(text)
     if errors:
         return 1
     lines = [
@@ -105,6 +113,14 @@ def main() -> int:
     lines.append("pub const RULESET_SKILL_USAGE: &[(Rules, SkillId, SkillUsageType)] = &[")
     for (r, variant), usage in sorted(usages.items()):
         lines.append(f"    (Rules::{RUST_RULES[r]}, SkillId::{variant}, SkillUsageType::{camel(usage)}),")
+    lines.append("];")
+    lines.append("")
+    lines.append("/// Java `Skill.getDefaultSkillValue()` of the ruleset's class, where it is not 0 (the int its")
+    lines.append("/// constructor passes after the category): (rules, SkillId, default value).")
+    lines.append("pub const RULESET_SKILL_DEFAULT_VALUE: &[(Rules, SkillId, i32)] = &[")
+    for (r, variant), value in sorted(defaults.items()):
+        if value != 0:
+            lines.append(f"    (Rules::{RUST_RULES[r]}, SkillId::{variant}, {value}),")
     lines.append("];")
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     for r in RULES:
