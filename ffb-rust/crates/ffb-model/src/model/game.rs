@@ -109,6 +109,13 @@ pub struct Game {
     pub concession_possible: bool,
     pub conceded_legally: bool,
     pub testing: bool,
+    /// Java: `fTurnTime` (no notification for observers). Only the replay loader (BACKLOG §O)
+    /// sets it today; the engine does not track time.
+    #[serde(default)]
+    pub turn_time: i64,
+    /// Java: `fGameTime` (no notification for observers); see `turn_time`.
+    #[serde(default)]
+    pub game_time: i64,
     /// Set true when a turnover occurs (failed pickup, failed dodge, etc.) so EndPlayerAction
     /// pushes end_turn_sequence() instead of select_sequence(). Cleared after consumption.
     pub turnover: bool,
@@ -148,6 +155,11 @@ pub struct Game {
     /// Java: GameState.getGame().getDialogParameter().getId() — which dialog is currently shown.
     /// Set by UtilServerDialog.showDialog(), cleared by hideDialog().
     pub dialog_id: Option<DialogId>,
+    /// Java: `Game.fDialogParameter` -- the full parameter object. Only the replay loader (BACKLOG
+    /// §O, `init_from`) fills it today; the engine still tracks just `dialog_id`, which the loader
+    /// keeps in step (`getDialogParameter().getId()`).
+    #[serde(skip)]
+    pub dialog_parameter: Option<crate::dialog::dialog_parameter_factory::DialogParameter>,
     /// Java: GameState.getReportList() — all reports emitted this turn/game.
     /// Populated by step methods via report structs in ffb-model/src/report/.
     #[serde(skip)]
@@ -210,6 +222,8 @@ impl Game {
             concession_possible: false,
             conceded_legally: false,
             testing: false,
+            turn_time: 0,
+            game_time: 0,
             turnover: false,
             home_additional_assists: 0,
             away_additional_assists: 0,
@@ -222,6 +236,7 @@ impl Game {
             kicking_swarmers: 0,
             active_shadowers: Vec::new(),
             dialog_id: None,
+            dialog_parameter: None,
             report_list: ReportList::new(),
             zapped_players: Vec::new(),
             command_re_roll_source: None,
@@ -409,6 +424,149 @@ impl Game {
     }
 }
 
+/// Java `Game.toJsonValue()` / `Game.initFrom(source, json)` (BACKLOG §O O2(a)).
+impl Game {
+    /// Java: `Game.toJsonValue()`. Every key is written (null where the Java field is null);
+    /// `dialogParameter` only for a non-null parameter. `teamState` is always `FULL`: the
+    /// SKELETON form is never loaded (see `init_from`).
+    pub fn to_json_value(&self) -> Result<serde_json::Value, String> {
+        use crate::util::java_json as j;
+        use serde_json::Value;
+        let rules = self.rules;
+        let mut o = serde_json::Map::new();
+        o.insert("gameId".into(), Value::from(self.id));
+        o.insert("scheduled".into(), j::string_or_null(self.scheduled.as_deref()));
+        o.insert("started".into(), j::string_or_null(self.started.as_deref()));
+        o.insert("finished".into(), j::string_or_null(self.finished.as_deref()));
+        o.insert("homePlaying".into(), Value::Bool(self.home_playing));
+        o.insert("half".into(), Value::from(self.half));
+        o.insert("homeFirstOffense".into(), Value::Bool(self.home_first_offense));
+        o.insert("setupOffense".into(), Value::Bool(self.setup_offense));
+        o.insert("waitingForOpponent".into(), Value::Bool(self.waiting_for_opponent));
+        o.insert("turnTime".into(), Value::from(self.turn_time));
+        o.insert("gameTime".into(), Value::from(self.game_time));
+        o.insert("timeoutPossible".into(), Value::Bool(self.timeout_possible));
+        o.insert("timeoutEnforced".into(), Value::Bool(self.timeout_enforced));
+        o.insert("concessionPossible".into(), Value::Bool(self.concession_possible));
+        o.insert("testing".into(), Value::Bool(self.testing));
+        o.insert("turnMode".into(), Value::String(self.turn_mode.name().to_string()));
+        o.insert("lastTurnMode".into(), j::string_or_null(self.last_turn_mode.map(TurnMode::name)));
+        o.insert("defenderId".into(), j::string_or_null(self.defender_id.as_deref()));
+        o.insert("lastDefenderId".into(), j::string_or_null(self.last_defender_id.as_deref()));
+        o.insert("defenderAction".into(), j::string_or_null(self.defender_action.map(PlayerAction::name)));
+        o.insert("passCoordinate".into(), j::field_coordinate_or_null(self.pass_coordinate));
+        o.insert("throwerId".into(), j::string_or_null(self.thrower_id.as_deref()));
+        o.insert("throwerAction".into(), j::string_or_null(self.thrower_action.map(PlayerAction::name)));
+        o.insert("teamState".into(), Value::String("FULL".into()));
+        o.insert("teamAway".into(), self.team_away.to_json_value(rules)?);
+        o.insert("turnDataAway".into(), self.turn_data_away.to_json_value(rules)?);
+        o.insert("teamHome".into(), self.team_home.to_json_value(rules)?);
+        o.insert("turnDataHome".into(), self.turn_data_home.to_json_value(rules)?);
+        o.insert("fieldModel".into(), self.field_model.to_json_value(rules, &self.team_home, &self.team_away)?);
+        o.insert("actingPlayer".into(), self.acting_player.to_json_value(rules)?);
+        o.insert(
+            "gameResult".into(),
+            self.game_result.to_json_value(rules, Some(&self.team_home), Some(&self.team_away))?,
+        );
+        o.insert("gameOptions".into(), self.options.to_json_value());
+        if let Some(parameter) = &self.dialog_parameter {
+            o.insert("dialogParameter".into(), parameter.to_json_value(rules)?);
+        }
+        o.insert("concededLegally".into(), Value::Bool(self.conceded_legally));
+        Ok(Value::Object(o))
+    }
+
+    /// Java: `Game.initFrom(source, json)` on a freshly constructed `Game`: the options first
+    /// (they select the ruleset whose factories decode the rest), then the scalars, both teams
+    /// (away, then home, IN PLACE), both turn data, the field model, the acting player, the game
+    /// result, the dialog parameter, `concededLegally` (null-safe) and `lastDefenderId` (only when
+    /// defined -- the old value is kept otherwise).
+    ///
+    /// `Err` where Java throws (a primitive `boolean`/`int` from an absent key, `toDate` of an absent
+    /// key, `TeamState.valueOf` of an unknown name) and where the Rust model cannot hold the Java
+    /// value: a null `turnMode` (Rust `TurnMode` is not optional -- an unknown name from a newer
+    /// server is null in Java) and the SKELETON team state (`TeamSkeleton` is not ported; no corpus
+    /// start state uses it).
+    pub fn init_from(&mut self, json: &serde_json::Value) -> Result<(), String> {
+        use crate::util::java_json as j;
+        let obj = j::to_json_object(json)?;
+
+        let options_json = j::get_object(obj, "gameOptions")?.map(|o| serde_json::Value::Object(o.clone()));
+        self.options.init_from(options_json.as_ref().unwrap_or(&serde_json::Value::Null))?;
+        let rules = self.options.rules_version()?;
+        self.rules = rules;
+
+        self.id = u64::try_from(j::get_long(obj, "gameId")?).map_err(|_| "gameId: negative id".to_string())?;
+        self.scheduled = j::get_date(obj, "scheduled")?;
+        self.started = j::get_date(obj, "started")?;
+        self.finished = j::get_date(obj, "finished")?;
+        self.home_playing = j::get_boolean(obj, "homePlaying")?;
+        self.half = j::get_int(obj, "half")?;
+        self.home_first_offense = j::get_boolean(obj, "homeFirstOffense")?;
+        self.setup_offense = j::get_boolean(obj, "setupOffense")?;
+        self.waiting_for_opponent = j::get_boolean(obj, "waitingForOpponent")?;
+        self.turn_time = j::get_long(obj, "turnTime")?;
+        self.game_time = j::get_long(obj, "gameTime")?;
+        self.timeout_possible = j::get_boolean(obj, "timeoutPossible")?;
+        self.timeout_enforced = j::get_boolean(obj, "timeoutEnforced")?;
+        self.concession_possible = j::get_boolean(obj, "concessionPossible")?;
+        self.testing = j::get_boolean(obj, "testing")?;
+        let turn_mode_for_name = |key: &str| -> Result<Option<TurnMode>, String> {
+            Ok(j::get_enum_name(obj, key)?.and_then(|name| {
+                TurnMode::all().iter().copied().find(|m| j::java_equals_ignore_case(m.name(), name))
+            }))
+        };
+        self.turn_mode = turn_mode_for_name("turnMode")?
+            .ok_or_else(|| format!("turnMode: null ({:?}) -- the Rust Game cannot hold a null turn mode", obj.get("turnMode")))?;
+        self.last_turn_mode = turn_mode_for_name("lastTurnMode")?;
+        self.defender_id = j::get_string(obj, "defenderId")?;
+        self.defender_action = j::get_enum_name(obj, "defenderAction")?.and_then(PlayerAction::from_name);
+        self.pass_coordinate = j::get_field_coordinate(obj, "passCoordinate")?;
+        self.thrower_id = j::get_string(obj, "throwerId")?;
+        self.thrower_action = j::get_enum_name(obj, "throwerAction")?.and_then(PlayerAction::from_name);
+
+        let team_state = j::get_string(obj, "teamState")?;
+        if j::is_provided(team_state.as_deref()) {
+            match team_state.as_deref() {
+                Some("FULL") => {}
+                Some("SKELETON") => return Err("teamState SKELETON: TeamSkeleton is not ported".into()),
+                Some(other) => return Err(format!("TeamState.valueOf({other:?}): no such constant")),
+                None => unreachable!(),
+            }
+        }
+
+        let sub = |key: &str| -> serde_json::Value { obj.get(key).cloned().unwrap_or(serde_json::Value::Null) };
+        self.team_away.init_from(rules, &sub("teamAway"))?;
+        self.team_home.init_from(rules, &sub("teamHome"))?;
+        let options = self.options.clone();
+        self.turn_data_away.init_from(rules, &options, &sub("turnDataAway"))?;
+        self.turn_data_home.init_from(rules, &options, &sub("turnDataHome"))?;
+        self.field_model.init_from(rules, &self.team_home, &self.team_away, &sub("fieldModel"))?;
+        self.acting_player.init_from(rules, &sub("actingPlayer"))?;
+        self.game_result.init_from(rules, &self.team_home, &self.team_away, &sub("gameResult"))?;
+
+        self.dialog_parameter = None;
+        if let Some(dialog_object) = j::get_object(obj, "dialogParameter")? {
+            let factory = crate::dialog::dialog_parameter_factory::DialogParameterFactory::new();
+            self.dialog_parameter = factory.for_json_value(rules, &serde_json::Value::Object(dialog_object.clone()))?;
+        }
+        self.dialog_id = self.dialog_parameter.as_ref().map(|p| p.get_id());
+        self.conceded_legally = j::get_boolean_object(obj, "concededLegally")?.unwrap_or(false);
+
+        if j::is_defined_in(obj, "lastDefenderId") {
+            self.last_defender_id = j::get_string(obj, "lastDefenderId")?;
+        }
+        Ok(())
+    }
+
+    /// A Java `new Game(source, manager)` followed by `initFrom(source, json)`.
+    pub fn from_java_json(json: &serde_json::Value) -> Result<Game, String> {
+        let mut game = Game::new(Team::new(), Team::new(), Rules::Bb2016);
+        game.init_from(json)?;
+        Ok(game)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -437,6 +595,49 @@ mod tests {
             vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         }
+    }
+
+    /// Java `Game.toJsonValue` -> `initFrom` -> `toJsonValue` is a fixed point; the scalars Java
+    /// reads with primitive unboxing (`homePlaying`, ...) are `Err` when absent; `lastDefenderId`
+    /// keeps its old value when the key is absent; `turnMode` is matched case-insensitively.
+    #[test]
+    fn json_game_round_trip_and_java_read_rules() {
+        let mut g = Game::new(Team::new(), Team::new(), Rules::Bb2025);
+        g.options.init_from(&serde_json::json!({"gameOptionArray": [
+            {"gameOptionId": "rulesVersion", "gameOptionValue": "BB2025"}]})).unwrap();
+        g.id = 42;
+        g.started = Some("2026-11-22T10:11:12.345".into());
+        g.turn_time = 7;
+        g.game_time = 99;
+        g.last_turn_mode = Some(TurnMode::Setup);
+        g.thrower_action = Some(PlayerAction::Pass);
+        g.pass_coordinate = Some(FieldCoordinate::new(3, 4));
+        let json = g.to_json_value().unwrap();
+        let back = Game::from_java_json(&json).unwrap();
+        assert_eq!(back.to_json_value().unwrap(), json);
+        assert_eq!((back.id, back.turn_time, back.game_time, back.rules), (42, 7, 99, Rules::Bb2025));
+        assert_eq!(json["teamState"], "FULL");
+        assert!(json.get("dialogParameter").is_none(), "written only for a non-null parameter");
+
+        let mut no_home_playing = json.clone();
+        no_home_playing.as_object_mut().unwrap().remove("homePlaying");
+        assert!(Game::from_java_json(&no_home_playing).is_err());
+
+        let mut absent_date = json.clone();
+        absent_date.as_object_mut().unwrap().remove("scheduled");
+        assert!(Game::from_java_json(&absent_date).is_err(), "toDate(null) NPEs");
+
+        let mut odd = json.clone();
+        odd["turnMode"] = "REGULAR".into();
+        odd["lastDefenderId"] = "p7".into();
+        let mut game = Game::from_java_json(&odd).unwrap();
+        assert_eq!(game.turn_mode, TurnMode::Regular);
+        odd.as_object_mut().unwrap().remove("lastDefenderId");
+        game.init_from(&odd).unwrap();
+        assert_eq!(game.last_defender_id.as_deref(), Some("p7"), "kept when not defined");
+
+        odd["teamState"] = "SKELETON".into();
+        assert!(Game::from_java_json(&odd).is_err());
     }
 
     #[test]

@@ -53,6 +53,72 @@ pub fn get_int(obj: &JsonObject, key: &str) -> Result<i32, String> {
     }
 }
 
+/// `JsonLongOption.getFrom`: absent or JSON null -> 0, else `asLong()` (a non-integral or
+/// non-number value throws).
+pub fn get_long(obj: &JsonObject, key: &str) -> Result<i64, String> {
+    match obj.get(key) {
+        None | Some(Value::Null) => Ok(0),
+        Some(v) => v.as_i64().ok_or_else(|| format!("{key}: asLong on {v}")),
+    }
+}
+
+/// `JsonDateOption.getFrom` = `UtilJson.toDate(getValueFrom(..))`: an ABSENT key passes a Java null
+/// to `toDate`, whose `pValue.isNull()` throws; JSON null or a non-string -> null; a string is
+/// parsed with the zone-less `yyyy-MM-dd'T'HH:mm:ss.SSS` and written back with the same format.
+///
+/// The Rust model keeps the STRING (BACKLOG §O O1 log: parse + format round-trips the replay's
+/// string, except inside a DST gap of the JVM default zone). Only the exact canonical form with
+/// in-range fields is accepted; anything Java's LENIENT `SimpleDateFormat` would normalise (or
+/// reject -> null) is an `Err`, so a divergence can never be silent.
+pub fn get_date(obj: &JsonObject, key: &str) -> Result<Option<String>, String> {
+    match obj.get(key) {
+        None => Err(format!("{key}: missing (UtilJson.toDate(null) NPE)")),
+        Some(Value::String(s)) => {
+            if is_canonical_timestamp(s) {
+                Ok(Some(s.clone()))
+            } else {
+                Err(format!("{key}: timestamp {s:?} is not in the canonical yyyy-MM-dd'T'HH:mm:ss.SSS form"))
+            }
+        }
+        Some(_) => Ok(None),
+    }
+}
+
+/// `yyyy-MM-dd'T'HH:mm:ss.SSS`, ASCII digits, every field in its calendar range (so the lenient
+/// Java parse does not roll it over).
+fn is_canonical_timestamp(s: &str) -> bool {
+    let b = s.as_bytes();
+    if b.len() != 23 {
+        return false;
+    }
+    let digits = |r: std::ops::Range<usize>| -> Option<u32> {
+        b[r.clone()].iter().all(u8::is_ascii_digit).then(|| s[r].parse().ok()).flatten()
+    };
+    if b[4] != b'-' || b[7] != b'-' || b[10] != b'T' || b[13] != b':' || b[16] != b':' || b[19] != b'.' {
+        return false;
+    }
+    let (Some(year), Some(month), Some(day), Some(hour), Some(minute), Some(second), Some(_milli)) = (
+        digits(0..4),
+        digits(5..7),
+        digits(8..10),
+        digits(11..13),
+        digits(14..16),
+        digits(17..19),
+        digits(20..23),
+    ) else {
+        return false;
+    };
+    let leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => return false,
+    };
+    year >= 1 && (1..=days_in_month).contains(&day) && hour < 24 && minute < 60 && second < 60
+}
+
 /// `JsonStringOption.getFrom`: absent or JSON null -> null.
 pub fn get_string(obj: &JsonObject, key: &str) -> Result<Option<String>, String> {
     match obj.get(key) {
@@ -282,6 +348,24 @@ pub fn string_map(map: &[(String, Option<String>)]) -> Value {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn get_long_and_get_date_follow_the_java_options() {
+        let o = json!({"n": 12345678901i64, "z": null, "s": "x",
+            "d": "2024-02-29T23:59:59.999", "bad": "2023-02-29T00:00:00.000", "short": "2024-01-01T00:00:00.5",
+            "num": 5, "dn": null});
+        let o = o.as_object().unwrap();
+        assert_eq!(get_long(o, "n"), Ok(12345678901));
+        assert_eq!(get_long(o, "z"), Ok(0));
+        assert_eq!(get_long(o, "missing"), Ok(0));
+        assert!(get_long(o, "s").is_err());
+        assert_eq!(get_date(o, "d"), Ok(Some("2024-02-29T23:59:59.999".into())));
+        assert_eq!(get_date(o, "dn"), Ok(None), "JSON null -> null");
+        assert_eq!(get_date(o, "num"), Ok(None), "a non-string -> null");
+        assert!(get_date(o, "missing").is_err(), "toDate(null) NPE");
+        assert!(get_date(o, "bad").is_err(), "lenient roll-over is not modelled");
+        assert!(get_date(o, "short").is_err());
+    }
 
     fn obj(v: Value) -> JsonObject {
         v.as_object().unwrap().clone()
