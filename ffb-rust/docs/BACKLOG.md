@@ -11561,7 +11561,78 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
   25,329 non-zero SPP carries.
 - `cargo test --workspace` green.
 
+### O2 log — iteration 13 (2026-11-23): ModelChangeProcessor + the per-sync state gate (O2(b) started)
+- **`ModelChangeId` replaced by the Java enum, GENERATED** (`D:/ffb_replay_parity/tools/gen_model_change_id.py`
+  from `ModelChangeId.java`, 169 ids, Java order, `getName()`, `getDataType()`, `ModelChangeIdFactory.forName`
+  = equalsIgnoreCase). The old hand-kept Rust enum had invented ids (`GameSetActingTeam`...), was missing ~40
+  and had wrong names/types (`actingPlayerSetLeaping`, `fieldModelOutOfBounds`, `teamResultDedicatedFansModifier`,
+  `turnDataSecureTheBallUsed`, `turnDataPuntUsed` are the Java names). `ModelChange` gained the Java `key`;
+  `ModelChange`/`ModelChangeList::init_from`.
+- `ModelChangeDataType::from_json_value(rules, options, json) -> ModelChangeValue` = Java `fromJsonValue`
+  (JSON null -> Null for every type; unknown enum names -> Null through the ruleset factories; `Err` for
+  card / card effect / card choices / game option / dialog id / sketch state -- none in the corpus).
+- **`ModelChangeProcessor::apply(game, DecodedModelChange)`** (`ffb-model/src/model/change/model_change_processor.rs`)
+  for every id. It applies the JAVA client-side mutators (private `java_*` helpers), NOT the engine methods,
+  which carry server behaviour (bb2025 ChompRemovalObserver, Rust bridge flags): `ActingPlayer.setPlayerId`
+  full reset, `setOldPlayerState` (a second non-null is ignored), `markSkillUsed/Unused` (player's set when the
+  RULESET class tracks outside activation), FieldModel HashSets first-wins + remove-by-key (move/pushback
+  squares, track numbers, dice decorations by coordinate; markers replace), `setPlayerState` (stored when no
+  state yet or a different non-null id), `remove(Player)` drops the coordinate and KEEPS the state, chomps,
+  `Game.setTurnMode` moves the old non-null mode into `lastTurnMode`, `GAME_SET_DEFENDER/THROWER/LAST_DEFENDER_ID`
+  take the KEY. `Game.turn_mode_null` = Java's null turn mode (newer-server `dwarfenWisdom`). Still `Err`
+  ("model change not ported yet"): fieldModelAdd{Enhancements,Hatred,IntensiveTraining,Prayer,SkillEnhancements,
+  Wisdom}, fieldModelRemovePrayer, cards, gameOptionsAddOption.
+- **Java SkillUsageType per ruleset, generated**: `scripts/gen_ruleset_skill_names.py` now also writes
+  `RULESET_SKILL_USAGE` (the `SkillUsageType` each concrete class passes to `super(..)`, REGULAR when none);
+  `SkillFactory::usage_type_in(rules, id)`. **FINDING (engine, not fixed, needs a gate):** the engine's
+  hand-kept `SkillId::usage_type_for` gives BB2016/BB2020 skills their BB2025 type (Dodge, Pro, Sure Feet,
+  Lone Fouler ONCE_PER_TURN; Leader ONCE_PER_HALF...) where Java's `skill/mixed` classes are REGULAR -- found
+  by replay 1966013 (BB2020) sync 295, where the Rust replay marked Dodge used on the player and Java did not.
+  Engine callers of `usage_type_for` should move to `usage_type_in` (gate the matrix when doing it).
+- **Gate `ffb-replay states <out_dir> <java_dir> <dir|file>...`** (`replay/states.rs`) = `parseFile`'s state loop
+  1:1 (first serverGameState + `drop_unknown_inducements` -> `start_of_game`; per serverModelSync: unknown ids
+  dropped by EXACT name, `drop_unknown_values`, the whole list decoded, applied minus IGNORE_PLAYER_MARKER,
+  both inducement sets reset after a coin-choice dialog, `<index> <sha>`), writes `<out>/<id>.states`, diffs
+  with `<java_dir>/<id>.states` (run5), writes the first diverging Rust state as `<out>/<id>.<index>.rust.json`.
+  Java side of a diverging sync: `env FFB_REPLAY_STATE_DUMP=<dir> FFB_REPLAY_STATE_DUMP_MAX=<n> java -cp
+  D:/ffb_replay_parity/bin/ffb-ai-replay-o1.jar com.fumbbl.ffb.ai.simulation.FumbblReplayParser --per-replay
+  <out> <file>` (the dump dir must exist); compare with `D:/ffb_replay_parity/tools/json_diff.py`;
+  `tools/show_sync.py <ffbr> <index>` prints a sync's changes.
+- **Result on `D:/ffb_replays/fumbbl` (10 replays): 3 identical end to end (1966013 after the usage-type fix),
+  0 different, 7 stop at an unported item** (serverAddPlayer 4, fieldModelAddHatred 2, fieldModelAddPrayer 1),
+  every line before the stop identical (13,498 lines). Partial corpus run (first 47 replays, stopped -- the
+  whole corpus takes ~3.5 h at ~10 replays/min): **0 DIFF**; stops: fieldModelAddHatred 18, serverAddPlayer 15,
+  fieldModelAddPrayer 7, fieldModelAddEnhancements 7, fieldModelAddIntensiveTraining 2.
+- `cargo test --workspace` green. Commit `83cffd2cb`.
+
 ### RESUME HERE
+**This iteration (2026-11-23, loop iteration 13):** O2(b) started -- ModelChangeProcessor + `ffb-replay states`
+gate (see "O2 log — iteration 13"). Nothing running; no `.loop_wait.json`.
+**Next, in this order (each = 1:1 port from the .java + unit tests + `ffb-replay states` on `D:/ffb_replays/fumbbl`,
+then a wider sample):**
+1. **The enhancement family** in `model_change_processor.rs` (most common stop): `FieldModel.addHatred`
+   (`skillFactory.forProperty(canBeGainedByGettingEven)` + `Player.addEnhancement("Getting Even " + keyword, ..)`,
+   plus `PlayerResult.addGainedHatred`), `addPrayerEnhancements` (`prayer.enhancements(StatsMechanic)` per ruleset
+   Prayer enum, source = `prayer.getName()`), `addEnhancements` (`game.getEnhancementRegistry().forName(name)`),
+   `addSkillEnhancements` (`skill.getEnhancements()`), `addIntensiveTrainingSkill` (source
+   `PrayerFactory.intensivePrayer().getName()`, value = default skill value), `addWisdomSkill`
+   (`Constant.getGrantAbleSkills`), `removePrayerEnhancements`. All write the Player's
+   `temporary_{skills,modifiers,properties}_map` (Java HashMap<String, HashSet>; `addEnhancement` is a no-op when the
+   source is already active; `SkillWithValue` equality = check the .java) + the engine caches. Modifier names =
+   `<STAT>-<class>` (TemporaryStatModifierFactory); property names = `ISkillProperty.getName()`? (check the
+   JSON option) -- non-empty property sets are `Err` in `Player::init_from` today, port the factory.
+2. **`serverAddPlayer`** handler (546 replays): `ServerCommandAddPlayer.initFrom` (RosterPlayer JSON already
+   ported), `Team.addPlayer` (fPlayerByNr REPLACES a same-nr player while fPlayerById keeps it -- `Err` if it
+   happens), `RosterPlayer.updatePosition(position, updateStats=TRUE, ..)` (position stats, `addSkill` of the
+   position skills, skill + behaviour PlayerModifiers, lasting-injury `StatsMechanic`), or `init(old)` for a known
+   player; `setPlayerState`, `UtilBox.putPlayerIntoBox`, the player result's sendToBox*. Then Zap/Unzap (15).
+3. Run the whole corpus: `target/release/ffb-replay.exe states D:/ffb_replay_parity/rust_states_all
+   D:/ffb_replay_parity/run5_java <the 5 corpus dirs>` (~3.5 h; launch DETACHED and write `.loop_wait.json`),
+   classify every ERROR/DIFF kind. Then O3 (actions).
+Open engine findings for later gates: `SkillId::usage_type_for` (iteration 13), prayer-name compare (iteration 6).
+Watch-outs still open: `Team.fPlayerById` same-nr replacement, FieldModel cards (`Err`), skill-property sets.
+
+> History -- RESUME HERE of 2026-11-23 (loop iteration 12), superseded:
 **This iteration (2026-11-23, loop iteration 12):** O2(a) is COMPLETE -- see "O2 log — iteration 12":
 `start-check game` and `start-check startOfGame` both 2,224/2,224. Nothing running; no
 `.loop_wait.json` needed.
