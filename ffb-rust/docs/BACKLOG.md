@@ -11267,7 +11267,60 @@ except FumbblReplayParser) + `jar uf` of the parser + census classes compiled fr
 iteration. Rebuild recipe if the harness changes again: `javac -cp <base jar> -d <dir> <sources>`,
 copy the base jar, `jar uf <copy> -C <dir> com`, NEW file name (never overwrite a frozen jar).
 
+### O2 log — iteration 3 (2026-11-22 ~21:00): Rust replay reader + canonical writer, byte-identical
+**Built `ffb-replay`** (2nd bin of ffb-parity, `crates/ffb-parity/src/replay/`):
+- `canonical.rs` = 1:1 port of the harness's `canonicalCopy`/`canonicalGameJson`/`sha256Hex` +
+  minimal-json 0.9.5 printing: `UNORDERED_ARRAY` alternatives verbatim (anchored = Java `matches()`),
+  keys + unordered elements in Java String order (UTF-16 code units, `java_string_cmp`), stable sort,
+  minimal-json string escaping (probed on the real jar: `\uXXXX` lower-case for every control char
+  except `\t \n \r`, plus `\u2028`/`\u2029`; non-ASCII verbatim). Numbers: only ints/longs exist and
+  print as `Integer/Long.toString`; a fraction is an ERROR (no Double.toString rule needed yet). Built
+  on `serde_json::Value` (no `arbitrary_precision`, no `preserve_order`; the writer orders itself).
+- `ffbr.rs` = `.ffbr` read (gzip via flate2's **zlib** backend -- the one this workspace already
+  builds for mysql_common, so no new crates offline) + the Java input list rule (dir files sorted by
+  name in String order, dedup by id, first wins).
+- `ffb-replay canon-check <dump_dir> <states>`: re-canonicalises Java's `FFB_REPLAY_STATE_DUMP`
+  files after REVERSING every unordered array, compares bytes + sha with the `.states` line.
+  **400/400 identical** (replay 1965890, syncs 1..400; dumps in `D:/ffb_replay_parity/dump_1965890`,
+  Java out `dump_1965890_out`). Note: the dump dir must EXIST before the run (the harness does not
+  mkdirs; it fails the replay with NoSuchFileException otherwise).
+- `ffb-replay scan <dirs>`: the Rust reader over the WHOLE corpus: **2,224 read, 0 unreadable, all
+  with serverGameState**; net commands serverModelSync 6,621,983 / serverAddPlayer 812 (546
+  replays) / Zap 15 / Unzap 15 / serverGameState 2,224 -- identical to the Java census; **147
+  model-change ids** (list = `ffb-replay scan` output; 145 known + the 2 unknown). serde_json read
+  every file, so no lone-surrogate escapes exist in the corpus.
+
+**Architecture decision for O2(a)-(c) (made 2026-11-22, house rules):** the replay state is the
+EXISTING ffb-model `Game` graph (one Rust file per Java class), NOT a parallel JSON mirror. Each
+model class gets 1:1 `init_from(json)` / `to_json_value()` ported from its Java methods, and the
+Java fields it lacks are ADDED to the Rust struct (`#[serde(default)]`, engine ignores them):
+Game has no `turnTime`, `gameTime`, `teamState`, `dialogParameter` (only `dialog_id`) today; the
+71 `dialog/*_parameter.rs` structs exist but have no JSON methods (877,712 `gameSetDialogParameter`
+changes in the corpus -> every dialog class the corpus uses needs both). This is also what §N needs
+(the engine `Game` loaded from a replay). The canonical writer then runs on
+`game.to_json_value()` exactly as Java's does.
+
+**Verification gap to close first in O2(a):** Java writes a state line only AFTER each sync, so no
+Java output shows the decoded serverGameState or `startOfGame` by itself. Add a harness diagnostic
+(private classes dir, NOT the frozen jar -- the frozen jar and run5 stay valid) that dumps the
+canonical JSON of (1) `gsCmd.getGame().toJsonValue()` after the drop rules and (2) `startOfGame(..)`
+per replay; then Rust `Game::init_from(serverGameState.game) -> to_json_value -> canonical` must
+equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
+
 ### RESUME HERE
+**This iteration (2026-11-22 ~21:05):** O2 foundation landed (see "O2 log — iteration 3"): Rust
+`ffb-replay` reads the whole corpus and writes the canonical state text byte-identical to Java
+(400/400 dumps). **Running:** Java run5 below, ~1,850/2,224 at 21:05, 0 incomplete so far, ~6.8
+s/replay -> done ~21:50; `.loop_wait.json` = PID 5704 until 22:30.
+**Next:** (1) read run5 (`python -I scripts/replay_java_summary.py D:/ffb_replay_parity/run5_java`);
+2,224/2,224 -> it is the Java side of the manifest; anything else -> classify + harness fix + new
+frozen jar name. (2) the Java diagnostic dump of decoded serverGameState + startOfGame (above).
+(3) O2(a): `init_from`/`to_json_value` 1:1 per model class, bottom-up (FieldCoordinate, PlayerState,
+RosterPosition, Roster, Player/RosterPlayer, Team, InducementSet, TurnData, FieldModel, PlayerResult,
+TeamResult, GameResult, ActingPlayer, GameOptions, dialog parameters, Game), each with unit tests from
+the Java; gate = (1) of the diagnostic on all replays.
+
+> History -- RESUME HERE of 2026-11-22 17:30, superseded (run5 still running at 21:05):
 **Running (detached, started 2026-11-22 17:28):** Java **run5** = the FROZEN tool
 `D:/ffb_replay_parity/bin/ffb-ai-replay-o1.jar` (no classes dir) over the whole corpus ->
 `D:/ffb_replay_parity/run5_java`, log `run5_java.log/.err`, java PID 5704, ~2.2 h.

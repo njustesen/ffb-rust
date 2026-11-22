@@ -7,6 +7,10 @@ edition = "2021"
 name = "ffb-parity"
 path = "src/main.rs"
 
+[[bin]]
+name = "ffb-replay"
+path = "src/replay/main.rs"
+
 [dependencies]
 ffb-model = { path = "../ffb-model" }
 ffb-mechanics = { path = "../ffb-mechanics" }
@@ -23,3 +27,7 @@ thiserror = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 tokio = { workspace = true }
+sha2 = { workspace = true }
+regex = "1"
+# zlib backend: the one this workspace already builds (via mysql_common), no new crates
+flate2 = { version = "1", default-features = false, features = ["zlib"] }
