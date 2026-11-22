@@ -51,7 +51,12 @@ impl TtmToCrowdHandler {
             None, player_id, end_coordinate, None, None,
             ApothecaryMode::ThrownPlayer,
         );
-        injury_result.apply_to(game);
+        // NO `apply_to` here: Java only PUBLISHES the result. The TTM/KTM sequence's
+        // APOTHECARY [APOTHECARY_THROWN_PLAYER] step reports the injury and THEN applies it.
+        // Applying here as well ran applyTo's updatePlayerStateDependentProperties BEFORE the
+        // injury report, so a crowd-pushed Crumbleberry's ReportTwoForOne preceded his crowdpush
+        // injury report (cert8 star: underworld_underworldtroll_vs_gnome / snotling_vs_norse
+        // bb2020 + Grak & Crumbleberry, seed 1). Same fix as StepRightStuff's §M 2b(g).
 
         let mut params: Vec<StepParameter> = vec![
             // publish INJURY_RESULT
@@ -111,7 +116,9 @@ mod tests {
     }
 
     #[test]
-    fn handle_applies_injury_and_changes_state_from_standing() {
+    fn handle_sets_falling_and_does_not_apply_injury() {
+        // Java TtmToCrowdHandler: setPlayerState(FALLING), handleInjury (roll only), publish.
+        // The injury is applied later by APOTHECARY [THROWN_PLAYER], after its report.
         use ffb_model::util::rng::GameRng;
         use crate::injury::injuryType::injury_type_ttm_landing::InjuryTypeTTMLanding;
         let mut game = make_game();
@@ -120,9 +127,10 @@ mod tests {
         let mut rng = GameRng::new(0);
         let mut inj = InjuryTypeTTMLanding::new();
         TtmToCrowdHandler::handle(&mut game, &mut rng, "p1", coord, false, &mut inj);
-        // Player state changed from STANDING by injury application.
         let state = game.field_model.player_state("p1").unwrap();
-        assert_ne!(state.base(), PS_STANDING, "player state must have changed from STANDING after injury");
+        assert_eq!(state.base(), PS_FALLING, "the handler only marks the player FALLING");
+        assert_eq!(game.field_model.player_coordinate("p1"), Some(FieldCoordinate::new(5, 5)),
+            "not moved to the box: the apothecary step applies the injury");
     }
 
     #[test]
