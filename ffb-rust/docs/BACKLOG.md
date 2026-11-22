@@ -11151,5 +11151,92 @@ record extraction) plus a per-sync state line. Rust = a 1:1 port of exactly that
 - Canonical JSON: sort object keys recursively on both sides; integers print as integers; if a float
   ever appears, compare Java's `Double.toString` form and record the rule here.
 
+### O1 log — iteration 1 (2026-11-22)
+**Built (harness only, `91344da19`):** `FumbblReplayParser --per-replay <out> [--tool <jar>]
+[--from N --to M] <dir|file>...` writes per replay `<id>.states` (`<commandArray index> <sha256>` per
+applied model sync), `<id>.actions.jsonl` (the shard lines: replay_id/seq/final score + record),
+`<id>.status.json` (exception, skipped_syncs, applied_syncs, apply_errors, records, record_errors,
+end_check, unknown_model_changes, unhandled_commands) and `run_info.json` (tool + tool_sha256).
+Inputs are deduplicated by replay id, first wins, in the checker's CORPUS order.
+`scripts/replay_java_run.ps1 -Out <dir> [-Classes <dir>]` launches it detached over the whole corpus
+(prints the PID); `scripts/replay_java_summary.py <dir> [--list KIND]` groups the incomplete ones.
+Debug: `FFB_REPLAY_STATE_DUMP=<dir>` (+ `FFB_REPLAY_STATE_DUMP_MAX`, default 3) dumps the canonical
+JSON of the first syncs as `<dir>/<id>.<index>.json` -- the tool for Rust state diffs later.
+
+**Harness defects found and fixed (each was silently corrupting the old shard):**
+1. `serverAddPlayer` (546 replays), `serverZapPlayer`/`serverUnzapPlayer` (15) were never applied:
+   the replay client (`ClientReplayer.replayTo`) hands EVERY replayable command to its handler, and
+   `startOfGame` removes stars/mercs/raised players precisely because they come back this way.
+   Now 1:1 copies of `ClientCommandHandlerAddPlayer/ZapPlayer/UnzapPlayer`; any other non-sync
+   command is counted in `unhandled_commands` and fails the replay (corpus census 2026-11-22: only
+   serverGameState, serverModelSync, serverAddPlayer, serverZapPlayer, serverUnzapPlayer occur).
+2. Model syncs were applied with `Collections.emptySet()`; a REPLAY-mode client passes
+   `IGNORE_PLAYER_MARKER` (`ClientCommandHandlerModelSync`). Fixed.
+3. `ClientReplayer.replayTo` resets both inducement sets after a sync that sets a
+   `DialogCoinChoiceParameter`; the parser did not. Fixed (`resetInducements`, 1:1).
+4. Newer-server VALUES inside KNOWN model changes threw or poisoned the state: prayer
+   `BLESSING_OF_NUFFLE` (`fieldModelAddPrayer` -> IllegalArgumentException, `inducementSetAddPrayer`
+   -> null), re-roll properties `DRIVE_BONUS`, `LEADER` (null in the list -> NPE in
+   `DialogBlockRollPropertiesParameter.toJsonValue`). Same rule as unknown ids: dropped and reported
+   (`fieldModelAddPrayer=BLESSING_OF_NUFFLE`, `reRollProperty=DRIVE_BONUS` keys in
+   unknown_model_changes) -- `dropUnknownValues`. **Rust must drop exactly the same content.**
+5. Thirteen `catch (Exception ignored)` around record building now count into record_errors
+   (kinds RE_ROLL_DECLINE, USE_APOTHECARY_DECLINE, RE_ROLL_OFFER, USE_CHAINSAW_DECLINE,
+   FOLLOWUP_CHOICE, PASS_TARGET, PASS_BLOCK, TOUCHBACK_STATE, TOUCHBACK, MOVE_TARGET_SETUP,
+   MOVE_TARGET_FLUSH, PLAYER_SELECT_MDE, BLOCK_CHOICE_TEAM, WRITE); a failed `applyTo` counts as
+   apply_errors and fails the replay. The static MDE `RNG` is reseeded per replay (records used to
+   depend on which replays ran before).
+Result on the 15 replays of `fumbbl/` + `partial/`: 15/15 complete (were 12/15 under the new strict
+status; the old shard hid all of it).
+
+**Canonical state form (`988d6780c`) -- the Rust side MUST implement exactly this.** "Keys sorted"
+alone was not canonical: `gameOptionArray` (from `HashMap<GameOptionId,..>`) came out in a different
+order on two JVM runs of the same build. Source classification (every array under
+`Game.toJsonValue()`, done 2026-11-22): ~25 arrays serialise a HashMap/HashSet -- enum or
+identity-hash keys (order differs per JVM run) or String/FieldCoordinate/Skill-name keys (order is a
+function of the container's insertion + resize HISTORY, not of its content). Rule:
+1. Every object's keys sorted (Java String order = UTF-16 code units; all keys are ASCII).
+2. Arrays at these paths (`.`-joined keys, `[]` per array level; `FumbblReplayParser.UNORDERED_ARRAY`)
+   are sorted by each element's own canonical text (after 1+2 recursively), Java String order:
+   `team{Home,Away}.specialRules`, `.roster.positionArray`, `.roster.positionArray[].skillCategories{Normal,Double}`,
+   `.playerArray[](.player)?.temporary{Skills,Modifiers,Properties}Map.<any key>`, `.playerArray[](.player)?.usedSkills`;
+   `turnData{Home,Away}.inducementSet.{inducementArray,cardsAvailable,cardsActive,cardsDeactivated,starPlayerPositionIds,prayers}`;
+   `fieldModel.{pushbackSquareArray,moveSquareArray,trackNumberArray,diceDecorationArray,fieldMarkerArray,playerMarkerArray}`,
+   `fieldModel.playerDataArray[].{cards,cardEffects}`, `fieldModel.targetSelectionState.usedSkills`;
+   `actingPlayer.usedSkills`; `gameOptions.gameOptionArray`; `dialogParameter.nrOfCardsPerType`.
+3. Every other array keeps its order (Lists; `RosterPosition` skillArray/skillValues/skillDisplayValues
+   come from a LinkedHashMap and are index-parallel -- untouched; playerArray/playerDataArray/
+   playerResults follow `Team.getPlayers()` = sorted by nr).
+4. Printing = minimal-json `toString()` (no spaces; its string escaping); sha256 of the UTF-8 bytes.
+No floats occur. `scheduled/started/finished` are Dates printed with a zone-less
+`yyyy-MM-dd'T'HH:mm:ss.SSS` in the JVM default zone (parse+format round-trips the replay's string
+except inside a DST gap -- Rust keeps the string). Watch-outs for the Rust port, from the same
+classification: `FieldModel.chomps()` inserts empty `chomped.<id>: []` just by being queried;
+`TeamResult.getPlayerResult` creates default results lazily; `Team.fPlayerByNr` drops a player that
+shares a nr.
+Verified: two JVM runs over the 19 replays of fumbbl/partial/window -> byte-identical states,
+actions, statuses.
+
+**Corpus censuses (2026-11-22, for O2 scope):** net commands = serverGameState + serverModelSync in
+all 2,224, serverAddPlayer in 546, serverZapPlayer/serverUnzapPlayer in 15, nothing else.
+147 distinct model-change ids occur (incl. the 2 unknown ones); the Rust ModelChangeProcessor must
+cover the 145 known ones (`python -I` one-liner over `modelChangeList.modelChangeArray[].modelChangeId`,
+re-run it rather than trusting this number).
+
 ### RESUME HERE
-Nothing built yet. Start with O1: the Java outputs + run_info, then the three open counts.
+**Running (detached, started 2026-11-22 ~12:45):** Java run4 = the committed `988d6780c` parser
+(classes snapshot `D:/ffb_replay_parity/run4_classes` ahead of `D:/ffb_replays/ffb-ai-replay.jar`,
+which is byte-identical to the in-repo `ffb-ai-jar-with-dependencies.jar`, sha 760a7457...; no engine
+commit since it was built) over the whole corpus -> `D:/ffb_replay_parity/run4_java`, log
+`run4_java.log/.err`, java PID 25804, ~3.5 s/replay => ~2.2 h. `.loop_wait.json` holds the PID.
+Read it with `python -I scripts/replay_java_summary.py D:/ffb_replay_parity/run4_java` (and
+`--list <kind>` for the ids). The aborted run3 (older build without the canonical sort, same
+handling otherwise) had 126/126 complete when stopped, so the night set looks far cleaner than the
+old baseline's 2,182 record errors / 100 end-check mismatches -- confirm on run4, do not assume.
+**Next:** (1) classify whatever run4 leaves incomplete and fix it in the harness (one class per
+iteration, verify on its replays, re-run only those with explicit file args); (2) once Java is
+2,224/2,224, build the FROZEN Java tool: copy the jar to `D:/ffb_replay_parity/bin/` and
+`jar uf` the harness classes into the copy (never `mvn package` over a frozen jar), re-run the corpus
+with `-Jar <frozen> ` and no `-Classes`; (3) start O2(a) in Rust: Java-JSON Game loader +
+canonical writer (rules above), round-trip test on every replay's serverGameState, then
+startOfGame, then ModelChangeProcessor.
