@@ -46,6 +46,12 @@ impl Weather {
         }
     }
 
+    /// Java `WeatherFactory.forName`: the first `values()` constant whose `getName()`
+    /// `equalsIgnoreCase` the name (null otherwise).
+    pub fn for_name_ignore_case(name: &str) -> Option<Weather> {
+        Weather::all().iter().copied().find(|w| crate::util::java_json::java_equals_ignore_case(w.name(), name))
+    }
+
     /// Map a 2D6 sum to weather. Mirrors Java DiceInterpreter.interpretWeather().
     /// 2=SwelteringHeat, 3=VerySunny, 11=PouringRain, 12=Blizzard, 4–10=Nice.
     pub fn for_roll(total: i32) -> Weather {

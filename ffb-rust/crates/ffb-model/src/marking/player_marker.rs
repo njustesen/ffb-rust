@@ -40,6 +40,19 @@ impl PlayerMarker {
         })
     }
 
+    /// Java: `new PlayerMarker().initFrom(source, jsonValue)`, Java-exact (`JsonStringOption`
+    /// semantics: a non-string value throws). The marker goes into a `HashSet` hashed by player id,
+    /// so a null `playerId` is `Err` (NPE in Java).
+    pub fn init_from(json: &serde_json::Value) -> Result<Self, String> {
+        use crate::util::java_json as j;
+        let o = j::to_json_object(json)?;
+        let player_id = j::get_string(o, "playerId")?;
+        if player_id.is_none() {
+            return Err("PlayerMarker: null playerId (hashCode NPE)".into());
+        }
+        Ok(Self { player_id, home_text: j::get_string(o, "homeText")?, away_text: j::get_string(o, "awayText")? })
+    }
+
     /// Java: `PlayerMarker.initFrom(source, jsonValue)`.
     pub fn from_json(json: &serde_json::Value) -> Self {
         Self {

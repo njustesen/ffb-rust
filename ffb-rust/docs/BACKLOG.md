@@ -11467,21 +11467,52 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
   serious injuries over 12 names (incl. bb2016/2020/2025 names), 24,071 send-to-box reasons, 1,305
   non-empty gainedHatred, 632 stalling, 135 conceded, 18 penalty scores. `cargo test --workspace` green.
 
+### O2 log — iteration 9 (2026-11-23 ~02:15): FieldModel gated
+- **Ported 1:1** `FieldModel::{init_from(rules, home, away, json), to_json_value(rules, home, away)}`
+  plus the element classes' JSON: `BloodSpot`, `TrackNumber`, `DiceDecoration` (`BlockKind.valueOf`
+  exact), `MoveSquare`, `PushbackSquare`, `RangeRuler`, `FieldMarker`, `PlayerMarker::init_from`
+  (Java-exact; the old lenient `from_json` stays for its engine callers), `TargetSelectionState`
+  (legacy `blitzState`/`blitzStatus` keys, `Status.valueOf`, defined-only fields).
+  `Weather::for_name_ignore_case` / `Direction::for_name_ignore_case` = the Java factories
+  (`equalsIgnoreCase`). `java_json::{get_field_coordinate, field_coordinate_or_null, get_object,
+  get_player_state}`. New Java fields on FieldModel: `bloodspots`, `track_numbers` (serde default,
+  skipped when empty -> engine serialisation unchanged).
+- **Java semantics kept:** every FieldModel `HashSet` (pushback/move squares, track numbers, dice
+  decorations, field markers -- keyed by coordinate; player markers -- keyed by player id) keeps the
+  FIRST of two equal elements (`HashSet.add` does not replace), and a null key is `Err` (hashCode
+  NPE); bloodspots and trap doors are Lists (duplicates kept, order kept); player data attach only to
+  a player `getGame().getPlayerById` finds (home, then away), output = `getGame().getPlayers()` (home
+  by nr, then away by nr) with an absent state written as UNKNOWN (0); `outOfBounds`, `rangeRuler`,
+  `chomped` read only when defined; targetSelectionState kept when absent.
+- **`Err` (not ported yet, none in the corpus's start states):** non-empty `cards` / `cardEffects`
+  (Java `addCard` also changes the PLAYER: `addActivationEnhancements`; `addCardEffect` adds
+  temporary skills -- port both with `fieldModelAddCard`/`AddCardEffect` in the ModelChangeProcessor),
+  null/unknown weather, null rangeRuler thrower, null trap-door coordinate, empty chomped lists.
+  Known gap: Java's `fPlayerById` still finds a player REPLACED by a same-nr player
+  (iteration 7); Rust drops its field data. Output is identical (the replaced player is not in
+  `getPlayers()`), but a later model change addressing that id would diverge -- watch for it.
+- **start-check fieldModel: 2,224/2,224 identical, first run.** Non-vacuous
+  (`D:/ffb_replay_parity/tools/field_census.py`): 57,310 player data entries, 23,276 bloodspots,
+  44,880 player markers, 144 field markers, 134 trap doors (67 replays), 34 move squares, 10 track
+  numbers, 3 dice decorations, 2 pushback squares, 1 target selection state, 5 weathers, 59 null ball
+  coordinates, 4 moving bombs. `cargo test --workspace` green (`field_model::json_tests`, java_json).
+
 ### RESUME HERE
-**This iteration (2026-11-23 ~01:30, loop iteration 7 of this run):** see "O2 log — iteration 8":
-GameResult/TeamResult/PlayerResult JSON; `gameResult` 2,224/2,224 (all earlier subtrees still 2,224).
-Nothing running; no `.loop_wait.json` needed.
+**This iteration (2026-11-23 ~02:15, loop iteration 8 of this run):** see "O2 log — iteration 9":
+FieldModel JSON; `fieldModel` 2,224/2,224. Nothing running; no `.loop_wait.json` needed.
 **Next:** O2(a) class by class, each = 1:1 port from the .java + unit tests + a `load_subtree` arm +
 `start-check <subtree>` 2,224/2,224 (binary: `cargo build --release -p ffb-parity --bin ffb-replay`;
 run `target/release/ffb-replay.exe start-check D:/ffb_replay_parity/start_all <subtree>
 D:/ffb_replays/fumbbl D:/ffb_replays/partial D:/ffb_replays/window
 D:/ffb_replays/fumbbl_night_20261122 D:/ffb_replays/fumbbl_night_20261122/partial`):
 (1) ~~`actingPlayer`~~ DONE; (2) ~~`turnDataHome`/`turnDataAway`~~ DONE; (3) ~~`teamHome`/`teamAway`~~
-DONE; (4) ~~`gameResult`~~ DONE; (5) `fieldModel` (next); (6) `dialogParameter` (the corpus's dialog classes); (7) the whole `Game` (scalars + all
-of the above) -> compare the full gs.json sha; then `startOfGame` vs `<id>.sog.json`. After O2(a):
-ModelChangeProcessor. Open follow-ups: ZappedPlayer JSON (`Err` today; zap/unzap commands occur in 15
-replays), skill-property sets in `temporaryPropertiesMap` (`Err` if non-empty), the prayer-name finding
-above.
+DONE; (4) ~~`gameResult`~~ DONE; (5) ~~`fieldModel`~~ DONE; (6) `dialogParameter` (next: census the
+corpus's dialog ids in the serverGameStates AND in the 877,712 `gameSetDialogParameter` changes,
+port each dialog class's JSON 1:1; unknown dialog ids -> the whole parameter null); (7) the whole
+`Game` (scalars + all of the above) -> compare the full gs.json sha; then `startOfGame` vs
+`<id>.sog.json`. After O2(a): ModelChangeProcessor. Open follow-ups: ZappedPlayer JSON (`Err` today;
+zap/unzap commands occur in 15 replays), skill-property sets in `temporaryPropertiesMap` (`Err` if
+non-empty), FieldModel cards/card effects (`Err`, see iteration 9), the prayer-name finding above.
 
 > History -- RESUME HERE of 2026-11-22 ~21:05, superseded (run5 finished 2,224/2,224):
 **This iteration (2026-11-22 ~21:05):** O2 foundation landed (see "O2 log — iteration 3"): Rust

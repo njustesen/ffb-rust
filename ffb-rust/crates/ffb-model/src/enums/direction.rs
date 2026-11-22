@@ -41,6 +41,12 @@ impl Direction {
         }
     }
 
+    /// Java `DirectionFactory.forName`: the first `values()` constant whose `getName()`
+    /// `equalsIgnoreCase` the name (null otherwise).
+    pub fn for_name_ignore_case(name: &str) -> Option<Direction> {
+        Direction::all().iter().copied().find(|d| crate::util::java_json::java_equals_ignore_case(d.name(), name))
+    }
+
     /// Mirror horizontally (flip left/right)
     pub fn transform(self) -> Direction {
         match self {

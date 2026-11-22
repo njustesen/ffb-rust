@@ -41,6 +41,28 @@ impl FieldMarker {
         }
     }
 
+    /// Java: `FieldMarker.toJsonValue()`.
+    pub fn to_json_value(&self) -> serde_json::Value {
+        use crate::util::java_json as j;
+        let mut o = j::JsonObject::new();
+        o.insert("coordinate".into(), j::field_coordinate_or_null(self.coordinate));
+        o.insert("homeText".into(), j::string_or_null(self.home_text.as_deref()));
+        o.insert("awayText".into(), j::string_or_null(self.away_text.as_deref()));
+        serde_json::Value::Object(o)
+    }
+
+    /// Java: `new FieldMarker().initFrom(source, jsonValue)`. The marker goes into a `HashSet`
+    /// hashed by coordinate, so a null coordinate is `Err` (NPE in Java).
+    pub fn init_from(json: &serde_json::Value) -> Result<Self, String> {
+        use crate::util::java_json as j;
+        let o = j::to_json_object(json)?;
+        let coordinate = j::get_field_coordinate(o, "coordinate")?;
+        if coordinate.is_none() {
+            return Err("FieldMarker: null coordinate (hashCode NPE)".into());
+        }
+        Ok(Self { coordinate, home_text: j::get_string(o, "homeText")?, away_text: j::get_string(o, "awayText")? })
+    }
+
     /// Java: `static transform(FieldMarker)`.
     pub fn transform_opt(marker: Option<&FieldMarker>) -> Option<FieldMarker> {
         marker.map(|m| m.transform())

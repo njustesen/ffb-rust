@@ -15,6 +15,22 @@ impl TrackNumber {
 
     pub fn get_coordinate(&self) -> Option<&FieldCoordinate> { self.coordinate.as_ref() }
     pub fn get_number(&self) -> i32 { self.number }
+
+    /// Java: `TrackNumber.toJsonValue()`.
+    pub fn to_json_value(&self) -> serde_json::Value {
+        use crate::util::java_json as j;
+        let mut o = j::JsonObject::new();
+        o.insert("number".into(), serde_json::Value::from(self.number));
+        o.insert("coordinate".into(), j::field_coordinate_or_null(self.coordinate));
+        serde_json::Value::Object(o)
+    }
+
+    /// Java: `new TrackNumber().initFrom(source, jsonValue)`.
+    pub fn init_from(json: &serde_json::Value) -> Result<Self, String> {
+        use crate::util::java_json as j;
+        let o = j::to_json_object(json)?;
+        Ok(TrackNumber { number: j::get_int(o, "number")?, coordinate: j::get_field_coordinate(o, "coordinate")? })
+    }
 }
 
 impl Default for TrackNumber {

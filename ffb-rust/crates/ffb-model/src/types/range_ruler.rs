@@ -42,6 +42,30 @@ impl RangeRuler {
         }
     }
 
+    /// Java: `RangeRuler.toJsonValue()`.
+    pub fn to_json_value(&self) -> serde_json::Value {
+        use crate::util::java_json as j;
+        let mut o = j::JsonObject::new();
+        o.insert("throwerId".into(), serde_json::Value::from(self.thrower_id.clone()));
+        o.insert("targetCoordinate".into(), j::field_coordinate_or_null(self.target_coordinate));
+        o.insert("minimumRoll".into(), serde_json::Value::from(self.minimum_roll));
+        o.insert("throwTeamMate".into(), serde_json::Value::Bool(self.throw_team_mate));
+        serde_json::Value::Object(o)
+    }
+
+    /// Java: `new RangeRuler().initFrom(source, jsonValue)`. `Err` for a null `throwerId` (the Rust
+    /// field is not optional) and a missing `throwTeamMate` (primitive: unboxing NPE).
+    pub fn init_from(json: &serde_json::Value) -> Result<Self, String> {
+        use crate::util::java_json as j;
+        let o = j::to_json_object(json)?;
+        Ok(RangeRuler {
+            thrower_id: j::get_string(o, "throwerId")?.ok_or("RangeRuler: null throwerId")?,
+            target_coordinate: j::get_field_coordinate(o, "targetCoordinate")?,
+            minimum_roll: j::get_int(o, "minimumRoll")?,
+            throw_team_mate: j::get_boolean(o, "throwTeamMate")?,
+        })
+    }
+
     pub fn transform(self) -> RangeRuler {
         RangeRuler {
             target_coordinate: self.target_coordinate.map(|c| c.transform()),

@@ -18,6 +18,40 @@ impl PushbackSquare {
         PushbackSquare { coordinate, direction, home_choice, selected: false, locked: false }
     }
 
+    /// Java: `PushbackSquare.toJsonValue()`.
+    pub fn to_json_value(&self) -> serde_json::Value {
+        use crate::util::java_json as j;
+        let mut o = j::JsonObject::new();
+        o.insert("coordinate".into(), j::field_coordinate_or_null(Some(self.coordinate)));
+        o.insert("direction".into(), serde_json::Value::from(self.direction.name()));
+        o.insert("selected".into(), serde_json::Value::Bool(self.selected));
+        o.insert("locked".into(), serde_json::Value::Bool(self.locked));
+        o.insert("homeChoice".into(), serde_json::Value::Bool(self.home_choice));
+        serde_json::Value::Object(o)
+    }
+
+    /// Java: `new PushbackSquare().initFrom(source, jsonValue)`. `Err` for a null coordinate (the
+    /// `HashSet` it goes into hashes the coordinate -> NPE) and for a null/unknown direction
+    /// (`DirectionFactory.forName` null, which the Rust struct cannot hold); the three booleans are
+    /// primitives (a missing one is an unboxing NPE).
+    pub fn init_from(json: &serde_json::Value) -> Result<Self, String> {
+        use crate::util::java_json as j;
+        let o = j::to_json_object(json)?;
+        let coordinate =
+            j::get_field_coordinate(o, "coordinate")?.ok_or("PushbackSquare: null coordinate (hashCode NPE)")?;
+        let name = j::get_enum_name(o, "direction")?;
+        let direction = name
+            .and_then(Direction::for_name_ignore_case)
+            .ok_or_else(|| format!("PushbackSquare: direction {name:?} is null in Java"))?;
+        Ok(PushbackSquare {
+            coordinate,
+            direction,
+            selected: j::get_boolean(o, "selected")?,
+            locked: j::get_boolean(o, "locked")?,
+            home_choice: j::get_boolean(o, "homeChoice")?,
+        })
+    }
+
     pub fn transform(self) -> PushbackSquare {
         PushbackSquare {
             coordinate: self.coordinate.transform(),

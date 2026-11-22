@@ -139,6 +139,39 @@ pub fn java_equals_ignore_case(a: &str, b: &str) -> bool {
     })
 }
 
+/// `JsonFieldCoordinateOption.getFrom` = `UtilJson.toFieldCoordinate`: absent or null -> null; an
+/// array of exactly two ints -> the coordinate; anything else throws.
+pub fn get_field_coordinate(obj: &JsonObject, key: &str) -> Result<Option<crate::types::FieldCoordinate>, String> {
+    match obj.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Array(a)) if a.len() == 2 => {
+            Ok(Some(crate::types::FieldCoordinate::new(as_int(key, &a[0])?, as_int(key, &a[1])?)))
+        }
+        Some(v) => Err(format!("{key}: JsonValue is not a valid FieldCoordinate object: {v}")),
+    }
+}
+
+/// `UtilJson.toJsonValue(FieldCoordinate)`: null -> JSON null, else `[x, y]`.
+pub fn field_coordinate_or_null(coordinate: Option<crate::types::FieldCoordinate>) -> Value {
+    coordinate.map_or(Value::Null, |c| Value::Array(vec![Value::from(c.x), Value::from(c.y)]))
+}
+
+/// `JsonObjectOption.getFrom`: absent or null -> null; not an object -> `asObject` throws.
+pub fn get_object<'a>(obj: &'a JsonObject, key: &str) -> Result<Option<&'a JsonObject>, String> {
+    match obj.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Object(o)) => Ok(Some(o)),
+        Some(v) => Err(format!("{key}: asObject on {v}")),
+    }
+}
+
+/// `UtilJson.toPlayerState`, as a Rust `PlayerState` (whose id is unsigned: a negative id `Err`s).
+pub fn get_player_state(obj: &JsonObject, key: &str) -> Result<Option<crate::enums::PlayerState>, String> {
+    get_player_state_id(obj, key)?
+        .map(|id| u32::try_from(id).map(crate::enums::PlayerState).map_err(|_| format!("{key}: player state {id}")))
+        .transpose()
+}
+
 /// `JsonValue.valueOf(String)` / `UtilJson.toJsonValue(INamedObject)`: null -> JSON null.
 pub fn string_or_null(value: Option<&str>) -> Value {
     value.map_or(Value::Null, |s| Value::String(s.to_string()))
@@ -173,6 +206,22 @@ mod tests {
         assert_eq!(get_string(&o, "n"), Ok(None));
         assert_eq!(get_string(&o, "s"), Ok(Some("x".to_string())));
         assert_eq!(get_player_state_id(&o, "i"), Ok(Some(7)));
+    }
+
+    #[test]
+    fn field_coordinate_and_object_semantics_match_java() {
+        use crate::types::FieldCoordinate;
+        let o = obj(json!({ "c": [3, 4], "n": null, "bad": [1], "s": "x", "o": { "k": 1 } }));
+        assert_eq!(get_field_coordinate(&o, "c"), Ok(Some(FieldCoordinate::new(3, 4))));
+        assert_eq!(get_field_coordinate(&o, "n"), Ok(None));
+        assert_eq!(get_field_coordinate(&o, "missing"), Ok(None));
+        assert!(get_field_coordinate(&o, "bad").is_err()); // size != 2 -> IllegalArgumentException
+        assert!(get_field_coordinate(&o, "s").is_err());
+        assert_eq!(field_coordinate_or_null(Some(FieldCoordinate::new(3, 4))), json!([3, 4]));
+        assert_eq!(field_coordinate_or_null(None), Value::Null);
+        assert!(get_object(&o, "o").unwrap().is_some());
+        assert_eq!(get_object(&o, "n"), Ok(None));
+        assert!(get_object(&o, "s").is_err());
     }
 
     #[test]

@@ -9,6 +9,8 @@ use crate::model::target_selection_state::TargetSelectionState;
 use crate::model::dice_decoration::DiceDecoration;
 use crate::marking::player_marker::PlayerMarker;
 use crate::marking::field_marker::FieldMarker;
+use crate::model::blood_spot::BloodSpot;
+use crate::model::track_number::TrackNumber;
 
 /// The game board: player positions, ball position, and transient UI state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,6 +93,16 @@ pub struct FieldModel {
     /// Java: FieldModel.fFieldMarkers — coach-authored text markers per pitch square.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub field_markers: Vec<FieldMarker>,
+
+    /// Java: FieldModel.fBloodspots (a List). Client-side display data the engine never writes;
+    /// carried for the replay JSON (BACKLOG §O).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bloodspots: Vec<BloodSpot>,
+
+    /// Java: FieldModel.fTrackNumbers (a HashSet keyed by coordinate). Client-side display data the
+    /// engine never writes; carried for the replay JSON (BACKLOG §O).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub track_numbers: Vec<TrackNumber>,
 }
 
 impl FieldModel {
@@ -122,6 +134,8 @@ impl FieldModel {
             player_cards: HashMap::new(),
             player_markers: Vec::new(),
             field_markers: Vec::new(),
+            bloodspots: Vec::new(),
+            track_numbers: Vec::new(),
         }
     }
 
@@ -570,9 +584,393 @@ impl FieldModel {
     }
 }
 
+/// Java `FieldModel` JSON (BACKLOG §O replay states). The game's players come from its two teams:
+/// `getGame().getPlayerById` = home first, then away; `getGame().getPlayers()` = home players then
+/// away players, each in `Team.getPlayers()` (nr) order.
+impl FieldModel {
+    /// Java: `FieldModel.toJsonValue()`.
+    pub fn to_json_value(
+        &self,
+        rules: crate::enums::Rules,
+        team_home: &crate::model::team::Team,
+        team_away: &crate::model::team::Team,
+    ) -> Result<serde_json::Value, String> {
+        use crate::util::java_json as j;
+        use serde_json::Value;
+        let mut o = j::JsonObject::new();
+        o.insert("weather".into(), Value::from(self.weather.name()));
+        o.insert("ballCoordinate".into(), j::field_coordinate_or_null(self.ball_coordinate));
+        o.insert("ballInPlay".into(), Value::Bool(self.ball_in_play));
+        o.insert("ballMoving".into(), Value::Bool(self.ball_moving));
+        o.insert("bombCoordinate".into(), j::field_coordinate_or_null(self.bomb_coordinate));
+        o.insert("bombMoving".into(), Value::Bool(self.bomb_moving));
+        o.insert("bloodspotArray".into(), Value::Array(self.bloodspots.iter().map(BloodSpot::to_json_value).collect()));
+        o.insert(
+            "pushbackSquareArray".into(),
+            Value::Array(self.pushback_squares.iter().map(PushbackSquare::to_json_value).collect()),
+        );
+        o.insert("moveSquareArray".into(), Value::Array(self.move_squares.values().map(MoveSquare::to_json_value).collect()));
+        o.insert(
+            "trackNumberArray".into(),
+            Value::Array(self.track_numbers.iter().map(TrackNumber::to_json_value).collect()),
+        );
+        o.insert(
+            "diceDecorationArray".into(),
+            Value::Array(self.dice_decorations.iter().map(DiceDecoration::to_json_value).collect()),
+        );
+        o.insert(
+            "fieldMarkerArray".into(),
+            Value::Array(self.field_markers.iter().map(FieldMarker::to_json_value).collect()),
+        );
+        o.insert(
+            "playerMarkerArray".into(),
+            Value::Array(self.player_markers.iter().map(PlayerMarker::to_json_value).collect()),
+        );
+
+        let mut player_data_array = Vec::new();
+        for team in [team_home, team_away] {
+            let mut players: Vec<&crate::model::player::Player> = team.players.iter().collect();
+            players.sort_by_key(|p| p.nr);
+            for player in players {
+                let mut data = j::JsonObject::new();
+                data.insert("playerId".into(), Value::from(player.id.clone()));
+                data.insert("playerCoordinate".into(), j::field_coordinate_or_null(self.player_coordinate(&player.id)));
+                // getPlayerState: an absent (or null) state reads as PlayerState.UNKNOWN (0).
+                let state = self.player_state(&player.id).map_or(0, |s| s.0 as i32);
+                data.insert("playerState".into(), Value::from(state));
+                let cards = self.get_cards(&player.id);
+                if !cards.is_empty() {
+                    return Err(format!("FieldModel.toJsonValue: cards of {} not ported yet", player.id));
+                }
+                data.insert("cards".into(), Value::Array(Vec::new()));
+                if self.card_effects.get(&player.id).is_some_and(|e| !e.is_empty()) {
+                    return Err(format!("FieldModel.toJsonValue: card effects of {} not ported yet", player.id));
+                }
+                data.insert("cardEffects".into(), Value::Array(Vec::new()));
+                player_data_array.push(Value::Object(data));
+            }
+        }
+        o.insert("playerDataArray".into(), Value::Array(player_data_array));
+
+        if let Some(state) = &self.target_selection_state {
+            o.insert("targetSelectionState".into(), state.to_json_value(rules)?);
+        }
+        let trap_doors = self
+            .trap_doors
+            .iter()
+            .map(|c| {
+                let mut t = j::JsonObject::new();
+                t.insert("coordinate".into(), j::field_coordinate_or_null(Some(*c)));
+                Value::Object(t)
+            })
+            .collect();
+        o.insert("trapDoors".into(), Value::Array(trap_doors));
+        o.insert("outOfBounds".into(), Value::Bool(self.out_of_bounds));
+        if let Some(range_ruler) = &self.range_ruler {
+            o.insert("rangeRuler".into(), range_ruler.to_json_value());
+        }
+        // JsonStringListMapOption.addTo: one JsonStringArrayOption per entry.
+        let mut chomped = j::JsonObject::new();
+        for (chomper, chompees) in &self.chomped {
+            chomped.insert(chomper.clone(), Value::Array(chompees.iter().map(|c| Value::from(c.clone())).collect()));
+        }
+        o.insert("chomped".into(), Value::Object(chomped));
+        Ok(Value::Object(o))
+    }
+
+    /// Java: `FieldModel.initFrom(IFactorySource, JsonValue)`, 1:1. The `HashSet` fields keep the
+    /// FIRST of two elements with the same key (coordinate / player id: `HashSet.add` does not
+    /// replace); player coordinates, states, cards and effects only attach to a player the game
+    /// holds. `Err` where Java throws and where the Rust model cannot hold the Java value (null or
+    /// unknown weather, cards / card effects -- none occur in the corpus's start states yet).
+    pub fn init_from(
+        &mut self,
+        rules: crate::enums::Rules,
+        team_home: &crate::model::team::Team,
+        team_away: &crate::model::team::Team,
+        json: &serde_json::Value,
+    ) -> Result<(), String> {
+        use crate::util::java_json as j;
+        let o = j::to_json_object(json)?;
+        let array = |key: &str| -> Result<&Vec<serde_json::Value>, String> {
+            j::get_array(o, key)?.ok_or_else(|| format!("FieldModel: {key} is null (NPE)"))
+        };
+
+        let weather = j::get_enum_name(o, "weather")?;
+        self.weather = weather
+            .and_then(Weather::for_name_ignore_case)
+            .ok_or_else(|| format!("FieldModel: weather {weather:?} is null in Java"))?;
+        self.ball_coordinate = j::get_field_coordinate(o, "ballCoordinate")?;
+        self.ball_in_play = j::get_boolean(o, "ballInPlay")?;
+        self.ball_moving = j::get_boolean(o, "ballMoving")?;
+        self.bomb_coordinate = j::get_field_coordinate(o, "bombCoordinate")?;
+        self.bomb_moving = j::get_boolean(o, "bombMoving")?;
+
+        self.bloodspots.clear();
+        for element in array("bloodspotArray")? {
+            self.bloodspots.push(BloodSpot::init_from(element)?);
+        }
+        self.pushback_squares.clear();
+        for element in array("pushbackSquareArray")? {
+            let square = PushbackSquare::init_from(element)?;
+            if !self.pushback_squares.iter().any(|s| s.coordinate == square.coordinate) {
+                self.pushback_squares.push(square);
+            }
+        }
+        self.move_squares.clear();
+        for element in array("moveSquareArray")? {
+            let square = MoveSquare::init_from(element)?;
+            self.move_squares.entry(square.coordinate).or_insert(square);
+        }
+        self.track_numbers.clear();
+        for element in array("trackNumberArray")? {
+            let number = TrackNumber::init_from(element)?;
+            if number.coordinate.is_none() {
+                return Err("TrackNumber: null coordinate (hashCode NPE)".into());
+            }
+            if !self.track_numbers.iter().any(|t| t.coordinate == number.coordinate) {
+                self.track_numbers.push(number);
+            }
+        }
+        self.dice_decorations.clear();
+        for element in array("diceDecorationArray")? {
+            let decoration = DiceDecoration::init_from(element)?;
+            if decoration.coordinate.is_none() {
+                return Err("DiceDecoration: null coordinate (hashCode NPE)".into());
+            }
+            if !self.dice_decorations.iter().any(|d| d.coordinate == decoration.coordinate) {
+                self.dice_decorations.push(decoration);
+            }
+        }
+        self.field_markers.clear();
+        for element in array("fieldMarkerArray")? {
+            let marker = FieldMarker::init_from(element)?;
+            if !self.field_markers.iter().any(|m| m.coordinate == marker.coordinate) {
+                self.field_markers.push(marker);
+            }
+        }
+        self.player_markers.clear();
+        for element in array("playerMarkerArray")? {
+            let marker = PlayerMarker::init_from(element)?;
+            if !self.player_markers.iter().any(|m| m.player_id == marker.player_id) {
+                self.player_markers.push(marker);
+            }
+        }
+
+        self.player_coordinates.clear();
+        self.coordinate_arrival.clear();
+        self.player_states.clear();
+        self.player_cards.clear();
+        self.trap_doors.clear();
+
+        for element in array("playerDataArray")? {
+            let data = j::to_json_object(element)?;
+            let player_id = j::get_string(data, "playerId")?;
+            // getGame().getPlayerById: null for a null id or a player neither team holds; every
+            // setter below is then a no-op.
+            let known = player_id.as_deref().is_some_and(|id| team_home.has_player(id) || team_away.has_player(id));
+            let coordinate = j::get_field_coordinate(data, "playerCoordinate")?;
+            let state = j::get_player_state(data, "playerState")?;
+            let cards = j::get_string_array(data, "cards")?;
+            let card_effects = j::get_string_array(data, "cardEffects")?;
+            let Some(id) = player_id.filter(|_| known) else { continue };
+            // setPlayerCoordinate: a null coordinate is ignored; only a changed one is stored.
+            if let Some(coordinate) = coordinate {
+                if self.player_coordinates.get(&id) != Some(&coordinate) {
+                    self.arrival_counter += 1;
+                    self.coordinate_arrival.insert(id.clone(), self.arrival_counter);
+                    self.player_coordinates.insert(id.clone(), coordinate);
+                }
+            }
+            // setPlayerState: stored when there is no state yet or the id changes (a null state
+            // over no state stores null = absent here, which reads back as UNKNOWN like Java's).
+            if let Some(state) = state {
+                if self.player_states.get(&id) != Some(&state) {
+                    self.player_states.insert(id.clone(), state);
+                }
+            }
+            if cards.is_some_and(|c| !c.is_empty()) {
+                return Err(format!("FieldModel.initFrom: cards of {id} not ported yet"));
+            }
+            if card_effects.is_some_and(|c| !c.is_empty()) {
+                return Err(format!("FieldModel.initFrom: card effects of {id} not ported yet"));
+            }
+        }
+
+        let mut target_selection = j::get_object(o, "targetSelectionState")?;
+        if target_selection.is_none() {
+            target_selection = j::get_object(o, "blitzState")?;
+        }
+        if let Some(state) = target_selection {
+            self.target_selection_state =
+                Some(TargetSelectionState::init_from(rules, &serde_json::Value::Object(state.clone()))?);
+        }
+
+        if let Some(trap_doors) = j::get_array(o, "trapDoors")? {
+            for element in trap_doors {
+                // TrapDoor.initFrom; the List keeps duplicates.
+                let coordinate = j::get_field_coordinate(j::to_json_object(element)?, "coordinate")?
+                    .ok_or("TrapDoor: null coordinate (not representable)")?;
+                self.trap_doors.push(coordinate);
+            }
+        }
+
+        if j::is_defined_in(o, "outOfBounds") {
+            self.out_of_bounds = j::get_boolean(o, "outOfBounds")?;
+        }
+        if j::is_defined_in(o, "rangeRuler") {
+            let ruler = j::get_object(o, "rangeRuler")?.ok_or("FieldModel: rangeRuler null (NPE)")?;
+            self.range_ruler = Some(RangeRuler::init_from(&serde_json::Value::Object(ruler.clone()))?);
+        }
+        if j::is_defined_in(o, "chomped") {
+            // JsonStringListMapOption.getFrom (a non-object value yields an empty map), putAll.
+            if let Some(map) = o.get("chomped").and_then(serde_json::Value::as_object) {
+                for (chomper, list) in map {
+                    let chompees = j::get_string_array(map, chomper)?
+                        .filter(|l| !l.is_empty())
+                        .ok_or_else(|| format!("chomped.{chomper}: {list} (Java stores null)"))?
+                        .into_iter()
+                        .map(|c| c.ok_or_else(|| format!("chomped.{chomper}: null element")))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    self.chomped.insert(chomper.clone(), chompees);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 impl Default for FieldModel {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod json_tests {
+    use super::*;
+    use crate::enums::Rules;
+    use crate::model::player::Player;
+    use crate::model::team::Team;
+    use serde_json::json;
+
+    fn team(ids: &[(&str, i32)]) -> Team {
+        let mut t = Team::new();
+        for (id, nr) in ids {
+            t.players.push(Player { id: id.to_string(), nr: *nr, ..Default::default() });
+        }
+        t
+    }
+
+    fn base() -> serde_json::Value {
+        json!({
+            "weather": "Nice Weather", "ballCoordinate": [24, 8], "ballInPlay": true, "ballMoving": false,
+            "bombCoordinate": null, "bombMoving": false,
+            "bloodspotArray": [{"coordinate": [13, 7], "injury": 8}, {"coordinate": [13, 7], "injury": 5}],
+            "pushbackSquareArray": [], "moveSquareArray": [], "trackNumberArray": [], "diceDecorationArray": [],
+            "fieldMarkerArray": [], "playerMarkerArray": [],
+            "playerDataArray": [], "trapDoors": [], "outOfBounds": false, "chomped": {}
+        })
+    }
+
+    #[test]
+    fn json_field_model_round_trip_java_shape() {
+        // Shapes copied from the Java start dumps (D:/ffb_replay_parity/start_all).
+        let (home, away) = (team(&[("h2", 2), ("h1", 1)]), team(&[("a1", 1)]));
+        let mut j = base();
+        j["playerDataArray"] = json!([
+            {"playerId": "h1", "playerCoordinate": [12, 7], "playerState": 1, "cards": [], "cardEffects": []},
+            {"playerId": "a1", "playerCoordinate": null, "playerState": 258, "cards": null, "cardEffects": []},
+            {"playerId": "nobody", "playerCoordinate": [1, 1], "playerState": 1, "cards": [], "cardEffects": []}
+        ]);
+        j["trapDoors"] = json!([{"coordinate": [19, 13]}, {"coordinate": [19, 13]}]);
+        j["targetSelectionState"] = json!({"playerId": "h1", "playerStateOld": 258, "targetSelectionStatus": "SELECTED",
+            "targetSelectionStatusIsCommitted": true, "usedSkills": []});
+        let mut fm = FieldModel::new();
+        fm.init_from(Rules::Bb2020, &home, &away, &j).unwrap();
+        let out = fm.to_json_value(Rules::Bb2020, &home, &away).unwrap();
+        // Bloodspots are a List (duplicates kept, order kept); trap doors a List too.
+        assert_eq!(out["bloodspotArray"], j["bloodspotArray"]);
+        assert_eq!(out["trapDoors"], j["trapDoors"]);
+        // getGame().getPlayers(): home by nr, then away; an unknown id attaches nowhere; a player
+        // with no state reads as UNKNOWN (0); an absent coordinate is null.
+        assert_eq!(
+            out["playerDataArray"],
+            json!([
+                {"playerId": "h1", "playerCoordinate": [12, 7], "playerState": 1, "cards": [], "cardEffects": []},
+                {"playerId": "h2", "playerCoordinate": null, "playerState": 0, "cards": [], "cardEffects": []},
+                {"playerId": "a1", "playerCoordinate": null, "playerState": 258, "cards": [], "cardEffects": []}
+            ])
+        );
+        assert_eq!(out["targetSelectionState"], j["targetSelectionState"]);
+        assert_eq!(out["weather"], json!("Nice Weather"));
+        assert_eq!(out["ballCoordinate"], json!([24, 8]));
+        assert!(out.get("rangeRuler").is_none());
+    }
+
+    #[test]
+    fn json_field_model_hash_sets_keep_the_first_element() {
+        let (home, away) = (team(&[]), team(&[]));
+        let mut j = base();
+        j["moveSquareArray"] = json!([
+            {"coordinate": [16, 11], "minimumRollDodge": 3, "minimumRollGfi": 0},
+            {"coordinate": [16, 11], "minimumRollDodge": 0, "minimumRollGfi": 2}
+        ]);
+        j["playerMarkerArray"] = json!([
+            {"playerId": "p", "homeText": "first", "awayText": ""},
+            {"playerId": "p", "homeText": "second", "awayText": ""}
+        ]);
+        j["pushbackSquareArray"] = json!([
+            {"coordinate": [5, 10], "direction": "west", "homeChoice": false, "locked": false, "selected": true},
+            {"coordinate": [5, 10], "direction": "South", "homeChoice": false, "locked": false, "selected": false}
+        ]);
+        let mut fm = FieldModel::new();
+        fm.init_from(Rules::Bb2025, &home, &away, &j).unwrap();
+        let out = fm.to_json_value(Rules::Bb2025, &home, &away).unwrap();
+        assert_eq!(out["moveSquareArray"], json!([{"coordinate": [16, 11], "minimumRollDodge": 3, "minimumRollGfi": 0}]));
+        assert_eq!(out["playerMarkerArray"], json!([{"playerId": "p", "homeText": "first", "awayText": ""}]));
+        // DirectionFactory.forName is equalsIgnoreCase; getName() writes the canonical name.
+        assert_eq!(
+            out["pushbackSquareArray"],
+            json!([{"coordinate": [5, 10], "direction": "West", "homeChoice": false, "locked": false, "selected": true}])
+        );
+    }
+
+    #[test]
+    fn json_field_model_java_option_rules() {
+        let (home, away) = (team(&[("p", 1)]), team(&[]));
+        // Legacy blitzState / blitzStatus keys.
+        let mut j = base();
+        j["blitzState"] = json!({"playerId": "p", "blitzStatus": "STARTED"});
+        let mut fm = FieldModel::new();
+        fm.init_from(Rules::Bb2016, &home, &away, &j).unwrap();
+        let tss = fm.target_selection_state.as_ref().unwrap();
+        assert!(tss.is_started() && !tss.is_committed());
+        // outOfBounds / rangeRuler / chomped are read only when present.
+        let mut j = base();
+        j.as_object_mut().unwrap().remove("outOfBounds");
+        j["rangeRuler"] = json!({"throwerId": "p", "targetCoordinate": [3, 4], "minimumRoll": 4, "throwTeamMate": false});
+        j["chomped"] = json!({"p": ["q"]});
+        let mut fm = FieldModel::new();
+        fm.out_of_bounds = true;
+        fm.init_from(Rules::Bb2025, &home, &away, &j).unwrap();
+        assert!(fm.out_of_bounds);
+        let out = fm.to_json_value(Rules::Bb2025, &home, &away).unwrap();
+        assert_eq!(out["rangeRuler"], j["rangeRuler"]);
+        assert_eq!(out["chomped"], json!({"p": ["q"]}));
+        // Where Java throws or holds what Rust cannot: Err.
+        for (key, value) in [
+            ("weather", json!("Acid Rain")),
+            ("ballInPlay", serde_json::Value::Null),
+            ("bloodspotArray", serde_json::Value::Null),
+            ("moveSquareArray", json!([{"coordinate": null, "minimumRollDodge": 0, "minimumRollGfi": 0}])),
+            ("diceDecorationArray", json!([{"coordinate": [1, 1], "nrOfDice": 1, "blockKind": "SHOVE"}])),
+            ("playerDataArray", json!([{"playerId": "p", "playerCoordinate": null, "playerState": 1, "cards": ["Custard Pie"], "cardEffects": []}])),
+        ] {
+            let mut j = base();
+            j[key] = value;
+            assert!(FieldModel::new().init_from(Rules::Bb2025, &home, &away, &j).is_err(), "{key}");
+        }
     }
 }
 

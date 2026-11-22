@@ -44,6 +44,30 @@ impl MoveSquare {
     pub fn transform(self) -> MoveSquare {
         MoveSquare { coordinate: self.coordinate.transform(), ..self }
     }
+
+    /// Java: `MoveSquare.toJsonValue()`.
+    pub fn to_json_value(&self) -> serde_json::Value {
+        use crate::util::java_json as j;
+        let mut o = j::JsonObject::new();
+        o.insert("coordinate".into(), j::field_coordinate_or_null(Some(self.coordinate)));
+        o.insert("minimumRollDodge".into(), serde_json::Value::from(self.minimum_roll_dodge));
+        o.insert("minimumRollGfi".into(), serde_json::Value::from(self.minimum_roll_gfi));
+        serde_json::Value::Object(o)
+    }
+
+    /// Java: `new MoveSquare().initFrom(source, jsonValue)`. A null coordinate is `Err`: the only
+    /// Java caller adds the square to a `HashSet`, whose `hashCode()` (`getCoordinate().hashCode()`)
+    /// then throws.
+    pub fn init_from(json: &serde_json::Value) -> Result<Self, String> {
+        use crate::util::java_json as j;
+        let o = j::to_json_object(json)?;
+        let coordinate = j::get_field_coordinate(o, "coordinate")?.ok_or("MoveSquare: null coordinate (hashCode NPE)")?;
+        Ok(MoveSquare {
+            coordinate,
+            minimum_roll_dodge: j::get_int(o, "minimumRollDodge")?,
+            minimum_roll_gfi: j::get_int(o, "minimumRollGfi")?,
+        })
+    }
 }
 
 #[cfg(test)]
