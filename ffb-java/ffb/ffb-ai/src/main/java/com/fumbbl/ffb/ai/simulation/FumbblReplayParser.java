@@ -100,16 +100,34 @@ public class FumbblReplayParser {
         File inputPath = null;
         File outputDir = null;
         int  shardNum  = -1;
+        File perReplayDir = null;
+        File tool = null;
+        int from = 0, to = Integer.MAX_VALUE;
+        List<File> positional = new ArrayList<>();
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "--shard": shardNum = Integer.parseInt(args[++i]); break;
+                case "--per-replay": perReplayDir = new File(args[++i]); break;
+                case "--tool": tool = new File(args[++i]); break;
+                case "--from": from = Integer.parseInt(args[++i]); break;
+                case "--to": to = Integer.parseInt(args[++i]); break;
                 default:
                     if (!args[i].startsWith("-")) {
+                        positional.add(new File(args[i]));
                         if (inputPath == null)      inputPath = new File(args[i]);
                         else if (outputDir == null) outputDir = new File(args[i]);
                     }
             }
+        }
+
+        if (perReplayDir != null) {
+            if (positional.isEmpty()) {
+                System.err.println("Usage: FumbblReplayParser --per-replay <outDir> [--tool <jar>] [--from N --to M] <dir|file.ffbr>...");
+                System.exit(1);
+            }
+            runPerReplay(positional, perReplayDir, tool, from, to);
+            return;
         }
 
         if (inputPath == null || outputDir == null) {
@@ -155,6 +173,7 @@ public class FumbblReplayParser {
                     // shard could not be split by game or weighted by outcome).
                     java.io.StringWriter buf = new java.io.StringWriter();
                     int count;
+                    CUR = new PerReplay();
                     try (BufferedWriter bw = new BufferedWriter(buf)) {
                         count = parseFile(f, server, bw);
                     }
@@ -201,6 +220,203 @@ public class FumbblReplayParser {
         for (com.fumbbl.ffb.model.change.ModelChangeId id : com.fumbbl.ffb.model.change.ModelChangeId.values()) {
             KNOWN_MODEL_CHANGES.add(id.getName());
         }
+    }
+
+    // ── Per-replay outputs (BACKLOG §O, scripts/replay_parity_check.py) ───────
+
+    /** What one replay produced: the counters the goal checker reads plus the state lines. */
+    static final class PerReplay {
+        int skippedSyncs;
+        int appliedSyncs;
+        int applyErrors;
+        String firstApplyError;
+        String endCheck = "not reached";
+        final java.util.Map<String, Integer> recordErrors = new java.util.TreeMap<>();
+        final java.util.Map<String, Integer> unknownModelChanges = new java.util.TreeMap<>();
+        /** Commands the replay client would handle but this processor does not (must stay empty). */
+        final java.util.Map<String, Integer> unhandledCommands = new java.util.TreeMap<>();
+        /** "<commandArray index> <sha256 of canonical Game JSON>" per applied model sync. */
+        final StringBuilder states = new StringBuilder();
+    }
+
+    static final File STATE_DUMP_DIR = System.getenv("FFB_REPLAY_STATE_DUMP") == null ? null
+        : new File(System.getenv("FFB_REPLAY_STATE_DUMP"));
+    static final int STATE_DUMP_MAX = System.getenv("FFB_REPLAY_STATE_DUMP_MAX") == null ? 3
+        : Integer.parseInt(System.getenv("FFB_REPLAY_STATE_DUMP_MAX"));
+
+    /** The replay being parsed (one per file; a fresh one even outside --per-replay mode). */
+    static PerReplay CUR = new PerReplay();
+
+    /**
+     * A record could not be built. Counted per kind, globally and for the current replay
+     * (these used to be swallowed silently by {@code catch (Exception ignored)}).
+     */
+    static void recordError(String kind, Exception e) {
+        CUR.recordErrors.merge(kind, 1, Integer::sum);
+        if (REPORT_ERRORS.merge(kind, 1, Integer::sum) == 1) {
+            System.err.println("  first error on " + kind + ": " + e);
+            StackTraceElement[] st = e.getStackTrace();
+            for (int s = 0; s < Math.min(6, st.length); s++) System.err.println("      at " + st[s]);
+        }
+    }
+
+    /** {@code value} with every object's keys sorted (String order, stable for duplicates). */
+    static JsonValue sortedCopy(JsonValue value) {
+        if (value.isObject()) {
+            JsonObject in = value.asObject();
+            List<JsonObject.Member> members = new ArrayList<>();
+            for (JsonObject.Member m : in) members.add(m);
+            members.sort(java.util.Comparator.comparing(JsonObject.Member::getName));
+            JsonObject out = new JsonObject();
+            for (JsonObject.Member m : members) out.add(m.getName(), sortedCopy(m.getValue()));
+            return out;
+        }
+        if (value.isArray()) {
+            JsonArray out = new JsonArray();
+            for (JsonValue v : value.asArray()) out.add(sortedCopy(v));
+            return out;
+        }
+        return value;
+    }
+
+    /** Canonical state text: {@code Game.toJsonValue()} with keys sorted, minimal-json printing. */
+    static String canonicalGameJson(Game game) {
+        return sortedCopy(game.toJsonValue()).toString();
+    }
+
+    static String sha256Hex(byte[] data) {
+        try {
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(data);
+            StringBuilder sb = new StringBuilder(64);
+            for (byte b : d) sb.append(String.format("%02x", b & 0xff));
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    static String sha256File(File f) throws IOException {
+        try (java.io.InputStream in = Files.newInputStream(f.toPath())) {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] buf = new byte[1 << 20];
+            int n;
+            while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
+            StringBuilder sb = new StringBuilder(64);
+            for (byte b : md.digest()) sb.append(String.format("%02x", b & 0xff));
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    static String jsonString(String s) {
+        return s == null ? "null" : JsonValue.valueOf(s).toString();
+    }
+
+    static String jsonMap(java.util.Map<String, Integer> m) {
+        StringBuilder sb = new StringBuilder("{");
+        for (java.util.Map.Entry<String, Integer> e : m.entrySet()) {
+            if (sb.length() > 1) sb.append(',');
+            sb.append(jsonString(e.getKey())).append(':').append(e.getValue());
+        }
+        return sb.append('}').toString();
+    }
+
+    static void writeText(File f, String text) throws IOException {
+        Files.write(f.toPath(), text.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * --per-replay mode: every input (dirs and files, deduplicated by replay id, first wins) gets
+     * {@code <id>.states}, {@code <id>.actions.jsonl}, {@code <id>.status.json} in {@code outDir},
+     * plus {@code run_info.json} naming the tool (the jar) and its sha256.
+     */
+    static void runPerReplay(List<File> inputs, File outDir, File tool, int from, int to) throws Exception {
+        java.util.LinkedHashMap<String, File> byId = new java.util.LinkedHashMap<>();
+        for (File in : inputs) {
+            List<File> files = new ArrayList<>();
+            if (in.isDirectory()) {
+                File[] found = in.listFiles(f -> f.isFile() && f.getName().endsWith(".ffbr"));
+                if (found != null) Collections.addAll(files, found);
+                files.sort(java.util.Comparator.comparing(File::getName));
+            } else {
+                files.add(in);
+            }
+            for (File f : files) byId.putIfAbsent(f.getName().replaceFirst("\\.ffbr$", ""), f);
+        }
+        outDir.mkdirs();
+        if (tool == null) {
+            tool = new File(FumbblReplayParser.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        }
+        String toolSha = tool.isFile() ? sha256File(tool) : "not-a-file:" + tool.getAbsolutePath();
+        writeText(new File(outDir, "run_info.json"), "{\"tool\":" + jsonString(tool.getAbsolutePath().replace('\\', '/'))
+            + ",\"tool_sha256\":" + jsonString(toolSha) + ",\"replays\":" + byId.size() + "}\n");
+        System.out.printf("=== FumbblReplayParser --per-replay: %d replays -> %s (tool %s %s)%n",
+            byId.size(), outDir, tool, toolSha.substring(0, Math.min(12, toolSha.length())));
+
+        HeadlessFantasyFootballServer server = new HeadlessFantasyFootballServer();
+        int n = 0, done = 0, bad = 0;
+        long t0 = System.currentTimeMillis();
+        for (java.util.Map.Entry<String, File> e : byId.entrySet()) {
+            int idx = n++;
+            if (idx < from || idx >= to) continue;
+            String replayId = e.getKey();
+            CUR = new PerReplay();
+            String exception = null;
+            java.io.StringWriter buf = new java.io.StringWriter();
+            try (BufferedWriter bw = new BufferedWriter(buf)) {
+                parseFile(e.getValue(), server, bw);
+            } catch (Throwable t) {
+                StringBuilder sb = new StringBuilder(t.toString());
+                StackTraceElement[] st = t.getStackTrace();
+                // The first frames are often JDK stream plumbing; show the first FFB frames too.
+                int shown = 0;
+                for (int s = 0; s < st.length && shown < 6; s++) {
+                    if (s < 2 || st[s].getClassName().startsWith("com.fumbbl")) {
+                        sb.append(" at ").append(st[s]);
+                        shown++;
+                    }
+                }
+                exception = sb.toString();
+            }
+            if (exception == null && CUR.applyErrors > 0) {
+                exception = "model changes failed to apply in " + CUR.applyErrors + " syncs; first: " + CUR.firstApplyError;
+            }
+            if (exception == null && !CUR.unhandledCommands.isEmpty()) {
+                exception = "unhandled commands " + CUR.unhandledCommands;
+            }
+            StringBuilder actions = new StringBuilder();
+            int seq = 0;
+            for (String line : buf.toString().split("\n")) {
+                line = line.trim();
+                if (!line.startsWith("{")) continue;
+                actions.append("{\"replay_id\":\"").append(replayId).append("\",\"seq\":").append(seq++)
+                    .append(",\"final_score_home\":").append(LAST_END_SCORE[0])
+                    .append(",\"final_score_away\":").append(LAST_END_SCORE[1])
+                    .append(line.length() > 2 ? "," : "").append(line.substring(1)).append('\n');
+            }
+            writeText(new File(outDir, replayId + ".states"), CUR.states.toString());
+            writeText(new File(outDir, replayId + ".actions.jsonl"), actions.toString());
+            writeText(new File(outDir, replayId + ".status.json"), "{\"exception\":" + jsonString(exception)
+                + ",\"skipped_syncs\":" + CUR.skippedSyncs
+                + ",\"applied_syncs\":" + CUR.appliedSyncs
+                + ",\"apply_errors\":" + CUR.applyErrors
+                + ",\"records\":" + seq
+                + ",\"record_errors\":" + jsonMap(CUR.recordErrors)
+                + ",\"end_check\":" + jsonString(CUR.endCheck)
+                + ",\"unknown_model_changes\":" + jsonMap(CUR.unknownModelChanges)
+                + ",\"unhandled_commands\":" + jsonMap(CUR.unhandledCommands) + "}\n");
+            boolean clean = exception == null && CUR.skippedSyncs == 0 && CUR.recordErrors.isEmpty()
+                && "OK".equals(CUR.endCheck);
+            done++;
+            if (!clean) bad++;
+            if (done % 50 == 0) {
+                System.out.printf("  [%d] %d incomplete, %.1f s%n", done, bad, (System.currentTimeMillis() - t0) / 1000.0);
+            }
+        }
+        System.out.printf("Done. %d replays, %d incomplete, %.1f s%n", done, bad, (System.currentTimeMillis() - t0) / 1000.0);
+        System.out.println("  record-building errors per kind: " + REPORT_ERRORS);
+        System.out.println("  unknown model changes dropped: " + UNKNOWN_MODEL_CHANGES);
     }
 
     /**
@@ -262,11 +478,132 @@ public class FumbblReplayParser {
         }
     }
 
+    static void countUnknown(String key) {
+        UNKNOWN_MODEL_CHANGES.merge(key, 1, Integer::sum);
+        CUR.unknownModelChanges.merge(key, 1, Integer::sum);
+    }
+
+    /**
+     * A KNOWN model change can still carry a value only a newer FUMBBL server knows (a prayer or a
+     * re-roll property this engine version has no constant for). Same rule as unknown model-change
+     * ids: that content is dropped and reported ("<id>=<value>" / "reRollProperty=<name>"), never
+     * added to the engine. Returns true when the whole change must be dropped; otherwise removes
+     * the unknown elements in place.
+     */
+    static boolean dropUnknownValues(Game game, JsonObject mc) {
+        String id = mc.getString("modelChangeId", "");
+        JsonValue value = mc.get("modelChangeValue");
+        com.fumbbl.ffb.factory.PrayerFactory prayers = game.getFactory(com.fumbbl.ffb.FactoryType.Factory.PRAYER);
+        switch (id) {
+            case "fieldModelAddPrayer":
+            case "fieldModelRemovePrayer":
+                if (prayers != null && value != null && value.isString()) {
+                    try {
+                        prayers.valueOf(value.asString());
+                    } catch (IllegalArgumentException e) {
+                        countUnknown(id + "=" + value.asString());
+                        return true;
+                    }
+                }
+                return false;
+            case "inducementSetAddPrayer":
+            case "inducementSetRemovePrayer":
+                if (prayers != null && value != null && value.isString() && prayers.forName(value.asString()) == null) {
+                    countUnknown(id + "=" + value.asString());
+                    return true;
+                }
+                return false;
+            default:
+                break;
+        }
+        if (value != null && value.isObject()) {
+            JsonValue props = value.asObject().get("reRollProperties");
+            if (props != null && props.isArray()) {
+                com.fumbbl.ffb.factory.ReRollPropertyFactory rrp = new com.fumbbl.ffb.factory.ReRollPropertyFactory();
+                JsonArray keptProps = new JsonArray();
+                boolean changed = false;
+                for (JsonValue p : props.asArray()) {
+                    if (p.isString() && rrp.forName(p.asString()) == null) {
+                        countUnknown("reRollProperty=" + p.asString());
+                        changed = true;
+                    } else {
+                        keptProps.add(p);
+                    }
+                }
+                if (changed) value.asObject().set("reRollProperties", keptProps);
+            }
+        }
+        return false;
+    }
+
+    /** ClientCommandHandlerModelSync.IGNORE_PLAYER_MARKER (used whenever the client is not a PLAYER). */
+    static final java.util.Set<com.fumbbl.ffb.model.change.ModelChangeId> IGNORE_PLAYER_MARKER =
+        new java.util.HashSet<>(java.util.Arrays.asList(
+            com.fumbbl.ffb.model.change.ModelChangeId.FIELD_MODEL_ADD_PLAYER_MARKER,
+            com.fumbbl.ffb.model.change.ModelChangeId.FIELD_MODEL_REMOVE_PLAYER_MARKER));
+
+    /** ClientReplayer.reset: re-add every inducement with its current value (a fresh object, uses reset). */
+    static void resetInducements(com.fumbbl.ffb.model.InducementSet inducementSet) {
+        inducementSet.getInducementMapping().forEach((type, inducement) ->
+            inducementSet.addInducement(new com.fumbbl.ffb.inducement.Inducement(type, inducement.getValue())));
+    }
+
+    /** 1:1 copy of ClientCommandHandlerAddPlayer.handleNetCommand (model part). */
+    static void handleAddPlayer(Game game, com.fumbbl.ffb.net.commands.ServerCommandAddPlayer addPlayerCommand) {
+        Team team = game.getTeamHome().getId().equals(addPlayerCommand.getTeamId()) ? game.getTeamHome()
+            : game.getTeamAway();
+        Player<?> oldPlayer = team.getPlayerById(addPlayerCommand.getPlayer().getId());
+        if (oldPlayer == null) {
+            team.addPlayer(addPlayerCommand.getPlayer());
+            com.fumbbl.ffb.model.RosterPosition rosterPosition =
+                team.getRoster().getPositionById(addPlayerCommand.getPlayer().getPositionId());
+            addPlayerCommand.getPlayer().updatePosition(rosterPosition, game.getRules(), game.getId());
+        } else if (oldPlayer instanceof com.fumbbl.ffb.model.RosterPlayer) {
+            oldPlayer.init(addPlayerCommand.getPlayer(), game.getRules());
+        } else {
+            return;
+        }
+        game.getFieldModel().setPlayerState(addPlayerCommand.getPlayer(), addPlayerCommand.getPlayerState());
+        com.fumbbl.ffb.util.UtilBox.putPlayerIntoBox(game, addPlayerCommand.getPlayer());
+        com.fumbbl.ffb.model.PlayerResult playerResult = game.getGameResult().getPlayerResult(addPlayerCommand.getPlayer());
+        playerResult.setSendToBoxReason(addPlayerCommand.getSendToBoxReason());
+        playerResult.setSendToBoxTurn(addPlayerCommand.getSendToBoxTurn());
+        playerResult.setSendToBoxHalf(addPlayerCommand.getSendToBoxHalf());
+    }
+
+    /** 1:1 copy of ClientCommandHandlerZapPlayer.handleNetCommand. */
+    static void handleZapPlayer(Game game, com.fumbbl.ffb.net.commands.ServerCommandZapPlayer command) {
+        Team team = game.getTeamById(command.getTeamId());
+        Player<?> player = team.getPlayerById(command.getPlayerId());
+        if (player instanceof com.fumbbl.ffb.model.RosterPlayer) {
+            com.fumbbl.ffb.model.RosterPlayer rosterPlayer = (com.fumbbl.ffb.model.RosterPlayer) player;
+            com.fumbbl.ffb.model.ZappedPlayer zappedPlayer = new com.fumbbl.ffb.model.ZappedPlayer();
+            zappedPlayer.init(rosterPlayer, game.getRules());
+            team.addPlayer(zappedPlayer);
+            game.getFieldModel().sendPosition(player);
+        }
+    }
+
+    /** 1:1 copy of ClientCommandHandlerUnzapPlayer.handleNetCommand. */
+    static void handleUnzapPlayer(Game game, com.fumbbl.ffb.net.commands.ServerCommandUnzapPlayer command) {
+        Team team = game.getTeamById(command.getTeamId());
+        Player<?> player = team.getPlayerById(command.getPlayerId());
+        if (player instanceof com.fumbbl.ffb.model.ZappedPlayer) {
+            com.fumbbl.ffb.model.ZappedPlayer zappedPlayer = (com.fumbbl.ffb.model.ZappedPlayer) player;
+            com.fumbbl.ffb.model.RosterPlayer rosterPlayer = zappedPlayer.getOriginalPlayer();
+            team.addPlayer(rosterPlayer);
+            game.getFieldModel().sendPosition(rosterPlayer);
+        }
+    }
+
     // ── File parsing ──────────────────────────────────────────────────────────
 
     static int parseFile(File file, HeadlessFantasyFootballServer server, BufferedWriter writer)
             throws IOException {
 
+        // Every replay's records must depend on that replay alone, not on which files the run
+        // parsed before it (the MDE scorers draw from this RNG).
+        RNG.setSeed(0);
         byte[] raw = Files.readAllBytes(file.toPath());
         JsonObject root = UtilJson.gunzip(raw).asObject();
 
@@ -362,9 +699,34 @@ public class FumbblReplayParser {
 
         // ─────────────────────────────────────────────────────────────────────
 
+        for (int i = 0; i < startIdx - 1; i++) {
+            // Anything ahead of the serverGameState is never replayed; it must not exist.
+            CUR.unhandledCommands.merge("before-game-state:" + commandArray.get(i).asObject().getString("netCommandId", ""), 1, Integer::sum);
+        }
         for (int i = startIdx; i < commandArray.size(); i++) {
             JsonObject cmdObj = commandArray.get(i).asObject();
-            if (!"serverModelSync".equals(cmdObj.getString("netCommandId", ""))) continue;
+            String netCommandId = cmdObj.getString("netCommandId", "");
+            if (!"serverModelSync".equals(netCommandId)) {
+                // The replay client (ClientReplayer.replayTo) hands EVERY replayable command to its
+                // handler; these three change the Game (stars/mercs/raised players arrive this way).
+                switch (netCommandId) {
+                    case "serverAddPlayer":
+                        handleAddPlayer(game, (com.fumbbl.ffb.net.commands.ServerCommandAddPlayer)
+                            factory.forJsonValue(game.getRules(), commandArray.get(i)));
+                        break;
+                    case "serverZapPlayer":
+                        handleZapPlayer(game, (com.fumbbl.ffb.net.commands.ServerCommandZapPlayer)
+                            factory.forJsonValue(game.getRules(), commandArray.get(i)));
+                        break;
+                    case "serverUnzapPlayer":
+                        handleUnzapPlayer(game, (com.fumbbl.ffb.net.commands.ServerCommandUnzapPlayer)
+                            factory.forJsonValue(game.getRules(), commandArray.get(i)));
+                        break;
+                    default:
+                        CUR.unhandledCommands.merge(netCommandId, 1, Integer::sum);
+                }
+                continue;
+            }
 
             // A newer FUMBBL server emits model changes this engine does not know (e.g. bb2025
             // actingPlayerSetInitialAdjacentPartnerIds on EVERY activation). One unknown entry
@@ -375,16 +737,27 @@ public class FumbblReplayParser {
                 JsonArray kept = new JsonArray();
                 for (JsonValue mc : mcl.asObject().get("modelChangeArray").asArray()) {
                     String id = mc.isObject() ? mc.asObject().getString("modelChangeId", "") : "";
-                    if (KNOWN_MODEL_CHANGES.contains(id)) kept.add(mc);
-                    else UNKNOWN_MODEL_CHANGES.merge(id, 1, Integer::sum);
+                    if (!KNOWN_MODEL_CHANGES.contains(id)) {
+                        countUnknown(id);
+                    } else if (!dropUnknownValues(game, mc.asObject())) {
+                        kept.add(mc);
+                    }
                 }
                 mcl.asObject().set("modelChangeArray", kept);
             }
             ServerCommandModelSync syncCmd;
             try {
                 syncCmd = (ServerCommandModelSync) factory.forJsonValue(game.getRules(), commandArray.get(i));
-            } catch (Exception e) { SYNC_FAILURES[0]++; continue; }
-            if (syncCmd == null) { SYNC_FAILURES[0]++; continue; }
+            } catch (Exception e) {
+                SYNC_FAILURES[0]++;
+                if (CUR.skippedSyncs++ == 0) System.err.println("  " + file.getName() + " sync " + i + " unparsable: " + e);
+                continue;
+            }
+            if (syncCmd == null) {
+                SYNC_FAILURES[0]++;
+                if (CUR.skippedSyncs++ == 0) System.err.println("  " + file.getName() + " sync " + i + " decoded to null");
+                continue;
+            }
             SYNC_FAILURES[1]++;
 
             IReport[] reports = syncCmd.getReportList().getReports();
@@ -400,7 +773,7 @@ public class FumbblReplayParser {
                     try {
                         JsonObject rec = buildReRollRecord(rrPlayerId, rrActionName, rrMinRoll, rrIsFumble, rrState, 1);
                         if (rec != null) { writer.write(rec.toString()); writer.newLine(); recordCount++; }
-                    } catch (Exception ignored) {}
+                    } catch (Exception e) { recordError("RE_ROLL_DECLINE", e); }
                     rrState = null; rrPlayerId = null;
                 }
             }
@@ -417,7 +790,7 @@ public class FumbblReplayParser {
                         try {
                             JsonObject rec = buildUseApothecaryRecord(apoPlayerId, apoOldStateBase, apoOldSI, apoDeclineState, 1);
                             if (rec != null) { writer.write(rec.toString()); writer.newLine(); recordCount++; }
-                        } catch (Exception ignored) {}
+                        } catch (Exception e) { recordError("USE_APOTHECARY_DECLINE", e); }
                         apoPlayerId = null; apoDeclineState = null;
                     }
                 }
@@ -754,17 +1127,12 @@ public class FumbblReplayParser {
                     }
                 } catch (Exception e) {
                     // Previously swallowed silently; count per report kind, show the first of each.
-                    String k = String.valueOf(report.getId());
-                    if (REPORT_ERRORS.merge(k, 1, Integer::sum) == 1) {
-                        System.err.println("  first error on report " + k + ": " + e);
-                        StackTraceElement[] st = e.getStackTrace();
-                        for (int s = 0; s < Math.min(6, st.length); s++) System.err.println("      at " + st[s]);
-                    }
+                    recordError(String.valueOf(report.getId()), e);
                 }
 
                 if (rec != null) {
                     try { writer.write(rec.toString()); writer.newLine(); recordCount++; }
-                    catch (Exception ignored) {}
+                    catch (Exception e) { recordError("WRITE", e); }
                 }
 
                 // ── Post-switch: detect RE_ROLL opportunity from failed skill rolls ──
@@ -801,7 +1169,7 @@ public class FumbblReplayParser {
                                 rrState      = GameStateSerializer.serialize(game);
                             }
                         }
-                    } catch (Exception ignored) {}
+                    } catch (Exception e) { recordError("RE_ROLL_OFFER", e); }
                 }
 
                 // ── Post-switch: detect USE_CHAINSAW decline (block happens without chainsaw) ──
@@ -811,7 +1179,7 @@ public class FumbblReplayParser {
                         JsonObject rec2 = buildDialogRecordWithState("USE_CHAINSAW", 1,
                             new JsonObject(), pendingChainsawState);
                         if (rec2 != null) { writer.write(rec2.toString()); writer.newLine(); recordCount++; }
-                    } catch (Exception ignored) {}
+                    } catch (Exception e) { recordError("USE_CHAINSAW_DECLINE", e); }
                     pendingChainsaw = false; pendingChainsawState = null;
                 }
 
@@ -825,8 +1193,28 @@ public class FumbblReplayParser {
 
             // ── APPLY MODEL CHANGES ────────────────────────────────────────────
             try {
-                syncCmd.getModelChanges().applyTo(game, Collections.emptySet());
-            } catch (Exception ignored) {}
+                // ClientCommandHandlerModelSync in a REPLAY-mode client ignores player markers.
+                syncCmd.getModelChanges().applyTo(game, IGNORE_PLAYER_MARKER);
+                // ClientReplayer.replayTo: a sync that opens the coin choice resets both inducement sets.
+                if (java.util.Arrays.stream(syncCmd.getModelChanges().getChanges())
+                    .anyMatch(change -> change.getChangeId() == com.fumbbl.ffb.model.change.ModelChangeId.GAME_SET_DIALOG_PARAMETER
+                        && change.getValue() instanceof com.fumbbl.ffb.dialog.DialogCoinChoiceParameter)) {
+                    resetInducements(game.getTurnDataAway().getInducementSet());
+                    resetInducements(game.getTurnDataHome().getInducementSet());
+                }
+            } catch (Exception e) {
+                if (CUR.applyErrors++ == 0) CUR.firstApplyError = "sync " + i + ": " + e;
+            }
+            CUR.appliedSyncs++;
+            // §O state line: the full Game JSON after this sync, keys sorted, hashed.
+            String canonical = canonicalGameJson(game);
+            CUR.states.append(i).append(' ')
+                .append(sha256Hex(canonical.getBytes(StandardCharsets.UTF_8))).append('\n');
+            // Debug: FFB_REPLAY_STATE_DUMP=<dir> writes the canonical JSON of the first
+            // FFB_REPLAY_STATE_DUMP_MAX (default 3) applied syncs as <dir>/<replay>.<index>.json.
+            if (STATE_DUMP_DIR != null && CUR.appliedSyncs <= STATE_DUMP_MAX) {
+                writeText(new File(STATE_DUMP_DIR, file.getName().replaceFirst("\\.ffbr$", "") + "." + i + ".json"), canonical);
+            }
 
             // ── POST-CHANGE PASS ───────────────────────────────────────────────
 
@@ -853,7 +1241,7 @@ public class FumbblReplayParser {
                             }
                         }
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception e) { recordError("FOLLOWUP_CHOICE", e); }
                 if (fuCheckSyncs <= 0 && fuAttackerId != null) {
                     fuAttackerId = null; fuState = null; // timeout
                 }
@@ -872,7 +1260,7 @@ public class FumbblReplayParser {
                         JsonObject rec = buildCoordTargetRecord("pass_target", passTarget, pendingPassState, false);
                         if (rec != null) { writer.write(rec.toString()); writer.newLine(); recordCount++; }
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception e) { recordError("PASS_TARGET", e); }
                 pendingPassState = null; pendingPassCoord = null;
             }
 
@@ -888,7 +1276,7 @@ public class FumbblReplayParser {
                             if (rec != null) { writer.write(rec.toString()); writer.newLine(); recordCount++; }
                         }
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception e) { recordError("PASS_BLOCK", e); }
                 pbPlayerId = null; pbState = null;
             }
 
@@ -898,7 +1286,7 @@ public class FumbblReplayParser {
                 try {
                     touchbackState   = GameStateSerializer.serialize(game);
                     touchbackPending = true;
-                } catch (Exception ignored) {}
+                } catch (Exception e) { recordError("TOUCHBACK_STATE", e); }
             } else if (touchbackPending && game.getTurnMode() != TurnMode.TOUCHBACK) {
                 // TurnMode left TOUCHBACK — ball carrier is now the chosen receiver
                 try {
@@ -911,7 +1299,7 @@ public class FumbblReplayParser {
                             if (rec != null) { writer.write(rec.toString()); writer.newLine(); recordCount++; }
                         }
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception e) { recordError("TOUCHBACK", e); }
                 touchbackPending = false; touchbackState = null;
             }
 
@@ -942,7 +1330,7 @@ public class FumbblReplayParser {
                             }
                         }
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception e) { recordError("MOVE_TARGET_SETUP", e); }
                 nextMovePlayerId = null;
                 nextMoveAction   = null;
             }
@@ -959,7 +1347,7 @@ public class FumbblReplayParser {
                 if (moveRec != null) {
                     writer.write(moveRec.toString()); writer.newLine(); recordCount++;
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) { recordError("MOVE_TARGET_FLUSH", e); }
         }
 
         // End-of-replay check: the start-of-game rebuild plus every applied model change must land
@@ -970,9 +1358,11 @@ public class FumbblReplayParser {
             endGame.getHalf(), endGame.getTurnDataHome().getTurnNr(), endGame.getTurnDataAway().getTurnNr()};
         LAST_END_SCORE[0] = want[0];
         LAST_END_SCORE[1] = want[1];
-        System.out.printf("  %s end check %s: replayed score %d-%d half %d turns %d/%d, replay end %d-%d half %d turns %d/%d%n",
-            file.getName(), java.util.Arrays.equals(got, want) ? "OK" : "MISMATCH",
+        boolean endOk = java.util.Arrays.equals(got, want);
+        String endText = String.format("replayed score %d-%d half %d turns %d/%d, replay end %d-%d half %d turns %d/%d",
             got[0], got[1], got[2], got[3], got[4], want[0], want[1], want[2], want[3], want[4]);
+        CUR.endCheck = endOk ? "OK" : "MISMATCH: " + endText;
+        System.out.printf("  %s end check %s: %s%n", file.getName(), endOk ? "OK" : "MISMATCH", endText);
 
         return recordCount;
     }
@@ -1045,7 +1435,7 @@ public class FumbblReplayParser {
         try {
             sel = MoveDecisionEngine.selectPlayer(game, myTeam, opponentTeam,
                 isHome, /*allowBlock=*/true, RNG, /*argmax=*/true);
-        } catch (Exception ignored) {}
+        } catch (Exception e) { recordError("PLAYER_SELECT_MDE", e); }
 
         // Try to find the chosen action in MDE candidates
         if (sel != null) {
@@ -1126,7 +1516,7 @@ public class FumbblReplayParser {
                     }
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) { recordError("BLOCK_CHOICE_TEAM", e); }
 
         JsonObject rec = new JsonObject();
         rec.add("type",       "dialog");
