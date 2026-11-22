@@ -9714,7 +9714,10 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 **Lesson:** a gate ending early on BOTH sides matches; count REPORTS and check game-end turn/half.
 
 
-## §M — 2026-11-17: SKILL COVERAGE TIER — the agents use every skill (in progress)
+## §M — 2026-11-17: SKILL COVERAGE TIER — the agents use every skill (🏁 COMPLETE 2026-11-22)
+
+**Milestone write-up: [`MILESTONE_SKILL_COVERAGE.md`](MILESTONE_SKILL_COVERAGE.md)**. cert9 green on one
+frozen exe+jar, 411/411 ruleset skills firing, `skill_parity_check.py` DONE (`78f317ab5`).
 
 > **Supervisor directive DONE (loop iteration 11, 2026-11-20 ~19:40):** full skill suite on HEAD
 > `42a4ac29c`, frozen `D:/ffb_star/bin/ffb-parity-sk7.exe` + `ffb-ai-sk7.jar` (fresh mvn package),
