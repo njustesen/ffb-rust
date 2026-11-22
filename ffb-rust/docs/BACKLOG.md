@@ -11307,7 +11307,50 @@ canonical JSON of (1) `gsCmd.getGame().toJsonValue()` after the drop rules and (
 per replay; then Rust `Game::init_from(serverGameState.game) -> to_json_value -> canonical` must
 equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
 
+### O2 log — iteration 4 (2026-11-22 ~22:00): run5 green, start-state oracle, first Rust class gated
+- **run5 = 2,224/2,224 complete** (frozen `ffb-ai-replay-o1.jar`, 1,140,873 action records, 0 skipped
+  syncs, 0 record errors, every end check OK). `D:/ffb_replay_parity/run5_java` IS the Java side of the
+  eventual manifest as long as the harness parser does not change.
+- **Start-state oracle (the verification gap of iteration 3, closed):** new harness main
+  `ReplayStartDump <out> [--full] <dir|file>...` (ffb-ai, reuses the parser's decode + drop rules +
+  `startOfGame` + `canonicalGameJson` verbatim) writes `start_hashes.txt` (`<id> <sha gs> <sha sog>`)
+  and with `--full` `<id>.gs.json` (decoded end-of-game Game) + `<id>.sog.json` (`startOfGame`).
+  Compiled privately (`D:/ffb_replay_parity/classes_start`, ahead of the frozen o1 jar on the cp --
+  the frozen jar is untouched). Whole corpus: **2,224 replays, 0 errors, 63 s** ->
+  `D:/ffb_replay_parity/start_all` (~300 MB). Re-run:
+  `java -cp "D:/ffb_replay_parity/classes_start;D:/ffb_replay_parity/bin/ffb-ai-replay-o1.jar" com.fumbbl.ffb.ai.simulation.ReplayStartDump D:/ffb_replay_parity/start_all --full <the 5 corpus dirs>`.
+- **Rust gate `ffb-replay start-check <java_dir> <subtree> <corpus dirs>`** (`replay/start_check.rs`):
+  the replay's raw `serverGameState.game[subtree]` -> the 1:1 Rust `init_from` -> `to_json_value` of
+  that model class -> canonical (same path) vs the Java dump's subtree. Lets O2(a) be gated class by
+  class before the whole `Game` exists; add a `load_subtree` arm per class.
+- **First class: `GameOptions` (`ffb-model/src/model/game_options.rs`)** -- `add_option` (incl. the
+  piling-on / foul-bonus mutual exclusion), `init_from` (unknown ids create no option, values
+  normalised by the typed option's `setValue`/`getValueAsString`, missing rulesVersion -> BB2016),
+  `to_json_value`; 2 unit tests. **start-check gameOptions: 2,224/2,224 identical** -- not vacuous:
+  the raw input carries newer-server ids (`timeoutAllowed`, `enableGettingEven`,
+  `inducementJosefBugmanMax`, `inducementsAllowUnderdogSpending`) that Java drops and Rust now drops
+  the same way. Null option values do not occur in the corpus (Rust returns Err if one ever does).
+- **Dependency order found for the rest:** `gameResult` needs `Team` (PlayerResult resolves its player
+  through the team; `TeamResult.toJsonValue` iterates `team.getPlayers()` creating default results
+  lazily), so Team/Roster/RosterPosition/Player come before it. Independent subtrees that can go
+  first: `actingPlayer` (skill names via the ruleset's SkillFactory, PlayerState int, PlayerAction
+  forName, `skillsGrantedBy` map), `turnData{Home,Away}` (+ InducementSet, needs the rules for
+  inducement types/cards/prayers), the Game scalars.
+
 ### RESUME HERE
+**This iteration (2026-11-22 ~22:00, loop iteration 4):** see "O2 log — iteration 4": run5 2,224/2,224
+(Java side done), start-state oracle `D:/ffb_replay_parity/start_all` for all 2,224, `start-check`
+gate, `GameOptions` 2,224/2,224. Nothing running; no `.loop_wait.json` needed.
+**Next:** O2(a) class by class, each = 1:1 port from the .java + unit tests + a `load_subtree` arm +
+`start-check <subtree>` 2,224/2,224: (1) `actingPlayer`; (2) `turnDataHome`/`turnDataAway` with
+InducementSet (apply the parser's `dropUnknownInducements` to the raw JSON first -- port it into
+start_check/the loader exactly, keys `inducementArray=`/`prayers=`); (3) `teamHome`/`teamAway`
+(Roster, RosterPosition, RosterPlayer/Player; unknown skills silently omitted, unknown keywords ->
+Unknown -- see the exact drop rule in iteration 2); (4) `gameResult`; (5) `fieldModel`; (6)
+`dialogParameter` (the corpus's dialog classes); (7) the whole `Game` (scalars + all of the above) ->
+compare the full gs.json sha; then `startOfGame` vs `<id>.sog.json`. After O2(a): ModelChangeProcessor.
+
+> History -- RESUME HERE of 2026-11-22 ~21:05, superseded (run5 finished 2,224/2,224):
 **This iteration (2026-11-22 ~21:05):** O2 foundation landed (see "O2 log — iteration 3"): Rust
 `ffb-replay` reads the whole corpus and writes the canonical state text byte-identical to Java
 (400/400 dumps). **Running:** Java run5 below, ~1,850/2,224 at 21:05, 0 incomplete so far, ~6.8

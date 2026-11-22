@@ -6,9 +6,14 @@
 //!   canon-check <dump_dir> <states>    re-canonicalise the harness's FFB_REPLAY_STATE_DUMP files
 //!                                      (after scrambling every unordered array) and compare the
 //!                                      bytes and the sha256 with the Java `.states` lines
+//!   start-check <java_dir> <subtree> <dir|file>...
+//!                                      Rust init_from -> to_json_value of one Game subtree of every
+//!                                      replay's serverGameState vs the Java `ReplayStartDump`
+//!                                      `<id>.gs.json` (see start_check.rs)
 
 mod canonical;
 mod ffbr;
+mod start_check;
 
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -17,6 +22,7 @@ use std::path::{Path, PathBuf};
 fn usage() -> ! {
     eprintln!("usage: ffb-replay scan <dir|file>...");
     eprintln!("       ffb-replay canon-check <dump_dir> <states_file>");
+    eprintln!("       ffb-replay start-check <java_dir> <subtree> <dir|file>...");
     std::process::exit(2);
 }
 
@@ -26,6 +32,11 @@ fn main() {
     let code = match cmd.as_str() {
         "scan" if args.len() >= 2 => scan(&args[1..].iter().map(PathBuf::from).collect::<Vec<_>>()),
         "canon-check" if args.len() == 3 => canon_check(Path::new(&args[1]), Path::new(&args[2])),
+        "start-check" if args.len() >= 4 => start_check::start_check(
+            Path::new(&args[1]),
+            &args[2],
+            &args[3..].iter().map(PathBuf::from).collect::<Vec<_>>(),
+        ),
         _ => usage(),
     };
     std::process::exit(code);

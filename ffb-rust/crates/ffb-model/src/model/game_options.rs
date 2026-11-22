@@ -59,6 +59,85 @@ impl GameOptions {
         }
         option
     }
+
+    /// Java: `GameOptions.addOption(IGameOption pOption)` -- store the option, then switch off
+    /// the option it is mutually exclusive with (piling on armour/injury only, foul bonus
+    /// in/outside a tacklezone). This struct stores each option as its `getValueAsString()`.
+    pub fn add_option(&mut self, option: Option<Box<dyn IGameOption>>) {
+        let Some(option) = option else { return };
+        self.add_option_internal(option.as_ref());
+        let exclusive = match GameOptionEnum::for_name(option.get_id()) {
+            Some(GameOptionEnum::PILING_ON_ARMOR_ONLY) => Some(GameOptionEnum::PILING_ON_INJURY_ONLY),
+            Some(GameOptionEnum::PILING_ON_INJURY_ONLY) => Some(GameOptionEnum::PILING_ON_ARMOR_ONLY),
+            Some(GameOptionEnum::FOUL_BONUS) => Some(GameOptionEnum::FOUL_BONUS_OUTSIDE_TACKLEZONE),
+            Some(GameOptionEnum::FOUL_BONUS_OUTSIDE_TACKLEZONE) => Some(GameOptionEnum::FOUL_BONUS),
+            _ => None,
+        };
+        // ((GameOptionBoolean) pOption).isEnabled()
+        if let Some(other_id) = exclusive {
+            if option.get_value_as_string() == "true" {
+                let mut other = self.get_option_with_default(other_id);
+                if other.get_value_as_string() == "true" {
+                    other.set_value("false");
+                    self.add_option_internal(other.as_ref());
+                }
+            }
+        }
+    }
+
+    /// Java: `addOptionInternal` -- `fOptionById.put(pOption.getId(), pOption)` (the model-change
+    /// notification has no observer on this side).
+    fn add_option_internal(&mut self, option: &dyn IGameOption) {
+        self.options.insert(option.get_id().to_string(), option.get_value_as_string());
+    }
+
+    /// Java: `GameOptions.toJsonValue()` -- `{"gameOptionArray":[{"gameOptionId","gameOptionValue"}...]}`
+    /// (`GameOptionAbstract.toJsonValue`). Java iterates a HashMap, so the array order is not
+    /// model state; this one is sorted by id.
+    pub fn to_json_value(&self) -> serde_json::Value {
+        let mut keys: Vec<&String> = self.options.keys().collect();
+        keys.sort();
+        let option_array: Vec<serde_json::Value> = keys
+            .into_iter()
+            .map(|k| serde_json::json!({ "gameOptionId": k, "gameOptionValue": self.options[k] }))
+            .collect();
+        serde_json::json!({ "gameOptionArray": option_array })
+    }
+
+    /// Java: `GameOptions.initFrom(IFactorySource, JsonValue)` + `GameOptionFactory.fromJsonValue`:
+    /// an id this engine does not know creates no option (`createGameOption(null)` = null, and
+    /// `addOption(null)` is a no-op); a missing `rulesVersion` becomes BB2016.
+    /// `Err` where Java would throw.
+    pub fn init_from(&mut self, json: &serde_json::Value) -> Result<(), String> {
+        let option_array = json
+            .get("gameOptionArray")
+            .and_then(|v| v.as_array())
+            .ok_or("GameOptions.initFrom: gameOptionArray missing")?;
+        let factory = GameOptionFactory::new();
+        for element in option_array {
+            let id = element.get("gameOptionId").and_then(|v| v.as_str()).and_then(GameOptionEnum::for_name);
+            let Some(id) = id else { continue };
+            let mut option = factory.create_game_option(id);
+            if let Some(opt) = option.as_mut() {
+                match element.get("gameOptionValue") {
+                    Some(serde_json::Value::String(s)) => opt.set_value(s),
+                    None | Some(serde_json::Value::Null) => {
+                        return Err(format!("GameOptions.initFrom: null value for {} (not supported)", id.get_name()))
+                    }
+                    Some(other) => return Err(format!("GameOptions.initFrom: non-string value {other}")),
+                }
+            }
+            self.add_option(option);
+        }
+        if !self.options.contains_key(GameOptionEnum::RULESVERSION.get_name()) {
+            let mut rules = factory.create_game_option(GameOptionEnum::RULESVERSION);
+            if let Some(r) = rules.as_mut() {
+                r.set_value("BB2016");
+            }
+            self.add_option(rules);
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -130,6 +209,40 @@ mod tests {
         let mut opts = GameOptions::new();
         opts.set("extraTime", "false");
         assert!(!opts.is_enabled("extraTime"));
+    }
+
+    #[test]
+    fn init_from_normalises_values_drops_unknown_ids_and_defaults_rules_version() {
+        // Java: GameOptionBoolean.setValue("1") -> true, GameOptionInt "007" -> 7, an unknown id
+        // creates no option, no rulesVersion -> BB2016.
+        let json = serde_json::json!({ "gameOptionArray": [
+            { "gameOptionId": "testMode", "gameOptionValue": "1" },
+            { "gameOptionId": "turntime", "gameOptionValue": "007" },
+            { "gameOptionId": "someNewerServerOption", "gameOptionValue": "x" },
+        ]});
+        let mut opts = GameOptions::new();
+        opts.init_from(&json).unwrap();
+        assert_eq!(opts.get("testMode"), Some("true"));
+        assert_eq!(opts.get("turntime"), Some("7"));
+        assert_eq!(opts.get("someNewerServerOption"), None);
+        assert_eq!(opts.get("rulesVersion"), Some("BB2016"));
+        let back = opts.to_json_value();
+        assert_eq!(back["gameOptionArray"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn add_option_switches_off_the_mutually_exclusive_option() {
+        // Java GameOptions.addOption: enabling foulBonus disables foulBonusOutsideTacklezone.
+        let json = serde_json::json!({ "gameOptionArray": [
+            { "gameOptionId": "foulBonusOutsideTacklezone", "gameOptionValue": "true" },
+            { "gameOptionId": "foulBonus", "gameOptionValue": "true" },
+            { "gameOptionId": "rulesVersion", "gameOptionValue": "BB2025" },
+        ]});
+        let mut opts = GameOptions::new();
+        opts.init_from(&json).unwrap();
+        assert_eq!(opts.get("foulBonus"), Some("true"));
+        assert_eq!(opts.get("foulBonusOutsideTacklezone"), Some("false"));
+        assert_eq!(opts.get("rulesVersion"), Some("BB2025"));
     }
 
     #[test]
