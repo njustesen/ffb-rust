@@ -11223,7 +11223,64 @@ all 2,224, serverAddPlayer in 546, serverZapPlayer/serverUnzapPlayer in 15, noth
 cover the 145 known ones (`python -I` one-liner over `modelChangeList.modelChangeArray[].modelChangeId`,
 re-run it rather than trusting this number).
 
+### O1 log — iteration 2 (2026-11-22 ~17:30): Java 2,224/2,224 on a frozen tool (run5 confirming)
+**run4 result** (`988d6780c` parser, whole corpus): **2,220/2,224 complete**, 1,138,902 action records,
+0 skipped syncs, 0 apply errors. The 4 incomplete (1963972 1965996 1966023 1966121) were ONE class:
+the newer-server inducement **`dwarfenWisdom`** (turn mode, player-choice mode, report
+`dwarfenWisdomRoll`, inducement type). Fixed in the harness (same rule 4 as before, dropped +
+reported), verified 4/4 complete, 0 record errors, end check OK:
+6. `DialogUseInducementParameter.inducementTypeArray` element unknown -> NPE in `toJsonValue` (state
+   hash). Unknown elements removed, key `inducementType=<name>`.
+7. Unknown REPORT id (`dwarfenWisdomRoll`) -> `ReportList.initFrom` NPE -> the WHOLE sync skipped
+   (model changes lost). `dropUnknownReports`: report removed, key `report=<id>`.
+8. `inducementSetAdd/RemoveInducement` with a type the game's rules do not know (`dwarfenWisdom`, and
+   `josefBugman` in bb2025 games) -> `InducementSet` keyed it by **null** (all unknown types collide on
+   that key; the harness serializer NPEd). Whole change dropped, key `inducementSetAddInducement=<name>`.
+9. The serverGameState's `turnData{Home,Away}.inducementSet` carries the same unknown types, and unknown
+   prayer names (`Blessing of Nuffle` -> null element -> NPE in `InducementSet.toJsonValue`, 66
+   replays; harmless today only because `startOfGame` rebuilds that set). `dropUnknownInducements`
+   strips them from the game JSON and decodes again (the known types depend on the game's rules);
+   keys `inducementArray=<name>`, `prayers=<name>`.
+
+**The drop rule, made exact (the Rust port must implement exactly this):** the harness drops +
+reports a newer-server value ONLY where the in-repo engine would THROW or would POISON a container
+(null map key / null set or list element that later NPEs). Every other unknown value is decoded the
+engine's own way and that IS the oracle the Rust loader must reproduce: scalar enums ->
+`forName` null (gameSetTurnMode `dwarfenWisdom`, playerChoiceMode `catch`, seriousInjury
+`Broken Shoulder (-ST)`, menuProperty), unknown dialog ids -> the whole dialog parameter null
+(`reRollModifierChoice`, 579 syncs), unknown keywords -> `Unknown`, unknown roster/player skills
+(`I'll Carry You`, `Dwarfen Grit`, `Consummate Professional`) silently left out of skillArray /
+skillValues / skillDisplayValues, unknown game options left out, unknown JSON fields
+(`initialAdjacentPartnerIds`, `cheeringFansBlockAssist`, `blitzingPlayerId`) ignored.
+
+**New diagnostic `ReplayRoundTripCensus`** (ffb-ai, harness): decodes every net command of every
+replay with the engine (after the parser's own drop rules) and re-encodes it; every leaf that does not
+survive is counted per `<command> <modelChangeId|reportId> <path> <kind>` with sample values + replay
+ids; hash-container arrays compare as multisets. Full-corpus output (before fixes 6-9):
+`D:/ffb_replay_parity/census_rt_all.txt` -- 61 signatures, the ONLY throwing ones were 6/7/9 above.
+This file is the Rust loader's checklist of decode edge cases. Run:
+`java -cp D:/ffb_replay_parity/bin/ffb-ai-replay-o1.jar com.fumbbl.ffb.ai.simulation.ReplayRoundTripCensus <out.txt> <dir|file>...` (~15 min corpus).
+
+**Frozen Java tool:** `D:/ffb_replay_parity/bin/ffb-ai-replay-o1.jar`, sha256 `91e01aa2b60afc5f...`
+= `D:/ffb_replays/ffb-ai-replay.jar` (in-repo jar build of 2026-11-21, no engine/harness change since
+except FumbblReplayParser) + `jar uf` of the parser + census classes compiled from the commit of this
+iteration. Rebuild recipe if the harness changes again: `javac -cp <base jar> -d <dir> <sources>`,
+copy the base jar, `jar uf <copy> -C <dir> com`, NEW file name (never overwrite a frozen jar).
+
 ### RESUME HERE
+**Running (detached, started 2026-11-22 17:28):** Java **run5** = the FROZEN tool
+`D:/ffb_replay_parity/bin/ffb-ai-replay-o1.jar` (no classes dir) over the whole corpus ->
+`D:/ffb_replay_parity/run5_java`, log `run5_java.log/.err`, java PID 5704, ~2.2 h.
+`.loop_wait.json` holds the PID. Read it with
+`python -I scripts/replay_java_summary.py D:/ffb_replay_parity/run5_java`.
+Expected: 2,224/2,224 complete (run4 was 2,220 + the 4 fixed above). If so, run5 is the Java side of
+the eventual manifest (as long as the harness does not change again).
+**Next:** (1) confirm run5 2,224/2,224; anything else incomplete = classify + harness fix, new
+frozen jar name, re-run; (2) start O2(a) in Rust: Java-JSON Game loader + canonical writer (rules
+in the O1 log), the drop rules 4/6-9 + the exact rule above, round-trip test on every replay's
+serverGameState against `FFB_REPLAY_STATE_DUMP` dumps, then startOfGame, then ModelChangeProcessor.
+
+> History -- RESUME HERE of 2026-11-22 ~12:45, superseded (run4 finished: 2,220/2,224, see iteration 2):
 **Running (detached, started 2026-11-22 ~12:45):** Java run4 = the committed `988d6780c` parser
 (classes snapshot `D:/ffb_replay_parity/run4_classes` ahead of `D:/ffb_replays/ffb-ai-replay.jar`,
 which is byte-identical to the in-repo `ffb-ai-jar-with-dependencies.jar`, sha 760a7457...; no engine

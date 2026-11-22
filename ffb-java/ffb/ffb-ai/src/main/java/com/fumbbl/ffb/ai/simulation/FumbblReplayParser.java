@@ -554,10 +554,38 @@ public class FumbblReplayParser {
                     return true;
                 }
                 return false;
+            case "inducementSetAddInducement":
+            case "inducementSetRemoveInducement":
+                // An inducement type this ruleset has no constant for decodes to a null map key in
+                // InducementSet (every unknown type collides on it) and NPEs wherever the set is read.
+                if (value != null && value.isObject()) {
+                    String typeName = value.asObject().getString("inducementType", null);
+                    if (typeName != null && !knownInducementType(game, typeName)) {
+                        countUnknown(id + "=" + typeName);
+                        return true;
+                    }
+                }
+                return false;
             default:
                 break;
         }
         if (value != null && value.isObject()) {
+            // DialogUseInducementParameter: an inducement type this engine has no constant for
+            // decodes to null and NPEs in toJsonValue (dwarfenWisdom, 2026-11-22).
+            JsonValue types = value.asObject().get("inducementTypeArray");
+            if (types != null && types.isArray()) {
+                JsonArray keptTypes = new JsonArray();
+                boolean changed = false;
+                for (JsonValue t : types.asArray()) {
+                    if (t.isString() && !knownInducementType(game, t.asString())) {
+                        countUnknown("inducementType=" + t.asString());
+                        changed = true;
+                    } else {
+                        keptTypes.add(t);
+                    }
+                }
+                if (changed) value.asObject().set("inducementTypeArray", keptTypes);
+            }
             JsonValue props = value.asObject().get("reRollProperties");
             if (props != null && props.isArray()) {
                 com.fumbbl.ffb.factory.ReRollPropertyFactory rrp = new com.fumbbl.ffb.factory.ReRollPropertyFactory();
@@ -575,6 +603,93 @@ public class FumbblReplayParser {
             }
         }
         return false;
+    }
+
+    static boolean knownInducementType(Game game, String name) {
+        com.fumbbl.ffb.factory.InducementTypeFactory itf =
+            game.getFactory(com.fumbbl.ffb.FactoryType.Factory.INDUCEMENT_TYPE);
+        return itf.forName(name) != null;
+    }
+
+    /**
+     * The serverGameState's inducement sets can carry an inducement type this ruleset does not
+     * know (dwarfenWisdom); InducementSet.initFrom would key it by null. Same rule as the model
+     * changes: the entry is removed from the JSON and counted as "inducementArray=<name>"; an
+     * unknown prayer name likewise ("prayers=<name>").
+     * Returns true when something was removed (the caller then decodes the game again).
+     */
+    static boolean dropUnknownInducements(Game game, JsonObject gameJson) {
+        boolean changed = false;
+        for (String turnData : new String[]{"turnDataHome", "turnDataAway"}) {
+            JsonValue td = gameJson.get(turnData);
+            if (td == null || !td.isObject()) continue;
+            JsonValue set = td.asObject().get("inducementSet");
+            if (set == null || !set.isObject()) continue;
+            JsonValue arr = set.asObject().get("inducementArray");
+            if (arr == null || !arr.isArray()) continue;
+            JsonArray kept = new JsonArray();
+            boolean dropped = false;
+            for (JsonValue ind : arr.asArray()) {
+                String typeName = ind.isObject() ? ind.asObject().getString("inducementType", null) : null;
+                if (typeName != null && !knownInducementType(game, typeName)) {
+                    countUnknown("inducementArray=" + typeName);
+                    dropped = true;
+                } else {
+                    kept.add(ind);
+                }
+            }
+            if (dropped) {
+                set.asObject().set("inducementArray", kept);
+                changed = true;
+            }
+            // prayers: an unknown name becomes a null element of the prayer set and NPEs in
+            // InducementSet.toJsonValue (Blessing of Nuffle; same key as inducementSetAddPrayer)
+            JsonValue prayerArr = set.asObject().get("prayers");
+            com.fumbbl.ffb.factory.PrayerFactory prayers = game.getFactory(com.fumbbl.ffb.FactoryType.Factory.PRAYER);
+            if (prayerArr != null && prayerArr.isArray() && prayers != null) {
+                JsonArray keptPrayers = new JsonArray();
+                boolean droppedPrayer = false;
+                for (JsonValue p : prayerArr.asArray()) {
+                    if (p.isString() && prayers.forName(p.asString()) == null) {
+                        countUnknown("prayers=" + p.asString());
+                        droppedPrayer = true;
+                    } else {
+                        keptPrayers.add(p);
+                    }
+                }
+                if (droppedPrayer) {
+                    set.asObject().set("prayers", keptPrayers);
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * A report whose id this engine version does not know (a newer FUMBBL server, e.g.
+     * dwarfenWisdomRoll) makes ReportList.initFrom throw, and the WHOLE sync -- model changes
+     * included -- was skipped. Same rule as unknown model-change ids: the report is dropped and
+     * counted as "report=<id>". Reports never enter the Game state.
+     */
+    static void dropUnknownReports(JsonObject cmdObj) {
+        JsonValue rl = cmdObj.get("reportList");
+        if (rl == null || !rl.isObject()) return;
+        JsonValue reports = rl.asObject().get("reports");
+        if (reports == null || !reports.isArray()) return;
+        com.fumbbl.ffb.factory.ReportIdFactory ids = new com.fumbbl.ffb.factory.ReportIdFactory();
+        JsonArray kept = new JsonArray();
+        boolean changed = false;
+        for (JsonValue r : reports.asArray()) {
+            String rid = r.isObject() ? r.asObject().getString("reportId", null) : null;
+            if (rid != null && ids.forName(rid) == null) {
+                countUnknown("report=" + rid);
+                changed = true;
+            } else {
+                kept.add(r);
+            }
+        }
+        if (changed) rl.asObject().set("reports", kept);
     }
 
     /** ClientCommandHandlerModelSync.IGNORE_PLAYER_MARKER (used whenever the client is not a PLAYER). */
@@ -660,6 +775,12 @@ public class FumbblReplayParser {
             if ("serverGameState".equals(cmdObj.getString("netCommandId", ""))) {
                 ServerCommandGameState gsCmd =
                     (ServerCommandGameState) factory.forJsonValue(server, commandArray.get(i));
+                // The inducement types a game knows depend on its rules, so decode once, strip
+                // the unknown ones from the JSON, and decode again.
+                if (gsCmd != null && gsCmd.getGame() != null && cmdObj.get("game") != null
+                    && dropUnknownInducements(gsCmd.getGame(), cmdObj.get("game").asObject())) {
+                    gsCmd = (ServerCommandGameState) factory.forJsonValue(server, commandArray.get(i));
+                }
                 if (gsCmd != null) {
                     game = gsCmd.getGame();
                     startIdx = i + 1;
@@ -786,6 +907,7 @@ public class FumbblReplayParser {
                 }
                 mcl.asObject().set("modelChangeArray", kept);
             }
+            dropUnknownReports(cmdObj);
             ServerCommandModelSync syncCmd;
             try {
                 syncCmd = (ServerCommandModelSync) factory.forJsonValue(game.getRules(), commandArray.get(i));
