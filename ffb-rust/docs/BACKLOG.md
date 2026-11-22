@@ -9751,7 +9751,20 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > Not fixed (dead file, not dispatched): `step/bb2020/ttm/step_init_scatter_player.rs:152` has the
 > same un-Java `apply_to` on the hit-player branch.
 >
-> **RESUME HERE -- UPDATED 2026-11-22 07:10 (loop iteration 2 of 11-22), read this first (supersedes everything below).**
+> **RESUME HERE -- UPDATED 2026-11-22 07:22 (loop iteration 3 of 11-22), read this first (supersedes everything below).**
+> Supervisor directive of 07:15 carried out and removed: the user lifted the 21:00-07:00 window
+> until **Mon 2026-11-23 08:00** (0x7FF mask + 4 workers kept). **RUNNING: cert9 window 2, driver
+> PID 9000** = `final_cert.ps1 -name cert9 -skipLedger -anytime` (child cert_chain PID 3044,
+> `-anytime`), started 07:18:59 by the supervisor (old driver 27272 killed). Verified 07:21: both
+> PIDs alive; `D:/ffb_star/cert9.chain.log` shows mirror skipped (all 330 judged) and cross w1-w4
+> started 07:21; tally already grew cross 2626 -> 2638, 0 red. `.loop_wait.json` = PID 9000 until
+> 2026-11-23T08:00. **Do NOT launch another cert9 chain while 9000 lives.**
+> **The session that wakes then:** `python -I scripts/cert_tally.py cert9` (run from ffb-rust/ffb-rust).
+> All four GREEN -> write `docs/cert_manifest.json` (exe/jar/ledger/suite globs in the 01:25 block
+> below), commit, push. Not finished and no red -> relaunch the same form (`-anytime` allowed only
+> until Mon 08:00; after that drop it, it sleeps to 21:00). Any red -> fix 1:1 -> new freeze -> new cert.
+>
+> **History -- RESUME HERE of 2026-11-22 07:10 (loop iteration 2 of 11-22), superseded:**
 > **cert9 window 1 (01:21-07:01) result:** skill ledger done (`D:/ffb_ledger/cert9`; checker reads
 > it: **411/411 firing, missing 0**, only TODO = the manifest); **mirror 330/330 green** (steps +
 > reports, all 6 workers); **cross 2626/4012 judged, 0 red** (w1-4 stopped at 07:00, w5/w6 not
