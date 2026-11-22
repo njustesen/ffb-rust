@@ -11405,21 +11405,60 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
   so the agents never reach two prayers in one game. Fix = compare `name()` (enum) -- needs a gate run;
   queue it (it will also matter when the replay loader applies `inducementSetAddPrayer`).
 
+### O2 log — iteration 7 (2026-11-23 ~00:45): Team / Roster / RosterPosition / RosterPlayer gated
+- **Ported 1:1** (`init_from(rules, json)` / `to_json_value(rules)`): `RosterPosition`, `Roster`,
+  `Player` (= `Player.getFrom` + `RosterPlayer.initFrom/toJsonValue`), `Team` (+ `updateRoster(roster,
+  false)` = `update_roster_json` / `Player::update_position_json`). Unit tests
+  `team::tests::json_team_*` (expectations read off the .java files), `serious_injury_factory`
+  `name_of_kind_in_inverts_for_name_in_per_ruleset`, PlayerType/SkillCategory factory tests.
+- **Java semantics that the census + gate forced (keep them in mind for the model changes):**
+  `Team.updateRoster` sets the team's race to the ROSTER NAME; `fPlayerByNr` is a HashMap, so a
+  player sharing a nr REPLACES the earlier one; players' icon indexes advance in nr order
+  (`findNextIconSetIndex`) when `positionIconIndex < 0`; `RosterPlayer.fSkills` keeps a NULL in place
+  for an unknown skill (`I'll Carry You`, replay 1964629 -- `Player.unknown_skill_slots`), while
+  `RosterPosition` leaves unknown skills OUT (LinkedHashMap put, a duplicate keeps its place and takes
+  the last value); `skillValuesMap` drops unknown-skill (null) keys; lasting injuries keep a null for
+  an unknown name (`lasting_injuries: Vec<Option<SeriousInjuryKind>>`, per-ruleset
+  `serious_injury_factory::{values_in, for_name_in, name_of_kind_in}`); position `playerGender` is
+  null on 21,152 corpus positions (`RosterPosition.gender_null`); `playerStatus` absent on 616 players
+  (`Player.player_status_null`, written only when non-null); `SpecialRule.valueOf` throws on an unknown
+  rule (Rust `Err`); temporary maps keep sources with EMPTY sets; `TemporaryStatModifierFactory`
+  (`<STAT>-<class>`, only TemporaryStat{In,De}crementer exist) ported -- the modifiers also fill the
+  engine's `temporary_stat_mods` with the edition limit; skill properties sets must still be empty
+  (`Err` otherwise -- none in the start states).
+- **Engine-side changes (no behaviour change for engine games):** `PlayerTypeFactory.for_name` and
+  `SkillCategoryFactory.for_name` are now Java-exact (`equalsIgnoreCase`, "Normal" alias, MUTATION's alt
+  name); `SpecialRule::value_of`. New Java-only fields on Team (`roster`, `base_icon_path`,
+  `logo_url`), Roster (7), RosterPosition (7), Player (12), all `#[serde(default,
+  skip_serializing_if)]` so engine serialisation is byte-identical; the ~500 `Team {..}` literals got
+  the three `None`s mechanically, Player/Roster/RosterPosition literals `..Default::default()`.
+  Engine caches filled at JSON load: Player position stats/keywords/flags, `stat_injuries`,
+  `temporary_skills(_sources)`, `temporary_stat_mods`, extra-skill values (player value, else position);
+  Team `vampire_lord`/`necromancer`.
+- **start-check: teamHome 2,224/2,224, teamAway 2,224/2,224** (gameOptions, actingPlayer,
+  turnDataHome/Away re-run: still 2,224). Non-vacuous: 77,693 positions, 57,310 players, 1,738
+  non-empty temporary maps incl. Iron Man/Greasy Cleats/Dodgy Snack modifier sets, 4 null player skills,
+  381+ unknown-for-ruleset checks, 1,348 non-empty usedSkills. `cargo test --workspace` green.
+- Tools (outside git): `D:/ffb_replay_parity/tools/{team_census,team_nulls}.py` (censuses of the Java
+  team dumps), `cargo_errors.py` (cargo with errors only -- no shell pipes needed).
+
 ### RESUME HERE
-**This iteration (2026-11-22 ~23:45, loop iteration 6):** see "O2 log — iteration 6": turnData +
-InducementSet + per-ruleset inducement/prayer factories + the harness `dropUnknownInducements` port;
-`turnDataHome`/`turnDataAway` 2,224/2,224 (gameOptions, actingPlayer still 2,224). Nothing running;
-no `.loop_wait.json` needed.
+**This iteration (2026-11-23 ~00:45, loop iteration 6 of this run):** see "O2 log — iteration 7":
+Team/Roster/RosterPosition/RosterPlayer JSON; `teamHome`/`teamAway` 2,224/2,224 (all earlier subtrees
+still 2,224). Nothing running; no `.loop_wait.json` needed.
 **Next:** O2(a) class by class, each = 1:1 port from the .java + unit tests + a `load_subtree` arm +
 `start-check <subtree>` 2,224/2,224 (binary: `cargo build --release -p ffb-parity --bin ffb-replay`;
 run `target/release/ffb-replay.exe start-check D:/ffb_replay_parity/start_all <subtree>
 D:/ffb_replays/fumbbl D:/ffb_replays/partial D:/ffb_replays/window
 D:/ffb_replays/fumbbl_night_20261122 D:/ffb_replays/fumbbl_night_20261122/partial`):
-(1) ~~`actingPlayer`~~ DONE; (2) ~~`turnDataHome`/`turnDataAway`~~ DONE; (3) `teamHome`/`teamAway`
-(Roster, RosterPosition, RosterPlayer/Player; unknown skills silently omitted, unknown keywords ->
-Unknown -- see the exact drop rule in iteration 2); (4) `gameResult`; (5) `fieldModel`; (6)
-`dialogParameter` (the corpus's dialog classes); (7) the whole `Game` (scalars + all of the above) ->
-compare the full gs.json sha; then `startOfGame` vs `<id>.sog.json`. After O2(a): ModelChangeProcessor.
+(1) ~~`actingPlayer`~~ DONE; (2) ~~`turnDataHome`/`turnDataAway`~~ DONE; (3) ~~`teamHome`/`teamAway`~~
+DONE; (4) `gameResult` (needs both Teams: `PlayerResult` resolves its player through the team,
+`TeamResult.toJsonValue` creates default results lazily for every `team.getPlayers()`); (5)
+`fieldModel`; (6) `dialogParameter` (the corpus's dialog classes); (7) the whole `Game` (scalars + all
+of the above) -> compare the full gs.json sha; then `startOfGame` vs `<id>.sog.json`. After O2(a):
+ModelChangeProcessor. Open follow-ups: ZappedPlayer JSON (`Err` today; zap/unzap commands occur in 15
+replays), skill-property sets in `temporaryPropertiesMap` (`Err` if non-empty), the prayer-name finding
+above.
 
 > History -- RESUME HERE of 2026-11-22 ~21:05, superseded (run5 finished 2,224/2,224):
 **This iteration (2026-11-22 ~21:05):** O2 foundation landed (see "O2 log — iteration 3"): Rust

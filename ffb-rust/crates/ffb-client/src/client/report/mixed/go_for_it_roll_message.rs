@@ -83,7 +83,7 @@ mod tests {
             treasury: 0,
             special_rules: vec![],
             players: vec![Player { id: "p1".into(), name: "Grubber".into(), ..Default::default() }],
-            vampire_lord: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         }
     }

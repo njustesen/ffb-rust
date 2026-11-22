@@ -5,6 +5,10 @@ use crate::model::player::Player;
 use crate::model::roster::Roster;
 use crate::xml::{IXmlReadable, XmlAttributes};
 use crate::xml::util_xml::get_string_attribute;
+use crate::enums::Rules;
+use crate::model::special_rule::SpecialRule;
+use crate::util::java_json;
+use serde_json::Value;
 
 const XML_TAG: &str = "team";
 const XML_ATTRIBUTE_ID: &str = "id";
@@ -61,9 +65,32 @@ pub struct Team {
     /// Java: team.getRoster().hasNecromancer() — stored here to avoid roster lookup at mechanic time.
     #[serde(default)]
     pub necromancer: bool,
+
+    /// Java: `Team.fRoster` -- the roster the team JSON carries (BACKLOG §O replay state). The
+    /// engine's own games take their positions from the roster cache instead and leave it `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub roster: Option<Box<Roster>>,
+    /// Java: `Team.fBaseIconPath` (client cosmetics; carried for the Java JSON).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_icon_path: Option<String>,
+    /// Java: `Team.fLogoUrl`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logo_url: Option<String>,
 }
 
 impl Team {
+    /// Java: `new Team(IFactorySource)` -- an empty team (no players, no special rules).
+    pub fn new() -> Self {
+        Team {
+            id: String::new(), name: String::new(), race: String::new(), roster_id: String::new(),
+            coach: String::new(), rerolls: 0, apothecaries: 0, bribes: 0, master_chefs: 0,
+            prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0,
+            assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
+            special_rules: Vec::new(), players: Vec::new(), vampire_lord: false, necromancer: false,
+            roster: None, base_icon_path: None, logo_url: None,
+        }
+    }
+
     pub fn player(&self, id: &str) -> Option<&Player> {
         self.players.iter().find(|p| p.id == id)
     }
@@ -88,6 +115,120 @@ impl Team {
             let position = roster.position(&player.position_id);
             player.update_position(position);
         }
+    }
+
+    /// Java: `Team.addPlayer` into `fPlayerByNr` (a `HashMap`): a player whose nr is already
+    /// present REPLACES that player (`getPlayers()` -- and so the JSON -- only ever sees the last
+    /// one; Java's `fPlayerById` would still find the replaced one by id, Rust's lookups do not).
+    fn add_player_by_nr(&mut self, player: Player) {
+        match self.players.iter_mut().find(|p| p.nr == player.nr) {
+            Some(existing) => *existing = player,
+            None => self.players.push(player),
+        }
+    }
+
+    /// Java: `Team.initFrom(IFactorySource, JsonValue)` (BACKLOG §O replay JSON), on a freshly
+    /// constructed team. `Err` where Java throws (an unknown special rule: `SpecialRule.valueOf`)
+    /// or where the Rust struct cannot hold the Java value.
+    pub fn init_from(&mut self, rules: Rules, json_value: &Value) -> Result<(), String> {
+        let o = java_json::to_json_object(json_value)?;
+        self.id = java_json::get_string(o, "teamId")?.ok_or("Team: null teamId")?;
+        self.name = java_json::get_string(o, "teamName")?.ok_or("Team: null teamName")?;
+        self.coach = java_json::get_string(o, "coach")?.ok_or("Team: null coach")?;
+        self.race = java_json::get_string(o, "race")?.ok_or("Team: null race")?;
+        self.rerolls = java_json::get_int(o, "reRolls")?;
+        self.apothecaries = java_json::get_int(o, "apothecaries")?;
+        self.cheerleaders = java_json::get_int(o, "cheerleaders")?;
+        self.assistant_coaches = java_json::get_int(o, "assistantCoaches")?;
+        self.fan_factor = java_json::get_int(o, "fanFactor")?;
+        self.team_value = java_json::get_int(o, "teamValue")?;
+        self.treasury = java_json::get_int(o, "treasury")?;
+        self.base_icon_path = java_json::get_string(o, "baseIconPath")?;
+        self.logo_url = java_json::get_string(o, "logoUrl")?;
+        self.dedicated_fans = java_json::get_int(o, "dedicatedFans")?;
+        if let Some(rules_array) = java_json::get_string_array(o, "specialRules")? {
+            // ArrayTool.isProvided + filter(nonNull) + SpecialRule::valueOf (throws on unknown),
+            // into a Set.
+            for name in rules_array.into_iter().flatten() {
+                if SpecialRule::value_of(&name).is_none() {
+                    return Err(format!("Team: SpecialRule.valueOf({name:?}) throws"));
+                }
+                if !self.special_rules.contains(&name) {
+                    self.special_rules.push(name);
+                }
+            }
+        }
+
+        self.players.clear();
+        let player_array = java_json::get_array(o, "playerArray")?.ok_or("Team: playerArray is null (Java NPE)")?;
+        for element in player_array {
+            let mut player = Player::default();
+            player.init_from(rules, element)?;
+            self.add_player_by_nr(player);
+        }
+
+        let roster = match o.get("roster") {
+            Some(Value::Object(_)) => {
+                let mut roster = Roster::default();
+                roster.init_from(rules, &o["roster"])?;
+                Some(Box::new(roster))
+            }
+            None | Some(Value::Null) => None,
+            Some(other) => return Err(format!("Team roster: asObject on {other}")),
+        };
+        self.update_roster_json(roster);
+        Ok(())
+    }
+
+    /// Java: `Team.updateRoster(roster, updateStats = false, ..)`: keeps the roster, takes its id
+    /// and NAME as the team's roster id and race, and updates every player's position in
+    /// `getPlayers()` order (by nr -- the order the positions' icon counters advance in). Plus the
+    /// Rust-only roster caches the engine reads (`vampire_lord`, `necromancer`).
+    pub fn update_roster_json(&mut self, roster: Option<Box<Roster>>) {
+        self.roster = roster;
+        let Some(roster) = self.roster.as_mut() else { return };
+        self.roster_id = roster.id.clone();
+        self.race = roster.name.clone();
+        self.vampire_lord = roster.has_vampire_lord();
+        self.necromancer = roster.has_necromancer();
+        let mut order: Vec<usize> = (0..self.players.len()).collect();
+        order.sort_by_key(|&i| self.players[i].nr);
+        for i in order {
+            let position_id = self.players[i].position_id.clone();
+            self.players[i].update_position_json(roster.position_mut(&position_id));
+        }
+    }
+
+    /// Java: `Team.toJsonValue()` (BACKLOG §O). `playerArray` = `getPlayers()`, sorted by nr.
+    pub fn to_json_value(&self, rules: Rules) -> Result<Value, String> {
+        let s = |v: &Option<String>| java_json::string_or_null(v.as_deref());
+        let mut o = java_json::JsonObject::new();
+        o.insert("teamId".into(), Value::from(self.id.clone()));
+        o.insert("teamName".into(), Value::from(self.name.clone()));
+        o.insert("coach".into(), Value::from(self.coach.clone()));
+        o.insert("race".into(), Value::from(self.race.clone()));
+        o.insert("reRolls".into(), Value::from(self.rerolls));
+        o.insert("apothecaries".into(), Value::from(self.apothecaries));
+        o.insert("cheerleaders".into(), Value::from(self.cheerleaders));
+        o.insert("assistantCoaches".into(), Value::from(self.assistant_coaches));
+        o.insert("fanFactor".into(), Value::from(self.fan_factor));
+        o.insert("teamValue".into(), Value::from(self.team_value));
+        o.insert("treasury".into(), Value::from(self.treasury));
+        o.insert("baseIconPath".into(), s(&self.base_icon_path));
+        o.insert("logoUrl".into(), s(&self.logo_url));
+        o.insert("dedicatedFans".into(), Value::from(self.dedicated_fans));
+        o.insert(
+            "specialRules".into(),
+            Value::Array(self.special_rules.iter().map(|r| Value::from(r.clone())).collect()),
+        );
+        let mut players: Vec<&Player> = self.players.iter().collect();
+        players.sort_by_key(|p| p.nr);
+        let player_array = players.into_iter().map(|p| p.to_json_value(rules)).collect::<Result<Vec<_>, _>>()?;
+        o.insert("playerArray".into(), Value::Array(player_array));
+        if let Some(roster) = &self.roster {
+            o.insert("roster".into(), roster.to_json_value(rules)?);
+        }
+        Ok(Value::Object(o))
     }
 }
 
@@ -202,7 +343,7 @@ mod tests {
             treasury: 0,
             special_rules: vec![],
             players: vec![],
-            vampire_lord: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         }
     }
@@ -391,7 +532,7 @@ mod tests {
             prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
             cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
             team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
-            vampire_lord: false, necromancer: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None, necromancer: false,
         }
     }
 
@@ -447,7 +588,7 @@ mod tests {
             id: "amazon.lrb6".into(), name: "Amazon".into(), race: String::new(),
             reroll_cost: 50_000, max_rerolls: 8, positions: vec![blitzer_pos],
             special_rules: vec![], necromancer: false, keywords: vec![],
-            raised_position_id: None,
+            raised_position_id: None, ..Default::default()
         };
 
         team.update_roster(&roster);
@@ -457,5 +598,118 @@ mod tests {
         let blitzer = team.player("teamAmazonKalimar1").unwrap();
         assert_eq!(blitzer.movement, 6);
         assert_eq!(blitzer.armour, 7);
+    }
+
+    // ── Java JSON (BACKLOG §O): expectations read off Team/Roster/RosterPosition/RosterPlayer.java ──
+
+    fn json_position() -> serde_json::Value {
+        serde_json::json!({
+            "positionId": "p1", "positionName": "Lineman", "shorthand": "L", "displayName": null,
+            "playerType": "regular", "playerGender": null, "quantity": 16, "movement": 6,
+            "strength": 3, "agility": 3, "passing": 4, "armour": 9, "cost": 50000, "race": null,
+            "undead": false, "thrall": false, "teamWithPositionId": null, "nameGenerator": null,
+            "replacesPosition": "", "urlPortrait": null, "urlIconSet": "i/1.png", "nrOfIcons": 2,
+            "skillCategoriesNormal": ["General", "general"], "skillCategoriesDouble": ["mutations"],
+            "skillArray": ["Block", "I'll Carry You", "Mighty Blow", "Block"],
+            "skillValues": [null, "x", "1", "2"], "skillDisplayValues": ["B"],
+            "keywords": ["lineman", "No Such Keyword"]
+        })
+    }
+
+    fn json_player(nr: i32, name: &str) -> serde_json::Value {
+        serde_json::json!({
+            "playerKind": "rosterPlayer", "playerId": format!("id{nr}"), "playerNr": nr,
+            "positionId": "p1", "playerName": name, "playerGender": "female", "playerType": "Regular",
+            "movement": 6, "strength": 3, "agility": 3, "passing": 4, "armour": 9,
+            "lastingInjuries": ["Smashed Knee (-MA)", "Broken Shoulder (-ST)"],
+            "recoveringInjury": "Smashed Knee (-MA)",
+            "urlPortrait": null, "urlIconSet": null, "nrOfIcons": 0, "positionIconIndex": -1,
+            "skillArray": ["Dodge", "I'll Carry You", "Block"],
+            "temporarySkillsMap": { "Blessed Statue of Nuffle": ["Pro", "Mighty Blow_1"] },
+            "temporaryModifiersMap": { "Iron Man": ["AV-com.fumbbl.ffb.modifiers.TemporaryStatIncrementer"] },
+            "temporaryPropertiesMap": { "Iron Man": [] },
+            "skillValuesMap": { "Block": null, "I'll Carry You": "3" },
+            "skillDisplayValuesMap": {},
+            "usedSkills": ["Dodge"]
+        })
+    }
+
+    fn json_team() -> serde_json::Value {
+        serde_json::json!({
+            "teamId": "t1", "teamName": "T", "coach": "C", "race": "Raw Race", "reRolls": 3,
+            "apothecaries": 1, "cheerleaders": 0, "assistantCoaches": 0, "fanFactor": 0,
+            "teamValue": 1000000, "treasury": 0, "baseIconPath": null, "logoUrl": null,
+            "dedicatedFans": 2, "specialRules": ["SWARMING", "SWARMING", null],
+            "playerArray": [json_player(2, "first"), json_player(1, "one"), json_player(2, "second")],
+            "roster": {
+                "rosterId": "r1", "rosterName": "Roster Name", "reRollCost": 50000, "maxReRolls": 8,
+                "baseIconPath": null, "logoUrl": null, "raisedPositionId": null, "apothecary": true,
+                "necromancer": false, "undead": false, "riotousPositionId": null, "nameGenerator": null,
+                "maxBigGuys": 1, "positionArray": [json_position()], "keywords": ["Vampire Lord"]
+            }
+        })
+    }
+
+    #[test]
+    fn json_team_follows_the_java_decode() {
+        let rules = crate::enums::Rules::Bb2025;
+        let mut team = Team::new();
+        team.init_from(rules, &json_team()).unwrap();
+        // updateRoster: race = roster NAME, roster id taken over; roster caches filled.
+        assert_eq!(team.race, "Roster Name");
+        assert_eq!(team.roster_id, "r1");
+        assert!(team.vampire_lord);
+        // fPlayerByNr: the second nr-2 player replaced the first.
+        assert_eq!(team.players.len(), 2);
+        assert_eq!(team.player_by_nr(2).unwrap().name, "second");
+        // Set<SpecialRule>, null filtered.
+        assert_eq!(team.special_rules, vec!["SWARMING".to_string()]);
+        // Icon indexes: -1 -> findNextIconSetIndex, in nr order (nr 1 gets 0, nr 2 gets 1).
+        assert_eq!(team.player_by_nr(1).unwrap().icon_set_index, 0);
+        assert_eq!(team.player_by_nr(2).unwrap().icon_set_index, 1);
+
+        let out = team.to_json_value(rules).unwrap();
+        assert_eq!(out["race"], "Roster Name");
+        let players = out["playerArray"].as_array().unwrap();
+        assert_eq!(players.iter().map(|p| p["playerNr"].as_i64().unwrap()).collect::<Vec<_>>(), vec![1, 2]);
+        let p = &players[0];
+        // Unknown skill stays a null IN PLACE; unknown injury a null element.
+        assert_eq!(p["skillArray"], serde_json::json!(["Dodge", null, "Block"]));
+        assert_eq!(p["lastingInjuries"], serde_json::json!(["Smashed Knee (-MA)", null]));
+        assert_eq!(p["recoveringInjury"], "Smashed Knee (-MA)");
+        // A null key (unknown skill) is dropped from the values map; a null value is kept.
+        assert_eq!(p["skillValuesMap"], serde_json::json!({ "Block": null }));
+        assert_eq!(p["temporarySkillsMap"], serde_json::json!({ "Blessed Statue of Nuffle": ["Pro", "Mighty Blow_1"] }));
+        assert_eq!(p["temporaryPropertiesMap"], serde_json::json!({ "Iron Man": [] }));
+        assert!(p.get("playerStatus").is_none(), "a null playerStatus is not written");
+        assert_eq!(p["playerType"], "Regular");
+        // The temporary modifier reaches the engine's effective stats (AV 9 + 1).
+        assert_eq!(team.player_by_nr(1).unwrap().armour_with_modifiers(), 10);
+
+        let pos = &out["roster"]["positionArray"][0];
+        // LinkedHashMap: the duplicate Block keeps its place with the LAST value; the unknown
+        // skill is left out; display values only up to the array's length.
+        assert_eq!(pos["skillArray"], serde_json::json!(["Block", "Mighty Blow"]));
+        assert_eq!(pos["skillValues"], serde_json::json!(["2", "1"]));
+        assert_eq!(pos["skillDisplayValues"], serde_json::json!(["B", null]));
+        assert_eq!(pos["playerGender"], serde_json::Value::Null);
+        assert_eq!(pos["playerType"], "Regular");
+        assert_eq!(pos["skillCategoriesNormal"], serde_json::json!(["General"]));
+        assert_eq!(pos["skillCategoriesDouble"], serde_json::json!(["Mutation"]));
+        assert_eq!(pos["keywords"], serde_json::json!(["Lineman", "Unknown"]));
+    }
+
+    #[test]
+    fn json_team_errors_where_java_throws() {
+        let rules = crate::enums::Rules::Bb2025;
+        let mut bad_rule = json_team();
+        bad_rule["specialRules"] = serde_json::json!(["NOT_A_RULE"]);
+        assert!(Team::new().init_from(rules, &bad_rule).is_err(), "SpecialRule.valueOf throws");
+        let mut bad_modifier = json_team();
+        bad_modifier["playerArray"][0]["temporaryModifiersMap"] = serde_json::json!({ "x": ["AV-no.such.Class"] });
+        assert!(Team::new().init_from(rules, &bad_modifier).is_err(), "Class.forName throws");
+        let mut no_apo = json_team();
+        no_apo["roster"].as_object_mut().unwrap().remove("apothecary");
+        assert!(Team::new().init_from(rules, &no_apo).is_err(), "null Boolean unboxed");
     }
 }

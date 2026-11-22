@@ -193,7 +193,7 @@ mod tests {
             cheerleaders: 0, assistant_coaches: 0, fan_factor: 0,
             dedicated_fans: 0, team_value: 0, treasury: 0,
             special_rules: vec![], players: vec![],
-            vampire_lord: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         }
     }
@@ -267,7 +267,7 @@ mod tests {
             bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
             fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
             special_rules: vec![], players: vec![catcher.clone()],
-            vampire_lord: false, necromancer: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None, necromancer: false,
         };
         let away = Team {
             id: "away".into(), name: "away".into(), race: "Human".into(),
@@ -276,7 +276,7 @@ mod tests {
             bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
             fan_factor: 0, dedicated_fans: 0, team_value: 0, treasury: 0,
             special_rules: vec![], players: vec![opponent.clone()],
-            vampire_lord: false, necromancer: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None, necromancer: false,
         };
         let mut game = Game::new(home, away, Rules::Bb2025);
         game.field_model.weather = Weather::Nice;

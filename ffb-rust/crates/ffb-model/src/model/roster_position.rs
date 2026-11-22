@@ -2,7 +2,14 @@ use std::any::Any;
 use serde::{Deserialize, Serialize};
 use crate::enums::{Keyword, PlayerType, PlayerGender, SkillCategory};
 use crate::model::game::Game;
-use crate::model::skill_def::SkillWithValue;
+use crate::model::skill_def::{SkillId, SkillWithValue};
+use crate::enums::Rules;
+use crate::util::java_json::{self, JsonObject};
+use serde_json::Value;
+
+fn is_zero(v: &i32) -> bool {
+    *v == 0
+}
 use crate::xml::{IXmlReadable, XmlAttributes};
 use crate::xml::util_xml::{get_string_attribute, get_int_attribute};
 use crate::factory::skill_factory::SkillFactory;
@@ -86,6 +93,32 @@ pub struct RosterPosition {
     /// `UtilServerGame.checkForMissingPartners` (bb2020 Two for One).
     #[serde(default)]
     pub team_with_position_id: Option<String>,
+
+    /// Java: `RosterPosition.fUrlPortrait` (client cosmetics; carried for the Java JSON, BACKLOG §O).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url_portrait: Option<String>,
+    /// Java: `RosterPosition.fUrlIconSet`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url_icon_set: Option<String>,
+    /// Java: `RosterPosition.fNrOfIcons`.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub nr_of_icons: i32,
+    /// Java: `RosterPosition.fGender` is null (the JSON's `playerGender` null, absent or unknown --
+    /// 21,152 corpus positions); `gender` keeps its default for the engine and the JSON writes null.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub gender_null: bool,
+    /// Java: `RosterPosition.nameGenerator`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name_generator: Option<String>,
+    /// Java: `RosterPosition.displayValues` (`LinkedHashMap<Skill, String>`, keyed like
+    /// `fSkillValues` = `skills`): the NON-null entries only -- Java's `get` of an absent key and of
+    /// a key mapped to null both read null, the only way the map is ever read.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skill_display_values: Vec<(SkillId, String)>,
+    /// Java: `RosterPosition.fCurrentIconSetIndex` (transient; -1 from the Java constructor, set by
+    /// `init_from`), advanced by `find_next_icon_set_index`.
+    #[serde(skip)]
+    pub current_icon_set_index: i32,
 
     /// Java: `RosterPosition.fInsideSkillListTag` (transient) — true while inside `<skillList>`.
     #[serde(skip)]
@@ -255,6 +288,204 @@ impl RosterPosition {
         let target = kw.get_name().to_lowercase();
         self.keywords.iter().any(|k| k.to_lowercase() == target)
     }
+
+    /// Java: `RosterPosition.findNextIconSetIndex()`.
+    pub fn find_next_icon_set_index(&mut self) -> i32 {
+        if self.nr_of_icons > 0 {
+            self.current_icon_set_index += 1;
+            if self.current_icon_set_index >= self.nr_of_icons {
+                self.current_icon_set_index = 0;
+            }
+        }
+        self.current_icon_set_index
+    }
+
+    /// Java: `fSkillValues.put(skill, value)` on the `LinkedHashMap`: a present key keeps its
+    /// place and takes the new value.
+    fn put_skill_value(&mut self, skill_id: SkillId, value: Option<String>) {
+        match self.skills.iter_mut().find(|sw| sw.skill_id == skill_id) {
+            Some(sw) => sw.value = value,
+            None => self.skills.push(SkillWithValue { skill_id, value }),
+        }
+    }
+
+    /// Java: `displayValues.put(skill, value)` (only non-null values are stored, see the field).
+    fn put_display_value(&mut self, skill_id: SkillId, value: Option<String>) {
+        self.skill_display_values.retain(|(s, _)| *s != skill_id);
+        if let Some(v) = value {
+            self.skill_display_values.push((skill_id, v));
+        }
+    }
+
+    /// Java: `displayValues.get(skill)`.
+    pub fn display_value(&self, skill_id: SkillId) -> Option<&str> {
+        self.skill_display_values.iter().find(|(s, _)| *s == skill_id).map(|(_, v)| v.as_str())
+    }
+
+    /// Java: `RosterPosition.initFrom(IFactorySource, JsonValue)` (BACKLOG §O replay JSON), on a
+    /// freshly constructed position. `Err` where Java throws, and where the Rust struct cannot hold
+    /// the value Java would hold (a null id/name/type/gender, a null or unknown skill category).
+    pub fn init_from(&mut self, rules: Rules, json_value: &Value) -> Result<(), String> {
+        let o = java_json::to_json_object(json_value)?;
+        // Java constructor.
+        self.current_icon_set_index = -1;
+
+        self.id = java_json::get_string(o, "positionId")?.ok_or("RosterPosition: null positionId")?;
+        self.name = java_json::get_string(o, "positionName")?.ok_or("RosterPosition: null positionName")?;
+        self.shorthand = java_json::get_string(o, "shorthand")?;
+        self.display_name = java_json::get_string(o, "displayName")?;
+        self.player_type = PlayerTypeFactory::default()
+            .for_name(java_json::get_enum_name(o, "playerType")?.unwrap_or(""))
+            .ok_or("RosterPosition: null playerType")?;
+        let gender = PlayerGenderFactory::default().for_name(java_json::get_enum_name(o, "playerGender")?.unwrap_or(""));
+        self.gender = gender.unwrap_or_default();
+        self.gender_null = gender.is_none();
+        self.quantity = java_json::get_int(o, "quantity")?;
+        self.movement = java_json::get_int(o, "movement")?;
+        self.strength = java_json::get_int(o, "strength")?;
+        self.agility = java_json::get_int(o, "agility")?;
+        self.passing = java_json::get_int(o, "passing")?;
+        self.armour = java_json::get_int(o, "armour")?;
+        self.cost = java_json::get_int(o, "cost")?;
+        self.race = java_json::get_string(o, "race")?;
+        self.is_undead = java_json::get_boolean(o, "undead")?;
+        self.is_thrall = java_json::get_boolean(o, "thrall")?;
+        self.team_with_position_id = java_json::get_string(o, "teamWithPositionId")?;
+        self.name_generator = java_json::get_string(o, "nameGenerator")?;
+        self.replaces_position = java_json::get_string(o, "replacesPosition")?;
+
+        self.url_portrait = java_json::get_string(o, "urlPortrait")?;
+        self.url_icon_set = java_json::get_string(o, "urlIconSet")?;
+        self.nr_of_icons = java_json::get_int(o, "nrOfIcons")?;
+
+        self.skill_categories_normal = Self::skill_categories_from(o, "skillCategoriesNormal")?;
+        self.skill_categories_double = Self::skill_categories_from(o, "skillCategoriesDouble")?;
+
+        self.skills.clear();
+        self.skill_display_values.clear();
+        let skill_array = java_json::get_array(o, "skillArray")?;
+        let skill_values = java_json::get_string_array(o, "skillValues")?;
+        let display_values = java_json::get_string_array(o, "skillDisplayValues")?;
+        if let (Some(skill_array), Some(skill_values)) = (skill_array, skill_values.as_ref()) {
+            // Java: `ArrayTool.isProvided(skillValues)` = non-null and non-empty.
+            if !skill_array.is_empty() && !skill_values.is_empty() {
+                for (i, element) in skill_array.iter().enumerate() {
+                    let skill = match element {
+                        Value::Null => None,
+                        Value::String(name) => SkillFactory::for_name_in(rules, name),
+                        other => return Err(format!("RosterPosition skillArray: asString on {other}")),
+                    };
+                    if let Some(skill) = skill {
+                        let value = skill_values
+                            .get(i)
+                            .ok_or_else(|| format!("RosterPosition skillValues: index {i} out of bounds"))?
+                            .clone();
+                        self.put_skill_value(skill, value);
+                        if let Some(display_values) = display_values.as_ref() {
+                            if display_values.len() >= i + 1 {
+                                self.put_display_value(skill, display_values[i].clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if java_json::is_defined_in(o, "keywords") {
+            let names = java_json::get_string_array(o, "keywords")?
+                .ok_or("RosterPosition: keywords is null (Java NPE)")?;
+            for name in names {
+                // Java: `Keyword.forName(name)` -- `equalsIgnoreCase(null)` is false -> UNKNOWN.
+                let keyword = match name {
+                    Some(n) => Keyword::for_name(&n),
+                    None => Keyword::UNKNOWN,
+                };
+                self.keywords.push(keyword.get_name().to_string());
+            }
+        }
+
+        // Rust-only caches the engine reads instead of the Java call-site computations (the same
+        // derivation as the XML `end_xml_element`).
+        self.is_big_guy = self.player_type == PlayerType::BigGuy
+            || self.keywords.iter().any(|k| k.eq_ignore_ascii_case("Big Guy"));
+        self.is_lineman = self.keywords.iter().any(|k| k.eq_ignore_ascii_case("Lineman"));
+        Ok(())
+    }
+
+    /// Java: the `fSkillCategoriesOn{Normal,Double}Roll` loop of `initFrom` -- a `HashSet` of
+    /// `UtilJson.toEnumWithName(SkillCategoryFactory, ..)`; a null array throws (`size()`).
+    fn skill_categories_from(o: &JsonObject, key: &str) -> Result<Vec<SkillCategory>, String> {
+        let array = java_json::get_array(o, key)?.ok_or_else(|| format!("RosterPosition: {key} is null (Java NPE)"))?;
+        let mut categories = Vec::new();
+        for element in array {
+            let category = match element {
+                Value::String(name) => SkillCategoryFactory::default().for_name(name),
+                Value::Null => None,
+                other => return Err(format!("RosterPosition {key}: asString on {other}")),
+            };
+            let category = category.ok_or_else(|| format!("RosterPosition {key}: null skill category {element}"))?;
+            if !categories.contains(&category) {
+                categories.push(category);
+            }
+        }
+        Ok(categories)
+    }
+
+    /// Java: `RosterPosition.toJsonValue()` (BACKLOG §O). The skill categories are a Java
+    /// `HashSet` (order is not part of the state: the canonical form sorts them).
+    pub fn to_json_value(&self, rules: Rules) -> Result<Value, String> {
+        let mut o = JsonObject::new();
+        let s = |v: &Option<String>| java_json::string_or_null(v.as_deref());
+        o.insert("positionId".into(), Value::from(self.id.clone()));
+        o.insert("positionName".into(), Value::from(self.name.clone()));
+        o.insert("shorthand".into(), s(&self.shorthand));
+        o.insert("displayName".into(), s(&self.display_name));
+        o.insert("playerType".into(), Value::from(self.player_type.name()));
+        o.insert(
+            "playerGender".into(),
+            if self.gender_null { Value::Null } else { Value::from(self.gender.name()) },
+        );
+        o.insert("quantity".into(), Value::from(self.quantity));
+        o.insert("movement".into(), Value::from(self.movement));
+        o.insert("strength".into(), Value::from(self.strength));
+        o.insert("agility".into(), Value::from(self.agility));
+        o.insert("passing".into(), Value::from(self.passing));
+        o.insert("armour".into(), Value::from(self.armour));
+        o.insert("cost".into(), Value::from(self.cost));
+        o.insert("race".into(), s(&self.race));
+        o.insert("undead".into(), Value::from(self.is_undead));
+        o.insert("thrall".into(), Value::from(self.is_thrall));
+        o.insert("teamWithPositionId".into(), s(&self.team_with_position_id));
+        o.insert("nameGenerator".into(), s(&self.name_generator));
+        o.insert("replacesPosition".into(), s(&self.replaces_position));
+
+        o.insert("urlPortrait".into(), s(&self.url_portrait));
+        o.insert("urlIconSet".into(), s(&self.url_icon_set));
+        o.insert("nrOfIcons".into(), Value::from(self.nr_of_icons));
+
+        let categories = |v: &Vec<SkillCategory>| Value::Array(v.iter().map(|c| Value::from(c.name())).collect());
+        o.insert("skillCategoriesNormal".into(), categories(&self.skill_categories_normal));
+        o.insert("skillCategoriesDouble".into(), categories(&self.skill_categories_double));
+
+        if !self.skills.is_empty() {
+            let mut skill_array = Vec::new();
+            let mut skill_values = Vec::new();
+            let mut display_values = Vec::new();
+            for sw in &self.skills {
+                let name = SkillFactory::name_in(rules, sw.skill_id)
+                    .ok_or_else(|| format!("RosterPosition: {:?} is not a {} skill", sw.skill_id, rules.name()))?;
+                skill_array.push(Value::from(name));
+                skill_values.push(s(&sw.value));
+                display_values.push(java_json::string_or_null(self.display_value(sw.skill_id)));
+            }
+            o.insert("skillArray".into(), Value::Array(skill_array));
+            o.insert("skillValues".into(), Value::Array(skill_values));
+            o.insert("skillDisplayValues".into(), Value::Array(display_values));
+        }
+
+        o.insert("keywords".into(), Value::Array(self.keywords.iter().map(|k| Value::from(k.clone())).collect()));
+        Ok(Value::Object(o))
+    }
 }
 
 #[cfg(test)]
@@ -293,7 +524,7 @@ mod tests {
             replaces_position: None, team_with_position_id: None,
             inside_skill_list_tag: false,
             inside_skill_category_list_tag: false,
-            current_skill_value: None,
+            current_skill_value: None, ..Default::default()
         }
     }
 

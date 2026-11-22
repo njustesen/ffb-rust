@@ -62,6 +62,23 @@ impl SpecialRule {
         ]
         .iter().copied().find(|r| r.get_rule_name().eq_ignore_ascii_case(name))
     }
+
+    /// Java: `SpecialRule.valueOf(name)` -- the exact enum-constant name (Java throws on any
+    /// other; `None` here). The constant names are the Rust variant names (`Debug`).
+    pub fn value_of(name: &str) -> Option<Self> {
+        [
+            SpecialRule::BADLANDS_BRAWL, SpecialRule::ELVEN_KINGDOMS_LEAGUE,
+            SpecialRule::HALFLING_THIMBLE_CUP, SpecialRule::LUSTRIAN_SUPERLEAGUE,
+            SpecialRule::OLD_WORLD_CLASSIC, SpecialRule::SYLVANIAN_SPOTLIGHT,
+            SpecialRule::UNDERWORLD_CHALLENGE, SpecialRule::WORLDS_EDGE_SUPERLEAGUE,
+            SpecialRule::BRIBERY_AND_CORRUPTION, SpecialRule::FAVOURED_OF_UNDIVIDED,
+            SpecialRule::FAVOURED_OF_KHORNE, SpecialRule::FAVOURED_OF_NURGLE,
+            SpecialRule::FAVOURED_OF_TZEENTCH, SpecialRule::FAVOURED_OF_SLAANESH,
+            SpecialRule::LOW_COST_LINEMEN, SpecialRule::SWARMING,
+            SpecialRule::MASTERS_OF_UNDEATH, SpecialRule::BRAWLIN_BRUTES,
+        ]
+        .iter().copied().find(|r| format!("{r:?}") == name)
+    }
 }
 
 #[cfg(test)]

@@ -353,7 +353,7 @@ mod tests {
             treasury: 0,
             special_rules: vec![],
             players: vec![ffb_model::model::player::Player { id: "p1".into(), ..Default::default() }],
-            vampire_lord: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         };
         let away = Team { id: "t2".into(), players: vec![], ..home.clone() };
@@ -389,7 +389,7 @@ mod tests {
             treasury: 0,
             special_rules: vec![],
             players: vec![],
-            vampire_lord: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         };
         let away = Team { id: "t2".into(), ..home.clone() };

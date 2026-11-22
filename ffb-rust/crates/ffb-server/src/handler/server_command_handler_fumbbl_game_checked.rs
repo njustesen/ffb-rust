@@ -135,7 +135,7 @@ fn parse_roster(xml: &str) -> Roster {
     let empty = || Roster {
         id: String::new(), name: String::new(), race: String::new(),
         reroll_cost: 0, max_rerolls: 0, positions: vec![], special_rules: vec![],
-        necromancer: false, keywords: vec![], raised_position_id: None,
+        necromancer: false, keywords: vec![], raised_position_id: None, ..Default::default()
     };
     let parsed = XmlHandler::parse(None, xml, Box::new(empty()));
     match parsed.into_any().downcast::<Roster>() {
@@ -180,7 +180,7 @@ mod tests {
             treasury: 0,
             special_rules: vec![],
             players: vec![],
-            vampire_lord: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         }
     }

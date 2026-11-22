@@ -254,7 +254,7 @@ pub fn roster_json_to_roster(rj: &RosterJson, rules: Rules) -> Roster {
         special_rules: rj.special_rules.clone(),
         necromancer: rj.necromancer,
         keywords: rj.keywords.clone(),
-        raised_position_id: rj.raised_position_id.clone(),
+        raised_position_id: rj.raised_position_id.clone(), ..Default::default()
     }
 }
 
@@ -340,7 +340,7 @@ pub fn position_json_to_roster_position(pos: &PositionJson, roster_id: &str, is_
         team_with_position_id: pos.team_with_position_id.clone(),
         inside_skill_list_tag: false,
         inside_skill_category_list_tag: false,
-        current_skill_value: None,
+        current_skill_value: None, ..Default::default()
     }
 }
 

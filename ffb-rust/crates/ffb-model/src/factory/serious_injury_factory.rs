@@ -189,6 +189,28 @@ impl ISeriousInjury for AnySeriousInjury {
     }
 }
 
+/// Java: the `values` a `SeriousInjuryFactory` holds after `initialize` for a game of `rules`
+/// (the same edition choice as `SeriousInjuryFactory::initialize`, without needing a `Game`).
+pub fn values_in(rules: Rules) -> Vec<AnySeriousInjury> {
+    match rules {
+        Rules::Bb2016 | Rules::Common => ALL_BB2016.iter().copied().map(AnySeriousInjury::Bb2016).collect(),
+        Rules::Bb2020 => ALL_BB2020.iter().copied().map(AnySeriousInjury::Bb2020).collect(),
+        Rules::Bb2025 => ALL_BB2025.iter().copied().map(AnySeriousInjury::Bb2025).collect(),
+    }
+}
+
+/// Java: `SeriousInjuryFactory.forName(name)` of a game of `rules` -- exact `getName()` match,
+/// null for a name the ruleset does not know (BACKLOG §O replay JSON).
+pub fn for_name_in(rules: Rules, name: &str) -> Option<AnySeriousInjury> {
+    values_in(rules).into_iter().find(|v| v.get_name() == name)
+}
+
+/// The Java `getName()` of the `rules` injury the engine stores as `kind` (`to_kind` is
+/// injective within one ruleset), for writing a `SeriousInjuryKind` back as Java JSON.
+pub fn name_of_kind_in(rules: Rules, kind: SeriousInjuryKind) -> Option<String> {
+    values_in(rules).into_iter().find(|v| v.to_kind() == kind).map(|v| v.get_name().to_string())
+}
+
 /// Java: `com.fumbbl.ffb.factory.SeriousInjuryFactory`.
 #[derive(Debug, Clone, Default)]
 pub struct SeriousInjuryFactory {
@@ -254,7 +276,7 @@ mod tests {
             prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
             cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
             team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
-            vampire_lord: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         }
     }
@@ -350,6 +372,22 @@ mod tests {
         let empty_factory = SeriousInjuryFactory::new();
         assert!(empty_factory.for_attribute(InjuryAttribute::MA).is_none());
         let _ = factory; // keep bb2020 factory constructed for parity with other tests
+    }
+
+    #[test]
+    fn name_of_kind_in_inverts_for_name_in_per_ruleset() {
+        for rules in [Rules::Bb2016, Rules::Bb2020, Rules::Bb2025] {
+            for v in values_in(rules) {
+                let name = v.get_name().to_string();
+                assert_eq!(for_name_in(rules, &name), Some(v));
+                assert_eq!(name_of_kind_in(rules, v.to_kind()), Some(name), "{rules:?} {v:?}");
+            }
+        }
+        // A newer-server name is unknown (Java forName -> null).
+        assert_eq!(for_name_in(Rules::Bb2025, "Broken Shoulder (-ST)"), None);
+        // Names are per ruleset: the BB2016 "(NI)" knee is not a BB2025 injury.
+        assert!(for_name_in(Rules::Bb2016, "Smashed Knee (NI)").is_some());
+        assert_eq!(for_name_in(Rules::Bb2025, "Smashed Knee (NI)"), None);
     }
 
     #[test]

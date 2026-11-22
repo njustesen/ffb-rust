@@ -101,7 +101,7 @@ mod tests {
             bloodweiser_kegs: 0, riotous_rookies: 0, fan_factor: 0,
             assistant_coaches: 0, cheerleaders: 0, dedicated_fans: 0,
             treasury: 0, team_value: 0, players: vec![], special_rules: vec![],
-            vampire_lord: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         };
         let away = Team { id: "away".into(), ..home.clone() };

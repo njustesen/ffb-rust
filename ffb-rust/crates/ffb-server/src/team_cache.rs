@@ -113,7 +113,7 @@ fn map_to_team(file: &Path) -> io::Result<Team> {
         prayers_to_nuffle: 0, bloodweiser_kegs: 0, riotous_rookies: 0,
         cheerleaders: 0, assistant_coaches: 0, fan_factor: 0, dedicated_fans: 0,
         team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
-        vampire_lord: false, necromancer: false,
+        vampire_lord: false, roster: None, base_icon_path: None, logo_url: None, necromancer: false,
     };
     let parsed = XmlHandler::parse(None, &content, Box::new(empty));
     parsed.into_any().downcast::<Team>().map(|t| *t).map_err(|_| {

@@ -4,6 +4,9 @@ use crate::model::game::Game;
 use crate::model::roster_position::RosterPosition;
 use crate::xml::{IXmlReadable, XmlAttributes};
 use crate::xml::util_xml::get_string_attribute;
+use crate::enums::{Keyword, Rules};
+use crate::util::java_json;
+use serde_json::Value;
 
 const XML_TAG: &str = "roster";
 const XML_ATTRIBUTE_ID: &str = "id";
@@ -14,7 +17,7 @@ const XML_TAG_MAX_RE_ROLLS: &str = "maxReRolls";
 const XML_TAG_KEYWORD: &str = "keyword";
 
 /// A team roster definition (one per race per edition).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Roster {
     pub id: String,
     pub name: String,
@@ -29,6 +32,32 @@ pub struct Roster {
     pub keywords: Vec<String>,
     #[serde(default)]
     pub raised_position_id: Option<String>,
+
+    /// Java: `Roster.fBaseIconPath` (client cosmetics; carried for the Java JSON, BACKLOG §O).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_icon_path: Option<String>,
+    /// Java: `Roster.fLogoUrl`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logo_url: Option<String>,
+    /// Java: `Roster.fApothecary` (`true` from the Java constructor; the JSON always sets it).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub apothecary: bool,
+    /// Java: `Roster.fUndead`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub undead: bool,
+    /// Java: `Roster.riotousPositionId`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub riotous_position_id: Option<String>,
+    /// Java: `Roster.nameGenerator`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name_generator: Option<String>,
+    /// Java: `Roster.maxBigGuys`.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub max_big_guys: i32,
+}
+
+fn is_zero(v: &i32) -> bool {
+    *v == 0
 }
 
 impl Roster {
@@ -57,6 +86,86 @@ impl Roster {
 
     fn add_position(&mut self, position: RosterPosition) {
         self.positions.push(position);
+    }
+
+    /// Java: `Roster.addPosition` into `fRosterPositionById` (a `HashMap`): a position whose id
+    /// is already present REPLACES that entry (the JSON path; order is not part of the state, the
+    /// canonical form sorts `positionArray`).
+    fn add_position_by_id(&mut self, position: RosterPosition) {
+        match self.positions.iter_mut().find(|p| p.id == position.id) {
+            Some(existing) => *existing = position,
+            None => self.positions.push(position),
+        }
+    }
+
+    /// Mutable `getPositionById` (the JSON `updatePosition` advances the position's icon index).
+    pub fn position_mut(&mut self, id: &str) -> Option<&mut RosterPosition> {
+        self.positions.iter_mut().find(|p| p.id == id)
+    }
+
+    /// Java: `Roster.initFrom(IFactorySource, JsonValue)` (BACKLOG §O replay JSON), on a freshly
+    /// constructed roster. `Err` where Java throws or the Rust struct cannot hold the value.
+    pub fn init_from(&mut self, rules: Rules, json_value: &Value) -> Result<(), String> {
+        let o = java_json::to_json_object(json_value)?;
+        self.id = java_json::get_string(o, "rosterId")?.ok_or("Roster: null rosterId")?;
+        self.name = java_json::get_string(o, "rosterName")?.ok_or("Roster: null rosterName")?;
+        self.reroll_cost = java_json::get_int(o, "reRollCost")?;
+        self.max_rerolls = java_json::get_int(o, "maxReRolls")?;
+        self.base_icon_path = java_json::get_string(o, "baseIconPath")?;
+        self.logo_url = java_json::get_string(o, "logoUrl")?;
+        self.raised_position_id = java_json::get_string(o, "raisedPositionId")?;
+        self.apothecary = java_json::get_boolean(o, "apothecary")?;
+        self.necromancer = java_json::get_boolean(o, "necromancer")?;
+        self.undead = java_json::get_boolean(o, "undead")?;
+        self.riotous_position_id = java_json::get_string(o, "riotousPositionId")?;
+        self.name_generator = java_json::get_string(o, "nameGenerator")?;
+
+        self.positions.clear();
+        if let Some(position_array) = java_json::get_array(o, "positionArray")? {
+            for element in position_array {
+                let mut position = RosterPosition::default();
+                position.init_from(rules, element)?;
+                self.add_position_by_id(position);
+            }
+        }
+
+        self.max_big_guys = java_json::get_int(o, "maxBigGuys")?;
+
+        if java_json::is_defined_in(o, "keywords") {
+            let names = java_json::get_string_array(o, "keywords")?.ok_or("Roster: keywords is null (Java NPE)")?;
+            for name in names {
+                let keyword = match name {
+                    Some(n) => Keyword::for_name(&n),
+                    None => Keyword::UNKNOWN,
+                };
+                self.keywords.push(keyword.get_name().to_string());
+            }
+        }
+        Ok(())
+    }
+
+    /// Java: `Roster.toJsonValue()` (BACKLOG §O). `positionArray` iterates a `HashMap` in Java;
+    /// the canonical form sorts it.
+    pub fn to_json_value(&self, rules: Rules) -> Result<Value, String> {
+        let mut o = java_json::JsonObject::new();
+        let s = |v: &Option<String>| java_json::string_or_null(v.as_deref());
+        o.insert("rosterId".into(), Value::from(self.id.clone()));
+        o.insert("rosterName".into(), Value::from(self.name.clone()));
+        o.insert("reRollCost".into(), Value::from(self.reroll_cost));
+        o.insert("maxReRolls".into(), Value::from(self.max_rerolls));
+        o.insert("baseIconPath".into(), s(&self.base_icon_path));
+        o.insert("logoUrl".into(), s(&self.logo_url));
+        o.insert("raisedPositionId".into(), s(&self.raised_position_id));
+        o.insert("apothecary".into(), Value::from(self.apothecary));
+        o.insert("necromancer".into(), Value::from(self.necromancer));
+        o.insert("undead".into(), Value::from(self.undead));
+        o.insert("riotousPositionId".into(), s(&self.riotous_position_id));
+        o.insert("nameGenerator".into(), s(&self.name_generator));
+        o.insert("maxBigGuys".into(), Value::from(self.max_big_guys));
+        let positions = self.positions.iter().map(|p| p.to_json_value(rules)).collect::<Result<Vec<_>, _>>()?;
+        o.insert("positionArray".into(), Value::Array(positions));
+        o.insert("keywords".into(), Value::Array(self.keywords.iter().map(|k| Value::from(k.clone())).collect()));
+        Ok(Value::Object(o))
     }
 }
 
@@ -134,7 +243,7 @@ mod tests {
             special_rules: vec![],
             necromancer: false,
             keywords: vec![],
-            raised_position_id: None,
+            raised_position_id: None, ..Default::default()
         }
     }
 
@@ -176,7 +285,7 @@ mod tests {
             replaces_position: None, team_with_position_id: None,
             inside_skill_list_tag: false,
             inside_skill_category_list_tag: false,
-            current_skill_value: None,
+            current_skill_value: None, ..Default::default()
         });
         assert!(r.position("lineman").is_some());
         assert!(r.position("blitzer").is_none());
@@ -196,7 +305,7 @@ mod tests {
             skills: vec![], skill_categories_normal: vec![],
             skill_categories_double: vec![], keywords: vec![],
             is_big_guy: false, is_lineman: false, is_undead: false, is_thrall: false,
-            race: None, replaces_position: None, team_with_position_id: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
+            race: None, replaces_position: None, team_with_position_id: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None, ..Default::default()
         });
         r.positions.push(crate::model::roster_position::RosterPosition {
             id: "star_griff".into(),
@@ -209,7 +318,7 @@ mod tests {
             skills: vec![], skill_categories_normal: vec![],
             skill_categories_double: vec![], keywords: vec![],
             is_big_guy: false, is_lineman: false, is_undead: false, is_thrall: false,
-            race: None, replaces_position: None, team_with_position_id: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
+            race: None, replaces_position: None, team_with_position_id: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None, ..Default::default()
         });
         let non_stars: Vec<_> = r.non_star_positions().collect();
         assert_eq!(non_stars.len(), 1, "Should only return non-star positions");
@@ -230,7 +339,7 @@ mod tests {
             skills: vec![], skill_categories_normal: vec![],
             skill_categories_double: vec![], keywords: vec![],
             is_big_guy: false, is_lineman: false, is_undead: false, is_thrall: false,
-            race: None, replaces_position: None, team_with_position_id: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
+            race: None, replaces_position: None, team_with_position_id: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None, ..Default::default()
         });
         assert_eq!(r.positions.len(), 1);
     }
@@ -246,7 +355,7 @@ mod tests {
             skills: vec![], skill_categories_normal: vec![],
             skill_categories_double: vec![], keywords: vec![],
             is_big_guy: false, is_lineman: false, is_undead: true, is_thrall: false,
-            race: None, replaces_position: None, team_with_position_id: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None,
+            race: None, replaces_position: None, team_with_position_id: None, inside_skill_list_tag: false, inside_skill_category_list_tag: false, current_skill_value: None, ..Default::default()
         }
     }
 
@@ -329,7 +438,7 @@ mod tests {
         let parsed = crate::xml::XmlHandler::parse(None, AMAZON_ROSTER_XML, Box::new(Roster {
             id: String::new(), name: String::new(), race: String::new(),
             reroll_cost: 0, max_rerolls: 0, positions: vec![], special_rules: vec![],
-            necromancer: false, keywords: vec![], raised_position_id: None,
+            necromancer: false, keywords: vec![], raised_position_id: None, ..Default::default()
         }));
         let roster = parsed.as_any().downcast_ref::<Roster>().unwrap();
         assert_eq!(roster.id, "amazon.lrb6");
@@ -343,7 +452,7 @@ mod tests {
         let parsed = crate::xml::XmlHandler::parse(None, AMAZON_ROSTER_XML, Box::new(Roster {
             id: String::new(), name: String::new(), race: String::new(),
             reroll_cost: 0, max_rerolls: 0, positions: vec![], special_rules: vec![],
-            necromancer: false, keywords: vec![], raised_position_id: None,
+            necromancer: false, keywords: vec![], raised_position_id: None, ..Default::default()
         }));
         let roster = parsed.as_any().downcast_ref::<Roster>().unwrap();
         assert_eq!(roster.positions.len(), 2);

@@ -190,7 +190,7 @@ mod tests {
             treasury: 0,
             special_rules: vec![],
             players: vec![],
-            vampire_lord: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         };
         let backup_game = ffb_model::model::game::Game::new(team("home"), team("away"), ffb_model::enums::Rules::Bb2025);
@@ -241,7 +241,7 @@ mod tests {
             treasury: 0,
             special_rules: vec![],
             players: vec![],
-            vampire_lord: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         }
     }

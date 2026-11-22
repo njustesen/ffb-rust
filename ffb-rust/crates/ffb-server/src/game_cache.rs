@@ -459,7 +459,7 @@ mod tests {
             treasury: 0,
             special_rules: vec![],
             players: player_ids.iter().map(|id| Player { id: id.to_string(), ..Default::default() }).collect(),
-            vampire_lord: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         }
     }

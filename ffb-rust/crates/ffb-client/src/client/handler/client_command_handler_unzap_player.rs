@@ -122,7 +122,7 @@ mod tests {
             treasury: 0,
             special_rules: vec![],
             players: vec![player],
-            vampire_lord: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         }
     }

@@ -233,7 +233,7 @@ mod tests {
             treasury: 0,
             special_rules: vec![],
             players: player_ids.iter().map(|id| make_player(id)).collect(),
-            vampire_lord: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         }
     }

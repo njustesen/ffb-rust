@@ -44,6 +44,12 @@ fn load_subtree(subtree: &str, game: &mut Value) -> Result<Value, String> {
             turn_data.init_from(rules, &options, input)?;
             turn_data.to_json_value(rules)
         }
+        "teamHome" | "teamAway" => {
+            let rules = options.rules_version()?;
+            let mut team = ffb_model::model::team::Team::new();
+            team.init_from(rules, input)?;
+            team.to_json_value(rules)
+        }
         "gameOptions" => Ok(options.to_json_value()),
         "actingPlayer" => {
             let rules = options.rules_version()?;

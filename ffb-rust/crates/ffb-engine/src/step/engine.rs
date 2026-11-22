@@ -3582,7 +3582,7 @@ pub(crate) fn test_team(side: &str, dedicated_fans: i32) -> ffb_model::model::te
         bloodweiser_kegs: 0, riotous_rookies: 0, cheerleaders: 0, assistant_coaches: 0,
         fan_factor: 0, dedicated_fans, team_value: 1_000_000, treasury: 0,
         special_rules: vec![], players: vec![],
-        vampire_lord: false,
+        vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
         necromancer: false,
     }
 }

@@ -1108,7 +1108,7 @@ pub fn make_team_from_file(roster_name: &str, side: &str, edition: &str) -> Resu
         treasury: spec.treasury,
         special_rules: spec.special_rules.clone(),
         players,
-        vampire_lord: roster_json.has_vampire_lord(),
+        vampire_lord: roster_json.has_vampire_lord(), roster: None, base_icon_path: None, logo_url: None,
         necromancer: roster_json.has_necromancer(),
     })
 }
@@ -1176,7 +1176,7 @@ fn make_lineman_team(side: &str, roster_id: &str) -> Team {
         treasury: 0,
         special_rules: vec![],
         players,
-        vampire_lord: false,
+        vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
         necromancer: false,
     }
 }
@@ -1275,7 +1275,7 @@ pub fn make_team_from_roster(roster_name: &str, side: &str, edition: &str) -> Re
         treasury: 0,
         special_rules: roster_json.special_rules.clone(),
         players,
-        vampire_lord: roster_json.has_vampire_lord(),
+        vampire_lord: roster_json.has_vampire_lord(), roster: None, base_icon_path: None, logo_url: None,
         necromancer: roster_json.has_necromancer(),
     })
 }

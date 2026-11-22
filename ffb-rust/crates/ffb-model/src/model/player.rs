@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use crate::enums::{PlayerType, PlayerGender, SeriousInjuryKind};
 use crate::factory::player_gender_factory::PlayerGenderFactory;
 use crate::factory::player_type_factory::PlayerTypeFactory;
-use crate::factory::serious_injury_factory::SeriousInjuryFactory;
+use crate::factory::serious_injury_factory::{self, SeriousInjuryFactory};
+use crate::enums::Rules;
+use crate::util::java_json;
+use serde_json::Value;
 use crate::factory::skill_factory::SkillFactory;
 use crate::model::game::Game;
 use crate::model::player_status::PlayerStatus;
@@ -171,6 +174,53 @@ pub struct Player {
     /// Java: player instanceof ZappedPlayer check — tracked via GameState.isZapped().
     #[serde(default)]
     pub zapped: bool,
+
+    // ── Java `RosterPlayer` fields carried for the Java JSON (BACKLOG §O replay state) ──
+    /// Java: `RosterPlayer.fLastingInjuries` -- one element per Java list element, `None` where
+    /// Java holds null (an injury name the game's ruleset does not know). The engine reads
+    /// `stat_injuries` (filled alongside, known injuries only, as the XML load does).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lasting_injuries: Vec<Option<SeriousInjuryKind>>,
+    /// Java: `RosterPlayer.fUrlPortrait`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url_portrait: Option<String>,
+    /// Java: `RosterPlayer.fUrlIconSet`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url_icon_set: Option<String>,
+    /// Java: `RosterPlayer.fNrOfIcons`.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub nr_of_icons: i32,
+    /// Java: `RosterPlayer.fIconSetIndex` (JSON `positionIconIndex`).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub icon_set_index: i32,
+    /// Java: `RosterPlayer.fSkills` may hold `null` (an unknown skill name from a newer server:
+    /// `UtilJson.toEnumWithName` -> null, added as is). `extra_skills` cannot hold a null, so the
+    /// Java list index of each null is kept here and `to_json_value` re-inserts it (BACKLOG §O).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unknown_skill_slots: Vec<usize>,
+    /// Java: `RosterPlayer.skillValues` (`Map<Skill, String>`; entries with a null value exist).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skill_values_map: Vec<(SkillId, Option<String>)>,
+    /// Java: `RosterPlayer.displayValues` (`Map<Skill, String>`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skill_display_values_map: Vec<(SkillId, Option<String>)>,
+    /// Java: `Player.temporarySkills` (`Map<String, Set<SkillWithValue>>`) as the JSON carries it,
+    /// including sources with an EMPTY set. The engine reads `temporary_skills` /
+    /// `temporary_skill_sources`, filled alongside at load.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub temporary_skills_map: Vec<(String, Vec<SkillWithValue>)>,
+    /// Java: `Player.temporaryModifiers` (`Map<String, Set<TemporaryStatModifier>>`): source ->
+    /// modifier names. Only empty sets can be loaded so far (the modifier factory is not ported).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub temporary_modifiers_map: Vec<(String, Vec<String>)>,
+    /// Java: `Player.temporaryProperties` (`Map<String, Set<ISkillProperty>>`): source ->
+    /// property names. Only empty sets can be loaded so far (the property factory is not ported).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub temporary_properties_map: Vec<(String, Vec<String>)>,
+    /// Java: `RosterPlayer.playerStatus` is null (the JSON had no `playerStatus`); Java's only
+    /// reads (`isJourneyman`, `== JOURNEYMAN`) treat null like ACTIVE, which `player_status` keeps.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub player_status_null: bool,
 
     /// Java: `RosterPlayer.fInsideSkillList` (transient) — true while inside `<skillList>`.
     #[serde(skip)]
@@ -676,7 +726,7 @@ impl Player {
             inside_injury_list: false,
             injury_current: false,
             inside_player_statistics: false,
-            current_skill_value: None,
+            current_skill_value: None, ..Default::default()
         }
     }
 
@@ -708,6 +758,365 @@ impl Player {
         for sw in &position.skills {
             self.add_skill(sw.skill_id);
         }
+    }
+}
+
+fn is_zero(v: &i32) -> bool {
+    *v == 0
+}
+
+/// Java `String.split("_")` for the `JsonSkillWithValuesMapOption` entries: trailing empty
+/// strings removed; an empty input yields `[""]`; an input of only separators yields `[]`.
+fn java_split_underscore(s: &str) -> Vec<&str> {
+    if s.is_empty() {
+        return vec![""];
+    }
+    let mut parts: Vec<&str> = s.split('_').collect();
+    while parts.last() == Some(&"") {
+        parts.pop();
+    }
+    parts
+}
+
+/// The JSON object at `key` if the option is defined AND holds an object (every Java map option
+/// in `RosterPlayer` reads `isDefinedIn` + `instanceof JsonObject`, else an empty map).
+fn json_map<'a>(o: &'a java_json::JsonObject, key: &str) -> Option<&'a java_json::JsonObject> {
+    o.get(key).and_then(Value::as_object)
+}
+
+/// Java `toEnumWithName(skillFactory, value)` for one array element: JSON null -> null.
+fn skill_element(rules: Rules, what: &str, element: &Value) -> Result<Option<SkillId>, String> {
+    match element {
+        Value::Null => Ok(None),
+        Value::String(name) => Ok(SkillFactory::for_name_in(rules, name)),
+        other => Err(format!("{what}: asString on {other}")),
+    }
+}
+
+impl Player {
+    /// Java: `Player.getFrom(source, json)` = `createPlayer` (a `ZappedPlayer` for
+    /// `playerKind == "zappedPlayer"`, else a `RosterPlayer`) + `RosterPlayer.initFrom` (BACKLOG §O
+    /// replay JSON), on a freshly constructed player. `Err` where Java throws and where the Rust
+    /// struct cannot hold the Java value (null id/name/type/gender, an unknown used skill, an
+    /// unknown temporary skill -- its later `toJsonValue` NPEs in Java --, a non-empty temporary
+    /// modifier/property set, a zapped player: those decoders are not ported yet).
+    pub fn init_from(&mut self, rules: Rules, json_value: &Value) -> Result<(), String> {
+        let o = java_json::to_json_object(json_value)?;
+        if java_json::get_string(o, "playerKind")?.as_deref() == Some("zappedPlayer") {
+            return Err("Player: ZappedPlayer JSON is not ported yet".into());
+        }
+        self.id = java_json::get_string(o, "playerId")?.ok_or("Player: null playerId")?;
+        self.nr = java_json::get_int(o, "playerNr")?;
+        self.position_id = java_json::get_string(o, "positionId")?.ok_or("Player: null positionId")?;
+        self.name = java_json::get_string(o, "playerName")?.ok_or("Player: null playerName")?;
+        self.gender = PlayerGenderFactory::default()
+            .for_name(java_json::get_enum_name(o, "playerGender")?.unwrap_or(""))
+            .ok_or("Player: null playerGender")?;
+        self.player_type = PlayerTypeFactory::default()
+            .for_name(java_json::get_enum_name(o, "playerType")?.unwrap_or(""))
+            .ok_or("Player: null playerType")?;
+
+        self.movement = java_json::get_int(o, "movement")?;
+        self.strength = java_json::get_int(o, "strength")?;
+        self.agility = java_json::get_int(o, "agility")?;
+        self.passing = java_json::get_int(o, "passing")?;
+        self.armour = java_json::get_int(o, "armour")?;
+
+        self.lasting_injuries.clear();
+        let lasting = java_json::get_array(o, "lastingInjuries")?.ok_or("Player: lastingInjuries is null (Java NPE)")?;
+        for element in lasting {
+            let injury = match element {
+                Value::Null => None,
+                Value::String(name) => serious_injury_factory::for_name_in(rules, name).map(|i| i.to_kind()),
+                other => return Err(format!("Player lastingInjuries: asString on {other}")),
+            };
+            self.lasting_injuries.push(injury);
+        }
+        // Rust-only engine cache, as the XML load fills it.
+        self.stat_injuries = self.lasting_injuries.iter().flatten().copied().collect();
+        self.recovering_injury = java_json::get_enum_name(o, "recoveringInjury")?
+            .and_then(|name| serious_injury_factory::for_name_in(rules, name))
+            .map(|i| i.to_kind());
+
+        self.url_portrait = java_json::get_string(o, "urlPortrait")?;
+        self.url_icon_set = java_json::get_string(o, "urlIconSet")?;
+        self.nr_of_icons = java_json::get_int(o, "nrOfIcons")?;
+        self.icon_set_index = java_json::get_int(o, "positionIconIndex")?;
+
+        self.starting_skills.clear();
+        self.extra_skills.clear();
+        self.unknown_skill_slots.clear();
+        let skill_array = java_json::get_array(o, "skillArray")?.ok_or("Player: skillArray is null (Java NPE)")?;
+        for (i, element) in skill_array.iter().enumerate() {
+            match skill_element(rules, "Player skillArray", element)? {
+                Some(skill_id) => self.extra_skills.push(SkillWithValue::new(skill_id)),
+                None => self.unknown_skill_slots.push(i),
+            }
+        }
+
+        // JsonTemporaryModifiersMapOption / JsonSkillWithValuesMapOption / JsonSkillPropertiesMapOption.
+        self.temporary_modifiers_map.clear();
+        if let Some(map) = json_map(o, "temporaryModifiersMap") {
+            for (source, array_value) in map {
+                let Some(array) = array_value.as_array() else { continue };
+                let mut names = Vec::new();
+                for value in array {
+                    let name = value.as_str().ok_or_else(|| format!("Player temporaryModifiersMap: asString on {value}"))?;
+                    Self::temporary_stat_modifier_for_name(name)?;
+                    names.push(name.to_string());
+                }
+                self.temporary_modifiers_map.push((source.clone(), names));
+            }
+        }
+        self.temporary_skills_map.clear();
+        if let Some(map) = json_map(o, "temporarySkillsMap") {
+            for (source, array_value) in map {
+                let Some(array) = array_value.as_array() else { continue };
+                let mut skills = Vec::new();
+                for value in array {
+                    let text = value.as_str().ok_or_else(|| format!("Player temporarySkillsMap: asString on {value}"))?;
+                    let parts = java_split_underscore(text);
+                    let first = parts.first().ok_or_else(|| format!("Player temporarySkillsMap: {text:?} splits to nothing (Java AIOOBE)"))?;
+                    let skill_id = SkillFactory::for_name_in(rules, first)
+                        .ok_or_else(|| format!("Player temporarySkillsMap: unknown skill {first:?} (Java NPE on write)"))?;
+                    skills.push(SkillWithValue { skill_id, value: parts.get(1).map(|v| v.to_string()) });
+                }
+                self.temporary_skills_map.push((source.clone(), skills));
+            }
+        }
+        self.temporary_properties_map = Self::empty_name_sets(o, "temporaryPropertiesMap")?;
+        // Rust-only engine caches of the temporary skills.
+        self.temporary_skills.clear();
+        self.temporary_skill_sources.clear();
+        let grants: Vec<(String, SkillWithValue)> = self
+            .temporary_skills_map
+            .iter()
+            .flat_map(|(source, skills)| skills.iter().map(move |sw| (source.clone(), sw.clone())))
+            .collect();
+        for (source, sw) in grants {
+            self.add_prayer_skill(&source, sw.skill_id, sw.value);
+        }
+        // ... and of the temporary stat modifiers (limit = the edition's `StatsMechanic.limit`).
+        self.temporary_stat_mods.clear();
+        let modifiers: Vec<(String, String)> = self
+            .temporary_modifiers_map
+            .iter()
+            .flat_map(|(source, names)| names.iter().map(move |n| (source.clone(), n.clone())))
+            .collect();
+        for (source, name) in modifiers {
+            let (stat, delta) = Self::temporary_stat_modifier_for_name(&name)?;
+            self.add_temporary_stat_mod_limited(&source, stat, delta, stat_limit(rules, stat));
+        }
+
+        self.skill_values_map = Self::skill_values_from(rules, o, "skillValuesMap")?;
+        self.skill_display_values_map = Self::skill_values_from(rules, o, "skillDisplayValuesMap")?;
+
+        // PlayerStatus.forName: null/empty -> null, else valueOf(upper case) or null.
+        let status = java_json::get_string(o, "playerStatus")?
+            .filter(|s| !s.is_empty())
+            .and_then(|s| PlayerStatus::for_name(&s));
+        self.player_status = status.unwrap_or(PlayerStatus::ACTIVE);
+        self.player_status_null = status.is_none();
+
+        if let Some(used) = java_json::get_array(o, "usedSkills")? {
+            for element in used {
+                let skill_id = skill_element(rules, "Player usedSkills", element)?
+                    .ok_or_else(|| format!("Player usedSkills: null/unknown skill {element}"))?;
+                self.used_skills.insert(skill_id);
+            }
+        }
+        Ok(())
+    }
+
+    /// Java: `TemporaryStatModifierFactory.forName(name)` -- `name.split("-")` = `<PlayerStatKey>`
+    /// and the modifier's canonical class name, instantiated by reflection. The only
+    /// `TemporaryStatModifier` subclasses are the incrementer (+1) and the decrementer (-1); any other
+    /// class, a bad key or a missing separator throws in Java. Returns (stat code, delta); the name
+    /// itself is what `getName()` writes back.
+    fn temporary_stat_modifier_for_name(name: &str) -> Result<(u8, i32), String> {
+        let parts: Vec<&str> = name.split('-').collect();
+        let class = parts.get(1).ok_or_else(|| format!("TemporaryStatModifierFactory: {name:?} has no class part"))?;
+        let delta = match *class {
+            "com.fumbbl.ffb.modifiers.TemporaryStatIncrementer" => 1,
+            "com.fumbbl.ffb.modifiers.TemporaryStatDecrementer" => -1,
+            other => return Err(format!("TemporaryStatModifierFactory: no modifier class {other:?}")),
+        };
+        let stat = match parts[0] {
+            "MA" => STAT_MA,
+            "ST" => STAT_ST,
+            "AG" => STAT_AG,
+            "PA" => STAT_PA,
+            "AV" => STAT_AV,
+            other => return Err(format!("TemporaryStatModifierFactory: PlayerStatKey.valueOf({other:?}) throws")),
+        };
+        Ok((stat, delta))
+    }
+
+    /// The temporary modifier / property maps: source -> set. Only empty sets are decodable here.
+    fn empty_name_sets(o: &java_json::JsonObject, key: &str) -> Result<Vec<(String, Vec<String>)>, String> {
+        let mut out = Vec::new();
+        if let Some(map) = json_map(o, key) {
+            for (source, array_value) in map {
+                let Some(array) = array_value.as_array() else { continue };
+                if !array.is_empty() {
+                    return Err(format!("Player {key}: non-empty set for {source:?} (factory not ported yet)"));
+                }
+                out.push((source.clone(), Vec::new()));
+            }
+        }
+        Ok(out)
+    }
+
+    /// `JsonSkillValuesMapOption.getFrom`: skill name -> value (JSON null -> null). An unknown
+    /// name is a NULL KEY in Java, which `addTo` skips and nothing reads -- not kept.
+    fn skill_values_from(rules: Rules, o: &java_json::JsonObject, key: &str) -> Result<Vec<(SkillId, Option<String>)>, String> {
+        let mut out: Vec<(SkillId, Option<String>)> = Vec::new();
+        if let Some(map) = json_map(o, key) {
+            for (name, value) in map {
+                let value = match value {
+                    Value::Null => None,
+                    Value::String(s) => Some(s.clone()),
+                    other => return Err(format!("Player {key}: asString on {other}")),
+                };
+                let Some(skill_id) = SkillFactory::for_name_in(rules, name) else { continue };
+                match out.iter_mut().find(|(s, _)| *s == skill_id) {
+                    Some(entry) => entry.1 = value,
+                    None => out.push((skill_id, value)),
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    /// Java: `RosterPlayer.updatePosition(position, updateStats = false, ..)` -- what
+    /// `Team.initFrom`'s `updateRoster(roster, false, ..)` does to each player: position id, the
+    /// type if unset (never: `init_from` refuses a null type), the icon index if negative. Plus the
+    /// Rust-only position caches the engine reads instead of `player.getPosition()` (the same
+    /// copies `update_position` makes; no Java-visible field changes).
+    pub fn update_position_json(&mut self, position: Option<&mut RosterPosition>) {
+        let Some(position) = position else { return };
+        self.position_id = position.id.clone();
+        if self.icon_set_index < 0 {
+            self.icon_set_index = position.find_next_icon_set_index();
+        }
+        self.position_movement = position.movement;
+        self.position_strength = position.strength;
+        self.position_agility = position.agility;
+        self.position_passing = position.passing;
+        self.position_armour = position.armour;
+        self.position_cost = position.cost;
+        self.position_team_with_position_id = position.team_with_position_id.clone();
+        self.is_thrall = position.is_thrall;
+        self.is_big_guy = position.is_big_guy;
+        self.is_lineman = position.is_lineman;
+        self.race = position.race.clone();
+        self.keywords = position.keywords.clone();
+        self.skill_categories_normal = position.skill_categories_normal.clone();
+        // Engine cache of Java `getSkillValueExcludingTemporaryOnes`: the player's own value, else
+        // the position's.
+        for sw in &mut self.extra_skills {
+            let own = self.skill_values_map.iter().find(|(s, _)| *s == sw.skill_id).and_then(|(_, v)| v.clone());
+            sw.value = own.or_else(|| position.skills.iter().find(|p| p.skill_id == sw.skill_id).and_then(|p| p.value.clone()));
+        }
+    }
+
+    /// Java: `RosterPlayer.toJsonValue()` (BACKLOG §O). `skillArray` = Java `fSkills`: for a JSON
+    /// loaded player exactly `extra_skills` with the nulls back in place; for an engine-built
+    /// player Java's `fSkills` is its own skills then the position's (`addSkill`), which is
+    /// `extra_skills` then the `starting_skills` not already present.
+    pub fn to_json_value(&self, rules: Rules) -> Result<Value, String> {
+        let skill_name = |id: SkillId| -> Result<&'static str, String> {
+            SkillFactory::name_in(rules, id).ok_or_else(|| format!("Player {}: {id:?} is not a {} skill", self.id, rules.name()))
+        };
+        let injury_name = |kind: SeriousInjuryKind| -> Result<Value, String> {
+            serious_injury_factory::name_of_kind_in(rules, kind)
+                .map(Value::from)
+                .ok_or_else(|| format!("Player {}: {kind:?} is not a {} injury", self.id, rules.name()))
+        };
+        let s = |v: &Option<String>| java_json::string_or_null(v.as_deref());
+        let mut o = java_json::JsonObject::new();
+        o.insert("playerKind".into(), Value::from("rosterPlayer"));
+        o.insert("playerId".into(), Value::from(self.id.clone()));
+        o.insert("playerNr".into(), Value::from(self.nr));
+        o.insert("positionId".into(), Value::from(self.position_id.clone()));
+        o.insert("playerName".into(), Value::from(self.name.clone()));
+        o.insert("playerGender".into(), Value::from(self.gender.name()));
+        o.insert("playerType".into(), Value::from(self.player_type.name()));
+        o.insert("movement".into(), Value::from(self.movement));
+        o.insert("strength".into(), Value::from(self.strength));
+        o.insert("agility".into(), Value::from(self.agility));
+        o.insert("passing".into(), Value::from(self.passing));
+        o.insert("armour".into(), Value::from(self.armour));
+
+        let lasting = self
+            .lasting_injuries
+            .iter()
+            .map(|i| i.map_or(Ok(Value::Null), injury_name))
+            .collect::<Result<Vec<_>, _>>()?;
+        o.insert("lastingInjuries".into(), Value::Array(lasting));
+        o.insert("recoveringInjury".into(), self.recovering_injury.map_or(Ok(Value::Null), injury_name)?);
+
+        o.insert("urlPortrait".into(), s(&self.url_portrait));
+        o.insert("urlIconSet".into(), s(&self.url_icon_set));
+        o.insert("nrOfIcons".into(), Value::from(self.nr_of_icons));
+        o.insert("positionIconIndex".into(), Value::from(self.icon_set_index));
+
+        let mut skills: Vec<Value> = Vec::new();
+        for sw in &self.extra_skills {
+            skills.push(Value::from(skill_name(sw.skill_id)?));
+        }
+        for sw in &self.starting_skills {
+            if !self.extra_skills.iter().any(|e| e.skill_id == sw.skill_id) {
+                skills.push(Value::from(skill_name(sw.skill_id)?));
+            }
+        }
+        for &slot in &self.unknown_skill_slots {
+            if slot > skills.len() {
+                return Err(format!("Player {}: unknown skill slot {slot} beyond the skill list", self.id));
+            }
+            skills.insert(slot, Value::Null);
+        }
+        o.insert("skillArray".into(), Value::Array(skills));
+
+        let mut temporary_skills = java_json::JsonObject::new();
+        for (source, set) in &self.temporary_skills_map {
+            let mut array = Vec::new();
+            for sw in set {
+                let mut text = skill_name(sw.skill_id)?.to_string();
+                if let Some(v) = &sw.value {
+                    text.push('_');
+                    text.push_str(v);
+                }
+                array.push(Value::from(text));
+            }
+            temporary_skills.insert(source.clone(), Value::Array(array));
+        }
+        o.insert("temporarySkillsMap".into(), Value::Object(temporary_skills));
+        let name_sets = |map: &Vec<(String, Vec<String>)>| {
+            Value::Object(
+                map.iter()
+                    .map(|(source, names)| (source.clone(), Value::Array(names.iter().map(|n| Value::from(n.clone())).collect())))
+                    .collect(),
+            )
+        };
+        o.insert("temporaryModifiersMap".into(), name_sets(&self.temporary_modifiers_map));
+        o.insert("temporaryPropertiesMap".into(), name_sets(&self.temporary_properties_map));
+        let values_map = |map: &Vec<(SkillId, Option<String>)>| -> Result<Value, String> {
+            let mut out = java_json::JsonObject::new();
+            for (id, v) in map {
+                out.insert(skill_name(*id)?.to_string(), s(v));
+            }
+            Ok(Value::Object(out))
+        };
+        o.insert("skillValuesMap".into(), values_map(&self.skill_values_map)?);
+        o.insert("skillDisplayValuesMap".into(), values_map(&self.skill_display_values_map)?);
+
+        if !self.player_status_null {
+            o.insert("playerStatus".into(), Value::from(self.player_status.get_name()));
+        }
+        let used = self.used_skills.iter().map(|id| skill_name(*id).map(Value::from)).collect::<Result<Vec<_>, _>>()?;
+        o.insert("usedSkills".into(), Value::Array(used));
+        Ok(Value::Object(o))
     }
 }
 
@@ -1002,7 +1411,7 @@ mod tests {
             injury_current: false,
             inside_player_statistics: false,
             current_skill_value: None,
-            skill_categories_normal: vec![],
+            skill_categories_normal: vec![], ..Default::default()
         }
     }
 
@@ -1235,7 +1644,7 @@ mod tests {
             replaces_position: None, team_with_position_id: None,
             inside_skill_list_tag: false,
             inside_skill_category_list_tag: false,
-            current_skill_value: None,
+            current_skill_value: None, ..Default::default()
         };
         let p = Player::from_position("p1", "Blitzer Joe", 3, &pos);
         assert_eq!(p.position_id, "blitzer");

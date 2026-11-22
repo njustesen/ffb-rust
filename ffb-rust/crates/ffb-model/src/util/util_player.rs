@@ -868,7 +868,7 @@ mod tests {
             dedicated_fans: 0, team_value: 0, treasury: 0,
             special_rules: vec![],
             players: vec![],
-            vampire_lord: false,
+            vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         }
     }
