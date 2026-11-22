@@ -96,7 +96,7 @@ mod tests {
     fn next_unrelated_change_does_not_panic() {
         let obs = ChompRemovalObserver::new();
         let mut game = make_game();
-        obs.next(Some("p-1"), ModelChangeId::GameSetActingTeam, &mut game);
+        obs.next(Some("p-1"), ModelChangeId::GameSetHomePlaying, &mut game);
     }
 
     #[test]

@@ -178,6 +178,13 @@ pub struct Game {
     /// Always `None` outside that call. BACKLOG §M phase 2b(a).
     #[serde(skip)]
     pub command_re_roll_source: Option<crate::enums::ReRollSource>,
+
+    /// Java: `Game.fTurnMode == null`. Rust's `turn_mode` is not optional; a replay's
+    /// `gameSetTurnMode` with a value the in-repo `TurnModeFactory` does not know (a newer server's
+    /// `dwarfenWisdom`) sets Java's field to null, which this flag records (`to_json_value` then
+    /// writes null). Only the replay `ModelChangeProcessor` sets it (BACKLOG §O).
+    #[serde(skip)]
+    pub turn_mode_null: bool,
 }
 
 impl Game {
@@ -240,6 +247,7 @@ impl Game {
             report_list: ReportList::new(),
             zapped_players: Vec::new(),
             command_re_roll_source: None,
+            turn_mode_null: false,
         }
     }
 
@@ -449,7 +457,7 @@ impl Game {
         o.insert("timeoutEnforced".into(), Value::Bool(self.timeout_enforced));
         o.insert("concessionPossible".into(), Value::Bool(self.concession_possible));
         o.insert("testing".into(), Value::Bool(self.testing));
-        o.insert("turnMode".into(), Value::String(self.turn_mode.name().to_string()));
+        o.insert("turnMode".into(), j::string_or_null((!self.turn_mode_null).then(|| self.turn_mode.name())));
         o.insert("lastTurnMode".into(), j::string_or_null(self.last_turn_mode.map(TurnMode::name)));
         o.insert("defenderId".into(), j::string_or_null(self.defender_id.as_deref()));
         o.insert("lastDefenderId".into(), j::string_or_null(self.last_defender_id.as_deref()));

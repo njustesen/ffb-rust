@@ -15,6 +15,9 @@
 //!   dialog-check <dialog.tsv> [dialogId...]
 //!                                      Rust dialog-parameter JSON vs the Java `ReplayDialogDump`
 //!                                      (every distinct dialog parameter; see dialog_check.rs)
+//!   states <out_dir> <java_dir> <dir|file>...
+//!                                      replay every model sync in Rust, write <id>.states and diff
+//!                                      them with the Java per-sync state hashes (see states.rs)
 
 mod canonical;
 mod dialog_check;
@@ -22,6 +25,7 @@ mod drop_rules;
 mod ffbr;
 mod start_check;
 mod start_of_game;
+mod states;
 
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -32,6 +36,7 @@ fn usage() -> ! {
     eprintln!("       ffb-replay canon-check <dump_dir> <states_file>");
     eprintln!("       ffb-replay start-check <java_dir> <subtree> <dir|file>...");
     eprintln!("       ffb-replay dialog-check <dialog.tsv> [dialogId...]");
+    eprintln!("       ffb-replay states <out_dir> <java_dir> <dir|file>...");
     std::process::exit(2);
 }
 
@@ -44,6 +49,11 @@ fn main() {
         "start-check" if args.len() >= 4 => start_check::start_check(
             Path::new(&args[1]),
             &args[2],
+            &args[3..].iter().map(PathBuf::from).collect::<Vec<_>>(),
+        ),
+        "states" if args.len() >= 4 => states::states(
+            Path::new(&args[1]),
+            Path::new(&args[2]),
             &args[3..].iter().map(PathBuf::from).collect::<Vec<_>>(),
         ),
         "dialog-check" if args.len() >= 2 => dialog_check::dialog_check(Path::new(&args[1]), &args[2..]),

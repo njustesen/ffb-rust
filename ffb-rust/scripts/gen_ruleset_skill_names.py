@@ -31,12 +31,22 @@ def super_name(text: str):
     return m.group(1).replace('\\"', '"') if m else None
 
 
+def usage_type(text: str):
+    m = re.search(r"super\([^;]*?SkillUsageType\.(\w+)", text, re.S)
+    return m.group(1) if m else "REGULAR"
+
+
+def camel(const: str) -> str:
+    return "".join(p.capitalize() for p in const.lower().split("_"))
+
+
 def main() -> int:
     rs = SKILL_ID_RS.read_text(encoding="utf-8")
     body = rs[rs.index("pub fn class_name(self)"):]
     body = body[: body.index("\n    }\n")]
     class_to_variant = {cls: var for var, cls in re.findall(r'SkillId::(\w+) => "([^"]+)"', body)}
     rows = {}
+    usages = {}
     errors = 0
     for f in sorted(SKILL_DIR.rglob("*.java")):
         text = f.read_text(encoding="utf-8", errors="replace")
@@ -72,6 +82,7 @@ def main() -> int:
                 print(f"ERROR duplicate {key}: {rows[key]} vs {(name, variant)}")
                 errors += 1
             rows[key] = (name, variant)
+            usages[(r, variant)] = usage_type(text)
     if errors:
         return 1
     lines = [
@@ -80,13 +91,20 @@ def main() -> int:
         "//! Java `SkillFactory` per ruleset: (rules, `Skill.getName()`, Rust `SkillId`) for every concrete",
         "//! skill class whose `@RulesCollection` covers the rules (COMMON = all three).",
         "",
-        "use crate::enums::{Rules, SkillId};",
+        "use crate::enums::{Rules, SkillId, SkillUsageType};",
         "",
         "pub const RULESET_SKILL_NAMES: &[(Rules, &str, SkillId)] = &[",
     ]
     for (r, _), (name, variant) in sorted(rows.items(), key=lambda kv: (kv[0][0], kv[0][1])):
         esc = name.replace("\\", "\\\\").replace('"', '\\"')
         lines.append(f'    (Rules::{RUST_RULES[r]}, "{esc}", SkillId::{variant}),')
+    lines.append("];")
+    lines.append("")
+    lines.append("/// Java `Skill.getSkillUsageType()` of the ruleset's class (the `SkillUsageType` its constructor")
+    lines.append("/// passes to `super(..)`; REGULAR when none): (rules, SkillId, usage type).")
+    lines.append("pub const RULESET_SKILL_USAGE: &[(Rules, SkillId, SkillUsageType)] = &[")
+    for (r, variant), usage in sorted(usages.items()):
+        lines.append(f"    (Rules::{RUST_RULES[r]}, SkillId::{variant}, SkillUsageType::{camel(usage)}),")
     lines.append("];")
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     for r in RULES:

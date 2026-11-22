@@ -17,7 +17,7 @@ mod tests {
 
     #[test]
     fn noop_compiles() {
-        let mc = ModelChange::new(ModelChangeId::GameSetActingTeam, ModelChangeDataType::String, serde_json::Value::Null);
+        let mc = ModelChange::new(ModelChangeId::GameSetHomePlaying, ModelChangeDataType::String, serde_json::Value::Null);
         NoOp.notify_change(&mc);
     }
 
