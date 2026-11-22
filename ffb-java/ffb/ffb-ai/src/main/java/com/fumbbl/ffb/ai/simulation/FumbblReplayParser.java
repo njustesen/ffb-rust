@@ -260,28 +260,69 @@ public class FumbblReplayParser {
         }
     }
 
+    /**
+     * Arrays of {@code Game.toJsonValue()} that serialise a HASH container (HashMap/HashSet). Their
+     * order is either different on every JVM run (enum / identity-hash keys: gameOptionArray, cards,
+     * prayers, skill categories, temporary skills/modifiers, inducements...) or a function of the
+     * container's insertion/resize HISTORY (String / FieldCoordinate / Skill-name hashes). Neither
+     * is model state, so the canonical form sorts them: elements ordered by their own canonical
+     * text, compared as Java Strings (UTF-16 code units). Classified from the source 2026-11-22
+     * (BACKLOG §O "canonical state form"); paths are object keys joined by '.', "[]" per array level.
+     * Every OTHER array keeps its order (Lists, LinkedHashMap, Team.getPlayers() sorted by nr).
+     */
+    static final java.util.regex.Pattern UNORDERED_ARRAY = java.util.regex.Pattern.compile(String.join("|",
+        "team(Home|Away)\\.specialRules",
+        "team(Home|Away)\\.roster\\.positionArray",
+        "team(Home|Away)\\.roster\\.positionArray\\[\\]\\.skillCategories(Normal|Double)",
+        "team(Home|Away)\\.playerArray\\[\\](\\.player)?\\.temporary(Skills|Modifiers|Properties)Map\\..+",
+        "team(Home|Away)\\.playerArray\\[\\](\\.player)?\\.usedSkills",
+        "turnData(Home|Away)\\.inducementSet\\.(inducementArray|cardsAvailable|cardsActive|cardsDeactivated|starPlayerPositionIds|prayers)",
+        "fieldModel\\.(pushbackSquareArray|moveSquareArray|trackNumberArray|diceDecorationArray|fieldMarkerArray|playerMarkerArray)",
+        "fieldModel\\.playerDataArray\\[\\]\\.(cards|cardEffects)",
+        "fieldModel\\.targetSelectionState\\.usedSkills",
+        "actingPlayer\\.usedSkills",
+        "gameOptions\\.gameOptionArray",
+        "dialogParameter\\.nrOfCardsPerType"));
+
     /** {@code value} with every object's keys sorted (String order, stable for duplicates). */
     static JsonValue sortedCopy(JsonValue value) {
+        return canonicalCopy(value, null);
+    }
+
+    /**
+     * Keys sorted everywhere; when {@code path} is non-null, arrays matching {@link #UNORDERED_ARRAY}
+     * are sorted by element text as well.
+     */
+    static JsonValue canonicalCopy(JsonValue value, String path) {
         if (value.isObject()) {
             JsonObject in = value.asObject();
             List<JsonObject.Member> members = new ArrayList<>();
             for (JsonObject.Member m : in) members.add(m);
             members.sort(java.util.Comparator.comparing(JsonObject.Member::getName));
             JsonObject out = new JsonObject();
-            for (JsonObject.Member m : members) out.add(m.getName(), sortedCopy(m.getValue()));
+            for (JsonObject.Member m : members) {
+                String sub = path == null ? null : (path.isEmpty() ? m.getName() : path + "." + m.getName());
+                out.add(m.getName(), canonicalCopy(m.getValue(), sub));
+            }
             return out;
         }
         if (value.isArray()) {
+            String sub = path == null ? null : path + "[]";
+            List<JsonValue> elements = new ArrayList<>();
+            for (JsonValue v : value.asArray()) elements.add(canonicalCopy(v, sub));
+            if (path != null && UNORDERED_ARRAY.matcher(path).matches()) {
+                elements.sort(java.util.Comparator.comparing(JsonValue::toString));
+            }
             JsonArray out = new JsonArray();
-            for (JsonValue v : value.asArray()) out.add(sortedCopy(v));
+            for (JsonValue v : elements) out.add(v);
             return out;
         }
         return value;
     }
 
-    /** Canonical state text: {@code Game.toJsonValue()} with keys sorted, minimal-json printing. */
+    /** Canonical state text: {@code Game.toJsonValue()}, keys sorted, unordered arrays sorted. */
     static String canonicalGameJson(Game game) {
-        return sortedCopy(game.toJsonValue()).toString();
+        return canonicalCopy(game.toJsonValue(), "").toString();
     }
 
     static String sha256Hex(byte[] data) {
