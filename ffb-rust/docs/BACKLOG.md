@@ -9751,7 +9751,23 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > Not fixed (dead file, not dispatched): `step/bb2020/ttm/step_init_scatter_player.rs:152` has the
 > same un-Java `apply_to` on the hit-player branch.
 >
-> **RESUME HERE -- UPDATED 2026-11-22 01:25 (loop iteration 1 of 11-22), read this first (supersedes everything below).**
+> **RESUME HERE -- UPDATED 2026-11-22 07:10 (loop iteration 2 of 11-22), read this first (supersedes everything below).**
+> **cert9 window 1 (01:21-07:01) result:** skill ledger done (`D:/ffb_ledger/cert9`; checker reads
+> it: **411/411 firing, missing 0**, only TODO = the manifest); **mirror 330/330 green** (steps +
+> reports, all 6 workers); **cross 2626/4012 judged, 0 red** (w1-4 stopped at 07:00, w5/w6 not
+> started); star + skill not started. Frozen pair re-hashed 07:05, unchanged (`f6a78d36...` exe,
+> `71371e62...` jar). Tally: **`python -I scripts/cert_tally.py cert9`** (all four suites vs
+> 330/4012/4012/121, lists reds, prints `ALL FOUR SUITES GREEN` when done; checked against cert8:
+> reproduces its star 4010/4012 + the 2 Grak reds exactly).
+> **WAITING (launched 07:06, detached): driver PID 27272** = `final_cert.ps1 -name cert9 -skipLedger`
+> (self-pinned 0x7FF, verified affinity 2047). Sleeps until 21:00, then `cert_chain.ps1 -name cert9`:
+> mirror skips all 330 judged cells, cross resumes the remaining 1386 gates, then star 4012, then
+> skill 121; stops at 07:00. `.loop_wait.json` holds PID 27272 until 2026-11-23 07:30. Expect one
+> more window after that for whatever star/skill is left (relaunch with the same launch form).
+> **The session that wakes then:** run `scripts/cert_tally.py cert9`; if all four are green write the
+> manifest (details in the superseded block below), commit, push; else relaunch with the same form.
+>
+> **History -- RESUME HERE of 2026-11-22 01:25 (loop iteration 1 of 11-22), superseded:**
 > **RUNNING (launched 01:21, detached): the cert9 FINAL-PROOF chain, driver PID 25672**
 > (`scripts/final_cert.ps1 -name cert9`, self-pinned 0x7FF, verified; 4 workers). Frozen pair:
 > `D:/ffb_star/bin/ffb-parity-cert9.exe` (release build of `93bf58936`, sha256 `f6a78d36...`) +
