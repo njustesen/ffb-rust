@@ -9732,33 +9732,54 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > and **all 46 bb2020 skill gates green** (40 `_sk` + 2 `_st` 20/20, 4 seed hunts 1/1, steps +
 > reports; `D:/ffb_regate/d20/skill/results.txt`). No red. Directive deleted.
 >
-> **SUPERVISOR DIRECTIVE (2026-11-21 ~16:00) -- goal redefined: NO exempt list.**
-> User: "there should be no exempt list. There should be rosters that match each ruleset and have
-> skill coverage for all skills within that ruleset." `skill_parity_check.py` now counts only each
-> RULESET's skills (`ruleset_universe()`: the edition's own roster positions + Infamous Staff +
-> stars + roster special rules + advancement categories / STAT_INCREASE, minus Java
-> `eligible()==false`; bb2016 = CRP/LRB6 without the §2.2 FUMBBL-legacy rosters).
-> `data/agent/skill_exempt.json` is deleted. Result on the cert8 ledger: **409/411**. The 9 former
-> exemptions bb2016 x8 + bb2020 PilingOn are simply not in any ruleset (no carrier, not learnable).
-> bb2025 Insignificant is covered by its draft rule (`DRAFT_RULES`: every bb2025 team obeys the
-> limit, 22 fielded).
-> **UPDATE ~16:45 (user: "If the two engines agree on the skill, it is green. We only care about
-> parity right now. Java is the truth"):** bb2025 TheBallista and Unsteady are skills the JAVA
-> ENGINE never resolves (traces in the checker's `JAVA_NEVER_FIRES`); both are fielded in the
-> certified games and both engines agree, so they are green. **Checker on the cert8 ledger:
-> 411/411 ruleset skills; the ONLY open item is the cert manifest.**
-> **So cert8 IS the final proof again -- do NOT change the exe or jar.** The supervisor relaunched
-> the cert8 driver (PID 22272, `final_cert.ps1 -name cert8 -skipLedger`, sleeps until 21:00, then
-> resumes cross from 2454 -> star -> skill; `.loop_wait.json` until 2026-11-22 07:30). Iteration
-> 1's half-done Secure the Ball client-rule rework (it would have changed bb2025 agent play) was
-> taken OUT of the tree, unreviewed and ungated, into
-> `docs/secure_the_ball_client_rule_2026-11-21.patch` -- a coverage follow-up for after the cert,
-> not part of this proof. The session that wakes: count verdicts as in RESUME HERE below; if
-> incomplete and no red, relaunch the same cert8 driver; if all four suites are green, write
-> `docs/cert_manifest.json` pointing at the cert8 exe/jar/ledger, commit, push -> DONE.
-> Any red: fix 1:1 -> new freeze -> new cert. Delete this block once cert8 completes.
+> **Supervisor directive (2026-11-21 ~16:00, "NO exempt list") DONE -- loop iteration 1 of
+> 2026-11-22, 00:52-01:25.** The checker counts only each ruleset's skills (`ruleset_universe()`,
+> see its docstring; `data/agent/skill_exempt.json` deleted; bb2025 TheBallista + Unsteady green via
+> `JAVA_NEVER_FIRES`, user: "Java is the truth"); on the cert8 ledger: **411/411 fire**. cert8
+> COMPLETED (driver exited 00:49) but was NOT all green, so it cannot be the manifest's proof:
+> **mirror 330/330, cross 4012/4012, skill 121/121 green; star 4010/4012** -- 2 report-only reds
+> (steps matched), both bb2020 + `[star.the_black_gobbo|star.grak_and_crumbleberry]`:
+> `underworld_underworldtroll_vs_gnome` (#w1/565) and `snotling_vs_norse` (#w3/650), seed 1.
+> Cause: a kicked Crumbleberry scattered into the crowd; Rust's shared `TtmToCrowdHandler` (live
+> path for bb2020 AND bb2025 = the bb2025 `StepInitScatterPlayer`) called `injury_result.apply_to`,
+> Java's only publishes INJURY_RESULT -- APOTHECARY [APOTHECARY_THROWN_PLAYER] reports and THEN
+> applies. The early apply ran updatePlayerStateDependentProperties first, so Rust wrote
+> `twoForOne` before the `crowdpush` injury report (same class as StepRightStuff's 2b(g)). Fixed
+> 1:1 in `93bf58936` (unit test now asserts FALLING + not moved). Gated on the dev exe (=cert9
+> bytes): both reds steps+reports identical; skill suite 121/121 (`D:/ffb_sksweep/ttc`); all 240
+> bb2020 Grak star gates green (`D:/ffb_scratch_ttc/star/sweep_g*.log`); workspace tests green.
+> Not fixed (dead file, not dispatched): `step/bb2020/ttm/step_init_scatter_player.rs:152` has the
+> same un-Java `apply_to` on the hit-player branch.
 >
-> **RESUME HERE -- UPDATED 2026-11-21 07:10 (loop iteration 19), read this first (supersedes everything below).**
+> **RESUME HERE -- UPDATED 2026-11-22 01:25 (loop iteration 1 of 11-22), read this first (supersedes everything below).**
+> **RUNNING (launched 01:21, detached): the cert9 FINAL-PROOF chain, driver PID 25672**
+> (`scripts/final_cert.ps1 -name cert9`, self-pinned 0x7FF, verified; 4 workers). Frozen pair:
+> `D:/ffb_star/bin/ffb-parity-cert9.exe` (release build of `93bf58936`, sha256 `f6a78d36...`) +
+> `D:/ffb_star/bin/ffb-ai-cert9.jar` (byte copy of the cert8 jar, sha256 `71371e62...`; the only
+> Java commits since cert8 are the FumbblReplayParser, which the parity runner does not use).
+> Order: skill ledger -> `D:/ffb_ledger/cert9` (python PID 11308, progress
+> `D:/ffb_ledger/cert9.run.log`, ~3-4 h) -> report -> `cert_chain.ps1 -name cert9` (mirror -> cross
+> -> star -> skill; log `D:/ffb_star/cert9.chain.log`; verdicts in `../mirror_cert9`, `../cross_cert9`,
+> `../starjobs_cert9` `scratch/sweep_w*.log`, `D:/ffb_sksweep/cert9/results.txt`). The chain STOPS at
+> 07:00. `.loop_wait.json` holds PID 25672 until 2026-11-22 07:30.
+> **The session that wakes then:** run `python -I scripts/skill_parity_check.py` (it reads the newest
+> ledger = cert9 once its report exists; expected 411/411, the only TODO the manifest), count
+> verdicts with a python tally (pattern `PARITY: (\d+)/\1 games match.*REPORTS: \1/\1 games
+> identical, 0 differ, 0 skipped\.`; targets mirror 330, cross 4012, star 4012, skill 121 lines all
+> `parity=n/n reports=n/n rc=0`), then relaunch for the next window with
+> `-name cert9 -skipLedger` (launch form below; it sleeps until 21:00 by itself, workers skip judged
+> gates) and a new `.loop_wait.json` (deadline 2026-11-23 07:30). Expect ~2 more windows (full
+> mirror ~3.5 h, cross ~3.6 h, star ~2.2 h, skill ~0.5 h). When all four suites are green on cert9,
+> write `docs/cert_manifest.json` (exe/jar/ledger above; suites globs
+> `C:/Users/Admin/niels/ffb-rust/mirror_cert9/scratch/sweep_w*.log`, `.../cross_cert9/...`,
+> `.../starjobs_cert9/...`, skill `D:/ffb_sksweep/cert9/results.txt`), commit, push. Any red: fix
+> 1:1 -> new freeze -> new cert (never mix builds).
+> Launch form (from bash, single quotes):
+> `powershell -NoProfile -Command '$p = Start-Process powershell -PassThru -WindowStyle Hidden -WorkingDirectory C:\Users\Admin\niels\ffb-rust\ffb-rust -ArgumentList @("-NoProfile","-File","C:\Users\Admin\niels\ffb-rust\ffb-rust\scripts\final_cert.ps1","-name","cert9","-skipLedger"); $p.Id'`
+> Iteration 1 of 11-21's Secure the Ball client-rule rework stays parked in
+> `docs/secure_the_ball_client_rule_2026-11-21.patch` (coverage follow-up after the proof).
+>
+> **History -- RESUME HERE of 2026-11-21 07:10 (loop iteration 19), superseded:**
 > **cert8 window 1 (02:01-07:01) result:** ledger done early (`D:/ffb_ledger/cert8`; checker: 408/420
 > fire, 12 exempt, **missing 0**); **mirror 330/330 green** (steps + reports; the usual 10
 > coverage-short gates, `but required coverage items are MISSING`, are not parity reds); **cross
