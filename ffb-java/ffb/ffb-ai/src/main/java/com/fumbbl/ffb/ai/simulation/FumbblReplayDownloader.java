@@ -46,7 +46,11 @@ import java.util.logging.Logger;
  * }</pre>
  *
  * <p>Exit codes: {@code 0} = success, {@code 1} = not found/error,
- * {@code 2} = filtered (rules or date mismatch).
+ * {@code 2} = filtered (rules or date mismatch), {@code 3} = could not connect / refused,
+ * {@code 4} = the server says the replay is unavailable / the id unknown (a normal gap),
+ * {@code 5} = any other server status (an error/refusal), {@code 6} = the server never answered,
+ * {@code 7} = the server completed the replay normally but it holds no commands (a normal gap).
+ * {@code --rules ALL} disables the rules filter (the default filter is BB2025).
  *
  * <p>On success, prints a one-line JSON metadata object to stdout so the
  * Python orchestrator can populate its manifest.
@@ -70,7 +74,7 @@ public class FumbblReplayDownloader {
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "--probe-only": probeOnly = true; break;
-                case "--rules":     rulesFilter = args[++i]; break;
+                case "--rules":     rulesFilter = args[++i]; if ("ALL".equals(rulesFilter)) rulesFilter = null; break;
                 case "--after":     afterDate   = args[++i]; break;
                 case "--before":    beforeDate  = args[++i]; break;
                 default:
@@ -107,12 +111,15 @@ public class FumbblReplayDownloader {
         try {
             session = container.connectToServer(endpoint, uri);
         } catch (Exception e) {
-            System.exit(1);
+            // exit 3 = the server could not be reached or refused the connection (orchestrators stop on it)
+            System.err.println("connect failed: " + e);
+            System.exit(3);
             return;
         }
 
         if (!session.isOpen()) {
-            System.exit(1);
+            System.err.println("connect failed: session not open");
+            System.exit(3);
         }
 
         // Send ClientCommandReplay — LZ-compressed as a binary frame (required by FUMBBL server)
@@ -144,14 +151,27 @@ public class FumbblReplayDownloader {
             if (msg == null) {
                 // Timed out — no more data
                 if (allCommands.isEmpty()) {
+                    System.err.println("no replay data within " + timeoutSecs + " s (game state "
+                        + (metadataExtracted ? "received" : "NOT received") + ", session "
+                        + (session.isOpen() ? "open" : "closed") + ")");
                     closeQuietly(session);
-                    System.exit(1);
+                    System.exit(metadataExtracted ? 1 : 6); // 6 = the server never answered at all
                 }
                 break; // partial replay — save what we have
             }
 
             JsonObject replayMsg = msg.asObject();
             String netCmdId = replayMsg.getString("netCommandId", "");
+
+            if ("serverStatus".equals(netCmdId)) {
+                String status = replayMsg.getString("serverStatus", "");
+                System.err.println("server status: " + status + " " + replayMsg.getString("message", ""));
+                closeQuietly(session);
+                if ("Replay Unavailable".equals(status) || "Unknown Game Id".equals(status)) {
+                    System.exit(4); // the server answered: no replay for this id
+                }
+                System.exit(5); // any other status (Fumbbl Error, ...) = the server is refusing/erroring
+            }
 
             // Handle serverGameState (metadata extraction)
             if ("serverGameState".equals(netCmdId)) {
@@ -236,7 +256,10 @@ public class FumbblReplayDownloader {
         closeQuietly(session);
 
         if (allCommands.isEmpty()) {
-            System.exit(1);
+            // the server completed the replay normally (lastCommand) but it holds no commands
+            System.err.println("replay complete but empty (game state " + (metadataExtracted ? "received" : "NOT received")
+                + ", started " + gameStarted + ")");
+            System.exit(7);
         }
 
         // Build output: {replayId, source, commandArray}
@@ -329,12 +352,14 @@ public class FumbblReplayDownloader {
                 JsonValue jv = JsonValue.readFrom(json);
                 JsonObject obj = jv.asObject();
                 String id = obj.getString("netCommandId", "");
-                // Enqueue game state and replay chunks; ignore unknown types
-                if ("serverGameState".equals(id) || "serverReplay".equals(id)) {
+                // Enqueue game state and replay chunks; report every other message on stderr
+                if ("serverGameState".equals(id) || "serverReplay".equals(id) || "serverStatus".equals(id)) {
                     queue.offer(jv);
+                } else {
+                    System.err.println("server message: " + abbreviate(json));
                 }
-            } catch (Exception ignored) {
-                // Malformed or non-JSON frame — discard
+            } catch (Exception e) {
+                System.err.println("undecodable frame (" + fullBytes.length + " bytes): " + abbreviate(raw));
             }
         }
 
@@ -346,20 +371,29 @@ public class FumbblReplayDownloader {
                 JsonValue jv = JsonValue.readFrom(text);
                 JsonObject obj = jv.asObject();
                 String id = obj.getString("netCommandId", "");
-                if ("serverGameState".equals(id) || "serverReplay".equals(id)) {
+                if ("serverGameState".equals(id) || "serverReplay".equals(id) || "serverStatus".equals(id)) {
                     queue.offer(jv);
+                } else {
+                    System.err.println("server text message: " + abbreviate(text));
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                System.err.println("undecodable text frame: " + abbreviate(text));
+            }
         }
 
         @OnError
         public void onError(Session session, Throwable t) {
-            // Errors are handled by the main thread via queue timeout
+            System.err.println("websocket error: " + t);
         }
 
         @OnClose
         public void onClose(Session session, CloseReason reason) {
-            // Closed — main thread will detect via queue timeout
+            System.err.println("websocket closed: " + reason.getCloseCode() + " " + reason.getReasonPhrase());
         }
+    }
+
+    static String abbreviate(String s) {
+        if (s == null) return "null";
+        return s.length() > 400 ? s.substring(0, 400) + "...(" + s.length() + " chars)" : s;
     }
 }
