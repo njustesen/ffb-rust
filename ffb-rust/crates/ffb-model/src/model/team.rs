@@ -127,6 +127,21 @@ impl Team {
         }
     }
 
+    /// Java: `Team.addPlayer(player)` for a player whose id the team does not hold yet (BACKLOG §O,
+    /// `ClientCommandHandlerAddPlayer`). `Err` when another player already has that nr: Java's
+    /// `fPlayerByNr` would drop it from `getPlayers()` while `fPlayerById` still finds it, which the
+    /// Rust team (one list) cannot hold.
+    pub fn add_player(&mut self, player: Player) -> Result<(), String> {
+        if let Some(existing) = self.players.iter().find(|p| p.nr == player.nr && p.id != player.id) {
+            return Err(format!(
+                "Team.addPlayer: nr {} of {} replaces {} in fPlayerByNr only (not representable)",
+                player.nr, player.id, existing.id
+            ));
+        }
+        self.add_player_by_nr(player);
+        Ok(())
+    }
+
     /// Java: `Team.initFrom(IFactorySource, JsonValue)` (BACKLOG §O replay JSON), on a freshly
     /// constructed team. `Err` where Java throws (an unknown special rule: `SpecialRule.valueOf`)
     /// or where the Rust struct cannot hold the Java value.

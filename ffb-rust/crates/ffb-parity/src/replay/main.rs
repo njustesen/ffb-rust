@@ -19,6 +19,7 @@
 //!                                      replay every model sync in Rust, write <id>.states and diff
 //!                                      them with the Java per-sync state hashes (see states.rs)
 
+mod add_player;
 mod canonical;
 mod dialog_check;
 mod drop_rules;

@@ -1020,6 +1020,112 @@ impl Player {
         }
     }
 
+    /// Java: `RosterPlayer.addSkill(skill)` on `fSkills` (= `extra_skills` for a JSON-loaded
+    /// player): a STAT_INCREASE / STAT_DECREASE skill is always appended (the only such classes
+    /// are the five `*Increase` skills), any other skill only when not yet in the list.
+    fn java_add_skill(&mut self, skill_id: SkillId) {
+        let stat_change = matches!(
+            skill_id,
+            SkillId::MovementIncrease
+                | SkillId::StrengthIncrease
+                | SkillId::AgilityIncrease
+                | SkillId::PassingIncrease
+                | SkillId::ArmourIncrease
+        );
+        if stat_change || !self.extra_skills.iter().any(|sw| sw.skill_id == skill_id) {
+            self.extra_skills.push(SkillWithValue::new(skill_id));
+        }
+    }
+
+    /// Java: `RosterPlayer.updatePosition(position, updateStats = true, factorySource, gameId)`
+    /// (BACKLOG §O: `ClientCommandHandlerAddPlayer` for a new player). Position id, type if unset,
+    /// icon index if negative, then the position's stats, `addSkill` of every position skill, the
+    /// skills' `PlayerModifier`s -- none: no common `Skill` registers one, and the stat-increase
+    /// `SkillBehaviour` modifiers exist only once `UtilSkillBehaviours.registerBehaviours` ran, which
+    /// the replay JVM never calls --, then the lasting injuries through the ruleset's
+    /// `StatsMechanic` (`statCanBeReducedByInjury(old, current)` against the stats as they were
+    /// before the injury loop).
+    pub fn update_position_with_stats(&mut self, rules: Rules, position: Option<&mut RosterPosition>) -> Result<(), String> {
+        let Some(position) = position else { return Ok(()) };
+        self.movement = position.movement;
+        self.strength = position.strength;
+        self.agility = position.agility;
+        self.passing = position.passing;
+        self.armour = position.armour;
+        let position_skills: Vec<SkillId> = position.skills.iter().map(|sw| sw.skill_id).collect();
+        for skill_id in position_skills {
+            self.java_add_skill(skill_id);
+        }
+        // position id, icon index (the position's counter advances), engine caches incl. the
+        // skill-value cache of the skills just added.
+        self.update_position_json(Some(position));
+
+        let (old_ma, old_av, old_ag, old_st, old_pa) = (self.movement, self.armour, self.agility, self.strength, self.passing);
+        let bb2016 = rules == Rules::Bb2016;
+        // bb2016: (original - current) < 2; mixed: always.
+        let can_reduce = |original: i32, current: i32| !bb2016 || (original - current) < 2;
+        // applyLastingInjury: bb2016 max(v - 1, min) for every key; mixed AG/PA min(v + 1, max),
+        // the rest max(v - 1, min).
+        let apply = |value: i32, stat: u8| {
+            let (min, max) = stat_limit(rules, stat);
+            if !bb2016 && (stat == STAT_AG || stat == STAT_PA) { (value + 1).min(max) } else { (value - 1).max(min) }
+        };
+        use crate::model::injury_attribute::InjuryAttribute;
+        use crate::model::serious_injury::SeriousInjury;
+        let injuries: Vec<SeriousInjuryKind> = self.lasting_injuries.iter().flatten().copied().collect();
+        for kind in injuries {
+            let name = serious_injury_factory::name_of_kind_in(rules, kind)
+                .ok_or_else(|| format!("Player {}: {kind:?} is not a {} injury", self.id, rules.name()))?;
+            let injury = serious_injury_factory::for_name_in(rules, &name)
+                .ok_or_else(|| format!("Player {}: no {} injury {name:?}", self.id, rules.name()))?;
+            match injury.get_injury_attribute() {
+                Some(InjuryAttribute::MA) if can_reduce(old_ma, self.movement) => self.movement = apply(self.movement, STAT_MA),
+                Some(InjuryAttribute::AV) if can_reduce(old_av, self.armour) => self.armour = apply(self.armour, STAT_AV),
+                Some(InjuryAttribute::AG) if can_reduce(old_ag, self.agility) => self.agility = apply(self.agility, STAT_AG),
+                Some(InjuryAttribute::ST) if can_reduce(old_st, self.strength) => self.strength = apply(self.strength, STAT_ST),
+                Some(InjuryAttribute::PA) if can_reduce(old_pa, self.passing) => self.passing = apply(self.passing, STAT_PA),
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    /// Java: `RosterPlayer.init(RosterPlayer other, source)` (`ClientCommandHandlerAddPlayer` for a
+    /// player the team already has): stats, lasting injuries (nulls skipped), recovering injury,
+    /// portrait / icon set / icon count, `fSkills` rebuilt through `addSkill` (nulls skipped) and the
+    /// player status. Id, nr, name, position and the temporary maps stay.
+    pub fn init_roster_player(&mut self, other: &Player) {
+        self.movement = other.movement;
+        self.strength = other.strength;
+        self.agility = other.agility;
+        self.passing = other.passing;
+        self.armour = other.armour;
+        self.lasting_injuries = other.lasting_injuries.iter().flatten().map(|k| Some(*k)).collect();
+        self.stat_injuries = self.lasting_injuries.iter().flatten().copied().collect();
+        self.recovering_injury = other.recovering_injury;
+        self.url_portrait = other.url_portrait.clone();
+        self.url_icon_set = other.url_icon_set.clone();
+        self.nr_of_icons = other.nr_of_icons;
+        let old_values: Vec<(SkillId, Option<String>)> =
+            self.extra_skills.iter().chain(self.starting_skills.iter()).map(|sw| (sw.skill_id, sw.value.clone())).collect();
+        self.extra_skills.clear();
+        self.starting_skills.clear();
+        self.unknown_skill_slots.clear();
+        // other.getSkills(): Java fSkills; for a JSON-decoded player = extra_skills (+ nulls).
+        let skills: Vec<SkillId> = other.extra_skills.iter().map(|sw| sw.skill_id).collect();
+        for skill_id in skills {
+            self.java_add_skill(skill_id);
+        }
+        // Engine cache of the skill values (no Java field): the old cached value of the same skill
+        // (= own value, else the position's), else the player's own value.
+        for sw in &mut self.extra_skills {
+            let own = self.skill_values_map.iter().find(|(s, _)| *s == sw.skill_id).and_then(|(_, v)| v.clone());
+            sw.value = own.or_else(|| old_values.iter().find(|(s, _)| *s == sw.skill_id).and_then(|(_, v)| v.clone()));
+        }
+        self.player_status = other.player_status;
+        self.player_status_null = other.player_status_null;
+    }
+
     /// Java: `RosterPlayer.toJsonValue()` (BACKLOG §O). `skillArray` = Java `fSkills`: for a JSON
     /// loaded player exactly `extra_skills` with the nulls back in place; for an engine-built
     /// player Java's `fSkills` is its own skills then the position's (`addSkill`), which is
