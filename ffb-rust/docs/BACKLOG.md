@@ -9751,7 +9751,22 @@ injury branch wherever Java calls the full dropPlayer -- latent, unreached by an
 > Not fixed (dead file, not dispatched): `step/bb2020/ttm/step_init_scatter_player.rs:152` has the
 > same un-Java `apply_to` on the hit-player branch.
 >
-> **RESUME HERE -- UPDATED 2026-11-22 07:22 (loop iteration 3 of 11-22), read this first (supersedes everything below).**
+> **RESUME HERE -- UPDATED 2026-11-22 (loop iteration 4 of 11-22), read this first (supersedes everything below).**
+> **🏁 §M GOAL MET: `scripts/skill_parity_check.py` prints DONE.** cert9 window 2 (driver PID 9000,
+> `-anytime`) ran cross to 08:40, star to 10:52, skill to 11:04 ("final_cert done" in
+> `D:/ffb_star/cert9.chain.log`). `python -I scripts/cert_tally.py cert9`: **mirror 330/330, cross
+> 4012/4012, star 4012/4012, skill 121/121, 0 red -- ALL FOUR SUITES GREEN**. Frozen pair re-hashed
+> after the run, unchanged: `D:/ffb_star/bin/ffb-parity-cert9.exe` sha256 `f6a78d36f7fe0708...`
+> (release build of `93bf58936`), `D:/ffb_star/bin/ffb-ai-cert9.jar` sha256 `71371e62af0b7039...`.
+> Ledger `D:/ffb_ledger/cert9` (same exe): 411/411 ruleset skills firing, missing 0.
+> `docs/cert_manifest.json` written (exe, jar, ledger, suite globs `../{mirror,cross,starjobs}_cert9/
+> scratch/sweep_w*.log`, skill `D:/ffb_sksweep/cert9/results.txt`); the checker verified all four
+> suites against it + the ledger STAMP and printed DONE. Nothing is running; no `.loop_wait.json`.
+> **Next tier = a GOAL decision for the user** (do not auto-jump). Parked follow-ups: Secure the Ball
+> client-rule rework (`docs/secure_the_ball_client_rule_2026-11-21.patch`); the dead-file `apply_to`
+> in `step/bb2020/ttm/step_init_scatter_player.rs:152`; §N replay parity (docs/REPLAY_PARITY_PLAN.md).
+>
+> **History -- RESUME HERE of 2026-11-22 07:22 (loop iteration 3 of 11-22), superseded:**
 > Supervisor directive of 07:15 carried out and removed: the user lifted the 21:00-07:00 window
 > until **Mon 2026-11-23 08:00** (0x7FF mask + 4 workers kept). **RUNNING: cert9 window 2, driver
 > PID 9000** = `final_cert.ps1 -name cert9 -skipLedger -anytime` (child cert_chain PID 3044,

@@ -1,0 +1,11 @@
+{
+  "exe": "D:/ffb_star/bin/ffb-parity-cert9.exe",
+  "jar": "D:/ffb_star/bin/ffb-ai-cert9.jar",
+  "ledger": "D:/ffb_ledger/cert9",
+  "suites": {
+    "mirror": "C:/Users/Admin/niels/ffb-rust/mirror_cert9/scratch/sweep_w*.log",
+    "cross": "C:/Users/Admin/niels/ffb-rust/cross_cert9/scratch/sweep_w*.log",
+    "star": "C:/Users/Admin/niels/ffb-rust/starjobs_cert9/scratch/sweep_w*.log",
+    "skill": "D:/ffb_sksweep/cert9/results.txt"
+  }
+}
