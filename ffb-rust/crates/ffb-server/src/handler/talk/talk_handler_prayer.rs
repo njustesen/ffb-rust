@@ -320,6 +320,7 @@ mod tests {
             player_id: Some("p1".to_string()),
             skills: vec![SkillId::MightyBlow],
             skill_choice_mode: None,
+            null_skill_slots: vec![],
         };
         // roll 5 = KNUCKLE_DUSTERS (bb2025), requires argument.
         let commands = vec!["/prayer".to_string(), "5".to_string(), "Mighty_Blow".to_string()];

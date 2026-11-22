@@ -91,6 +91,14 @@ pub enum DialogId {
 }
 
 impl DialogId {
+    /// Java `DialogId.values()` (declaration order).
+    pub const VALUES: [DialogId; 84] = [DialogId::INFORMATION, DialogId::YES_OR_NO_QUESTION, DialogId::GAME_COACH_PASSWORD, DialogId::TEAM_CHOICE, DialogId::COIN_CHOICE, DialogId::RE_ROLL, DialogId::RE_ROLL_PROPERTIES, DialogId::RE_ROLL_FOR_TARGETS, DialogId::RE_ROLL_BLOCK_FOR_TARGETS, DialogId::SKILL_USE, DialogId::PROGRESS_BAR, DialogId::TEAM_SETUP, DialogId::USE_APOTHECARY, DialogId::USE_APOTHECARIES, DialogId::USE_IGORS, DialogId::USE_MORTUARY_ASSISTANTS, DialogId::RECEIVE_CHOICE, DialogId::FOLLOWUP_CHOICE, DialogId::START_GAME, DialogId::APOTHECARY_CHOICE, DialogId::TOUCHBACK, DialogId::INTERCEPTION, DialogId::SETUP_ERROR, DialogId::GAME_STATISTICS, DialogId::WINNINGS_RE_ROLL, DialogId::GAME_CHOICE, DialogId::KEY_BINDINGS, DialogId::BLOCK_ROLL, DialogId::PLAYER_CHOICE, DialogId::DEFENDER_ACTION, DialogId::JOIN, DialogId::CONCEDE_GAME, DialogId::ABOUT, DialogId::END_TURN, DialogId::LEAVE_GAME, DialogId::BRIBES, DialogId::PILING_ON, DialogId::BUY_INDUCEMENTS, DialogId::SOUND_VOLUME, DialogId::JOURNEYMEN, DialogId::SCALING_FACTOR, DialogId::CHAT_COMMANDS, DialogId::KICK_SKILL, DialogId::USE_IGOR, DialogId::USE_MORTUARY_ASSISTANT, DialogId::KICKOFF_RETURN, DialogId::SWARMING, DialogId::SWARMING_ERROR, DialogId::PETTY_CASH, DialogId::WIZARD_SPELL, DialogId::USE_INDUCEMENT, DialogId::PASS_BLOCK, DialogId::BUY_CARDS, DialogId::BUY_CARDS_AND_INDUCEMENTS, DialogId::ARGUE_THE_CALL, DialogId::SELECT_BLITZ_TARGET, DialogId::OPPONENT_BLOCK_SELECTION, DialogId::PILE_DRIVER, DialogId::USE_CHAINSAW, DialogId::BLOCK_ROLL_PARTIAL_RE_ROLL, DialogId::INVALID_SOLID_DEFENCE, DialogId::SELECT_SKILL, DialogId::BRIBERY_AND_CORRUPTION_RE_ROLL, DialogId::SELECT_GAZE_TARGET, DialogId::CONFIRM_END_ACTION, DialogId::CHANGE_LIST, DialogId::SELECT_WEATHER, DialogId::INFORMATION_OKAY, DialogId::STORE_PROPERTIES_LOCAL, DialogId::KICK_OFF_RESULT, DialogId::BLOODLUST_ACTION, DialogId::PENALTY_SHOOTOUT, DialogId::REPLAY_MODE_CHOICE, DialogId::CREDITS, DialogId::CREDITS_LICENSE, DialogId::BUY_PRAYERS_AND_INDUCEMENTS, DialogId::BLOCK_ROLL_PROPERTIES, DialogId::RE_ROLL_BLOCK_FOR_TARGETS_PROPERTIES, DialogId::OPPONENT_BLOCK_SELECTION_PROPERTIES, DialogId::PICK_UP_CHOICE, DialogId::SELECT_KEYWORD, DialogId::SELECT_POSITION, DialogId::RE_ROLL_REGENERATION_MULTIPLE, DialogId::PUNT_TO_CROWD];
+
+    /// Java `DialogIdFactory.forName`: the first value whose name `equalsIgnoreCase` the input.
+    pub fn for_name_ignore_case(name: &str) -> Option<DialogId> {
+        DialogId::VALUES.iter().copied().find(|d| crate::util::java_json::java_equals_ignore_case(d.get_name(), name))
+    }
+
     pub fn get_name(self) -> &'static str {
         match self {
             DialogId::INFORMATION => "information",

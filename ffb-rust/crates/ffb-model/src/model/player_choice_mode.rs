@@ -196,6 +196,12 @@ impl PlayerChoiceMode {
         Self::all().iter().copied().find(|v| v.get_name().eq_ignore_ascii_case(name))
     }
 
+    /// Java `PlayerChoiceModeFactory.forName`: the first value whose name `equalsIgnoreCase`
+    /// (Java's full rule, not just ASCII); `None` = Java null.
+    pub fn for_name_ignore_case(name: &str) -> Option<Self> {
+        Self::all().iter().copied().find(|v| crate::util::java_json::java_equals_ignore_case(v.get_name(), name))
+    }
+
     fn all() -> &'static [PlayerChoiceMode] {
         &[
             PlayerChoiceMode::TENTACLES,

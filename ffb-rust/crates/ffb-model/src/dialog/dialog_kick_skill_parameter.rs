@@ -39,6 +39,32 @@ impl IDialogParameter for DialogKickSkillParameter {
     }
 }
 
+// JSON serialization (BACKLOG §O).
+impl DialogKickSkillParameter {
+    /// Java `initFrom(IFactorySource, JsonValue)`.
+    pub fn init_from(&mut self, _rules: crate::enums::Rules, json: &serde_json::Value) -> Result<(), String> {
+        use crate::util::java_json as jj;
+        let obj = jj::to_json_object(json)?;
+        super::util_dialog_parameter::validate_dialog_id_json(DialogId::KICK_SKILL, obj)?;
+        self.player_id = jj::get_string(obj, "playerId")?;
+        self.ball_coordinate = jj::get_field_coordinate(obj, "ballCoordinate")?;
+        self.ball_coordinate_with_kick = jj::get_field_coordinate(obj, "ballCoordinateWithKick")?;
+        Ok(())
+    }
+
+    /// Java `toJsonValue()`.
+    pub fn to_json_value(&self, _rules: crate::enums::Rules) -> Result<serde_json::Value, String> {
+        use crate::util::java_json as jj;
+        use serde_json::Value;
+        let mut o = serde_json::Map::new();
+        o.insert("dialogId".into(), Value::from(DialogId::KICK_SKILL.get_name()));
+        o.insert("playerId".into(), jj::string_or_null(self.player_id.as_deref()));
+        o.insert("ballCoordinate".into(), jj::field_coordinate_or_null(self.ball_coordinate));
+        o.insert("ballCoordinateWithKick".into(), jj::field_coordinate_or_null(self.ball_coordinate_with_kick));
+        Ok(Value::Object(o))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

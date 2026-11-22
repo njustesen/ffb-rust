@@ -30,6 +30,21 @@ impl KeywordChoiceMode {
     pub fn for_name(name: &str) -> Option<Self> {
         match name { "gettingEven" => Some(KeywordChoiceMode::GETTING_EVEN), _ => None }
     }
+
+    /// Java `Enum.name()`: the constant name.
+    pub fn name(self) -> &'static str {
+        match self { KeywordChoiceMode::GETTING_EVEN => "GETTING_EVEN" }
+    }
+
+    /// Java `KeywordChoiceMode.valueOf(String)`: the EXACT constant name; null -> NullPointerException,
+    /// anything else -> IllegalArgumentException (both `Err`).
+    pub fn value_of(name: Option<&str>) -> Result<Self, String> {
+        match name {
+            Some("GETTING_EVEN") => Ok(KeywordChoiceMode::GETTING_EVEN),
+            Some(other) => Err(format!("No enum constant com.fumbbl.ffb.KeywordChoiceMode.{other}")),
+            None => Err("KeywordChoiceMode.valueOf: Name is null".to_string()),
+        }
+    }
 }
 
 #[cfg(test)]

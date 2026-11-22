@@ -32,6 +32,42 @@ impl IDialogParameter for DialogBribesParameter {
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
 
+// JSON serialization (BACKLOG §O).
+impl DialogBribesParameter {
+    /// Java `addXxx(String[])`: `ArrayTool.isProvided` (a null or empty array adds nothing), each
+    /// element through the `StringTool.isProvided` filter (null and "" are skipped).
+    fn add_provided(target: &mut Vec<String>, values: Option<Vec<Option<String>>>) {
+        for value in values.into_iter().flatten().flatten() {
+            if crate::util::java_json::is_provided(Some(&value)) {
+                target.push(value);
+            }
+        }
+    }
+
+    /// Java `initFrom(IFactorySource, JsonValue)`.
+    pub fn init_from(&mut self, _rules: crate::enums::Rules, json: &serde_json::Value) -> Result<(), String> {
+        use crate::util::java_json as jj;
+        let obj = jj::to_json_object(json)?;
+        super::util_dialog_parameter::validate_dialog_id_json(DialogId::BRIBES, obj)?;
+        self.team_id = jj::get_string(obj, "teamId")?;
+        self.max_nr_of_bribes = jj::get_int(obj, "maxNrOfBribes")?;
+        Self::add_provided(&mut self.player_ids, jj::get_string_array(obj, "playerIds")?);
+        Ok(())
+    }
+
+    /// Java `toJsonValue()`.
+    pub fn to_json_value(&self, _rules: crate::enums::Rules) -> Result<serde_json::Value, String> {
+        use crate::util::java_json as jj;
+        use serde_json::Value;
+        let mut o = serde_json::Map::new();
+        o.insert("dialogId".to_string(), Value::String(DialogId::BRIBES.get_name().to_string()));
+        o.insert("teamId".to_string(), jj::string_or_null(self.team_id.as_deref()));
+        o.insert("maxNrOfBribes".to_string(), Value::from(self.max_nr_of_bribes));
+        o.insert("playerIds".to_string(), jj::string_array(&self.player_ids));
+        Ok(Value::Object(o))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -51,5 +87,27 @@ mod tests {
         let back: DialogBribesParameter = serde_json::from_str(&json).unwrap();
         assert_eq!(back.get_max_nr_of_bribes(), 5);
         assert_eq!(back.get_team_id(), Some("team2"));
+    }
+}
+
+#[cfg(test)]
+mod json_tests {
+    use crate::dialog::dialog_parameter_factory::DialogParameterFactory;
+    use crate::enums::Rules;
+    use serde_json::{json, Value};
+
+    fn round_trip(rules: Rules, input: Value) -> Result<Value, String> {
+        let p = DialogParameterFactory::new().for_json_value(rules, &input)?.expect("parameter");
+        p.to_json_value(rules)
+    }
+
+    #[test]
+    fn json_round_trip_case() {
+        assert_eq!(round_trip(Rules::Bb2025, json!({"dialogId": "bribes", "maxNrOfBribes": 1, "playerIds": ["p1"], "teamId": "t1"})).unwrap(), json!({"dialogId": "bribes", "maxNrOfBribes": 1, "playerIds": ["p1"], "teamId": "t1"}));
+    }
+
+    #[test]
+    fn ids_are_filtered() {
+        assert_eq!(round_trip(Rules::Bb2025, json!({"dialogId": "bribes", "playerIds": ["", null, "p2"]})).unwrap(), json!({"dialogId": "bribes", "maxNrOfBribes": 0, "playerIds": ["p2"], "teamId": null}));
     }
 }

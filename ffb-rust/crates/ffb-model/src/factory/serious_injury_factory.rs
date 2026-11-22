@@ -211,6 +211,27 @@ pub fn name_of_kind_in(rules: Rules, kind: SeriousInjuryKind) -> Option<String> 
     values_in(rules).into_iter().find(|v| v.to_kind() == kind).map(|v| v.get_name().to_string())
 }
 
+/// `(SeriousInjury) JsonEnumWithNameOption(<key>, SERIOUS_INJURY).getFrom` as the engine's kind:
+/// absent/null -> null, else `forName` of the `rules` factory (unknown -> null).
+pub fn kind_from_json(
+    rules: Rules,
+    obj: &crate::util::java_json::JsonObject,
+    key: &str,
+) -> Result<Option<SeriousInjuryKind>, String> {
+    Ok(crate::util::java_json::get_enum_name(obj, key)?.and_then(|name| for_name_in(rules, name)).map(|si| si.to_kind()))
+}
+
+/// `UtilJson.toJsonValue(SeriousInjury)` of a kind: null -> JSON null, else the `rules` name; a kind
+/// the ruleset has no injury for is an `Err` (Java could not hold it).
+pub fn kind_to_json(rules: Rules, kind: Option<SeriousInjuryKind>) -> Result<serde_json::Value, String> {
+    match kind {
+        None => Ok(serde_json::Value::Null),
+        Some(k) => name_of_kind_in(rules, k)
+            .map(serde_json::Value::from)
+            .ok_or_else(|| format!("serious injury {k:?} is not a {rules:?} injury")),
+    }
+}
+
 /// Java: `com.fumbbl.ffb.factory.SeriousInjuryFactory`.
 #[derive(Debug, Clone, Default)]
 pub struct SeriousInjuryFactory {

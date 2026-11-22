@@ -377,6 +377,14 @@ impl CommonProperty {
         Self::all().iter().copied().find(|v| v.get_key().eq_ignore_ascii_case(key))
     }
 
+    /// Java `CommonProperty.forKey(key)` exactly: the first constant (declaration order) whose key
+    /// `String.equalsIgnoreCase` the input (Java's Unicode simple case folding, not ASCII-only);
+    /// a null key matches nothing.
+    pub fn for_key_java(key: Option<&str>) -> Option<Self> {
+        let key = key?;
+        Self::all().iter().copied().find(|v| crate::util::java_json::java_equals_ignore_case(v.get_key(), key))
+    }
+
     pub fn all() -> &'static [CommonProperty] {
         &[
             CommonProperty::CLIENT_COMMAND_COMPRESSION,

@@ -25,6 +25,13 @@ impl ReRolledActions {
         self.values.get(&name.to_lowercase())
     }
 
+    /// Java `ReRolledActionFactory.forName(name)` (`values().get(name.toLowerCase())`) on the one
+    /// shared registry -- for the dialog JSON decoders (BACKLOG §O), which must not rebuild the map.
+    pub fn for_name_shared(name: &str) -> Option<&'static ReRolledAction> {
+        static REGISTRY: std::sync::OnceLock<ReRolledActions> = std::sync::OnceLock::new();
+        REGISTRY.get_or_init(ReRolledActions::new).for_name(name)
+    }
+
     fn all_actions() -> Vec<ReRolledAction> {
         vec![
             ReRolledAction::new("Go For It"),
@@ -87,6 +94,8 @@ impl ReRolledActions {
             ReRolledAction::new("com.fumbbl.ffb.skill.bb2025.special.BlastinSolvesEverything"),
             ReRolledAction::new("Punt Direction"),
             ReRolledAction::new("Punt Distance"),
+            ReRolledAction::new("Swoop Direction"),
+            ReRolledAction::new("Swoop Distance"),
         ]
     }
 }

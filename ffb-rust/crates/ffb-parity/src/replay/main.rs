@@ -10,8 +10,12 @@
 //!                                      Rust init_from -> to_json_value of one Game subtree of every
 //!                                      replay's serverGameState vs the Java `ReplayStartDump`
 //!                                      `<id>.gs.json` (see start_check.rs)
+//!   dialog-check <dialog.tsv> [dialogId...]
+//!                                      Rust dialog-parameter JSON vs the Java `ReplayDialogDump`
+//!                                      (every distinct dialog parameter; see dialog_check.rs)
 
 mod canonical;
+mod dialog_check;
 mod drop_rules;
 mod ffbr;
 mod start_check;
@@ -24,6 +28,7 @@ fn usage() -> ! {
     eprintln!("usage: ffb-replay scan <dir|file>...");
     eprintln!("       ffb-replay canon-check <dump_dir> <states_file>");
     eprintln!("       ffb-replay start-check <java_dir> <subtree> <dir|file>...");
+    eprintln!("       ffb-replay dialog-check <dialog.tsv> [dialogId...]");
     std::process::exit(2);
 }
 
@@ -38,6 +43,7 @@ fn main() {
             &args[2],
             &args[3..].iter().map(PathBuf::from).collect::<Vec<_>>(),
         ),
+        "dialog-check" if args.len() >= 2 => dialog_check::dialog_check(Path::new(&args[1]), &args[2..]),
         _ => usage(),
     };
     std::process::exit(code);

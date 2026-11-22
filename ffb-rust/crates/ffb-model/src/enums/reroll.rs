@@ -29,6 +29,47 @@ impl ReRollProperty {
         }
     }
 
+    /// Java `ReRollPropertyFactory.forName`: the first value (declaration order) whose name
+    /// `equalsIgnoreCase` the input, else null.
+    pub fn for_name_ignore_case(name: &str) -> Option<Self> {
+        [
+            ReRollProperty::Trr, ReRollProperty::BrilliantCoaching, ReRollProperty::Mascot,
+            ReRollProperty::Pro, ReRollProperty::Loner, ReRollProperty::PumpUpTheCrowd,
+            ReRollProperty::ShowStar,
+        ]
+        .into_iter()
+        .find(|p| crate::util::java_json::java_equals_ignore_case(p.name(), name))
+    }
+
+    /// Java (the dialog / `BlockRollProperties` decoders, BACKLOG §O):
+    /// `ReRollPropertyFactory factory = source.getFactory(RE_ROLL_PROPERTY);`
+    /// `Arrays.stream(RE_ROLL_PROPERTIES.getFrom(source, obj)).map(factory::forName)`.
+    /// The factory is `@RulesCollection(BB2025)` only, so in any other ruleset it is null and the
+    /// bound method reference `factory::forName` throws even for an empty array; an absent or null
+    /// array throws too (`Arrays.stream(null)`); a JSON-null element or an unknown name is a null
+    /// list entry (`None`).
+    pub fn list_from_json(
+        rules: crate::enums::Rules,
+        obj: &crate::util::java_json::JsonObject,
+    ) -> Result<Vec<Option<Self>>, String> {
+        let names = crate::util::java_json::get_string_array(obj, "reRollProperties")?
+            .ok_or("reRollProperties: NullPointerException (Arrays.stream(null))")?;
+        if rules != crate::enums::Rules::Bb2025 {
+            return Err(format!("no ReRollPropertyFactory for {rules:?} (factory::forName on null)"));
+        }
+        Ok(names.iter().map(|n| n.as_deref().and_then(Self::for_name_ignore_case)).collect())
+    }
+
+    /// Java `IJsonOption.RE_ROLL_PROPERTIES.addTo(obj, props.stream().map(ReRollProperty::getName)..)`:
+    /// a null entry throws (NPE in `getName`).
+    pub fn list_to_json(properties: &[Option<Self>]) -> Result<serde_json::Value, String> {
+        properties
+            .iter()
+            .map(|p| p.map(|p| serde_json::Value::from(p.name())).ok_or_else(|| "ReRollProperty::getName on null".to_string()))
+            .collect::<Result<Vec<_>, _>>()
+            .map(serde_json::Value::Array)
+    }
+
     pub fn from_name(name: &str) -> Option<Self> {
         [
             ReRollProperty::Trr, ReRollProperty::BrilliantCoaching, ReRollProperty::Mascot,

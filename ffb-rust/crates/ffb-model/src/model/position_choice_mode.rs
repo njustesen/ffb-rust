@@ -27,6 +27,21 @@ impl PositionChoiceMode {
     pub fn for_name(name: &str) -> Option<Self> {
         match name { "raiseDead" => Some(PositionChoiceMode::RAISE_DEAD), _ => None }
     }
+
+    /// Java `Enum.name()`: the constant name.
+    pub fn name(self) -> &'static str {
+        match self { PositionChoiceMode::RAISE_DEAD => "RAISE_DEAD" }
+    }
+
+    /// Java `PositionChoiceMode.valueOf(String)`: the EXACT constant name; null -> NullPointerException,
+    /// anything else -> IllegalArgumentException (both `Err`).
+    pub fn value_of(name: Option<&str>) -> Result<Self, String> {
+        match name {
+            Some("RAISE_DEAD") => Ok(PositionChoiceMode::RAISE_DEAD),
+            Some(other) => Err(format!("No enum constant com.fumbbl.ffb.PositionChoiceMode.{other}")),
+            None => Err("PositionChoiceMode.valueOf: Name is null".to_string()),
+        }
+    }
 }
 
 #[cfg(test)]

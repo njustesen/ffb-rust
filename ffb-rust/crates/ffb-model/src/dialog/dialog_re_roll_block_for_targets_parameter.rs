@@ -20,6 +20,19 @@ impl IDialogParameter for DialogReRollBlockForTargetsParameter {
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
 
+// JSON serialization (BACKLOG §O).
+impl DialogReRollBlockForTargetsParameter {
+    /// Java `initFrom(IFactorySource, JsonValue)`.
+    pub fn init_from(&mut self, _rules: crate::enums::Rules, _json: &serde_json::Value) -> Result<(), String> {
+        Err("DialogReRollBlockForTargetsParameter.initFrom: not ported yet".to_string())
+    }
+
+    /// Java `toJsonValue()`.
+    pub fn to_json_value(&self, _rules: crate::enums::Rules) -> Result<serde_json::Value, String> {
+        Err("DialogReRollBlockForTargetsParameter.toJsonValue: not ported yet".to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

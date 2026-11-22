@@ -177,6 +177,16 @@ impl SkillUse {
         Self::all().iter().copied().find(|v| v.get_name().eq_ignore_ascii_case(name))
     }
 
+    /// Java `SkillUseFactory.forName(name)` exactly: `StringTool.isProvided(name)`, then the first
+    /// constant (declaration order) whose name `equalsIgnoreCase` (Unicode) -- so "gainFrenzy" is
+    /// always GAIN_FRENZY_FOR_BLITZ, never GAIN_GAZE (which shares the name).
+    pub fn for_name_java(name: &str) -> Option<Self> {
+        if name.is_empty() {
+            return None;
+        }
+        Self::all().iter().copied().find(|v| crate::util::java_json::java_equals_ignore_case(name, v.get_name()))
+    }
+
     fn all() -> &'static [Self] {
         &[
             Self::WOULD_NOT_HELP, Self::NO_TEAM_MATE_IN_RANGE, Self::STOP_OPPONENT,

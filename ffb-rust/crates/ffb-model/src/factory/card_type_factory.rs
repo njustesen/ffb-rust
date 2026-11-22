@@ -29,8 +29,41 @@ impl<'a> CardTypeFactory<'a> {
     }
 }
 
+/// Java: `game.getFactory(Factory.CARD_TYPE).forName(name)` for a game of `rules` --
+/// `initialize(Game)` fills the set with `Scanner<>(CardType.class).getEnumValues(options)`, i.e.
+/// the values of the `CardType` enums whose `@RulesCollection` the ruleset is-or-extends:
+/// `bb2016.CardType` for BB2016, `bb2020.CardType` for BB2020 and NONE for BB2025 (no BB2025
+/// card type exists, so every name is null there). `forName` is `equalsIgnoreCase` and yields
+/// the type, whose `getName()` is the canonical spelling. `None` = Java null.
+pub fn for_name_in(rules: crate::enums::Rules, name: &str) -> Option<&'static str> {
+    use crate::enums::Rules;
+    use crate::inducement::bb2016::card_type::CardType as Bb2016CardType;
+    use crate::inducement::bb2020::card_type::CardType as Bb2020CardType;
+    static BB2016: [Bb2016CardType; 2] = [Bb2016CardType::MAGIC_ITEM, Bb2016CardType::DIRTY_TRICK];
+    static BB2020: [Bb2020CardType; 2] = [Bb2020CardType::MAGIC_ITEM, Bb2020CardType::DIRTY_TRICK];
+    let types: Vec<&'static dyn CardType> = match rules {
+        Rules::Bb2016 => BB2016.iter().map(|t| t as &'static dyn CardType).collect(),
+        Rules::Bb2020 => BB2020.iter().map(|t| t as &'static dyn CardType).collect(),
+        Rules::Bb2025 | Rules::Common => Vec::new(),
+    };
+    types
+        .into_iter()
+        .map(|t| t.get_name())
+        .find(|type_name| crate::util::java_json::java_equals_ignore_case(type_name, name))
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn for_name_in_is_per_ruleset_and_returns_the_canonical_name() {
+        use crate::enums::Rules;
+        assert_eq!(super::for_name_in(Rules::Bb2016, "MAGICITEM"), Some("magicItem"));
+        assert_eq!(super::for_name_in(Rules::Bb2020, "dirtyTrick"), Some("dirtyTrick"));
+        // no BB2025 CardType enum: the factory's set is empty
+        assert_eq!(super::for_name_in(Rules::Bb2025, "magicItem"), None);
+        assert_eq!(super::for_name_in(Rules::Bb2016, "unknown"), None);
+    }
+
     use super::*;
     use crate::inducement::bb2016::card_type::CardType as Bb2016CardType;
 

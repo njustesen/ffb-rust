@@ -58,10 +58,124 @@ pub fn drop_unknown_inducements(rules: Rules, options: &GameOptions, game_json: 
     Ok(dropped_keys)
 }
 
+/// `FumbblReplayParser.knownInducementType(game, name)`: the game's `InducementTypeFactory.forName`.
+fn known_inducement_type(rules: Rules, name: &str) -> bool {
+    ffb_model::factory::inducement_type_factory::for_name_in(rules, name).is_some()
+}
+
+/// `FumbblReplayParser.dropUnknownValues(game, mc)` on one model change of a known id: values
+/// inside it that the in-repo engine has no constant for. Returns `(drop the whole change,
+/// countUnknown keys)`; otherwise removes the unknown elements in place. The game has a prayer
+/// factory only in BB2020/BB2025 (`prayers != null`).
+/// `Err` where minimal-json would throw (`getString` on a non-string `inducementType`).
+pub fn drop_unknown_values(rules: Rules, options: &GameOptions, mc: &mut Value) -> Result<(bool, Vec<String>), String> {
+    let mut keys = Vec::new();
+    let id = match mc.get("modelChangeId") {
+        None => String::new(),
+        Some(Value::String(s)) => s.clone(),
+        Some(other) => return Err(format!("modelChangeId getString on {other}")),
+    };
+    let has_prayer_factory = matches!(rules, Rules::Bb2020 | Rules::Bb2025);
+    let value = mc.get_mut("modelChangeValue");
+    match id.as_str() {
+        "fieldModelAddPrayer" | "fieldModelRemovePrayer" => {
+            // prayers.valueOf(name): the ruleset's Prayer enum constant, IllegalArgumentException if none
+            if let (true, Some(Value::String(name))) = (has_prayer_factory, value.as_deref()) {
+                let known = match rules {
+                    Rules::Bb2020 => ffb_model::inducement::bb2020::prayer::Prayer::for_enum_name(name).is_some(),
+                    _ => ffb_model::inducement::bb2025::prayer::Prayer::for_enum_name(name).is_some(),
+                };
+                if !known {
+                    keys.push(format!("{id}={name}"));
+                    return Ok((true, keys));
+                }
+            }
+            return Ok((false, keys));
+        }
+        "inducementSetAddPrayer" | "inducementSetRemovePrayer" => {
+            if let (true, Some(Value::String(name))) = (has_prayer_factory, value.as_deref()) {
+                if ffb_model::factory::prayer_factory::for_name_in(rules, options, name)?.is_none() {
+                    keys.push(format!("{id}={name}"));
+                    return Ok((true, keys));
+                }
+            }
+            return Ok((false, keys));
+        }
+        "inducementSetAddInducement" | "inducementSetRemoveInducement" => {
+            if let Some(Value::Object(obj)) = value.as_deref() {
+                let type_name = match obj.get("inducementType") {
+                    None => None,
+                    Some(Value::String(s)) => Some(s.as_str()),
+                    Some(other) => return Err(format!("{id}: inducementType getString on {other}")),
+                };
+                if let Some(name) = type_name {
+                    if !known_inducement_type(rules, name) {
+                        keys.push(format!("{id}={name}"));
+                        return Ok((true, keys));
+                    }
+                }
+            }
+            return Ok((false, keys));
+        }
+        _ => {}
+    }
+    if let Some(Value::Object(obj)) = value {
+        // DialogUseInducementParameter: an inducement type the engine has no constant for.
+        if let Some(Value::Array(types)) = obj.get_mut("inducementTypeArray") {
+            types.retain(|t| match t {
+                Value::String(name) if !known_inducement_type(rules, name) => {
+                    keys.push(format!("inducementType={name}"));
+                    false
+                }
+                _ => true,
+            });
+        }
+        if let Some(Value::Array(props)) = obj.get_mut("reRollProperties") {
+            props.retain(|p| match p {
+                Value::String(name) if ffb_model::enums::ReRollProperty::for_name_ignore_case(name).is_none() => {
+                    keys.push(format!("reRollProperty={name}"));
+                    false
+                }
+                _ => true,
+            });
+        }
+    }
+    Ok((false, keys))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn drop_unknown_values_filters_dialog_arrays_and_drops_unknown_set_changes() {
+        let options = GameOptions::new();
+        let mut mc = json!({"modelChangeId": "gameSetDialogParameter", "modelChangeValue": {
+            "dialogId": "blockRollProperties",
+            "reRollProperties": ["TRR", "DRIVE_BONUS", "pro", 3]
+        }});
+        let (drop, keys) = drop_unknown_values(Rules::Bb2025, &options, &mut mc).unwrap();
+        assert!(!drop);
+        assert_eq!(keys, vec!["reRollProperty=DRIVE_BONUS"]);
+        assert_eq!(mc["modelChangeValue"]["reRollProperties"], json!(["TRR", "pro", 3]));
+
+        let mut mc = json!({"modelChangeId": "gameSetDialogParameter", "modelChangeValue": {
+            "dialogId": "useInducement", "inducementTypeArray": ["dwarfenWisdom", "bribes"]
+        }});
+        let (drop, keys) = drop_unknown_values(Rules::Bb2025, &options, &mut mc).unwrap();
+        assert!(!drop);
+        assert_eq!(keys, vec!["inducementType=dwarfenWisdom"]);
+        assert_eq!(mc["modelChangeValue"]["inducementTypeArray"], json!(["bribes"]));
+
+        let mut mc = json!({"modelChangeId": "inducementSetAddInducement", "modelChangeValue": {"inducementType": "dwarfenWisdom"}});
+        assert_eq!(drop_unknown_values(Rules::Bb2025, &options, &mut mc).unwrap(), (true, vec!["inducementSetAddInducement=dwarfenWisdom".to_string()]));
+
+        let mut mc = json!({"modelChangeId": "inducementSetAddPrayer", "modelChangeValue": "Blessing of Nuffle"});
+        assert!(drop_unknown_values(Rules::Bb2025, &options, &mut mc).unwrap().0);
+        // BB2016 has no prayer factory: kept
+        assert!(!drop_unknown_values(Rules::Bb2016, &options, &mut mc).unwrap().0);
+    }
 
     #[test]
     fn drops_newer_server_inducements_and_prayers_like_the_harness() {

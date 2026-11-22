@@ -23,6 +23,35 @@ impl IDialogParameter for DialogPileDriverParameter {
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
 
+// JSON serialization (BACKLOG §O).
+impl DialogPileDriverParameter {
+    /// Java `initFrom(IFactorySource, JsonValue)`.
+    pub fn init_from(&mut self, _rules: crate::enums::Rules, json: &serde_json::Value) -> Result<(), String> {
+        use crate::util::java_json as jj;
+        let obj = jj::to_json_object(json)?;
+        super::util_dialog_parameter::validate_dialog_id_json(DialogId::PILE_DRIVER, obj)?;
+        self.team_id = jj::get_string(obj, "teamId")?;
+        // Arrays.stream(PLAYER_IDS.getFrom(..)): absent/null -> NPE. A JSON-null element would be
+        // a null list entry, which this Vec<String> cannot hold (none occur) -> Err.
+        let ids = jj::get_string_array(obj, "playerIds")?.ok_or("playerIds: NullPointerException (Arrays.stream(null))")?;
+        for id in ids {
+            self.knocked_down_players.push(id.ok_or("playerIds: null element not representable")?);
+        }
+        Ok(())
+    }
+
+    /// Java `toJsonValue()`.
+    pub fn to_json_value(&self, _rules: crate::enums::Rules) -> Result<serde_json::Value, String> {
+        use crate::util::java_json as jj;
+        use serde_json::Value;
+        let mut o = serde_json::Map::new();
+        o.insert("dialogId".into(), Value::from(DialogId::PILE_DRIVER.get_name()));
+        o.insert("playerIds".into(), jj::string_array(&self.knocked_down_players));
+        o.insert("teamId".into(), jj::string_or_null(self.team_id.as_deref()));
+        Ok(Value::Object(o))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

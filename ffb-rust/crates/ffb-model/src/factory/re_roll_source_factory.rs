@@ -18,6 +18,13 @@ impl ReRollSourceFactory {
     }
 
     pub fn initialize(&mut self) {}
+
+    /// Java `ReRollSourceFactory.forName(name)` (`values().get(name.toLowerCase())`) on one shared
+    /// registry -- for the dialog JSON decoders (BACKLOG §O).
+    pub fn for_name_shared(name: &str) -> Option<&'static ReRollSource> {
+        static REGISTRY: std::sync::OnceLock<ReRollSources> = std::sync::OnceLock::new();
+        REGISTRY.get_or_init(ReRollSources::new).for_name(name)
+    }
 }
 
 #[cfg(test)]

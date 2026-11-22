@@ -305,6 +305,28 @@ impl SkillFactory {
         RULESET_SKILL_NAMES.iter().find(|(r, _, s)| *r == rules && *s == id).map(|(_, n, _)| *n)
     }
 
+    /// Java `(Skill) UtilJson.toEnumWithName(skillFactory, value)` -- also what a SKILL-factory
+    /// `JsonEnumWithNameOption.getFrom` does with the member value: absent or JSON null -> null,
+    /// a non-string throws (`asString`), else [`Self::for_name_in`] (an unknown name is null).
+    pub fn from_json_value_in(rules: Rules, value: Option<&serde_json::Value>) -> Result<Option<SkillId>, String> {
+        match value {
+            None | Some(serde_json::Value::Null) => Ok(None),
+            Some(serde_json::Value::String(name)) => Ok(Self::for_name_in(rules, name)),
+            Some(other) => Err(format!("skill: asString on {other}")),
+        }
+    }
+
+    /// Java `UtilJson.toJsonValue(Skill)`: null -> JSON null, else `skill.getName()` of the `rules`
+    /// factory. A skill the ruleset does not have is an `Err` (Java could not hold it).
+    pub fn to_json_value_in(rules: Rules, skill: Option<SkillId>) -> Result<serde_json::Value, String> {
+        match skill {
+            None => Ok(serde_json::Value::Null),
+            Some(id) => Self::name_in(rules, id)
+                .map(serde_json::Value::from)
+                .ok_or_else(|| format!("skill {id:?} is not a {rules:?} skill")),
+        }
+    }
+
     /// Returns an iterator over every registered `SkillId`.
     ///
     /// Mirrors `SkillFactory.getSkills()` which returns `skills.values()`.

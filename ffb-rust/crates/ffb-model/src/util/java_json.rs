@@ -182,6 +182,102 @@ pub fn player_state_or_null(id: Option<i32>) -> Value {
     id.map_or(Value::Null, Value::from)
 }
 
+/// `JsonArrayOption.getFrom`: absent or JSON null -> a NEW EMPTY array (not null!); a non-array
+/// throws (`asArray`). Contrast `get_array`, which keeps absent/null as `None`.
+pub fn get_json_array_option(obj: &JsonObject, key: &str) -> Result<Vec<Value>, String> {
+    Ok(get_array(obj, key)?.cloned().unwrap_or_default())
+}
+
+/// `JsonIntArrayOption.getFrom`: absent or JSON null -> null; every element `asInt()` (throws on
+/// a non-int, incl. JSON null).
+pub fn get_int_array(obj: &JsonObject, key: &str) -> Result<Option<Vec<i32>>, String> {
+    match get_array(obj, key)? {
+        None => Ok(None),
+        Some(a) => a.iter().map(|v| as_int(key, v)).collect::<Result<Vec<_>, _>>().map(Some),
+    }
+}
+
+/// `JsonIntArrayOption.addTo` value: null -> JSON null, else `[ints]`.
+pub fn int_array_or_null(values: Option<&[i32]>) -> Value {
+    values.map_or(Value::Null, |a| Value::Array(a.iter().map(|&i| Value::from(i)).collect()))
+}
+
+/// `JsonBooleanArrayOption.getFrom`: `getValueFrom(..).asArray()` with no null check -- absent
+/// (NPE) or JSON null (`asArray` throws) is an error; every element `asBoolean()`.
+pub fn get_boolean_array(obj: &JsonObject, key: &str) -> Result<Vec<bool>, String> {
+    match obj.get(key) {
+        Some(Value::Array(a)) => a.iter().map(|v| as_boolean(key, v)).collect(),
+        Some(v) => Err(format!("{key}: asArray on {v}")),
+        None => Err(format!("{key}: NullPointerException (missing boolean array)")),
+    }
+}
+
+/// `JsonBooleanArrayOption.addTo` value: null -> JSON null, else `[booleans]`.
+pub fn boolean_array_or_null(values: Option<&[bool]>) -> Value {
+    values.map_or(Value::Null, |a| Value::Array(a.iter().map(|&b| Value::Bool(b)).collect()))
+}
+
+/// `JsonStringArrayOption.addTo` value: null -> JSON null, else the strings (a null element ->
+/// JSON null).
+pub fn string_array_or_null(values: Option<&[Option<String>]>) -> Value {
+    values.map_or(Value::Null, |a| Value::Array(a.iter().map(|s| string_or_null(s.as_deref())).collect()))
+}
+
+/// `JsonStringArrayOption.addTo` of a non-null collection of non-null strings.
+pub fn string_array(values: &[String]) -> Value {
+    Value::Array(values.iter().map(|s| Value::String(s.clone())).collect())
+}
+
+/// `StringTool.isProvided(Object)`: non-null and `toString().length() > 0`.
+pub fn is_provided(value: Option<&str>) -> bool {
+    value.is_some_and(|s| !s.is_empty())
+}
+
+/// `JsonIntegerMapOption.getFrom`: a NEW map (Java `HashMap`); filled only when the value is a
+/// JSON object, each member `asInt()` (throws on a non-int). Absent, null or a non-object value ->
+/// empty. Returned in input member order; the Java map is a HashMap (its `addTo` order is the
+/// HashMap's, irrelevant under canonical key sorting). A duplicate member name: later wins.
+pub fn get_integer_map(obj: &JsonObject, key: &str) -> Result<Vec<(String, i32)>, String> {
+    let mut out: Vec<(String, i32)> = Vec::new();
+    if let Some(Value::Object(o)) = obj.get(key) {
+        for (name, v) in o {
+            let value = as_int(key, v)?;
+            match out.iter_mut().find(|(n, _)| n == name) {
+                Some(e) => e.1 = value,
+                None => out.push((name.clone(), value)),
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// `JsonIntegerMapOption.addTo`: `{name: int}` (always an object, possibly empty).
+pub fn integer_map(map: &[(String, i32)]) -> Value {
+    Value::Object(map.iter().map(|(k, v)| (k.clone(), Value::from(*v))).collect())
+}
+
+/// `JsonStringMapOption.getFrom`: a NEW map, filled only when the value is a JSON object; each
+/// member read as `JsonStringOption` (absent/null -> null, a non-string throws `asString`) and
+/// kept only if `StringTool.isProvided`, else mapped to null.
+pub fn get_string_map(obj: &JsonObject, key: &str) -> Result<Vec<(String, Option<String>)>, String> {
+    let mut out: Vec<(String, Option<String>)> = Vec::new();
+    if let Some(Value::Object(o)) = obj.get(key) {
+        for name in o.keys() {
+            let value = get_string(o, name)?.filter(|s| is_provided(Some(s)));
+            match out.iter_mut().find(|(n, _)| n == name) {
+                Some(e) => e.1 = value,
+                None => out.push((name.clone(), value)),
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// `JsonStringMapOption.addTo`: `{name: string|null}` (always an object, possibly empty).
+pub fn string_map(map: &[(String, Option<String>)]) -> Value {
+    Value::Object(map.iter().map(|(k, v)| (k.clone(), string_or_null(v.as_deref()))).collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

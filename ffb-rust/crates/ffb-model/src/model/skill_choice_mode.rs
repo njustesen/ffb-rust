@@ -39,6 +39,25 @@ impl SkillChoiceMode {
         }
     }
 
+    /// Java `SkillChoiceMode.name()` (the enum constant name).
+    pub fn name(self) -> &'static str {
+        match self {
+            SkillChoiceMode::INTENSIVE_TRAINING => "INTENSIVE_TRAINING",
+            SkillChoiceMode::WISDOM_OF_THE_WHITE_DWARF => "WISDOM_OF_THE_WHITE_DWARF",
+        }
+    }
+
+    /// Java `SkillChoiceMode.valueOf(name)`: the exact constant name; anything else (incl. null)
+    /// throws, so `Err`.
+    pub fn value_of(name: Option<&str>) -> Result<Self, String> {
+        match name {
+            Some("INTENSIVE_TRAINING") => Ok(SkillChoiceMode::INTENSIVE_TRAINING),
+            Some("WISDOM_OF_THE_WHITE_DWARF") => Ok(SkillChoiceMode::WISDOM_OF_THE_WHITE_DWARF),
+            Some(other) => Err(format!("No enum constant SkillChoiceMode.{other}")),
+            None => Err("SkillChoiceMode.valueOf: Name is null".to_string()),
+        }
+    }
+
     pub fn for_name(name: &str) -> Option<Self> {
         match name {
             "intensiveTraining" => Some(SkillChoiceMode::INTENSIVE_TRAINING),

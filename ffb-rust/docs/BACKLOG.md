@@ -11497,18 +11497,57 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
   numbers, 3 dice decorations, 2 pushback squares, 1 target selection state, 5 weathers, 59 null ball
   coordinates, 4 moving bombs. `cargo test --workspace` green (`field_model::json_tests`, java_json).
 
+### O2 log — iterations 10-11 (2026-11-23): dialog parameters gated (all 52 corpus dialog ids)
+- **Oracle (harness, ours):** `ReplayDialogDump <out.tsv> <dir|file>...` (ffb-ai
+  `simulation/ReplayDialogDump.java`, compiled privately into `D:/ffb_replay_parity/classes_dialog`
+  ahead of the frozen o1 jar -- the jar is untouched) writes one line per DISTINCT dialog parameter
+  of the corpus (the serverGameState's `game.dialogParameter` + every `gameSetDialogParameter`
+  change, raw = before the drop rules): `<ruleset>\t<start|change>\t<raw>\t<canonical Java
+  decode+encode | null | ERROR ..>`. Corpus output `D:/ffb_replay_parity/dialog_all.tsv` (57 MB,
+  171,048 lines); census `dialog_census.txt` (`tools/dialog_census.py`); per-id samples + shape
+  census `tools/dialog_samples.py <tsv> <dialogId> [n]`.
+- **Rust gate `ffb-replay dialog-check <tsv> [dialogId...]`** (`replay/dialog_check.rs`): same drop
+  rule (`drop_rules::drop_unknown_values`, ported this iteration) -> `DialogParameterFactory::
+  for_json_value` -> `to_json_value` -> canonical; a Java ERROR must be a Rust `Err`.
+  **171,048 identical, 0 different, 52 dialog ids.** `start-check dialogParameter`: **2,224/2,224**.
+- **Ported 1:1 (init_from/to_json_value + json tests):** the `DialogParameterFactory` dispatch
+  (unknown id -> null parameter, e.g. `reRollModifierChoice`) and every dialog class the corpus uses
+  (52 ids incl. blockRollProperties 119k, reRollProperties 17k, skillUse 8.7k, useApothecary 7.4k,
+  playerChoice 6.4k, buyPrayersAndInducements 3.6k, the card dialogs via per-ruleset
+  `card_factory`/`card_type_factory::for_name_in`); `model::BlockRollProperties` rewritten to its
+  Java fields (engine never used the model struct); `bb2020::InjuryDescription` JSON;
+  `serious_injury_factory::{kind_from_json, kind_to_json}`; `ReRollProperty::{for_name_ignore_case,
+  list_from_json, list_to_json}` (the factory exists ONLY in BB2025: other rulesets throw even for an
+  empty array); `SkillChoiceMode::value_of` (exact constant name), `CommonProperty::for_key_java`,
+  Java-exact `forName` for PlayerChoiceMode/KeywordChoiceMode/PositionChoiceMode/SkillUse/SoundId.
+- **Java semantics worth remembering:** `JsonArrayOption.getFrom` returns a NEW EMPTY array for
+  absent/null (so `if (array != null)` guards are moot) while `JsonStringArrayOption` returns null;
+  `selectedIndex` absent -> 0 (JsonIntOption), not the field's -1; `DialogSelectSkillParameter` keeps a
+  null `Skill` for an unknown name (Rust `null_skill_slots`); `menuProperty` is written only when
+  `CommonProperty.forKey` found it. `BlockRollProperties.reRollProperties` is a HashSet of enums whose
+  path is NOT in the canonical unordered list -> Rust `Err`s on >1 element (never in the corpus; if it
+  ever occurs, Java's order itself is per-JVM-run and the canonical rule needs extending).
+- **Still `Err` stubs (no corpus occurrence, FUMBBL never sent them):** journeymen, kickOffResult,
+  opponentBlockSelection(+Properties), pilingOn, reRollBlockForTargets, reRollForTargets,
+  reRollRegenerationMultiple, teamSetup, useChainsaw, useIgor(s), useMortuaryAssistant(s).
+
 ### RESUME HERE
-**This iteration (2026-11-23 ~02:15, loop iteration 8 of this run):** see "O2 log — iteration 9":
-FieldModel JSON; `fieldModel` 2,224/2,224. Nothing running; no `.loop_wait.json` needed.
-**Next:** O2(a) class by class, each = 1:1 port from the .java + unit tests + a `load_subtree` arm +
+**This iteration (2026-11-23, loop iteration 10 of this run):** see "O2 log — iterations 10-11":
+dialog parameters, `dialog-check` 171,048/0 and `start-check dialogParameter` 2,224/2,224 (iteration 10
+of the loop had left this port uncommitted; iteration 11 finished the last 10 classes, fixed the test
+modules and committed). Nothing running; no `.loop_wait.json` needed.
+**Next:** (7) the whole `Game`: Game scalars (`turnTime`, `gameTime`, `teamState` -- check SKELETON,
+`dialogParameter` field on Game, ...) + all gated subtrees -> `Game::init_from/to_json_value` ->
+compare the full `<id>.gs.json` sha on all 2,224; then `startOfGame` vs `<id>.sog.json`; then
+ModelChangeProcessor (O2(b)) -- the dialog-check tsv already covers every `gameSetDialogParameter`
+value. Previous list for reference:
+O2(a) class by class, each = 1:1 port from the .java + unit tests + a `load_subtree` arm +
 `start-check <subtree>` 2,224/2,224 (binary: `cargo build --release -p ffb-parity --bin ffb-replay`;
 run `target/release/ffb-replay.exe start-check D:/ffb_replay_parity/start_all <subtree>
 D:/ffb_replays/fumbbl D:/ffb_replays/partial D:/ffb_replays/window
 D:/ffb_replays/fumbbl_night_20261122 D:/ffb_replays/fumbbl_night_20261122/partial`):
 (1) ~~`actingPlayer`~~ DONE; (2) ~~`turnDataHome`/`turnDataAway`~~ DONE; (3) ~~`teamHome`/`teamAway`~~
-DONE; (4) ~~`gameResult`~~ DONE; (5) ~~`fieldModel`~~ DONE; (6) `dialogParameter` (next: census the
-corpus's dialog ids in the serverGameStates AND in the 877,712 `gameSetDialogParameter` changes,
-port each dialog class's JSON 1:1; unknown dialog ids -> the whole parameter null); (7) the whole
+DONE; (4) ~~`gameResult`~~ DONE; (5) ~~`fieldModel`~~ DONE; (6) ~~`dialogParameter`~~ DONE; (7) the whole
 `Game` (scalars + all of the above) -> compare the full gs.json sha; then `startOfGame` vs
 `<id>.sog.json`. After O2(a): ModelChangeProcessor. Open follow-ups: ZappedPlayer JSON (`Err` today;
 zap/unzap commands occur in 15 replays), skill-property sets in `temporaryPropertiesMap` (`Err` if

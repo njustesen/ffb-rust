@@ -89,6 +89,24 @@ fn load_subtree(subtree: &str, game: &mut Value) -> Result<Value, String> {
     }
 }
 
+/// `Game.initFrom`'s dialog parameter: `JsonObjectOption.getFrom` (absent or null -> null, a
+/// non-object throws), then `new DialogParameterFactory().forJsonValue(source, object)`; the Java
+/// `toJsonValue` of the result, `None` when the game has no parameter.
+fn load_dialog_parameter(game: &mut Value) -> Result<Option<Value>, String> {
+    let mut options = ffb_model::model::game_options::GameOptions::new();
+    options.init_from(game.get("gameOptions").ok_or("gameOptions missing in serverGameState")?)?;
+    let rules = options.rules_version()?;
+    let obj = ffb_model::util::java_json::to_json_object(game)?;
+    let Some(dialog_object) = ffb_model::util::java_json::get_object(obj, "dialogParameter")? else {
+        return Ok(None);
+    };
+    let factory = ffb_model::dialog::dialog_parameter_factory::DialogParameterFactory::new();
+    match factory.for_json_value(rules, &Value::Object(dialog_object.clone()))? {
+        None => Ok(None),
+        Some(p) => p.to_json_value(rules).map(Some),
+    }
+}
+
 /// First differing byte offset with a little context, for the report.
 fn first_difference(a: &str, b: &str) -> String {
     let pos = a.bytes().zip(b.bytes()).position(|(x, y)| x != y).unwrap_or(a.len().min(b.len()));
@@ -104,11 +122,22 @@ pub fn start_check(java_dir: &Path, subtree: &str, inputs: &[PathBuf]) -> i32 {
     for (id, path) in &replays {
         let result = (|| -> Result<(String, String), String> {
             let mut game = game_state_json(path)?;
-            let rust = load_subtree(subtree, &mut game)?;
-            let rust_text = canonical::canonical_copy(&rust, Some(subtree))?.to_json_string();
             let java_file = java_dir.join(format!("{id}.gs.json"));
             let java_text = std::fs::read_to_string(&java_file).map_err(|e| format!("{}: {e}", java_file.display()))?;
             let java: Value = serde_json::from_str(&java_text).map_err(|e| format!("java json: {e}"))?;
+            if subtree == "dialogParameter" {
+                // Game.toJsonValue writes the key only for a non-null parameter.
+                let rust = load_dialog_parameter(&mut game)?;
+                let text = |v: Option<&Value>| -> Result<String, String> {
+                    Ok(match v {
+                        None => "<absent>".to_string(),
+                        Some(v) => canonical::canonical_copy(v, Some(subtree))?.to_json_string(),
+                    })
+                };
+                return Ok((text(rust.as_ref())?, text(java.get(subtree))?));
+            }
+            let rust = load_subtree(subtree, &mut game)?;
+            let rust_text = canonical::canonical_copy(&rust, Some(subtree))?.to_json_string();
             let java_sub = java.get(subtree).ok_or_else(|| format!("{subtree} missing in the Java dump"))?;
             let java_sub_text = canonical::canonical_copy(java_sub, Some(subtree))?.to_json_string();
             Ok((rust_text, java_sub_text))

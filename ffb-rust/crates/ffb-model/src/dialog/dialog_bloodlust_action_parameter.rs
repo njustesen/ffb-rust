@@ -17,6 +17,28 @@ impl IDialogParameter for DialogBloodlustActionParameter {
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
 
+// JSON serialization (BACKLOG §O).
+impl DialogBloodlustActionParameter {
+    /// Java `initFrom(IFactorySource, JsonValue)`.
+    pub fn init_from(&mut self, _rules: crate::enums::Rules, json: &serde_json::Value) -> Result<(), String> {
+        use crate::util::java_json as jj;
+        let obj = jj::to_json_object(json)?;
+        super::util_dialog_parameter::validate_dialog_id_json(DialogId::BLOODLUST_ACTION, obj)?;
+        // JsonBooleanOption into a primitive boolean: absent -> NPE.
+        self.change_to_move = jj::get_boolean(obj, "changeToMove")?;
+        Ok(())
+    }
+
+    /// Java `toJsonValue()` = `DialogWithoutParameter.toJsonValue()` (the dialog id) + changeToMove.
+    pub fn to_json_value(&self, _rules: crate::enums::Rules) -> Result<serde_json::Value, String> {
+        use serde_json::Value;
+        let mut o = serde_json::Map::new();
+        o.insert("dialogId".into(), Value::from(DialogId::BLOODLUST_ACTION.get_name()));
+        o.insert("changeToMove".into(), Value::Bool(self.change_to_move));
+        Ok(Value::Object(o))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

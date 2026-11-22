@@ -45,6 +45,38 @@ impl IDialogParameter for DialogApothecaryChoiceParameter {
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
 
+// JSON serialization (BACKLOG §O).
+impl DialogApothecaryChoiceParameter {
+    /// Java `initFrom(IFactorySource, JsonValue)`.
+    pub fn init_from(&mut self, rules: crate::enums::Rules, json: &serde_json::Value) -> Result<(), String> {
+        use crate::factory::serious_injury_factory as sif;
+        use crate::util::java_json as jj;
+        let obj = jj::to_json_object(json)?;
+        super::util_dialog_parameter::validate_dialog_id_json(DialogId::APOTHECARY_CHOICE, obj)?;
+        self.player_id = jj::get_string(obj, "playerId")?;
+        self.player_state_old = jj::get_player_state(obj, "playerStateOld")?;
+        self.serious_injury_old = sif::kind_from_json(rules, obj, "seriousInjuryOld")?;
+        self.player_state_new = jj::get_player_state(obj, "playerStateNew")?;
+        self.serious_injury_new = sif::kind_from_json(rules, obj, "seriousInjuryNew")?;
+        Ok(())
+    }
+
+    /// Java `toJsonValue()`.
+    pub fn to_json_value(&self, rules: crate::enums::Rules) -> Result<serde_json::Value, String> {
+        use crate::factory::serious_injury_factory as sif;
+        use crate::util::java_json as jj;
+        use serde_json::Value;
+        let mut o = serde_json::Map::new();
+        o.insert("dialogId".into(), Value::from(DialogId::APOTHECARY_CHOICE.get_name()));
+        o.insert("playerId".into(), jj::string_or_null(self.player_id.as_deref()));
+        o.insert("playerStateOld".into(), jj::player_state_or_null(self.player_state_old.map(|s| s.0 as i32)));
+        o.insert("seriousInjuryOld".into(), sif::kind_to_json(rules, self.serious_injury_old)?);
+        o.insert("playerStateNew".into(), jj::player_state_or_null(self.player_state_new.map(|s| s.0 as i32)));
+        o.insert("seriousInjuryNew".into(), sif::kind_to_json(rules, self.serious_injury_new)?);
+        Ok(Value::Object(o))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

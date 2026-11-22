@@ -445,6 +445,12 @@ impl PlayerAction {
         Self::all().iter().copied().find(|v| v.name().eq_ignore_ascii_case(name))
     }
 
+    /// Java `PlayerActionFactory.forName(name)` exactly: the first constant (declaration order)
+    /// whose name `equalsIgnoreCase` (Unicode simple case folding) the input, else null.
+    pub fn for_name_java(name: &str) -> Option<Self> {
+        Self::all().iter().copied().find(|v| crate::util::java_json::java_equals_ignore_case(v.name(), name))
+    }
+
     pub fn all() -> &'static [PlayerAction] {
         &[
             PlayerAction::Move, PlayerAction::Block, PlayerAction::Blitz,

@@ -24,6 +24,19 @@ impl IDialogParameter for DialogReRollRegenerationMultipleParameter {
     fn transform(&self) -> Box<dyn IDialogParameter> { Box::new(self.clone()) }
 }
 
+// JSON serialization (BACKLOG §O).
+impl DialogReRollRegenerationMultipleParameter {
+    /// Java `initFrom(IFactorySource, JsonValue)`.
+    pub fn init_from(&mut self, _rules: crate::enums::Rules, _json: &serde_json::Value) -> Result<(), String> {
+        Err("DialogReRollRegenerationMultipleParameter.initFrom: not ported yet".to_string())
+    }
+
+    /// Java `toJsonValue()`.
+    pub fn to_json_value(&self, _rules: crate::enums::Rules) -> Result<serde_json::Value, String> {
+        Err("DialogReRollRegenerationMultipleParameter.toJsonValue: not ported yet".to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
