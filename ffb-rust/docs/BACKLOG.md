@@ -11643,7 +11643,54 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
 - Results: `fumbbl/` **10/10 identical**, partial + window 9/9, the 15 corpus zap replays 15/15.
   `cargo test --workspace` green (15,136). Commits `913281cae`, `8eac99a97`.
 
+### O2 log — iteration 15 (2026-11-23 ~05:00): Rust states 2,224/2,224 -- O2 COMPLETE
+- **Whole-corpus states run** (`ffb-replay-zap.exe`, = `8eac99a97`, 01:00-04:43):
+  `D:/ffb_replay_parity/rust_states_all2.log` = **2,223 identical, 0 different, 1 error** of 2,224
+  (6,620,874 Rust state lines). The one error: 1965232 at command 2177, `fieldModelAddWisdom`.
+- **Ported `fieldModelAddWisdom` 1:1** (`0896b494b`): `Constant.getGrantAbleSkills(skillFactory)` (Break
+  Tackle, Dauntless, Mighty Blow "1", Sure Feet -- those the ruleset's factory knows) filtered by
+  `getSkill().equals(value)`, `ifPresent` -> `FieldModel.addWisdomSkill`: `getPlayerById` (null -> NPE `Err`),
+  the ruleset's Wisdom of the White Dwarf (none in BB2016 -> `Err`), `addTemporarySkills(
+  enhancementSourceName(), {swv})` -- BB2020 source `"Wisdom of the White Dwarf"`, BB2025 overrides it to
+  `"Granted by Wisdom of the White Dwarf"`; `SkillWithValue` has identity equality, so every add appends.
+  Unit test `wisdom_grants_only_the_four_grant_able_skills_under_the_ruleset_source`.
+  **1965232: 3,283/3,283 identical.** Together: **every corpus replay's state sequence is identical to run5**
+  (the final certified run over the whole corpus on ONE frozen exe happens in O4).
+  `cargo test --workspace` green (15,137 passed, 0 failed).
+
 ### RESUME HERE
+**This iteration (2026-11-23, loop iteration 15):** O2 COMPLETE -- states 2,224/2,224 (see "O2 log --
+iteration 15"). Nothing running; no `.loop_wait.json`.
+**Next: O3 (Rust actions)**, the checker's `actions identical` line + Rust `status.json`. Scope (read
+`ffb-ai/.../simulation/FumbblReplayParser.java` first):
+1. `parseFile` record logic = lines ~757-1570 (one loop over the commands; ~15 pending-state machines:
+   move_target, RE_ROLL, FOLLOWUP_CHOICE, USE_APOTHECARY/APOTHECARY_CHOICE, pass target, USE_CHAINSAW,
+   PASS_BLOCK, TOUCHBACK, ...) + the `build*Record` builders (lines 1585-2179) + `recordError` kinds. Records
+   are built from the PRE- and POST-sync Game and the sync's REPORTS (the Rust reports have `init_from`;
+   check the drop rule `dropUnknownReports` is ported -- `drop_rules.rs`).
+2. `GameStateSerializer.serialize` (370 lines) -- the `state` object in every record (board array etc.).
+3. `MoveDecisionEngine.selectMoveTarget` / `selectPlayer` (player_select + move_target records carry its
+   `scores` = DOUBLES). The Rust heuristic agent exists (DetMath bit-identical since the heuristic campaign)
+   -- reuse it on the replay `Game`, do not re-port. The MDE scorers draw from the parser's static
+   `java.util.Random RNG` (seed 0 per replay) -> port `java.util.Random` (48-bit LCG) 1:1.
+4. Number printing: actions carry doubles (`1.0499999999999998`, `0.7272727272727273`); minimal-json writes
+   `Double.toString` with a trailing `.0` cut off. The JVM is Temurin **21** -> JDK19+ shortest-repr
+   `Double.toString` (Giulietti), with Java's exponent rules (`E` form below 1e-3 / from 1e7). Port that
+   formatter exactly; never print a float through serde_json's default.
+5. Line format: `{"replay_id","seq","final_score_home","final_score_away", ...record}` (key order as Java
+   writes it -- NOT canonical-sorted; compare byte for byte). `<id>.status.json` with exception /
+   skipped_syncs / record_errors / end_check / unknown_model_changes the Java way (end check: the
+   `endGame` comparison in parseFile).
+Census of record kinds (1965232): player_select 280, move_target MOVE 142 / BLITZ_MOVE 14 / FOUL_MOVE /
+HAND_OVER_MOVE / THROW_TEAM_MATE_MOVE, dialog BLOCK_ROLL_PROPERTIES 70, SKILL_USE 26, RE_ROLL 25,
+FOLLOWUP_CHOICE 10, USE_APOTHECARY 5, INTERCEPTION 5, COIN_CHOICE, RECEIVE_CHOICE, ARGUE_THE_CALL,
+pass_target 8, kickoff_target 5, foul_target, handoff_target. Suggested order: (4)+(2) with a gate on the
+`state` objects first, then records kind by kind (dialog records without MDE first), MDE last.
+Gate tool to add: `ffb-replay actions <out> <java_dir> <dir|file>...` writing `<id>.actions.jsonl` +
+`status.json`, diffing with run5 line by line.
+Open engine findings for later gates: `SkillId::usage_type_for` (iteration 13), prayer-name compare (iteration 6).
+
+> History -- RESUME HERE of 2026-11-23 (loop iteration 14), superseded:
 **This iteration (2026-11-23, loop iteration 14):** serverAddPlayer + Zap/Unzap ported (see "O2 log —
 iteration 14"). **RUNNING (detached, PID 16428, `.loop_wait.json` until 06:30):** the whole-corpus states run
 `D:/ffb_replay_parity/bin/ffb-replay-zap.exe states D:/ffb_replay_parity/rust_states_all2
