@@ -21,6 +21,8 @@
 //!   actions <out_dir> <java_dir> <dir|file>...
 //!                                      the same replay with the action records (actions.rs), written
 //!                                      in the Java formats and diffed with the Java run (actions_gate.rs)
+//!   double-check <java_dir>            every number text in the "scores" arrays of the Java
+//!                                      <id>.actions.jsonl files == java_double::json_double(parse(text))
 
 mod actions;
 mod actions_gate;
@@ -30,6 +32,7 @@ mod dialog_check;
 mod drop_rules;
 mod ffbr;
 mod game_state_serializer;
+mod java_double;
 mod java_names;
 mod replay_report;
 mod start_check;
@@ -48,6 +51,7 @@ fn usage() -> ! {
     eprintln!("       ffb-replay dialog-check <dialog.tsv> [dialogId...]");
     eprintln!("       ffb-replay states <out_dir> <java_dir> <dir|file>...");
     eprintln!("       ffb-replay actions <out_dir> <java_dir> <dir|file>...");
+    eprintln!("       ffb-replay double-check <java_dir>");
     std::process::exit(2);
 }
 
@@ -72,6 +76,7 @@ fn main() {
             Path::new(&args[2]),
             &args[3..].iter().map(PathBuf::from).collect::<Vec<_>>(),
         ),
+        "double-check" if args.len() == 2 => double_check(Path::new(&args[1])),
         "dialog-check" if args.len() >= 2 => dialog_check::dialog_check(Path::new(&args[1]), &args[2..]),
         _ => usage(),
     };
@@ -133,6 +138,53 @@ fn scan(inputs: &[PathBuf]) -> i32 {
         println!("UNREADABLE {f}");
     }
     if failures.is_empty() { 0 } else { 1 }
+}
+
+/// Every number text of every `"scores":[...]` array in the Java action records must be what
+/// [`java_double::json_double`] prints for the double that text parses to (Java's parse and Rust's
+/// are both correctly rounded, so the parsed double is the one Java printed).
+fn double_check(java_dir: &Path) -> i32 {
+    let mut files: Vec<PathBuf> = std::fs::read_dir(java_dir)
+        .map(|rd| {
+            rd.flatten()
+                .map(|e| e.path())
+                .filter(|p| p.to_string_lossy().ends_with(".actions.jsonl"))
+                .collect()
+        })
+        .unwrap_or_default();
+    files.sort();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let (mut numbers, mut bad) = (0u64, 0u64);
+    for f in &files {
+        let Ok(text) = std::fs::read_to_string(f) else {
+            println!("BAD {}: unreadable", f.display());
+            bad += 1;
+            continue;
+        };
+        for line in text.lines() {
+            let mut rest = line;
+            while let Some(i) = rest.find("\"scores\":[") {
+                let after = &rest[i + "\"scores\":[".len()..];
+                let end = after.find(']').unwrap_or(after.len());
+                for t in after[..end].split(',').filter(|t| !t.is_empty()) {
+                    numbers += 1;
+                    if !seen.insert(t.to_string()) {
+                        continue;
+                    }
+                    let printed = t.parse::<f64>().map_err(|e| e.to_string()).and_then(java_double::json_double);
+                    if printed.as_deref() != Ok(t) {
+                        bad += 1;
+                        if bad <= 50 {
+                            println!("BAD {}: java {t} rust {printed:?}", f.display());
+                        }
+                    }
+                }
+                rest = &after[end..];
+            }
+        }
+    }
+    println!("double-check: {numbers} numbers, {} distinct, {bad} different, {} files", seen.len(), files.len());
+    if bad == 0 && numbers > 0 { 0 } else { 1 }
 }
 
 /// Reverses every array the canonical form must sort, so a check proves the sort, not the input.

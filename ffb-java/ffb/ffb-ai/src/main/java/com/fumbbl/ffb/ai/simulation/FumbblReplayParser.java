@@ -1484,8 +1484,19 @@ public class FumbblReplayParser {
                                 pendingMovePlayerId      = nextMovePlayerId;
                                 pendingMoveActionType    = nextMoveAction.name();
                                 pendingMoveState         = GameStateSerializer.serialize(game);
-                                pendingMoveCands         = mr.candidates;
-                                pendingMoveScores        = mr.rawScores;
+                                // Canonical candidate order (x, then y): findAllPaths returns a HashMap
+                                // filled from a ThreadLocal HashMap whose capacity depends on every earlier
+                                // call, so its iteration order is history-dependent. The scores are permuted
+                                // in parallel; the end option (if any) stays LAST.
+                                List<FieldCoordinate> sortedCands = new ArrayList<>(mr.candidates);
+                                sortedCands.sort((a, b) -> a.getX() != b.getX()
+                                    ? Integer.compare(a.getX(), b.getX()) : Integer.compare(a.getY(), b.getY()));
+                                double[] sortedScores = mr.rawScores.clone();
+                                for (int si = 0; si < sortedCands.size(); si++) {
+                                    sortedScores[si] = mr.rawScores[mr.candidates.indexOf(sortedCands.get(si))];
+                                }
+                                pendingMoveCands         = sortedCands;
+                                pendingMoveScores        = sortedScores;
                                 pendingMoveHasEnd        = mr.hasEndOption;
                                 pendingMoveBallCarrier   = mr.isBallCarrier;
                                 pendingMoveBallRetriever = mr.isBallRetriever;

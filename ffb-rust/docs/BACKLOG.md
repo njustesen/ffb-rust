@@ -11698,7 +11698,52 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
   on their replay alone). The Dijkstra `PriorityQueue` tie order also fixes which equal-probability path
   (and its last-ulp product) is kept -> port `java.util.PriorityQueue` siftUp/siftDown 1:1.
 
+### O3 log — iteration 17 (2026-11-23 ~05:45): O3(b) steps 1 + 3 -- canonical move_target order, Java number printing
+- **Why the sort is needed (verified in the Java, not assumed):** `PathProbabilityFinder.findAllPaths` returns a
+  fresh `HashMap` filled by iterating `TL_BEST_NODE`, a ThreadLocal `HashMap` that is only `clear()`ed, so its
+  table capacity -- and with it the insertion order into the result, hence the result's iteration order on
+  bucket collisions (`FieldCoordinate.hashCode = 31x+y`) -- depends on every earlier call in the JVM
+  (selectPlayer calls it too). The scores are order-independent (best probability per square + per-square
+  scorer); `argmax=true` means no RNG draw; the record's `action` is the square actually reached.
+- **Harness change (FumbblReplayParser, move-target setup):** candidates sorted by (x, then y), `rawScores`
+  permuted in parallel, the end-option score stays last. Frozen jar **`D:/ffb_replay_parity/bin/ffb-ai-replay-o3.jar`**
+  (= o1 jar copy + `jar uf` of `javac --release 8 -cp o1.jar -d D:/ffb_replay_parity/classes_o3
+  FumbblReplayParser.java`; the o1 jar is untouched; run_info tool hash `0b7d1e3b3c89`).
+  Check on `D:/ffb_replays/fumbbl` (out `D:/ffb_replay_parity/o3_fumbbl_java`) vs run5 with
+  `tools/o3_sort_check.py <new> <run5>`: states files identical, 4,049 non-move_target lines byte-identical,
+  1,360 move_target lines identical up to order (1,329 actually reordered: same (square, score) pairs, end
+  score last, same reached square) -> **OK 0**.
+- **Number printing (step 3) DONE:** `replay/java_double.rs` = `Double.toString` (JDK 19+ javadoc rule incl.
+  the m == 1 length-2 case and the half-even tie rule) + minimal-json `Json.value(double)` (`.0` cut,
+  NaN/Inf = error; checked with `javap -c` on the jar). **Trap found by the probe:** Rust `{:e}` does NOT
+  break exact ties to even (bits `0xc307b40843963382` = -833984006375024.25: Java `...242E14`, Rust `...243`);
+  when the shortest choice is ambiguous the code rounds the exact expansion half-even itself. Unit test vs
+  11,449 Temurin-21 outputs (`scripts/DoubleProbe.java` -> `replay/java_double_probe.in`: edges, random bit
+  patterns, 6,000 tie-prone binary fractions). New gate **`ffb-replay double-check <java_dir>`**: every number
+  text in `"scores":[...]` == `json_double(parse(text))`; o3_fumbbl_java: **225,498 numbers, 1,991 distinct,
+  0 different**. Not yet run on run5 (9.5 GB; held back while the corpus actions run is reading the disk).
+- `cargo test --workspace` green (15,149 passed).
+
 ### RESUME HERE
+**This iteration (2026-11-23, loop iteration 17):** O3(b) steps 1 + 3 done (see "O3 log -- iteration 17").
+**STILL RUNNING (detached, PID 31392, started 05:15):** the whole-corpus Rust actions run from iteration 16
+(`ffb-replay-o3a.exe actions D:/ffb_replay_parity/rust_actions_all D:/ffb_replay_parity/run5_java <5 dirs>`,
+~10 replays/min -> ~09:00; at 05:26 it was 100/100 identical). **The lifted run window ends 08:00:** if it is
+still running after 08:00, stop it (`powershell Stop-Process -Id 31392`) and work from the partial log (DIFF/ERROR
+lines, "first-diff kinds", final line; `tools/rec_diff.py` per DIFF); rerun the rest tonight.
+**Tonight (21:00-07:00, one corpus process at a time):** (a) run6 = the o3 jar over the whole corpus:
+`java -cp D:/ffb_replay_parity/bin/ffb-ai-replay-o3.jar com.fumbbl.ffb.ai.simulation.FumbblReplayParser
+--per-replay D:/ffb_replay_parity/run6_java <the 5 corpus dirs>` (detached, affinity 0x7FF; see
+`tools/launch_actions_all.ps1` for the dir list), then `tools/o3_sort_check.py run6 run5` (must be OK 0) and
+`ffb-replay double-check D:/ffb_replay_parity/run6_java` (0 different). run5 stays the oracle until then.
+**Next unit (daytime OK, no corpus run needed): O3(b) step 2 = the Rust MDE ports** (see the plan in the
+iteration-16 block below: ActionScore, PolicySampler.argmax, PathProbabilityFinder.findAllPaths, selectPlayer /
+selectMoveTarget + UtilPlayer helpers, then `flushMoveTarget` / `buildPlayerSelectRecord` in `actions.rs`;
+the Rust candidates must be emitted in the same (x, y) order; print scores with `java_double::json_double`
+into `CanonicalJson::Number`). Gate: `ffb-replay actions` against `o3_fumbbl_java` (already the o3 format)
+for fumbbl/ 10/10 first.
+
+> History -- RESUME HERE of 2026-11-23 (loop iteration 16), superseded:
 **This iteration (2026-11-23, loop iteration 16):** O3(a) done -- every non-MDE action record identical on
 the 19 replays of fumbbl/partial/window (see "O3 log -- iteration 16"), committed `bd6a2a1b2`.
 **RUNNING (detached, PID 31392, started 05:15):** whole-corpus `D:/ffb_replay_parity/bin/ffb-replay-o3a.exe
