@@ -1653,7 +1653,7 @@ to ✓, +8 reclassified from ○), ✓ (client-logic) 0→7.
 | `json/JsonStringOption.java` | `—` | `—` | — |
 | `json/JsonTemporaryModifiersMapOption.java` | `—` | `—` | — |
 | `json/JsonValueOption.java` | `—` | `—` | — |
-| `json/LZString.java` | `—` | `—` | — |
+| `json/LZString.java` | `ffb-model` | `json/lz_string.rs` | ✓ |
 | `json/MissingKeyException.java` | `—` | `—` | — |
 | `json/UtilJson.java` | `—` | `—` | — |
 

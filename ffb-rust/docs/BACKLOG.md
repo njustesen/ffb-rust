@@ -11962,3 +11962,71 @@ iteration, verify on its replays, re-run only those with explicit file args); (2
 with `-Jar <frozen> ` and no `-Classes`; (3) start O2(a) in Rust: Java-JSON Game loader +
 canonical writer (rules above), round-trip test on every replay's serverGameState, then
 startOfGame, then ModelChangeProcessor.
+
+
+## §P — 2026-11-23: GUI INTEGRATION — the unmodified Java Swing client plays a full game on the Rust server (ACTIVE)
+
+**Goal (user, 2026-11-23, after the §O progress report):** "work on the GUI integration". Read as: the
+Java GUI client (`ffb-java/ffb/ffb-client`, `FantasyFootballClientAwt`, unchanged) connects to the Rust
+`ffb-server`, two coaches (or one coach + the Java `AiMain` agent) play a whole game, and the Rust
+engine runs it. This is the "GUI-client tier (ffb-server wire fidelity)" deferred in §I until logic
+parity, which §I-§M closed.
+
+### Where the Rust server stands (survey 2026-11-23)
+- `crates/ffb-server` has the shape of the Java server (axum WebSocket, `ServerCommandHandler*`,
+  `GameCache`, `SessionManager`) but has never served a real client. `net/command_socket.rs` is
+  hand-rolled and incompatible: it pushes `serverVersion` unasked with the Cargo version, reads only
+  text frames, decodes a hand-rolled `ffb_protocol::client_commands::ClientCommand`, and has no LZString.
+  `net/wire.rs` / `wire_prompt.rs` are hand-made report/dialog shapes, not the Java classes.
+- The engine never sets `Game.dialog_parameter`; dialogs exist only as `AgentPrompt`s.
+- §O gave us the hard parts: Java-exact `Game.initFrom/toJsonValue` for the whole graph (=
+  `serverGameState`), `ModelChange`/`ModelChangeList`/`ModelChangeProcessor`, reports with
+  `init_from/to_json_value`, Java number printing.
+- No Java server to record against on this machine: Java standalone mode needs MySQL/MariaDB (coach
+  passwords, game id insert, user settings); none installed.
+
+### Java protocol facts (survey; paths under ffb-java/ffb)
+- URL `ws://<host>:<port>/command` (`FantasyFootballClient.java:213`); client.ini default port 22227.
+- Every message = one JSON object with `netCommandId` (+ `commandNr` server side), decoded by
+  `NetCommandFactory`. **Compression on by default:** JSON -> `LZString.compressToUTF16` -> UTF-8 ->
+  BINARY frame, both directions (`CommandEndpoint.java:118-130`, `ServerCommunication.java:330-345`);
+  text frames are accepted too.
+- Login: C `clientRequestVersion` -> S `serverVersion` (client requires server version >= 3.2.0 and its
+  own >= server's `clientVersion`, `LoginLogicModule.java:135-179`); C `clientPasswordChallenge` -> S
+  `serverPasswordChallenge` (null challenge in standalone) -> C `clientJoin{clientMode, coach,
+  password=hex MD5, gameId, gameName, teamId, teamName}`; no teamId -> S `serverTeamList`, client picks
+  and re-joins; with teamId -> S `serverUserSettings`, `serverJoin`; second coach joins the same
+  gameName -> `startGame` -> S `serverGameState` (away gets `transform()`ed, mirrored); both send
+  `clientStartGame`.
+- Play: ~105 client commands (`ClientCommunication.send*`); away coordinates are mirrored and the
+  server transforms them back. Server pushes `serverModelSync{modelChangeList, reportList, animation,
+  sound, gameTime, turnTime}` after every step (`UtilServerGame.syncGameModel`, the `Game` model-change
+  observer), away gets the transformed copy; `serverGameTime` every second; dialogs travel as the
+  `gameSetDialogParameter` model change (no dialog command).
+- Teams: `teams/*.xml` indexed by `<team id>` (= client teamId), filtered by `<coach>`.
+
+### Phases
+- **P1 transport + login, 1:1.** Port LZString (UTF16), the `/command` endpoint, `NetCommandFactory`
+  decode/encode of the real Java command classes (`ffb_protocol::commands::*` mirror), version,
+  password challenge (standalone: no DB -- a documented coach/password file instead of MySQL), team
+  list from team XML, join, `startGame` -> `serverGameState` from the Rust `Game.to_json_value`
+  (+ `transform` for away). Gate: two real Java clients log in, pick teams, and draw the field with
+  both teams at the start-game dialog.
+- **P2 client-visible state parity.** Everything the client reads must be what the Java server would
+  have: `turnMode`, acting player, field-model markers/move squares, and `dialogParameter` set where
+  Java calls `UtilServerDialog.showDialog`. Gate: the parity harness compares the canonical full
+  `Game.toJsonValue()` (the §O canonical form) per step, Java vs Rust, over the mirror/cross suites
+  -- a "client-view hash" next to the state hash and reports.
+- **P3 model sync.** ModelChangeList generation (diff of the Java-JSON form before/after a step, or
+  setter-level tracking) + `serverModelSync` with reports, animation, sound, times; away `transform`.
+  Gate: for every §O corpus sync, applying the generated list with the ported ModelChangeProcessor
+  gives exactly the next state; live games: client state == server state after every sync.
+- **P4 commands in.** Every `ClientCommand*` the client sends -> the engine action, incl. away
+  coordinate transform, `clientStartGame`, ping/pong, game time, end of game. Gate: Java `AiMain` vs
+  `AiMain` (headless WebSocket clients) play N whole games on the Rust server without an error, and a
+  human smoke test with two GUI windows.
+- **P5 done-check** `scripts/gui_check.py` (written before P4 closes) + docs + push.
+
+### RESUME HERE
+P1 not started. First unit: LZString port with Java-generated vectors, then the `/command` endpoint
+answering `clientRequestVersion` / `clientPasswordChallenge` the Java way.
