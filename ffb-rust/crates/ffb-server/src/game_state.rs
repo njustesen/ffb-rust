@@ -50,6 +50,9 @@ pub struct GameState {
     /// The game as the clients last received it (a `serverGameState` or the end state of the last
     /// `serverModelSync`). BACKLOG §P P3: the next sync is `diff(synced, game)`.
     pub synced: Option<Game>,
+    /// How many of the engine's reports (`Game::report_list`, append-only) the clients have
+    /// received in a `serverModelSync` `reportList`.
+    pub reports_sent: usize,
 }
 
 impl GameState {
@@ -63,6 +66,7 @@ impl GameState {
             status: None,
             pending_game: new_server_game(),
             synced: None,
+            reports_sent: 0,
         }
     }
 

@@ -12065,8 +12065,15 @@ Done (4):
 Open, in order:
 1. **Human smoke test** (needs the user): two GUI windows (`FantasyFootballClientAwt`) against
    `target/debug/ffb-server.exe 127.0.0.1:22227` started from `ffb-java/ffb/ffb-server`.
-2. Reports (game log): `serverModelSync.reportList` is empty -- send the Java-shaped reports the
-   report-parity runs already write.
+2. Reports (game log): plumbing done (`server_game_sync::new_reports`: the reports added since the
+   last sync, read from the LIVE engine game -- `ReportList::clone` is empty -- with `{x,y}` objects
+   rewritten to Java's `[x,y]`), but OFF unless `FFB_SERVER_REPORTS=1`: several Rust `to_json` writers
+   are not Java's wire shape (live: `ReportDodgeRoll` roll modifiers -> the client's
+   `StatBasedRollModifier.initFrom` throws "JsonValue is not an object" and drops the sync; the report
+   parity comparison evidently tolerates the difference). Next: an oracle tool -- per report id, the
+   key/type schema of the real Java report JSON in the §O replay corpus vs the Rust `to_json` of parity
+   games; fix every differing writer (server-side only if the parity stream must keep its form), then
+   turn reports on by default.
 3. The un-ported "decided inline" dialogs above (P2 tail), then the P2 gate (client-view hash in the
    parity harness).
 4. Diff coverage for the 11 fallback kinds; commit `sync-check` with the setups work.
