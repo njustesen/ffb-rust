@@ -131,8 +131,15 @@ fn player_side(game: &Game, id: Option<&str>) -> Option<bool> {
     }
 }
 
+/// The Java `Player` object `getPlayerById(id)` returns, as far as the mutators reach it: for a
+/// `ZappedPlayer` every mutator the processor calls (temporary maps / enhancements, markUsed,
+/// markUnused) delegates to `originalPlayer`, which the Rust game keeps in `zapped_players`.
 fn player_mut<'a>(game: &'a mut Game, id: &str) -> Option<&'a mut Player> {
-    match player_side(game, Some(id))? {
+    let side = player_side(game, Some(id))?;
+    if let Some(z) = game.zapped_players.iter_mut().find(|z| z.original_player.id == id) {
+        return Some(&mut z.original_player);
+    }
+    match side {
         true => game.team_home.player_mut(id),
         false => game.team_away.player_mut(id),
     }
@@ -210,7 +217,15 @@ fn java_set_acting_player_id(game: &mut Game, player_id: Option<String>) {
     ap.took_square = false;
     ap.blood_lust_discards_move_stack = false;
     let strength = match game.acting_player.player_id.clone() {
-        Some(id) => player_mut(game, &id).map_or(0, |p| p.strength_with_modifiers()),
+        // ZappedPlayer: getStatWithModifiers(ST, position strength) over the original's modifiers.
+        Some(id) => match game.zapped_players.iter().find(|z| z.original_player.id == id) {
+            Some(z) if player_side(game, Some(&id)).is_some() => {
+                let mut frog = z.original_player.clone();
+                frog.strength = z.position.get_strength();
+                frog.strength_with_modifiers()
+            }
+            _ => player_mut(game, &id).map_or(0, |p| p.strength_with_modifiers()),
+        },
         None => 0,
     };
     game.acting_player.strength = strength;

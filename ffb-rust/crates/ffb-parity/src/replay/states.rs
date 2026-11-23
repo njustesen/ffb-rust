@@ -8,7 +8,7 @@
 //! `IGNORE_PLAYER_MARKER`, both inducement sets reset when a change opens the coin choice
 //! (`ClientReplayer.replayTo`), then one state line `<command index> <sha256 of the canonical Game
 //! JSON>`; `serverAddPlayer` / `serverZapPlayer` / `serverUnzapPlayer` are handled by their client
-//! command handlers (`add_player.rs`; Zap/Unzap not ported yet: the replay stops with an error).
+//! command handlers (`add_player.rs`, `zap_player.rs`).
 
 use super::{canonical, drop_rules, ffbr};
 use ffb_model::enums::ModelChangeId;
@@ -79,6 +79,16 @@ fn replay_into(path: &Path, keep_texts: bool, out: &mut ReplayStates) -> Result<
         if net_command_id == "serverAddPlayer" {
             let command = super::add_player::ServerCommandAddPlayer::init_from(&game, cmd).map_err(|e| format!("command {i}: {e}"))?;
             super::add_player::handle_add_player(&mut game, command).map_err(|e| format!("command {i}: {e}"))?;
+            continue;
+        }
+        if net_command_id == "serverZapPlayer" || net_command_id == "serverUnzapPlayer" {
+            let command = super::zap_player::ZapCommand::init_from(cmd).map_err(|e| format!("command {i}: {e}"))?;
+            let result = if net_command_id == "serverZapPlayer" {
+                super::zap_player::handle_zap_player(&mut game, &command)
+            } else {
+                super::zap_player::handle_unzap_player(&mut game, &command)
+            };
+            result.map_err(|e| format!("command {i}: {e}"))?;
             continue;
         }
         if net_command_id != "serverModelSync" {

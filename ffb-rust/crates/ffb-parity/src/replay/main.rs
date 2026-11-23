@@ -27,6 +27,7 @@ mod ffbr;
 mod start_check;
 mod start_of_game;
 mod states;
+mod zap_player;
 
 use serde_json::Value;
 use std::collections::BTreeMap;

@@ -466,9 +466,9 @@ impl Game {
         o.insert("throwerId".into(), j::string_or_null(self.thrower_id.as_deref()));
         o.insert("throwerAction".into(), j::string_or_null(self.thrower_action.map(PlayerAction::name)));
         o.insert("teamState".into(), Value::String("FULL".into()));
-        o.insert("teamAway".into(), self.team_away.to_json_value(rules)?);
+        o.insert("teamAway".into(), self.team_away.to_json_value_with(rules, &self.zapped_players)?);
         o.insert("turnDataAway".into(), self.turn_data_away.to_json_value(rules)?);
-        o.insert("teamHome".into(), self.team_home.to_json_value(rules)?);
+        o.insert("teamHome".into(), self.team_home.to_json_value_with(rules, &self.zapped_players)?);
         o.insert("turnDataHome".into(), self.turn_data_home.to_json_value(rules)?);
         o.insert("fieldModel".into(), self.field_model.to_json_value(rules, &self.team_home, &self.team_away)?);
         o.insert("actingPlayer".into(), self.acting_player.to_json_value(rules)?);

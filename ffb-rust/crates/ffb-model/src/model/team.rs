@@ -216,6 +216,14 @@ impl Team {
 
     /// Java: `Team.toJsonValue()` (BACKLOG §O). `playerArray` = `getPlayers()`, sorted by nr.
     pub fn to_json_value(&self, rules: Rules) -> Result<Value, String> {
+        self.to_json_value_with(rules, &[])
+    }
+
+    /// `Team.toJsonValue()` with the game's zapped players: a zapped player is a Java
+    /// `ZappedPlayer` in the team, whose `toJsonValue` is `{"playerKind": "zappedPlayer", "player":
+    /// <originalPlayer.toJsonValue()>}` (the Rust team holds the frog-stat copy, the original lives
+    /// in `Game.zapped_players`).
+    pub fn to_json_value_with(&self, rules: Rules, zapped: &[crate::model::zapped_player::ZappedPlayer]) -> Result<Value, String> {
         let s = |v: &Option<String>| java_json::string_or_null(v.as_deref());
         let mut o = java_json::JsonObject::new();
         o.insert("teamId".into(), Value::from(self.id.clone()));
@@ -238,7 +246,18 @@ impl Team {
         );
         let mut players: Vec<&Player> = self.players.iter().collect();
         players.sort_by_key(|p| p.nr);
-        let player_array = players.into_iter().map(|p| p.to_json_value(rules)).collect::<Result<Vec<_>, _>>()?;
+        let player_array = players
+            .into_iter()
+            .map(|p| match zapped.iter().find(|z| z.original_player.id == p.id) {
+                Some(z) => {
+                    let mut o = java_json::JsonObject::new();
+                    o.insert("playerKind".into(), Value::from("zappedPlayer"));
+                    o.insert("player".into(), z.original_player.to_json_value(rules)?);
+                    Ok(Value::Object(o))
+                }
+                None => p.to_json_value(rules),
+            })
+            .collect::<Result<Vec<_>, String>>()?;
         o.insert("playerArray".into(), Value::Array(player_array));
         if let Some(roster) = &self.roster {
             o.insert("roster".into(), roster.to_json_value(rules)?);
