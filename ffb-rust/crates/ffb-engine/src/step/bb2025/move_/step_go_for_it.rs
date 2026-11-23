@@ -25,7 +25,8 @@ use ffb_mechanics::modifiers::go_for_it_context::GoForItContext;
 ///   1. Skill re-roll (e.g. Sprint / GoForIt — property canMakeAnExtraGfi) — auto-used
 ///   2. Team Re-Roll token (TRR) — offered via ReRollOffer prompt
 ///
-/// client-only: canChooseToIgnoreRushModifierAfterRoll dialog — headless never ignores rush modifier.
+/// canChooseToIgnoreRushModifierAfterRoll (Swift As The Breeze): offered like Java -- next to a
+/// skill re-roll, inside the team re-roll dialog, and after a failed re-roll.
 /// failedRushForJumpAlwaysLandsInTargetSquare skill check → wired in fail_gfi.
 pub struct StepGoForIt {
     /// Java: fGotoLabelOnFailure
@@ -68,7 +69,21 @@ impl Step for StepGoForIt {
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
             Action::UseReRoll { use_reroll: true } => {
-                // Agent accepted re-roll offer — re_roll_source was stored when we issued the prompt
+                // Agent accepted re-roll offer — re_roll_source was stored when we issued the prompt.
+                // Java re-rolls in rush() because usingModifierIgnoringSkill is null again.
+                self.roll = 0;
+                self.execute_step(game, rng)
+            }
+            // Java CLIENT_USE_SKILL with canChooseToIgnoreRushModifierAfterRoll:
+            // `usingModifierIgnoringSkill = isSkillUsed(); if (!used) setReRollSource(
+            // findSkillReRollSource(RUSH))`.
+            Action::UseSkill { skill_id, use_skill }
+                if skill_id.properties().contains(&NamedProperties::CAN_CHOOSE_TO_IGNORE_RUSH_MODIFIER_AFTER_ROLL) =>
+            {
+                self.using_modifier_ignoring_skill = Some(*use_skill);
+                if !*use_skill {
+                    self.re_roll_state.re_roll_source = find_skill_reroll_source(game, "GFI");
+                }
                 self.execute_step(game, rng)
             }
             Action::UseReRoll { use_reroll: false } => {
@@ -195,10 +210,40 @@ impl StepGoForIt {
             (2, vec![])
         };
 
+        // Java rush(): `successfulWithoutModifiers = isSkillRollSuccessful(roll,
+        // minimumRollGoingForIt(emptySet()))`; only then an UNUSED canChooseToIgnoreRushModifierAfterRoll
+        // skill counts. Once chosen it passes the rush outright (no ReportGoForItRoll).
+        let ignore_modifier_skill: Option<ffb_model::enums::SkillId> =
+            if crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(self.roll, 2) {
+                player_id.as_deref().and_then(|pid| game.player(pid)).and_then(|p| {
+                    p.all_skill_ids().find(|id| {
+                        id.properties().contains(&NamedProperties::CAN_CHOOSE_TO_IGNORE_RUSH_MODIFIER_AFTER_ROLL)
+                            && !p.used_skills.contains(id)
+                            && !game.acting_player.used_skills.contains(id)
+                    })
+                })
+            } else {
+                None
+            };
+        if let (Some(skill), Some(true)) = (ignore_modifier_skill, self.using_modifier_ignoring_skill) {
+            // Java: actingPlayer.markSkillUsed(skill); addReport(new ReportSkillUse(pid, skill, true,
+            // PASS_RUSH_WITHOUT_MODIFIERS)); return SUCCESS.
+            if let Some(pid) = player_id.as_deref() {
+                if let Some(p) = game.team_home.player_mut(pid).or_else(|| game.team_away.player_mut(pid)) {
+                    p.used_skills.insert(skill);
+                }
+                game.acting_player.used_skills.insert(skill);
+                game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                    Some(pid.to_string()), skill, true, ffb_model::model::skill_use::SkillUse::PASS_RUSH_WITHOUT_MODIFIERS));
+            }
+        }
+        let ignored_modifiers = ignore_modifier_skill.is_some() && self.using_modifier_ignoring_skill == Some(true);
+
         // Java `StepGoForIt` uses DiceInterpreter.isSkillRollSuccessful: a natural 6 always succeeds and a
         // natural 1 always fails, whatever the target. Only differs from a bare `>=` when the target
         // leaves 2..6, which is exactly when it matters.
-        let successful = crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
+        let successful = ignored_modifiers
+            || crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
 
         // Java line 234-238: if (usingModifierIgnoringSkill == null) addReport(new ReportGoForItRoll(...))
         if self.using_modifier_ignoring_skill.is_none() {
@@ -258,6 +303,11 @@ impl StepGoForIt {
             // Java: findSkillReRollSource(ReRolledActions.RUSH) — auto-use skill re-roll if found
             let skill_source = find_skill_reroll_source(game, "GFI");
             if let Some(source) = skill_source {
+                if let (None, Some(skill)) = (self.using_modifier_ignoring_skill, ignore_modifier_skill) {
+                    // Java: setReRolledAction(null); showDialog(new DialogSkillUseParameter(pid, skill, 0)).
+                    self.re_roll_state.re_rolled_action = None;
+                    return self.ask_modifier_ignoring_skill(game, skill).with_event(roll_event);
+                }
                 let pid = player_id.as_deref().unwrap_or("").to_owned();
                 use_reroll(game, &source, &pid, rng);
                 self.re_roll_state.re_roll_source = Some(source);
@@ -271,13 +321,42 @@ impl StepGoForIt {
 
             // No skill re-roll — offer TRR
             if let Some(prompt) = ask_for_reroll_if_available(game, "GFI", minimum_roll, false) {
+                // Java askForReRollIfAvailable(..., modificationSkill = skill): the re-roll dialog also
+                // offers the modifier-ignoring skill, which is answered with the SAME roll -- so the
+                // roll is reset only when the re-roll is accepted.
+                if let Some(skill) = ignore_modifier_skill {
+                    let acting = game.acting_player.player_id.clone();
+                    crate::step::util_server_re_roll::show_re_roll_properties_dialog(
+                        game, acting.as_deref(), "GFI", minimum_roll, false, None, Some(skill), Vec::new());
+                }
                 self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
-                self.roll = 0; // reset so the re-roll gets a fresh d6
                 return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
             }
+        } else if let (None, Some(skill)) = (self.using_modifier_ignoring_skill, ignore_modifier_skill) {
+            // Java: the re-rolled rush failed on modifiers only -- offer the skill.
+            return self.ask_modifier_ignoring_skill(game, skill).with_event(roll_event);
         }
 
         self.fail_gfi(game).with_event(roll_event)
+    }
+
+    /// Java `showDialog(new DialogSkillUseParameter(actingPlayer.getPlayerId(), skill, 0), false)`;
+    /// WAITING_FOR_SKILL_USE.
+    fn ask_modifier_ignoring_skill(&mut self, game: &mut Game, skill: ffb_model::enums::SkillId) -> StepOutcome {
+        let player_id = game.acting_player.player_id.clone().unwrap_or_default();
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                    player_id: Some(player_id.clone()),
+                    skill: Some(skill),
+                    minimum_roll: 0,
+                    ..Default::default()
+                }), false);
+        StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
+            player_id,
+            skill_id: skill as u16,
+            skill_name: format!("{skill:?}"),
+        })
     }
 
     fn fail_gfi(&mut self, game: &mut Game) -> StepOutcome {
@@ -668,5 +747,32 @@ mod tests {
         step.roll = 1;
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::GO_FOR_IT_ROLL));
+    }
+
+    /// Java bb2025 rush(): a Rush that fails only on modifiers (here Blizzard, 3+ with a 2) with an
+    /// unused Swift As The Breeze is offered the skill inside the team re-roll dialog; using it
+    /// passes the Rush with the same roll and reports PASS_RUSH_WITHOUT_MODIFIERS.
+    #[test]
+    fn swift_as_the_breeze_passes_a_rush_failed_on_modifiers() {
+        use ffb_model::enums::Weather;
+        let mut game = make_game();
+        game.turn_mode = TurnMode::Regular;
+        game.home_playing = true;
+        game.turn_data_home.rerolls = 1;
+        game.field_model.weather = Weather::Blizzard;
+        add_player_with_skill(&mut game, "p1", SkillId::SwiftAsTheBreeze);
+        game.acting_player.player_id = Some("p1".into());
+        game.acting_player.goes_for_it = true;
+        game.acting_player.current_move = 5;
+        let mut step = StepGoForIt::new("fail".into());
+        step.roll = 2;
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::Continue, "team re-roll offered");
+        let out = step.handle_command(&Action::UseSkill { skill_id: SkillId::SwiftAsTheBreeze, use_skill: true }, &mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(rng.call_count, 0, "no new die: the same roll passes");
+        assert!(game.acting_player.used_skills.contains(&SkillId::SwiftAsTheBreeze));
+        assert_eq!(game.turn_data_home.rerolls, 1, "no team re-roll spent");
     }
 }

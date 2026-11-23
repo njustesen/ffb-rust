@@ -359,7 +359,7 @@ impl Step for StepEndTurn {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
-            Action::ArgueTheCall { argue: _ } => {
+            Action::ArgueTheCall { .. } => {
                 self.within_secret_weapon_handling = true;
             }
             Action::UseBribe { use_bribe: _ } => {
@@ -567,7 +567,7 @@ mod tests {
     fn argue_the_call_sets_within_secret_weapon_handling() {
         let mut game = make_game();
         let mut step = StepEndTurn::new();
-        step.handle_command(&Action::ArgueTheCall { argue: true }, &mut game, &mut GameRng::new(0));
+        step.handle_command(&Action::ArgueTheCall { player_ids: vec!["p1".into()] }, &mut game, &mut GameRng::new(0));
         assert!(step.within_secret_weapon_handling);
     }
 

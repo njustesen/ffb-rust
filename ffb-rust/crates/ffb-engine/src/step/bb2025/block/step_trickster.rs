@@ -70,7 +70,11 @@ impl Step for StepTrickster {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         if self.action_status == TricksterPhase::SkillChoiceYes {
-            // Java: any command in SKILL_CHOICE_YES → EXECUTE_STEP (no pick-up dialog in this step)
+            // Java: CLIENT_PICK_UP_CHOICE → attemptPickUp + hideDialog; any command → EXECUTE_STEP.
+            if let Action::PickUpChoice { pick_up } = action {
+                self.attempt_pick_up = Some(*pick_up);
+                crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
+            }
         } else {
             match action {
                 Action::UseSkill { skill_id: _, use_skill } => {
@@ -223,13 +227,14 @@ impl StepTrickster {
                     && game.field_model.ball_moving
                 {
                     if game.rules == Rules::Bb2025 {
-                        // Java bb2025: DialogPickUpChoiceParameter. Both harnesses DECLINE it with
-                        // no draw (ParityRunner's PICK_UP_CHOICE arm), so `attemptPickUp = false`.
-                        // DEVIATION: Java's showDialog(DialogPickUpChoiceParameter, true) / the
-                        // matching hideDialog on CLIENT_PICK_UP_CHOICE are not ported -- Rust
-                        // answers the choice inline and never waits, so there is no open dialog.
+                        // Java bb2025: showDialog(new DialogPickUpChoiceParameter(), true); CONTINUE --
+                        // before leave(), so the defender's coach answers. Both harnesses DECLINE
+                        // with no draw (ParityRunner's PICK_UP_CHOICE arm).
                         if self.attempt_pick_up.is_none() {
-                            self.attempt_pick_up = Some(false);
+                            crate::util::util_server_dialog::UtilServerDialog::show_dialog(game,
+                                ffb_model::dialog::dialog_parameter_factory::DialogParameter::PickUpChoice(Default::default()),
+                                true);
+                            return StepOutcome::cont().with_prompt(AgentPrompt::PickUpChoice { player_id: def_id });
                         }
                         if self.attempt_pick_up == Some(true) {
                             outcome = outcome.publish(StepParameter::AttemptPickUp(true));
@@ -542,5 +547,32 @@ mod tests {
         game.field_model.replace_multi_block_target_coordinate(old, new);
         assert!(!game.field_model.multi_block_target_coordinates.contains(&old));
         assert!(game.field_model.multi_block_target_coordinates.contains(&new));
+    }
+
+    /// Java bb2025: a defender that lands on the loose (moving) ball is asked
+    /// (DialogPickUpChoiceParameter) BEFORE leave(); the answer becomes ATTEMPT_PICK_UP.
+    #[test]
+    fn landing_on_the_loose_ball_asks_the_defender_to_pick_up() {
+        for pick_up in [false, true] {
+            let mut game = make_game_with_trickster_defender();
+            let mut step = StepTrickster::new();
+            step.start(&mut game, &mut GameRng::new(0));
+            let home_playing = game.home_playing;
+            let out = step.handle_command(&Action::UseSkill { skill_id: SkillId::Trickster, use_skill: true },
+                &mut game, &mut GameRng::new(0));
+            let to = match out.prompt {
+                Some(AgentPrompt::TricksterMove { squares, .. }) => squares[0],
+                other => panic!("expected TricksterMove, got {other:?}"),
+            };
+            game.field_model.ball_coordinate = Some(to);
+            game.field_model.ball_moving = true;
+            let out = step.handle_command(&Action::TricksterMove { coord: to }, &mut game, &mut GameRng::new(0));
+            assert!(matches!(out.prompt, Some(AgentPrompt::PickUpChoice { .. })), "{:?}", out.prompt);
+            assert_ne!(game.home_playing, home_playing, "the defender's coach answers");
+            let out = step.handle_command(&Action::PickUpChoice { pick_up }, &mut game, &mut GameRng::new(0));
+            assert_eq!(out.action, StepAction::NextStep);
+            assert!(out.published.iter().any(|p| matches!(p, StepParameter::AttemptPickUp(b) if *b == pick_up)));
+            assert_eq!(game.home_playing, home_playing, "turn handed back");
+        }
     }
 }

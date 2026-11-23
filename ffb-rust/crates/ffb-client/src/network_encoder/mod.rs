@@ -161,7 +161,7 @@ pub fn encode(action: Action, active_player_id: Option<&str>) -> Option<ClientCo
             Some(ClientCommand::ClientConfirm(ClientConfirm))
         }
 
-        Action::ArgueTheCall { argue: _ } => {
+        Action::ArgueTheCall { .. } | Action::KickOffResultChoice { .. } | Action::PuntToCrowd { .. } | Action::PickUpChoice { .. } => {
             Some(ClientCommand::ClientConfirm(ClientConfirm))
         }
 

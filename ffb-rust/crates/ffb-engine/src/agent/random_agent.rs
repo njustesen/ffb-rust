@@ -1161,8 +1161,20 @@ impl Agent for RandomAgent {
             // Argue the call: AGENT_CONTRACT §7 — ALWAYS argue, deterministically, 0 rng. Java
             // ARGUE_THE_CALL always sends ClientCommandArgueTheCall(firstPlayer). Was random-sampled
             // via pick_bool (spurious draw + wrong choice).
-            Some(AgentPrompt::ArgueTheCall { .. }) =>
-                Action::ArgueTheCall { argue: true },
+            Some(AgentPrompt::ArgueTheCall { player_ids, .. }) =>
+                Action::ArgueTheCall { player_ids: player_ids.first().cloned().into_iter().collect() },
+            // Pick-up choice (bb2025 Trickster): ParityRunner's PICK_UP_CHOICE arm declines, 0 rng.
+            Some(AgentPrompt::PickUpChoice { .. }) => Action::PickUpChoice { pick_up: false },
+            // Punt to crowd: ParityRunner's PUNT_TO_CROWD case always declines, 0 rng.
+            Some(AgentPrompt::PuntToCrowd { .. }) => Action::PuntToCrowd { punt_to_crowd: false },
+            // Overtime kick-off result choice (OVERTIME_KICK_OFF_RESULTS = blitzOrSolidDefence only;
+            // the default option rolls). ParityRunner has no arm for it; take Solid Defence, 0 rng.
+            Some(AgentPrompt::KickOffResult { .. }) =>
+                Action::KickOffResultChoice { result: ffb_model::enums::KickoffResult::SolidDefence },
+            // Bribes: Java ParityRunner BRIBES always declines -- CLIENT_USE_INDUCEMENT with the
+            // team's AVOID_BAN type and no player. 0 rng.
+            Some(AgentPrompt::Bribes { inducement_type, .. }) =>
+                Action::UseInducement { inducement_type: Some(inducement_type.clone()), card_id: None, player_ids: vec![] },
             // Player choice: pick uniformly from eligible sorted by PlayerId — 1 decision_rng call.
             // Synced with Java ParityRunner PLAYER_CHOICE dialog case.
             // Java ParityRunner (PLAYER_CHOICE handler) declines EVERY PlayerChoiceMode dialog with

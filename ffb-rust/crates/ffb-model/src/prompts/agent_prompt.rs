@@ -374,11 +374,40 @@ pub enum AgentPrompt {
     SelectWeather {
         options: Vec<Weather>,
     },
+    /// Java `DialogArgueTheCallParameter(teamId, ..., playerIds)`: the team's coach names the
+    /// players to argue for (CLIENT_ARGUE_THE_CALL, `Action::ArgueTheCall`); an empty list declines.
     ArgueTheCall {
-        player_id: PlayerId,
+        team_id: String,
+        player_ids: Vec<PlayerId>,
+    },
+    /// Java `DialogBribesParameter(teamId, maxNrOfBribes, playerIds)`: use a bribe (the team's
+    /// AVOID_BAN `inducement_type`) for up to `max_nr_of_bribes` of `player_ids`, answered with
+    /// CLIENT_USE_INDUCEMENT (`Action::UseInducement`); an empty player list declines.
+    Bribes {
+        team_id: String,
+        inducement_type: String,
+        player_ids: Vec<PlayerId>,
+        max_nr_of_bribes: i32,
     },
     BriberyAndCorruption {
         team_id: String,
+    },
+    /// Java `DialogKickOffResultParameter(teamId)`: in overtime with OVERTIME_KICK_OFF_RESULTS =
+    /// blitzOrSolidDefence the kicking coach picks the kick-off result
+    /// (CLIENT_KICK_OFF_RESULT_CHOICE, `Action::KickOffResultChoice`).
+    KickOffResult {
+        team_id: String,
+    },
+    /// Java `DialogPuntToCrowdParameter`: a punter on a sideline or in an end zone may punt into the
+    /// crowd (CLIENT_PUNT_TO_CROWD, `Action::PuntToCrowd`).
+    PuntToCrowd {
+        player_id: PlayerId,
+    },
+    /// Java `DialogPickUpChoiceParameter` (bb2025 StepTrickster): the defender landed on the
+    /// loose ball -- try to pick it up or let it scatter (CLIENT_PICK_UP_CHOICE,
+    /// `Action::PickUpChoice`).
+    PickUpChoice {
+        player_id: PlayerId,
     },
     ConcedeGame {
         team_id: String,

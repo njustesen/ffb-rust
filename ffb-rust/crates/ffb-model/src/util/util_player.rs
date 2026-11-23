@@ -466,6 +466,29 @@ impl UtilPlayer {
             .collect()
     }
 
+    /// Java `findEligibleDivingTacklers(game, from, to, canAttemptToTackleJumpingPlayer)` (StepJump):
+    /// the opponents next to `from` that can tackle a LEAPING player -- edition-aware, since
+    /// bb2016's Diving Tackle registers only the dodging property -- minus the thrower (and the
+    /// block pair during a Dump-off), minus those next to `to` under DIVING_TACKLE_LEAVING_TZ_ONLY.
+    pub fn find_eligible_jump_tacklers(game: &Game, from: FieldCoordinate, to: FieldCoordinate) -> Vec<PlayerId> {
+        let Some(acting_id) = game.acting_player.player_id.clone() else { return Vec::new() };
+        let found: Vec<&PlayerId> = Self::find_adjacent_opposing_players_with_property(
+            game, &acting_id, from, NamedProperties::CAN_ATTEMPT_TO_TACKLE_JUMPING_PLAYER, false)
+            .into_iter()
+            .filter(|id| game.player(id).is_some_and(|p| p.has_skill_property_in(
+                game.rules, NamedProperties::CAN_ATTEMPT_TO_TACKLE_JUMPING_PLAYER)))
+            .collect();
+        let found = Self::filter_thrower(game, found);
+        let found = if game.turn_mode == TurnMode::DumpOff { Self::filter_attacker_and_defender(game, found) } else { found };
+        let leaving_tz_only = crate::option::util_game_option::is_option_enabled(
+            game, crate::option::game_option_id::DIVING_TACKLE_LEAVING_TZ_ONLY);
+        found.into_iter()
+            .filter(|id| !leaving_tz_only
+                || game.field_model.player_coordinate(id).map(|c| !c.is_adjacent(to)).unwrap_or(true))
+            .cloned()
+            .collect()
+    }
+
     /// 1:1 translation of canFoul.
     pub fn can_foul(game: &Game, player_id: &str) -> bool {
         if let Some(coord) = game.field_model.player_coordinate(player_id) {

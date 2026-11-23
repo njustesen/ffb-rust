@@ -82,6 +82,12 @@ pub struct StepEndTurn {
     half_started_early: bool,
     /// The StateMechanic events of that early start, attached when the step leaves.
     early_half_events: Vec<GameEvent>,
+    /// The team whose coach the open secret-weapon dialog asks (Java reads the command's sender).
+    dialog_team_home: Option<bool>,
+    /// The prompt of the dialog this step waits on.
+    prompt: Option<ffb_model::prompts::AgentPrompt>,
+    /// Java reportSecretWeaponsUsed runs once, inside the `!fNextSequencePushed` block.
+    secret_weapons_reported: bool,
 }
 
 impl StepEndTurn {
@@ -109,6 +115,9 @@ impl StepEndTurn {
             is_home_turn_ending: None,
             half_started_early: false,
             early_half_events: Vec::new(),
+            dialog_team_home: None,
+            prompt: None,
+            secret_weapons_reported: false,
         }
     }
 
@@ -499,170 +508,372 @@ impl StepEndTurn {
         half > 1 && (new_half || (touchdown && home_turn >= 8 && away_turn >= 8))
     }
 
-    fn argue_and_remove_secret_weapons(&mut self, game: &mut Game, rng: &mut GameRng) {
-        if std::env::var_os("FFB_TRACE").is_some() {
-            let flagged: Vec<String> = [false, true].iter().flat_map(|&h| {
-                let t = if h { &game.team_home } else { &game.team_away };
-                t.players.iter().map(|p| p.id.clone()).collect::<Vec<_>>()
-            }).filter(|pid| {
-                let h = game.team_home.has_player(pid);
-                game.game_result.team_result_mut(h).player_result_mut(pid).has_used_secret_weapon
-            }).collect();
-            eprintln!("RSWARGUE flagged={flagged:?}");
-        }
-        use ffb_model::enums::{PS_BANNED, PlayerState, SendToBoxReason};
+    fn team_id_of(game: &Game, is_home: bool) -> String {
+        if is_home { game.team_home.id.clone() } else { game.team_away.id.clone() }
+    }
+
+    fn turn_data_of(game: &mut Game, is_home: bool) -> &mut ffb_model::model::turn_data::TurnData {
+        if is_home { &mut game.turn_data_home } else { &mut game.turn_data_away }
+    }
+
+    /// Java `getPlayerIds(team, game)`: the team's players that used a secret weapon and are not
+    /// out of play. EDITION-SPECIFIC:
+    ///   bb2020/bb2025: `!PlayerState.REMOVED_FROM_PLAY.contains(base)`, and an unused I'll be
+    ///     back! (`ignoreFirstSecretWeaponSentOff`) is spent here instead (flag cleared, skill
+    ///     marked used, ReportSkillUse IGNORE_SENT_OFF) -- for the whole team, before any roll.
+    ///   bb2016: `base != BANNED` only (a CASUALTY secret weapon is still argued for and banned;
+    ///     dwarf seed 3 step 155), no I'll be back! clause.
+    fn secret_weapon_player_ids(game: &mut Game, is_home: bool) -> Vec<String> {
+        use ffb_model::enums::PS_BANNED;
         use ffb_model::model::property::named_properties::NamedProperties;
-        use ffb_model::report::mixed::report_argue_the_call_roll::ReportArgueTheCallRoll;
-
-        // DEVIATION (dialogs): Java asks via DialogBribesParameter (askForSecretWeaponBribes),
-        // DialogArgueTheCallParameter (askForArgueTheCall), DialogBriberyAndCorruptionParameter and
-        // DialogPlayerChoiceParameter(BRIBERY_AND_CORRUPTION) (reRollArgueFailures) and waits; this
-        // port resolves those choices inline (always argue, auto B&C re-roll), so none is shown.
-        // Phase B — argueTheCall: AWAY team first, then HOME. ParityRunner argues each flagged SW player.
-        for is_home in [false, true] {
-            let team_id = { let t = if is_home { &game.team_home } else { &game.team_away }; t.id.clone() };
-            let friends = game.prayer_state.is_friends_with_ref(&team_id);
-            let ids: Vec<String> = {
-                let t = if is_home { &game.team_home } else { &game.team_away };
-                t.players.iter().map(|p| p.id.clone()).collect()
-            };
-            // Java bb2020/bb2025 `getPlayerIds(team)` builds the argue list for the WHOLE team
-            // first, spending I'll be back! (ignoreFirstSecretWeaponSentOff) on every eligible
-            // player as it goes -- before any argue roll. Rust spent it inside the argue loop, which
-            // breaks on a coach ban, so a later Kreek lost his skill to an earlier team-mate's
-            // natural 1 (star tier: snotling bb2020, chaos_pact vs snotling seed 2).
-            if game.rules != ffb_model::enums::Rules::Bb2016 {
-                for pid in ids.iter() {
-                    if !game.game_result.team_result_mut(is_home).player_result_mut(pid).has_used_secret_weapon {
-                        continue;
-                    }
-                    let removed = game.field_model.player_state(pid)
-                        .map(|s| s.is_casualty() || s.base() == PS_BANNED)
-                        .unwrap_or(true);
-                    if removed { continue; }
-                    let ignore_skill = game.player(pid).and_then(|p| p.all_skill_ids().find(|sk|
-                        sk.properties().contains(&NamedProperties::IGNORE_FIRST_SECRET_WEAPON_SENT_OFF)
-                            && !p.used_skills.contains(sk)));
-                    if let Some(sk) = ignore_skill {
-                        game.game_result.team_result_mut(is_home).player_result_mut(pid).has_used_secret_weapon = false;
-                        if let Some(p) = game.player_mut(pid) { p.used_skills.insert(sk); }
-                        game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
-                            Some(pid.clone()), sk, true, ffb_model::model::skill_use::SkillUse::IGNORE_SENT_OFF));
-                    }
-                }
+        let bb2016 = game.rules == Rules::Bb2016;
+        let ids: Vec<String> = {
+            let t = if is_home { &game.team_home } else { &game.team_away };
+            t.players.iter().map(|p| p.id.clone()).collect()
+        };
+        let mut out = Vec::new();
+        for pid in ids {
+            if !game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon {
+                continue;
             }
-            for pid in ids {
-                let coach_banned = if is_home { game.turn_data_home.coach_banned } else { game.turn_data_away.coach_banned };
-                if coach_banned { break; }
-                if !game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon {
+            let removed = game.field_model.player_state(&pid)
+                .map(|s| if bb2016 { s.base() == PS_BANNED } else { s.is_casualty() || s.base() == PS_BANNED })
+                .unwrap_or(true);
+            if removed {
+                continue;
+            }
+            let ignore_skill = if bb2016 { None } else {
+                game.player(&pid).and_then(|p| p.all_skill_ids().find(|sk|
+                    sk.properties().contains(&NamedProperties::IGNORE_FIRST_SECRET_WEAPON_SENT_OFF)
+                        && !p.used_skills.contains(sk)))
+            };
+            if let Some(sk) = ignore_skill {
+                game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = false;
+                if let Some(p) = game.player_mut(&pid) { p.used_skills.insert(sk); }
+                game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
+                    Some(pid.clone()), sk, true, ffb_model::model::skill_use::SkillUse::IGNORE_SENT_OFF));
+            } else {
+                out.push(pid);
+            }
+        }
+        out
+    }
+
+    /// Java `playersForArgue` (bb2020/bb2025: minus the already argued; bb2016 has no such set).
+    fn players_for_argue(&self, game: &mut Game, is_home: bool) -> Vec<String> {
+        let mut ids = Self::secret_weapon_player_ids(game, is_home);
+        ids.retain(|id| !self.player_ids_argued.contains(id));
+        ids
+    }
+
+    /// Java `playersForBribe`: minus the players whose bribe failed (ONLY_ONE_BRIBE_PER_SEND_OFF).
+    fn players_for_bribe(&self, game: &mut Game, is_home: bool) -> Vec<String> {
+        let mut ids = Self::secret_weapon_player_ids(game, is_home);
+        ids.retain(|id| !self.player_ids_failed_bribes.contains(id));
+        ids
+    }
+
+    /// Java `askForArgueTheCall(team, ...)`: DialogArgueTheCallParameter(team, stayOnPitch=false,
+    /// friendsWithTheRef, biasedRefs) over the team's secret weapons, unless the option is off,
+    /// none is left or the coach is banned. The team's coach names the players to argue for.
+    fn ask_for_argue_the_call(&mut self, game: &mut Game, is_home: bool) -> bool {
+        use ffb_model::option::{game_option_id, util_game_option::is_option_enabled};
+        if !is_option_enabled(game, game_option_id::ARGUE_THE_CALL) {
+            return false;
+        }
+        let player_ids = self.players_for_argue(game, is_home);
+        if player_ids.is_empty() || Self::turn_data_of(game, is_home).coach_banned {
+            return false;
+        }
+        let team_id = Self::team_id_of(game, is_home);
+        let bb2016 = game.rules == Rules::Bb2016;
+        let friends = !bb2016 && game.prayer_state.is_friends_with_ref(&team_id);
+        let biased_refs = if bb2016 { 0 } else { Self::turn_data_of(game, is_home).inducement_set.value(Usage::ADD_TO_ARGUE_ROLL) };
+        let stop_timer = game.home_playing != is_home;
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::ArgueTheCall(
+                ffb_model::dialog::dialog_argue_the_call_parameter::DialogArgueTheCallParameter {
+                    team_id: Some(team_id.clone()),
+                    player_ids: player_ids.clone(),
+                    stay_on_pitch: false,
+                    friends_with_the_ref: friends,
+                    biased_refs,
+                }), stop_timer);
+        self.dialog_team_home = Some(is_home);
+        self.prompt = Some(ffb_model::prompts::AgentPrompt::ArgueTheCall { team_id, player_ids });
+        true
+    }
+
+    /// Java `askForSecretWeaponBribes(team)`: DialogBribesParameter(team, usesLeft, players) when the
+    /// team holds an AVOID_BAN inducement with a use left.
+    fn ask_for_secret_weapon_bribes(&mut self, game: &mut Game, is_home: bool) -> bool {
+        let player_ids = if game.rules == Rules::Bb2016 {
+            Self::secret_weapon_player_ids(game, is_home)
+        } else {
+            self.players_for_bribe(game, is_home)
+        };
+        if player_ids.is_empty() {
+            return false;
+        }
+        let set = &Self::turn_data_of(game, is_home).inducement_set;
+        let Some(bribes) = set.for_usage(Usage::AVOID_BAN).and_then(|t| set.get(t)) else { return false };
+        let uses_left = bribes.get_uses_left();
+        if uses_left <= 0 {
+            return false;
+        }
+        let team_id = Self::team_id_of(game, is_home);
+        let mut dialog = ffb_model::dialog::dialog_bribes_parameter::DialogBribesParameter::new_with(team_id.clone(), uses_left);
+        dialog.player_ids = player_ids.clone();
+        let stop_timer = game.home_playing != is_home;
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::Bribes(dialog), stop_timer);
+        self.dialog_team_home = Some(is_home);
+        self.prompt = Some(ffb_model::prompts::AgentPrompt::Bribes {
+            team_id,
+            inducement_type: bribes.type_id.clone(),
+            player_ids,
+            max_nr_of_bribes: uses_left,
+        });
+        true
+    }
+
+    fn set_argue_choice(&mut self, is_home: bool, choice: bool) {
+        if is_home { self.argue_the_call_choice_home = Some(choice); } else { self.argue_the_call_choice_away = Some(choice); }
+    }
+
+    fn set_bribes_choice(&mut self, is_home: bool, choice: bool) {
+        if is_home { self.bribes_choice_home = Some(choice); } else { self.bribes_choice_away = Some(choice); }
+    }
+
+    /// Java `argueTheCall(team, playerIds, friendsWithTheRef)` -- the CLIENT_ARGUE_THE_CALL answer.
+    /// bb2020/bb2025 track the argued players (the dialog comes back until none is left), roll on
+    /// the MODIFIED roll's coach ban, and re-roll a natural 1 with Bribery and Corruption; bb2016
+    /// answers once per team, rolls the plain die and writes its own report class.
+    fn argue_the_call(&mut self, game: &mut Game, rng: &mut GameRng, is_home: bool, player_ids: &[String]) {
+        use ffb_model::report::mixed::report_argue_the_call_roll::ReportArgueTheCallRoll;
+        let bb2016 = game.rules == Rules::Bb2016;
+        let provided = !player_ids.is_empty();
+        if bb2016 {
+            self.set_argue_choice(is_home, provided);
+        } else {
+            self.player_ids_argued.extend(player_ids.iter().cloned());
+            if self.players_for_argue(game, is_home).is_empty() || !provided {
+                self.set_argue_choice(is_home, provided);
+            }
+        }
+        if !provided {
+            return;
+        }
+        let team_id = Self::team_id_of(game, is_home);
+        let friends = !bb2016 && game.prayer_state.is_friends_with_ref(&team_id);
+        let bribery: Option<String> = Self::turn_data_of(game, is_home).inducement_set
+            .for_usage(Usage::REROLL_ARGUE).map(str::to_owned);
+        for pid in player_ids {
+            let on_team = if is_home { game.team_home.has_player(pid) } else { game.team_away.has_player(pid) };
+            if !on_team || Self::turn_data_of(game, is_home).coach_banned {
+                continue;
+            }
+            let roll = rng.d6();
+            if bb2016 {
+                let successful = DiceInterpreter::is_argue_the_call_successful(roll);
+                let coach_banned = DiceInterpreter::is_coach_banned(roll);
+                game.report_list.add(ffb_model::report::bb2016::report_argue_the_call_roll::ReportArgueTheCallRoll::new(
+                    pid.clone(), successful, coach_banned, roll));
+                if successful {
+                    game.game_result.team_result_mut(is_home).player_result_mut(pid).has_used_secret_weapon = false;
+                }
+                if coach_banned {
+                    Self::turn_data_of(game, is_home).coach_banned = true;
+                }
+                continue;
+            }
+            let mut modified = if friends && roll > 1 { roll + 1 } else { roll };
+            let biased_ref_bonus = Self::turn_data_of(game, is_home).inducement_set.value(Usage::ADD_TO_ARGUE_ROLL);
+            modified += biased_ref_bonus;
+            let successful = DiceInterpreter::is_argue_the_call_successful(modified);
+            let coach_banned = DiceInterpreter::is_coach_banned(modified);
+            game.report_list.add(ReportArgueTheCallRoll::new(
+                Some(pid.clone()), successful, coach_banned, roll, false, friends, biased_ref_bonus));
+            if successful {
+                game.game_result.team_result_mut(is_home).player_result_mut(pid).has_used_secret_weapon = false;
+            }
+            let can_be_re_rolled = roll == 1
+                && bribery.as_deref().is_some_and(|t| Self::turn_data_of(game, is_home).inducement_set.has_uses_left(t));
+            if can_be_re_rolled && coach_banned {
+                // (dwarf seed 2 i=155: a natural 1 re-rolled to a 6 keeps the Deathroller.)
+                self.re_roll_argue(game, rng, is_home, pid, bribery.as_deref().unwrap());
+            } else if coach_banned {
+                Self::turn_data_of(game, is_home).coach_banned = true;
+            } else if can_be_re_rolled {
+                self.player_ids_natural_ones.push(pid.clone());
+            }
+        }
+    }
+
+    /// Java `reRollArgue`: one Bribery-and-Corruption use, ReportBriberyAndCorruptionReRoll(USED),
+    /// then the player is argued for again.
+    fn re_roll_argue(&mut self, game: &mut Game, rng: &mut GameRng, is_home: bool, player_id: &str, bribery: &str) {
+        Self::turn_data_of(game, is_home).inducement_set.use_one_of(bribery);
+        let team_id = Self::team_id_of(game, is_home);
+        game.report_list.add(
+            ffb_model::report::mixed::report_bribery_and_corruption_re_roll::ReportBriberyAndCorruptionReRoll::new(
+                Some(team_id), "USED".into()));
+        self.argue_the_call(game, rng, is_home, &[player_id.to_string()]);
+    }
+
+    /// Java `reRollArgueFailures`: natural 1s a biased referee kept from banning the coach may be
+    /// re-rolled with Bribery and Corruption -- one player: DialogBriberyAndCorruptionParameter
+    /// (or at once when the roll was not modified), several: a BRIBERY_AND_CORRUPTION player choice.
+    fn re_roll_argue_failures(&mut self, game: &mut Game, rng: &mut GameRng) -> bool {
+        let Some(player_id) = self.player_ids_natural_ones.first().cloned() else { return false };
+        let is_home = game.team_home.has_player(&player_id);
+        let team_id = Self::team_id_of(game, is_home);
+        let set = &Self::turn_data_of(game, is_home).inducement_set;
+        let bribery = set.for_usage(Usage::REROLL_ARGUE).map(str::to_owned);
+        let roll_was_modified = set.for_usage(Usage::ADD_TO_ARGUE_ROLL).is_some();
+        if self.player_ids_natural_ones.len() == 1 {
+            if roll_was_modified {
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::BriberyAndCorruption(
+                        ffb_model::dialog::dialog_bribery_and_corruption_parameter::DialogBriberyAndCorruptionParameter {
+                            team_id: Some(team_id.clone()),
+                        }), false);
+                self.dialog_team_home = Some(is_home);
+                self.prompt = Some(ffb_model::prompts::AgentPrompt::BriberyAndCorruption { team_id });
+                return true;
+            }
+            if let Some(t) = bribery {
+                self.re_roll_argue(game, rng, is_home, &player_id, &t);
+            }
+            self.player_ids_natural_ones.clear();
+            return false;
+        }
+        let players = std::mem::take(&mut self.player_ids_natural_ones);
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                    team_id: Some(team_id),
+                    player_choice_mode: Some("BRIBERY_AND_CORRUPTION".into()),
+                    player_ids: players.clone(),
+                    descriptions: Vec::new(),
+                    max_selects: 1,
+                    min_selects: if roll_was_modified { 0 } else { 1 },
+                }), false);
+        self.dialog_team_home = Some(is_home);
+        self.prompt = Some(ffb_model::prompts::AgentPrompt::PlayerChoice {
+            eligible_players: players,
+            reason: "BRIBERY_AND_CORRUPTION".into(),
+            descriptions: Vec::new(),
+        });
+        true
+    }
+
+    /// The B&C natural-one answer (CLIENT_USE_RE_ROLL / CLIENT_PLAYER_CHOICE): re-roll the argue
+    /// for `player_id` when the team still has a Bribery-and-Corruption use.
+    fn answer_natural_one(&mut self, game: &mut Game, rng: &mut GameRng, is_home: bool, player_id: Option<String>) {
+        self.player_ids_natural_ones.clear();
+        let set = &Self::turn_data_of(game, is_home).inducement_set;
+        let bribery = set.for_usage(Usage::REROLL_ARGUE).filter(|t| set.has_uses_left(t)).map(str::to_owned);
+        if let (Some(t), Some(pid)) = (bribery, player_id.filter(|p| !p.is_empty())) {
+            self.re_roll_argue(game, rng, is_home, &pid, &t);
+        }
+    }
+
+    /// Java `useSecretWeaponBribes(team, playerIds)` -- the CLIENT_USE_INDUCEMENT (AVOID_BAN) answer.
+    fn use_secret_weapon_bribes(&mut self, game: &mut Game, rng: &mut GameRng, is_home: bool, player_ids: &[String]) {
+        use ffb_model::option::{game_option_id, util_game_option::is_option_enabled};
+        let bb2016 = game.rules == Rules::Bb2016;
+        if bb2016 {
+            self.set_bribes_choice(is_home, !player_ids.is_empty());
+        }
+        let bribes_type = Self::turn_data_of(game, is_home).inducement_set.for_usage(Usage::AVOID_BAN).map(str::to_owned);
+        let n = player_ids.len() as i32;
+        let enough = bribes_type.as_deref()
+            .and_then(|t| Self::turn_data_of(game, is_home).inducement_set.get(t))
+            .is_some_and(|i| i.get_uses_left() >= n);
+        if let (Some(t), true, true) = (bribes_type, !player_ids.is_empty(), enough) {
+            for _ in 0..n {
+                Self::turn_data_of(game, is_home).inducement_set.use_one_of(&t);
+            }
+            for pid in player_ids {
+                let on_team = if is_home { game.team_home.has_player(pid) } else { game.team_away.has_player(pid) };
+                if !on_team {
                     continue;
                 }
-                // Java getPlayerIds — the eligibility filter is EDITION-SPECIFIC:
-                //   bb2025: `!PlayerState.REMOVED_FROM_PLAY.contains(base)` (casualties/KO'd excluded)
-                //           plus the IllBeBack (ignoreFirstSecretWeaponSentOff) opt-out.
-                //   bb2016: `playerState.getBase() != PlayerState.BANNED` ONLY — a CASUALTY secret
-                //           weapon is still argued for and still banned, and bb2016 has no IllBeBack
-                //           clause at all (dwarf seed 3 step 155: the away Deathroller is a casualty
-                //           at halftime; Java still rolls its argue d6 and sets it BANNED, so Java
-                //           rolls TWO argue dice in a dwarf mirror where Rust rolled one — the
-                //           halftime kickoff scatter then read the wrong stream position).
-                let is_bb2016_sw = game.rules == ffb_model::enums::Rules::Bb2016;
-                let removed = game.field_model.player_state(&pid)
-                    .map(|s| if is_bb2016_sw { s.base() == PS_BANNED } else { s.is_casualty() || s.base() == PS_BANNED })
-                    .unwrap_or(true);
-                if removed { continue; }
-                // Java: `UtilCards.getUnusedSkillWithProperty(player, ignoreFirstSecretWeaponSentOff)`
-                // present -> setHasUsedSecretWeapon(false); player.markUsed(skill, game);
-                // addReport(ReportSkillUse(player, skill, true, IGNORE_SENT_OFF)). Rust only cleared
-                // the flag: no report, and the skill was never spent (star tier: Kreek Rustgouger).
-                let ignore_skill = if is_bb2016_sw { None } else {
-                    game.player(&pid).and_then(|p| p.all_skill_ids().find(|sk|
-                        sk.properties().contains(&NamedProperties::IGNORE_FIRST_SECRET_WEAPON_SENT_OFF)
-                            && !p.used_skills.contains(sk)))
-                };
-                if let Some(sk) = ignore_skill {
-                    game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = false;
-                    if let Some(p) = game.player_mut(&pid) { p.used_skills.insert(sk); }
-                    game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
-                        Some(pid.clone()), sk, true, ffb_model::model::skill_use::SkillUse::IGNORE_SENT_OFF));
-                    continue;
-                }
-                // Argue (ParityRunner always argues). rollArgueTheCall d6; +1 if friendsWithTheRef and roll>1.
-                // Java per-player block, incl. the Bribery-and-Corruption argue re-roll:
-                //   biasedRefBonus = inducementSet.value(ADD_TO_ARGUE_ROLL); modifiedRoll += bonus
-                //   canBeReRolled = roll == 1 && briberyReRoll present && hasUsesLeft
-                //   if (canBeReRolled && coachBanned) reRollArgue(...)   // consume use + report + re-argue
-                //   else if (coachBanned) setCoachBanned(true)
-                // Java's reRollArgue recursion is bounded by the inducement's uses; the loop below is
-                // its iterative equivalent. (dwarf seed 2 i=155: home Deathroller's argue rolled a
-                // natural 1 → B&C re-roll 6 → SW flag cleared, Deathroller plays half 2; Rust banned
-                // it and the halftime dice stream shifted.)
-                loop {
-                    let roll = rng.d6();
-                    let mut modified = if friends && roll > 1 { roll + 1 } else { roll };
-                    let biased_ref_bonus = {
-                        let td = if is_home { &game.turn_data_home } else { &game.turn_data_away };
-                        td.inducement_set.value(ffb_model::inducement::usage::Usage::ADD_TO_ARGUE_ROLL)
-                    };
-                    modified += biased_ref_bonus;
-                    let successful = DiceInterpreter::is_argue_the_call_successful(modified);
-                    let coach_ban = DiceInterpreter::is_coach_banned(modified);
-                    // Java bb2016 StepEndTurn:543 writes the 4-field bb2016 class.
-                    if game.rules == ffb_model::enums::Rules::Bb2016 {
-                        game.report_list.add(
-                            ffb_model::report::bb2016::report_argue_the_call_roll::ReportArgueTheCallRoll::new(
-                                pid.clone(), successful, coach_ban, roll));
-                    } else {
-                        game.report_list.add(ReportArgueTheCallRoll::new(
-                            Some(pid.clone()), successful, coach_ban, roll, false, friends, biased_ref_bonus,
-                        ));
-                    }
-                    if successful {
-                        game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = false;
-                    }
-                    let bribery_type: Option<String> = {
-                        let td = if is_home { &game.turn_data_home } else { &game.turn_data_away };
-                        td.inducement_set.for_usage(ffb_model::inducement::usage::Usage::REROLL_ARGUE)
-                            .filter(|t| td.inducement_set.has_uses_left(t))
-                            .map(str::to_owned)
-                    };
-                    let can_be_rerolled = roll == 1 && bribery_type.is_some();
-                    if can_be_rerolled && coach_ban {
-                        // Java reRollArgue: consume a use, report USED, argue this player again.
-                        let type_id = bribery_type.unwrap();
-                        let td = if is_home { &mut game.turn_data_home } else { &mut game.turn_data_away };
-                        td.inducement_set.use_one_of(&type_id);
-                        game.report_list.add(
-                            ffb_model::report::mixed::report_bribery_and_corruption_re_roll::ReportBriberyAndCorruptionReRoll::new(
-                                Some(team_id.clone()), "USED".into(),
-                            ),
-                        );
-                        continue;
-                    }
-                    if coach_ban {
-                        if is_home { game.turn_data_home.coach_banned = true; } else { game.turn_data_away.coach_banned = true; }
-                    }
-                    break;
-                }
-                // EDITION-SPECIFIC — how many players a team argues for.
-                //   bb2025 `StepEndTurn` keeps a `playerIdsArgued` set and `playersForArgue(team, game)`
-                //     excludes anyone already argued, so `askForArgueTheCall` RE-FIRES the dialog until
-                //     the team has no un-argued secret weapon left: one d6 per eligible player.
-                //   bb2016 `StepEndTurn` has NO such tracking. `askForArgueTheCall` is guarded by
-                //     `fArgueTheCallChoice{Home,Away} == null`, so it fires ONCE per team, and
-                //     `argueTheCall(team, playerIds)` rolls only for the ids the CLIENT named —
-                //     ParityRunner names exactly one (`playerIds[0]`). One d6 per TEAM, full stop.
-                // Looping in bb2016 rolled one argue die per eligible weapon: a goblin mirror has two
-                // per team (Fanatic + Bombardier), so Rust drew 4 argue d6 where Java drew 2 and the
-                // halftime kickoff read the wrong stream position (goblin bb2016 seed 1, i=124: Java
-                // ball 21,7 vs Rust 25,9).
-                if game.rules == ffb_model::enums::Rules::Bb2016 {
-                    break;
+                let roll = rng.d6();
+                let successful = DiceInterpreter::is_bribes_successful(roll);
+                game.report_list.add(ffb_model::report::report_bribes_roll::ReportBribesRoll::new(pid.clone(), successful, roll));
+                if successful {
+                    game.game_result.team_result_mut(is_home).player_result_mut(pid).has_used_secret_weapon = false;
+                } else if !bb2016 && is_option_enabled(game, game_option_id::ONLY_ONE_BRIBE_PER_SEND_OFF) {
+                    self.player_ids_failed_bribes.insert(pid.clone());
                 }
             }
         }
+        if !bb2016 && (self.players_for_bribe(game, is_home).is_empty() || player_ids.is_empty()) {
+            self.set_bribes_choice(is_home, !player_ids.is_empty());
+            self.player_ids_failed_bribes.clear();
+        }
+    }
 
-        // Phase C — removeUsedSecretWeapons: ban the still-flagged players (set BANNED + off the pitch).
+    /// The argue / bribes gates of Java `executeStep` (bb2020/bb2025 :428-471: argue AWAY, HOME,
+    /// then bribes AWAY, HOME; bb2016 :371-398: bribes first, then argue). Each is asked only at a
+    /// drive end that is not the end of the game (`ask`). Returns true while a dialog waits.
+    fn secret_weapon_gates(&mut self, game: &mut Game, rng: &mut GameRng, ask: bool) -> bool {
+        if game.rules == Rules::Bb2016 {
+            if self.bribes_choice_away.is_none() {
+                self.bribes_choice_away = Some(false);
+                if ask && self.ask_for_secret_weapon_bribes(game, false) { self.bribes_choice_away = None; }
+            }
+            if self.bribes_choice_home.is_none() && self.bribes_choice_away.is_some() {
+                self.bribes_choice_home = Some(false);
+                if ask && self.ask_for_secret_weapon_bribes(game, true) { self.bribes_choice_home = None; }
+            }
+            if self.bribes_choice_home.is_some() && self.bribes_choice_away.is_some() && self.argue_the_call_choice_away.is_none() {
+                self.argue_the_call_choice_away = Some(false);
+                if ask && self.ask_for_argue_the_call(game, false) { self.argue_the_call_choice_away = None; }
+            }
+            if self.bribes_choice_home.is_some() && self.bribes_choice_away.is_some()
+                && self.argue_the_call_choice_home.is_none() && self.argue_the_call_choice_away.is_some()
+            {
+                self.argue_the_call_choice_home = Some(false);
+                if ask && self.ask_for_argue_the_call(game, true) { self.argue_the_call_choice_home = None; }
+            }
+        } else {
+            if self.argue_the_call_choice_away.is_none() {
+                self.argue_the_call_choice_away = Some(false);
+                if ask && self.ask_for_argue_the_call(game, false) { self.argue_the_call_choice_away = None; }
+            }
+            if self.re_roll_argue_failures(game, rng) {
+                return true;
+            }
+            if self.argue_the_call_choice_home.is_none() && self.argue_the_call_choice_away.is_some() {
+                self.argue_the_call_choice_home = Some(false);
+                if ask && self.ask_for_argue_the_call(game, true) { self.argue_the_call_choice_home = None; }
+            }
+            if self.re_roll_argue_failures(game, rng) {
+                return true;
+            }
+            if self.bribes_choice_away.is_none() && self.argue_the_call_choice_home.is_some() && self.argue_the_call_choice_away.is_some() {
+                self.bribes_choice_away = Some(false);
+                if ask && self.ask_for_secret_weapon_bribes(game, false) { self.bribes_choice_away = None; }
+            }
+            if self.bribes_choice_home.is_none() && self.bribes_choice_away.is_some()
+                && self.argue_the_call_choice_home.is_some() && self.argue_the_call_choice_away.is_some()
+            {
+                self.bribes_choice_home = Some(false);
+                if ask && self.ask_for_secret_weapon_bribes(game, true) { self.bribes_choice_home = None; }
+            }
+        }
+        self.prompt.is_some()
+    }
+
+    /// Java `removeUsedSecretWeapons` (run once the choices are made, not at the end of the game):
+    /// every player still flagged is BANNED and boxed.
+    ///   bb2016: no removed-from-play guard (a casualty secret weapon is banned too);
+    ///   bb2020/bb2025: players already out of play are skipped.
+    fn remove_used_secret_weapons(&mut self, game: &mut Game) {
+        use ffb_model::enums::{PS_BANNED, PlayerState, SendToBoxReason};
         for is_home in [true, false] {
             let ids: Vec<String> = {
                 let t = if is_home { &game.team_home } else { &game.team_away };
@@ -673,20 +884,13 @@ impl StepEndTurn {
                     continue;
                 }
                 game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = false;
-                // Java removeUsedSecretWeapons: bb2016 sets BANNED for EVERY still-flagged player with
-                // no removed-from-play guard (a casualty secret weapon is banned too); bb2025 skips
-                // players already out of play.
-                let is_bb2016_sw = game.rules == ffb_model::enums::Rules::Bb2016;
+                let is_bb2016_sw = game.rules == Rules::Bb2016;
                 let removed = game.field_model.player_state(&pid)
                     .map(|s| if is_bb2016_sw { s.base() == PS_BANNED } else { s.is_casualty() || s.base() == PS_BANNED })
                     .unwrap_or(true);
                 if removed { continue; }
-                // Java removeUsedSecretWeapon: setPlayerState(BANNED) + putPlayerIntoBox. remove_player clears
-                // the field coordinate + state; set BANNED so setup skips it and the state reads "-1,-1,Reserve"
-                // (PS_BANNED maps to the default "Reserve", off-pitch → -1,-1), matching Java.
-                if std::env::var_os("FFB_TRACE").is_some() {
-                    eprintln!("RSWBAN pid={pid}");
-                }
+                // Java removeUsedSecretWeapon: setPlayerState(BANNED) + putPlayerIntoBox. remove_player
+                // clears the field coordinate + state; BANNED keeps it out of the setup.
                 game.field_model.remove_player(&pid);
                 game.field_model.set_player_state(&pid, PlayerState::new(PS_BANNED));
                 let pr = game.game_result.team_result_mut(is_home).player_result_mut(&pid);
@@ -695,6 +899,25 @@ impl StepEndTurn {
                 pr.send_to_box_half = self.half;
             }
         }
+    }
+
+    /// Test driver: the gates answered as the parity agents do (argue for the first listed player,
+    /// decline bribes and Bribery-and-Corruption re-rolls), then the ban.
+    #[cfg(test)]
+    fn argue_and_remove_secret_weapons(&mut self, game: &mut Game, rng: &mut GameRng) {
+        while self.secret_weapon_gates(game, rng, true) {
+            let is_home = self.dialog_team_home.unwrap_or(true);
+            match self.prompt.take() {
+                Some(ffb_model::prompts::AgentPrompt::ArgueTheCall { player_ids, .. }) => {
+                    let first: Vec<String> = player_ids.into_iter().take(1).collect();
+                    self.argue_the_call(game, rng, is_home, &first);
+                }
+                Some(ffb_model::prompts::AgentPrompt::Bribes { .. }) => self.use_secret_weapon_bribes(game, rng, is_home, &[]),
+                Some(_) => self.answer_natural_one(game, rng, is_home, None),
+                None => break,
+            }
+        }
+        self.remove_used_secret_weapons(game);
     }
 
     /// Java: `touchdownPlayer = fieldModel.getPlayer(ballCoordinate)` with an UNUSED
@@ -714,6 +937,7 @@ impl StepEndTurn {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: UtilServerDialog.hideDialog(getGameState())
         crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
+        self.prompt = None;
         // Java: if (turnNr == 0) capture turnNr + half for later send-to-box use
         if self.turn_nr == 0 {
             self.turn_nr = game.turn_data().turn_nr;
@@ -722,6 +946,11 @@ impl StepEndTurn {
             self.is_home_turn_ending = Some(game.home_playing);
         }
 
+        // Events collected during this pass, attached to the final outcome.
+        let mut pending_events: Vec<GameEvent> = Vec::new();
+        // Java `if (!fWithinSecretWeaponHandling) { ... }`: once a secret-weapon dialog has been
+        // answered, only the argue / bribes gates below run again.
+        if !self.within_secret_weapon_handling {
         // Skip guard: non-player-turn modes just propagate END_TURN and exit
         let skip_mode = matches!(
             game.turn_mode,
@@ -792,9 +1021,6 @@ impl StepEndTurn {
         if !self.half_started_early {
             self.new_half = Self::check_end_of_half(game);
         }
-
-        // Events collected during this pass, attached to the final outcome.
-        let mut pending_events: Vec<GameEvent> = Vec::new();
 
         if !self.next_sequence_pushed {
             self.next_sequence_pushed = true;
@@ -931,8 +1157,10 @@ impl StepEndTurn {
             }
 
             // Java: fieldModel.clearMoveSquares / clearTrackNumbers / clearDiceDecorations → stub
-            // Java: reportSecretWeaponsUsed → stub
+            // Java: reportSecretWeaponsUsed → below, once (`secret_weapons_reported`)
         }
+        }
+        let touchdown = self.touchdown.unwrap_or(false);
 
         // Secret Weapon end-of-drive send-off: reportSecretWeaponsUsed → argueTheCall (away then home) →
         // removeUsedSecretWeapons, all resolved deterministically (ParityRunner always argues; bribes
@@ -966,33 +1194,19 @@ impl StepEndTurn {
             eprintln!("RETGATE new_half={} td={} half={} choiceA={:?} eog={} mode={:?}",
                 self.new_half, touchdown, game.half, self.argue_the_call_choice_away, is_end_of_game, game.turn_mode);
         }
-        if self.argue_the_call_choice_away.is_none() {
-            if self.new_half || touchdown {
-                // Java reportSecretWeaponsUsed: the 2d6 ban roll runs at every drive end, even the
-                // final one — it consumes dice before the end-of-game KO-recovery / MVP rolls.
-                self.report_secret_weapons_used(game, rng);
-                // Java gates only argueTheCall / removeUsedSecretWeapons by !fEndGame.
-                if !is_end_of_game {
-                    self.argue_and_remove_secret_weapons(game, rng);
-                }
-            }
-            self.argue_the_call_choice_away = Some(false);
+        // Java reportSecretWeaponsUsed (in the `!fNextSequencePushed` block, at every drive end, even
+        // the final one): the 2d6 Stunty-Leeg ban rolls come before the end-of-game KO recovery.
+        if (self.new_half || touchdown) && !self.secret_weapons_reported {
+            self.secret_weapons_reported = true;
+            self.report_secret_weapons_used(game, rng);
         }
-        if self.argue_the_call_choice_home.is_none() && self.argue_the_call_choice_away.is_some() {
-            self.argue_the_call_choice_home = Some(false);
-        }
-        if self.bribes_choice_away.is_none()
-            && self.argue_the_call_choice_home.is_some()
-            && self.argue_the_call_choice_away.is_some()
-        {
-            self.bribes_choice_away = Some(false);
-        }
-        if self.bribes_choice_home.is_none()
-            && self.bribes_choice_away.is_some()
-            && self.argue_the_call_choice_home.is_some()
-            && self.argue_the_call_choice_away.is_some()
-        {
-            self.bribes_choice_home = Some(false);
+        // Java `!fEndGame && (fNewHalf || fTouchdown)`: the argue / bribes dialogs, coach by coach.
+        let ask = !is_end_of_game && (self.new_half || touchdown);
+        if self.secret_weapon_gates(game, rng, ask) {
+            let prompt = self.prompt.clone().expect("a waiting gate leaves its prompt");
+            let mut out = StepOutcome::cont().with_prompt(prompt);
+            for ev in pending_events { out = out.with_event(ev); }
+            return out;
         }
 
         let all_choices_done = self.argue_the_call_choice_home.is_some()
@@ -1001,6 +1215,10 @@ impl StepEndTurn {
             && self.bribes_choice_away.is_some();
 
         if self.end_game || all_choices_done {
+            // Java: `if (!fEndGame && fRemoveUsedSecretWeapons) removeUsedSecretWeapons();`
+            if ask {
+                self.remove_used_secret_weapons(game);
+            }
             // Java StepEndTurn:489-495: `getFaintingCount` (the KO-recovery / fainting dice) and
             // `ReportTurnEnd` come BEFORE `deactivateEffectsAndPrayers` and
             // `removeReRollsLastingForDrive`; Rust ran them after, so the lost-re-roll reports
@@ -1217,6 +1435,43 @@ impl Step for StepEndTurn {
         // Java CLIENT_USE_SKILL: `if (player.hasUnused(skill) && skill.hasSkillProperty(
         //   canGrantReRollAfterTouchdown)) { useStarOfTheShow = isSkillUsed();
         //   if (used) player.markUsed(skill, game); EXECUTE_STEP }`
+        // The secret-weapon dialogs (Java CLIENT_ARGUE_THE_CALL / CLIENT_USE_INDUCEMENT /
+        // CLIENT_USE_RE_ROLL / CLIENT_PLAYER_CHOICE BRIBERY_AND_CORRUPTION), answered by the coach of
+        // the team the dialog asks.
+        if let Some(prompt) = self.prompt.clone() {
+            use ffb_model::prompts::AgentPrompt as P;
+            let is_home = self.dialog_team_home.unwrap_or(game.home_playing);
+            match (action, &prompt) {
+                (Action::ArgueTheCall { player_ids }, P::ArgueTheCall { .. }) => {
+                    self.argue_the_call(game, rng, is_home, player_ids);
+                    self.within_secret_weapon_handling = true;
+                }
+                (Action::UseInducement { inducement_type, player_ids, .. }, P::Bribes { .. }) => {
+                    let avoid_ban = inducement_type.as_deref()
+                        .and_then(|t| Self::turn_data_of(game, is_home).inducement_set.get(t))
+                        .is_some_and(|i| i.has_usage(Usage::AVOID_BAN));
+                    if avoid_ban {
+                        self.within_secret_weapon_handling = true;
+                        self.use_secret_weapon_bribes(game, rng, is_home, player_ids);
+                    }
+                }
+                (Action::UseReRoll { use_reroll }, P::BriberyAndCorruption { .. }) => {
+                    let player_id = if *use_reroll { self.player_ids_natural_ones.first().cloned() } else { None };
+                    self.answer_natural_one(game, rng, is_home, player_id);
+                }
+                (Action::Acknowledge, P::BriberyAndCorruption { .. }) => {
+                    self.answer_natural_one(game, rng, is_home, None);
+                }
+                (Action::PlayerChoice { player_id, .. }, P::PlayerChoice { reason, .. }) if reason == "BRIBERY_AND_CORRUPTION" => {
+                    self.answer_natural_one(game, rng, is_home, player_id.clone());
+                }
+                (Action::SelectPlayer { player_id }, P::PlayerChoice { reason, .. }) if reason == "BRIBERY_AND_CORRUPTION" => {
+                    self.answer_natural_one(game, rng, is_home, Some(player_id.clone()));
+                }
+                // Java: UNHANDLED_COMMAND -- the dialog stays open.
+                _ => return StepOutcome::cont().with_prompt(prompt),
+            }
+        }
         if let Action::UseSkill { skill_id, use_skill } = action {
             if let Some((player_id, skill)) = Self::unused_star_of_the_show(game) {
                 if skill == *skill_id {

@@ -93,6 +93,9 @@ pub struct StepApplyKickoffResult {
     pub selected_players: Vec<String>,
     /// Java: eligiblePlayers — players eligible for selection.
     pub eligible_players: Vec<String>,
+    /// The coach answered the Charge / Solid Defence player choice (CLIENT_PLAYER_CHOICE) or ended
+    /// the kick-off turn (CLIENT_END_TURN) -- the commands after which Java re-executes the step.
+    pub choice_made: bool,
 }
 
 impl StepApplyKickoffResult {
@@ -111,6 +114,7 @@ impl StepApplyKickoffResult {
             to_coordinate: None,
             selected_players: Vec::new(),
             eligible_players: Vec::new(),
+            choice_made: false,
         }
     }
 }
@@ -136,6 +140,11 @@ impl Step for StepApplyKickoffResult {
             }
             Action::EndTurn => {
                 self.end_kickoff = true;
+                // Java CLIENT_END_TURN re-executes the step: during the Charge dialog that ends the
+                // Charge with no player chosen.
+                if self.kickoff_result == Some(KickoffResult::Charge) {
+                    self.choice_made = true;
+                }
                 if game.turn_mode == TurnMode::QuickSnap {
                     game.home_playing = !game.home_playing;
                     game.turn_mode = TurnMode::Kickoff;
@@ -145,6 +154,25 @@ impl Step for StepApplyKickoffResult {
             }
             Action::ConfirmSetup => {
                 self.end_kickoff = true;
+            }
+            // Java CLIENT_PLAYER_CHOICE (SOLID_DEFENCE / CHARGE): the selected players; a SOLID_DEFENCE
+            // answer enters TurnMode.SOLID_DEFENCE. The agents decline with an empty SelectPlayer.
+            Action::PlayerChoice { player_ids, mode, .. } if mode == "SOLID_DEFENCE" || mode == "CHARGE" => {
+                self.selected_players.extend(player_ids.iter().filter(|id| self.eligible_players.contains(id)).cloned());
+                self.choice_made = true;
+                if mode == "SOLID_DEFENCE" {
+                    game.turn_mode = TurnMode::SolidDefence;
+                }
+            }
+            Action::SelectPlayer { player_id } if !self.choice_made && !self.eligible_players.is_empty()
+                && matches!(self.kickoff_result, Some(KickoffResult::Charge | KickoffResult::SolidDefence)) => {
+                if self.eligible_players.contains(player_id) {
+                    self.selected_players.push(player_id.clone());
+                }
+                self.choice_made = true;
+                if self.kickoff_result == Some(KickoffResult::SolidDefence) {
+                    game.turn_mode = TurnMode::SolidDefence;
+                }
             }
             _ => {}
         }
@@ -600,13 +628,12 @@ impl StepApplyKickoffResult {
                 return StepOutcome::next();
             }
 
-            // client-only: show DialogPlayerChoiceParameter(CHARGE) — dialog is client-side
-            // DEVIATION: Java shows DialogPlayerChoiceParameter(actingTeam, CHARGE, eligiblePlayers,
-            // null, nrOfPlayersAllowed) and waits; this path selects nobody and moves on at once,
-            // so no dialog is shown (it would never be answered).
-            // For now (random-agent stub): no players selected → skip blitz.
-            game.turn_mode = TurnMode::Kickoff;
-            return StepOutcome::next();
+            // Java: showDialog(new DialogPlayerChoiceParameter(actingTeam, CHARGE, eligiblePlayers,
+            // null, nrOfPlayersAllowed), false) and wait for CLIENT_PLAYER_CHOICE.
+            return self.ask_player_choice(game, "CHARGE");
+        }
+        if !self.choice_made {
+            return StepOutcome::cont();
         }
 
         if self.selected_players.is_empty() {
@@ -615,14 +642,168 @@ impl StepApplyKickoffResult {
             return StepOutcome::next();
         }
 
-        // Players were selected → deactivate non-selected players and GOTO blitz label.
+        // Java: the acting team's on-pitch players that were NOT chosen lose their activation
+        // (`changeActive(false)`), then GOTO the blitz label.
+        let acting_ids: Vec<String> = game.active_team().players.iter().map(|p| p.id.clone()).collect();
+        for id in acting_ids {
+            let on_pitch = game.field_model.player_coordinate(&id)
+                .is_some_and(|c| FieldCoordinateBounds::FIELD.is_in_bounds(c));
+            if on_pitch && !self.selected_players.contains(&id) {
+                if let Some(state) = game.field_model.player_state(&id) {
+                    game.field_model.set_player_state(&id, state.change_active(false));
+                }
+            }
+        }
         let label = self.goto_label_on_blitz.clone();
         StepOutcome::goto(&label)
     }
 
+    /// Java `UtilServerDialog.showDialog(new DialogPlayerChoiceParameter(actingTeam.getId(), mode,
+    /// eligiblePlayers, null, nrOfPlayersAllowed), false)` (Charge / Solid Defence): the coach
+    /// picks up to `nr_of_players_allowed` of the eligible players.
+    fn ask_player_choice(&mut self, game: &mut Game, mode: &str) -> StepOutcome {
+        let team_id = game.active_team().id.clone();
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+            game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                    team_id: Some(team_id),
+                    player_choice_mode: Some(mode.to_string()),
+                    player_ids: self.eligible_players.clone(),
+                    descriptions: Vec::new(),
+                    max_selects: self.nr_of_players_allowed,
+                    min_selects: 0,
+                },
+            ),
+            false,
+        );
+        StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::PlayerChoice {
+            eligible_players: self.eligible_players.clone(),
+            reason: mode.to_string(),
+            descriptions: Vec::new(),
+        })
+    }
+
     // ── SolidDefence ──────────────────────────────────────────────────────────
 
+    /// Java bb2025 `StepApplyKickoffResult.handleSolidDefense`: roll d3+3 (capped by the eligible
+    /// players -- on the pitch, no opposing tackle zone), ask the coach which of them to set up
+    /// again (DialogPlayerChoiceParameter SOLID_DEFENCE); the chosen ones go to the reserves box,
+    /// every other player of the team is deactivated, and END_TURN checks the new setup.
+    fn handle_solid_defence_bb2025(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        use ffb_model::enums::PS_PRONE;
+        if game.turn_mode == TurnMode::SolidDefence {
+            if self.end_kickoff {
+                let moved: Vec<String> = self.players_at_coordinates.iter()
+                    .filter(|(id, at)| game.field_model.player_coordinate(id) != Some(**at))
+                    .map(|(id, _)| id.clone())
+                    .collect();
+                let valid = self.valid_solid_defence(game, moved)
+                    && SetupMechanic::new().check_setup_with_swarmers(game, game.home_playing, game.kicking_swarmers);
+                if valid {
+                    return Self::leave_solid_defence(game);
+                }
+                self.end_kickoff = false;
+                return StepOutcome::cont();
+            }
+            if !self.choice_made {
+                return StepOutcome::cont();
+            }
+            if self.selected_players.is_empty() {
+                return Self::leave_solid_defence(game);
+            }
+            let acting_ids: Vec<String> = game.active_team().players.iter().map(|p| p.id.clone()).collect();
+            for id in acting_ids {
+                let on_pitch = game.field_model.player_coordinate(&id)
+                    .is_some_and(|c| FieldCoordinateBounds::FIELD.is_in_bounds(c));
+                if !on_pitch {
+                    continue;
+                }
+                let Some(state) = game.field_model.player_state(&id) else { continue };
+                if self.selected_players.contains(&id) {
+                    game.field_model.set_player_state(&id, state.change_base(PS_RESERVE));
+                    UtilBox::put_player_into_box(game, &id);
+                } else {
+                    game.field_model.set_player_state(&id, state.change_active(false));
+                }
+            }
+            return StepOutcome::cont();
+        }
+        if !self.eligible_players.is_empty() {
+            return StepOutcome::cont();
+        }
+        let acting_team_id = game.active_team().id.clone();
+        let other = if game.home_playing { game.team_away.clone() } else { game.team_home.clone() };
+        let acting_ids: Vec<String> = game.active_team().players.iter().map(|p| p.id.clone()).collect();
+        for id in &acting_ids {
+            match game.field_model.player_coordinate(id) {
+                Some(coord) if FieldCoordinateBounds::FIELD.is_in_bounds(coord) => {
+                    if UtilPlayer::find_adjacent_players_with_tacklezones(game, &other, coord, false).is_empty() {
+                        self.eligible_players.push(id.clone());
+                        self.players_at_coordinates.insert(id.clone(), coord);
+                    }
+                }
+                _ => {
+                    if let Some(state) = game.field_model.player_state(id) {
+                        if state.base() == PS_RESERVE {
+                            game.field_model.set_player_state(id, state.change_base(PS_PRONE));
+                        }
+                    }
+                }
+            }
+        }
+        let roll = rng.d3();
+        self.nr_of_players_allowed = (roll + 3).min(self.eligible_players.len() as i32);
+        game.report_list.add(ReportSolidDefenceRoll::new(Some(acting_team_id.clone()), roll, self.nr_of_players_allowed));
+        let event = GameEvent::SolidDefenceRoll { team_id: acting_team_id, roll, amount: self.nr_of_players_allowed };
+        if self.eligible_players.is_empty() {
+            return StepOutcome::next().with_event(event);
+        }
+        self.ask_player_choice(game, "SOLID_DEFENCE").with_event(event)
+    }
+
+    /// Java bb2025 `leaveSolidDefence`.
+    fn leave_solid_defence(game: &mut Game) -> StepOutcome {
+        use ffb_model::enums::PS_PRONE;
+        game.kicking_swarmers = 0;
+        game.turn_mode = TurnMode::Kickoff;
+        let acting_ids: Vec<String> = game.active_team().players.iter().map(|p| p.id.clone()).collect();
+        for id in acting_ids {
+            if let Some(state) = game.field_model.player_state(&id) {
+                if state.base() == PS_PRONE {
+                    game.field_model.set_player_state(&id, state.change_base(PS_RESERVE));
+                }
+            }
+        }
+        StepOutcome::next()
+    }
+
+    /// Java bb2025 `validSolidDefence`: no more than the allowed number moved, and only chosen
+    /// players moved; otherwise DialogInvalidSolidDefenceParameter(team, moved-but-not-chosen, limit).
+    fn valid_solid_defence(&self, game: &mut Game, mut moved: Vec<String>) -> bool {
+        let too_many = moved.len() as i32 > self.nr_of_players_allowed;
+        moved.retain(|id| !self.selected_players.contains(id));
+        if too_many || !moved.is_empty() {
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::InvalidSolidDefence(
+                    ffb_model::dialog::dialog_invalid_solid_defence_parameter::DialogInvalidSolidDefenceParameter {
+                        team_id: Some(game.active_team().id.clone()),
+                        amount: moved.len() as i32,
+                        limit: self.nr_of_players_allowed,
+                    },
+                ),
+                false,
+            );
+            return false;
+        }
+        true
+    }
+
     fn handle_solid_defence(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        if game.rules == Rules::Bb2025 {
+            return self.handle_solid_defence_bb2025(game, rng);
+        }
         if game.turn_mode == TurnMode::SolidDefence {
             if self.end_kickoff {
                 let moved_players = self.players_at_coordinates.keys()
@@ -1761,21 +1942,82 @@ mod tests {
             game.team_home.players.push(make_min_player(&id));
             game.field_model.set_player_state(&id, PlayerState::new(ffb_model::enums::PS_RESERVE));
         }
+        // One player on the pitch, out of every tackle zone: the one eligible for Solid Defence.
+        game.team_home.players.push(make_min_player("onpitch"));
+        game.field_model.set_player_state("onpitch", PlayerState::new(ffb_model::enums::PS_STANDING));
+        game.field_model.set_player_coordinate("onpitch", FieldCoordinate::new(5, 5));
         game.home_playing = true;
 
         let mut step = make_step();
         step.kickoff_result = Some(KickoffResult::SolidDefence);
-        // First call: enters Solid Defence mode.
-        step.start(&mut game, &mut GameRng::new(0));
+        // Java bb2025: roll, then the SOLID_DEFENCE player choice over the eligible players.
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::PlayerChoice { ref reason, ref eligible_players, .. })
+            if reason == "SOLID_DEFENCE" && eligible_players == &vec!["onpitch".to_string()]));
+        assert!(game.field_model.player_state("hp0").unwrap().base() == ffb_model::enums::PS_PRONE,
+            "reserves are kept out of the re-setup (RESERVE -> PRONE)");
+
+        // The coach picks the player: it goes to the reserves box, the mode is SOLID_DEFENCE.
+        step.handle_command(&Action::PlayerChoice { player_id: Some("onpitch".into()),
+            player_ids: vec!["onpitch".into()], mode: "SOLID_DEFENCE".into() }, &mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::SolidDefence);
+        assert!(game.field_model.player_coordinate("onpitch").map_or(true, |c| !FieldCoordinateBounds::FIELD.is_in_bounds(c)));
 
-        // Simulate the receiving player's EndTurn (no players actually moved).
+        // EndTurn without setting him up again: checkSetup fails, Solid Defence stays.
         step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
-
-        // Before the fix: an invalid setup (checkSetup == false) was ignored, and the step
-        // always left Solid Defence once the moved-player count was within the allowed cap.
-        // After the fix: an invalid setup must keep the game in Solid Defence.
         assert_eq!(game.turn_mode, TurnMode::SolidDefence, "invalid setup must not leave Solid Defence");
+    }
+
+    /// Java bb2025 handleSolidDefense: an empty choice (the parity agents' answer) leaves at
+    /// once -- KICKOFF, NEXT_STEP, the reserves back to RESERVE.
+    #[test]
+    fn solid_defence_empty_choice_leaves() {
+        use ffb_model::enums::PlayerState;
+        let mut game = make_game();
+        game.team_home.players.push(make_min_player("onpitch"));
+        game.field_model.set_player_state("onpitch", PlayerState::new(ffb_model::enums::PS_STANDING));
+        game.field_model.set_player_coordinate("onpitch", FieldCoordinate::new(5, 5));
+        game.team_home.players.push(make_min_player("res"));
+        game.field_model.set_player_state("res", PlayerState::new(ffb_model::enums::PS_RESERVE));
+        game.home_playing = true;
+        let mut step = make_step();
+        step.kickoff_result = Some(KickoffResult::SolidDefence);
+        step.start(&mut game, &mut GameRng::new(0));
+        let out = step.handle_command(&Action::SelectPlayer { player_id: String::new() }, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, crate::step::framework::StepAction::NextStep);
+        assert_eq!(game.turn_mode, TurnMode::Kickoff);
+        assert_eq!(game.field_model.player_state("res").unwrap().base(), PS_RESERVE);
+    }
+
+    /// Java bb2025 handleCharge: the CHARGE player choice; nobody chosen -> NEXT_STEP; chosen
+    /// players -> the others are deactivated and the step goes to the blitz label.
+    #[test]
+    fn charge_asks_the_coach_and_deactivates_the_unchosen() {
+        use ffb_model::enums::PlayerState;
+        for choose in [false, true] {
+            let mut game = make_game();
+            for id in ["a", "b"] {
+                game.team_home.players.push(make_min_player(id));
+                game.field_model.set_player_state(id, PlayerState::new(ffb_model::enums::PS_STANDING).change_active(true));
+            }
+            game.field_model.set_player_coordinate("a", FieldCoordinate::new(5, 5));
+            game.field_model.set_player_coordinate("b", FieldCoordinate::new(5, 9));
+            game.home_playing = true;
+            let mut step = make_step();
+            step.kickoff_result = Some(KickoffResult::Charge);
+            let out = step.start(&mut game, &mut GameRng::new(0));
+            assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::PlayerChoice { ref reason, .. }) if reason == "CHARGE"));
+            let ids: Vec<String> = if choose { vec!["a".into()] } else { vec![] };
+            let out = step.handle_command(&Action::PlayerChoice { player_id: ids.first().cloned(),
+                player_ids: ids, mode: "CHARGE".into() }, &mut game, &mut GameRng::new(0));
+            if choose {
+                assert_eq!(out.action, crate::step::framework::StepAction::GotoLabel);
+                assert!(game.field_model.player_state("a").unwrap().is_active());
+                assert!(!game.field_model.player_state("b").unwrap().is_active());
+            } else {
+                assert_eq!(out.action, crate::step::framework::StepAction::NextStep);
+            }
+        }
     }
 
     // ── QuickSnap: end sub-phase when active players run out mid-move ────────

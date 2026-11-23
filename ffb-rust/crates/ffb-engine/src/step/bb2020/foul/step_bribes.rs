@@ -56,8 +56,8 @@ impl Step for StepBribes {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
-            Action::ArgueTheCall { argue } => {
-                self.argue_the_call_choice = Some(*argue);
+            Action::ArgueTheCall { player_ids } => {
+                self.argue_the_call_choice = Some(!player_ids.is_empty());
                 self.argue_the_call_successful = None;
             }
             Action::UseBribe { use_bribe } => {

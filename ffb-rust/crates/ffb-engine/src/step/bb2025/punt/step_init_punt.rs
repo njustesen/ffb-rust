@@ -41,6 +41,8 @@ impl Step for StepInitPunt {
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
             Action::EndTurn => { self.end_turn = true; }
+            // Java CLIENT_PUNT_TO_CROWD: `puntToCrowd = command.isPuntToCrowd()`.
+            Action::PuntToCrowd { punt_to_crowd } => { self.punt_to_crowd = Some(*punt_to_crowd); }
             Action::Punt { coord } => {
                 // Java: `checkCommandIsFromHomePlayer ? coord : coord.transform()` — an away
                 // coach's CLIENT_FIELD_COORDINATE arrives in HIS mirrored view and the server
@@ -115,15 +117,15 @@ impl StepInitPunt {
                 || player_coord.x == 0 || player_coord.x == 25;
             if !on_boundary {
                 self.punt_to_crowd = Some(false);
-            } else {
-                // Java shows DialogPuntToCrowdParameter for a boundary punter; the parity
-                // contract answers it with a deterministic DECLINE and zero draws
-                // (ParityRunner's PUNT_TO_CROWD case — the default was the NON-SEEDED
-                // RandomStrategy). Auto-decline here so both sides spend nothing and the punt
-                // proceeds to the target squares (dark_elf bb2025 seed 1 i=64: the (0,13)
-                // endzone punter).
-                self.punt_to_crowd = Some(false);
             }
+        }
+        if self.punt_to_crowd.is_none() {
+            // Java: showDialog(new DialogPuntToCrowdParameter(), false); CONTINUE. The parity agents
+            // decline (ParityRunner's PUNT_TO_CROWD case), zero draws (dark_elf bb2025 seed 1
+            // i=64: the (0,13) end-zone punter).
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::PuntToCrowd(Default::default()), false);
+            return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::PuntToCrowd { player_id });
         }
 
         if self.punt_to_crowd == Some(true) {
@@ -378,5 +380,36 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("endLabel"));
+    }
+
+    /// Java: a punter on a sideline / in an end zone is asked (DialogPuntToCrowdParameter); a
+    /// decline goes on to the punt target squares, an accept is a touchback.
+    #[test]
+    fn boundary_punter_is_asked_to_punt_to_the_crowd() {
+        use ffb_model::enums::{PlayerType, PlayerGender};
+        use ffb_model::model::player::Player;
+        for accept in [false, true] {
+            let mut game = make_game();
+            game.team_home.players.push(Player {
+                id: "punter3".into(), name: "p".into(), nr: 3,
+                position_id: "lineman".into(), player_type: PlayerType::Regular,
+                gender: PlayerGender::Male,
+                movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
+                starting_skills: vec![ffb_model::model::skill_def::SkillWithValue::new(ffb_model::enums::SkillId::Punt)],
+                ..Default::default()
+            });
+            game.field_model.set_player_coordinate("punter3", FieldCoordinate::new(5, 0));
+            game.acting_player.player_id = Some("punter3".into());
+            game.acting_player.player_action = Some(PlayerAction::Punt);
+            let mut step = StepInitPunt::new("end".into());
+            let out = step.start(&mut game, &mut GameRng::new(0));
+            assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::PuntToCrowd { .. })));
+            let out = step.handle_command(&Action::PuntToCrowd { punt_to_crowd: accept }, &mut game, &mut GameRng::new(0));
+            if accept {
+                assert!(out.published.iter().any(|p| matches!(p, StepParameter::Touchback(true))));
+            } else {
+                assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::PuntTarget { .. })));
+            }
+        }
     }
 }

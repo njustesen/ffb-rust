@@ -325,7 +325,19 @@ impl Agent for UniformAgent {
                 let idx = self.pick(sorted.len());
                 Action::Touchback { player_id: sorted[idx].0.clone() }
             }
-            Some(AgentPrompt::ArgueTheCall { .. }) => Action::ArgueTheCall { argue: self.pick_bool() },
+            Some(AgentPrompt::ArgueTheCall { player_ids, .. }) => {
+                let player_ids = player_ids.iter().filter(|_| self.pick_bool()).cloned().collect();
+                Action::ArgueTheCall { player_ids }
+            }
+            Some(AgentPrompt::PuntToCrowd { .. }) => Action::PuntToCrowd { punt_to_crowd: self.pick_bool() },
+            Some(AgentPrompt::PickUpChoice { .. }) => Action::PickUpChoice { pick_up: self.pick_bool() },
+            Some(AgentPrompt::KickOffResult { .. }) => Action::KickOffResultChoice {
+                result: if self.pick_bool() { ffb_model::enums::KickoffResult::Charge } else { ffb_model::enums::KickoffResult::SolidDefence },
+            },
+            Some(AgentPrompt::Bribes { inducement_type, player_ids, .. }) => {
+                let player_ids = player_ids.first().filter(|_| self.pick_bool()).cloned().into_iter().collect();
+                Action::UseInducement { inducement_type: Some(inducement_type.clone()), card_id: None, player_ids }
+            }
             Some(AgentPrompt::MultiBlockTargets { eligible_players, .. }) => {
                 if eligible_players.len() < 2 {
                     return Action::EndPlayerAction;

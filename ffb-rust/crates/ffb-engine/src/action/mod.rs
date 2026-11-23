@@ -144,8 +144,16 @@ pub enum Action {
     UseApothecary { player_id: PlayerId, use_apothecary: bool },
     /// Use a bribe to avoid ejection.
     UseBribe { use_bribe: bool },
-    /// Choose whether to argue the call after a foul ejection.
-    ArgueTheCall { argue: bool },
+    /// Java CLIENT_ARGUE_THE_CALL: the players the coach argues for (empty = decline). Answers
+    /// `AgentPrompt::ArgueTheCall` (foul ejection, end-of-drive secret weapons).
+    ArgueTheCall { player_ids: Vec<PlayerId> },
+
+    /// Java CLIENT_PICK_UP_CHOICE: attempt the pick-up or not.
+    PickUpChoice { pick_up: bool },
+    /// Java CLIENT_PUNT_TO_CROWD: punt into the crowd (a touchback) or not.
+    PuntToCrowd { punt_to_crowd: bool },
+    /// Java CLIENT_KICK_OFF_RESULT_CHOICE: the overtime kick-off result the coach picked.
+    KickOffResultChoice { result: ffb_model::enums::KickoffResult },
 
     // ── Inducement ────────────────────────────────────────────────────────────
     /// Purchase inducements before the game.

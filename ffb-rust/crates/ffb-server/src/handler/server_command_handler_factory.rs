@@ -644,6 +644,26 @@ impl ServerCommandHandlerFactory {
             AnyClientCommand::ClientTouchback(t) => t.ball_coordinate.map(|c| if side == TeamSide::Away { c.transform() } else { c }),
             _ => None,
         };
+        // Java AbstractStep.handleCommand: CLIENT_CONCEDE_GAME is handled by whatever step runs.
+        if let AnyClientCommand::ClientConcedeGame(c) = &client_command {
+            let Some(status) = c.concede_game_status else { return };
+            let mut gc = self.game_cache.lock().unwrap();
+            let Some(gs) = gc.get_game_state_by_id_mut(game_id) else { return };
+            let conceded = match gs.driver.as_mut() {
+                Some(driver) => {
+                    driver.begin_report_snapshots();
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| driver.concede_game(status, side == TeamSide::Home)))
+                        .unwrap_or_else(|_| {
+                            log::error!("game {game_id}: engine panicked on a concession");
+                            false
+                        })
+                }
+                None => false,
+            };
+            log::info!("game {game_id}: {status:?} concession from {side:?} (conceded: {conceded})");
+            crate::util::server_game_sync::sync_game(gs, &self.session_manager);
+            return;
+        }
         let action = match decode_command(client_command, side) {
             Ok(a) => a,
             Err(e) => {
@@ -672,6 +692,16 @@ impl ServerCommandHandlerFactory {
             }
             action = Action::ConfirmSetup;
         }
+        // Java bb2025 StepApplyKickoffResult CLIENT_END_TURN in SOLID_DEFENCE:
+        // `setPlayerCoordinates(endTurnCommand.getPlayerCoordinates())` before the setup check.
+        if let (Some(ffb_model::prompts::AgentPrompt::KickoffEventPlacement { mode, .. }), Some(coordinates)) = (&prompt, &end_turn_coordinates) {
+            let home_playing = gs.get_game().map(|g| g.home_playing).unwrap_or(true);
+            if mode == "SolidDefence" && (side == TeamSide::Home) == home_playing {
+                if let Some(game) = gs.get_game_mut() {
+                    ffb_engine::util::util_server_setup::UtilServerSetup::set_player_coordinates(game, coordinates);
+                }
+            }
+        }
         if let Action::Touchback { player_id } = &mut action {
             if let (Some(c), Some(game)) = (touchback_coordinate, gs.get_game()) {
                 *player_id = game.field_model.player_at(c).map(|p| p.to_string()).unwrap_or_default();
@@ -680,7 +710,7 @@ impl ServerCommandHandlerFactory {
         // The engine steps for these player-choice modes match `Action::PlayerChoice` (by mode);
         // every other PlayerChoice prompt is answered with `SelectPlayer` ("" = declined).
         if let (Some(ffb_model::prompts::AgentPrompt::PlayerChoice { reason, .. }), Action::PlayerChoice { player_id, .. }) = (&prompt, &action) {
-            const BY_MODE: &[&str] = &["DIVING_TACKLE", "TENTACLES", "SHADOWING", "MVP", "ANIMAL_SAVAGERY", "PICK_ME_UP", "QUICK_BITE", "FURIOUS_OUTBURST"];
+            const BY_MODE: &[&str] = &["DIVING_TACKLE", "TENTACLES", "SHADOWING", "MVP", "ANIMAL_SAVAGERY", "PICK_ME_UP", "QUICK_BITE", "FURIOUS_OUTBURST", "SOLID_DEFENCE", "CHARGE"];
             if !BY_MODE.contains(&reason.as_str()) {
                 action = Action::SelectPlayer { player_id: player_id.clone().unwrap_or_default() };
             }
@@ -1005,7 +1035,14 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
             target_id: g.victim_id.ok_or_else(|| missing("victimId"))?,
         }),
         AnyClientCommand::ClientConfirm(_) => Ok(Action::Acknowledge),
-        AnyClientCommand::ClientArgueTheCall(a) => Ok(Action::ArgueTheCall { argue: !a.player_ids.is_empty() }),
+        AnyClientCommand::ClientArgueTheCall(a) => Ok(Action::ArgueTheCall { player_ids: a.player_ids }),
+        // Java CLIENT_USE_INDUCEMENT: StepBribes / StepEndTurn read the AVOID_BAN type and the
+        // bribed players, the inducement steps the type or card.
+        AnyClientCommand::ClientUseInducement(u) => Ok(Action::UseInducement {
+            inducement_type: u.inducement_type_name,
+            card_id: u.card_name,
+            player_ids: u.player_ids,
+        }),
 
         // Java DialogPlayerChoice answer; an empty selection declines. Re-shaped per prompt in
         // `handle_command` (some steps take `SelectPlayer`).
@@ -1015,7 +1052,14 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
             player_ids: p.player_ids,
         }),
 
-        AnyClientCommand::ClientKickOffResultChoice(_) => Ok(Action::Acknowledge),
+        // Java bb2025 StepTrickster CLIENT_PICK_UP_CHOICE.
+        AnyClientCommand::ClientPickUpChoice(p) => Ok(Action::PickUpChoice { pick_up: p.attempt_pick_up }),
+        // Java StepInitPunt CLIENT_PUNT_TO_CROWD.
+        AnyClientCommand::ClientPuntToCrowd(p) => Ok(Action::PuntToCrowd { punt_to_crowd: p.punt_to_crowd }),
+        // Java StepKickoffResultRoll CLIENT_KICK_OFF_RESULT_CHOICE: the overtime kick-off result.
+        AnyClientCommand::ClientKickOffResultChoice(k) => Ok(Action::KickOffResultChoice {
+            result: k.kickoff_result.ok_or_else(|| missing("kickoffResult"))?,
+        }),
         // Java StepBloodLust CLIENT_BLOODLUST_ACTION: change the action to a move or keep it.
         AnyClientCommand::ClientBloodlustAction(b) => Ok(Action::BloodlustAction { change: b.change }),
         // Java StepApothecary CLIENT_APOTHECARY_CHOICE: the chosen state and serious injury.

@@ -52,10 +52,18 @@ impl Step for StepKickoffResultRoll {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java CLIENT_KICK_OFF_RESULT_CHOICE: set fKickoffResult from the command.
-        // client-only: Action::KickoffResultChoice arrives from dialog; headless never receives this
-        self.execute_step(game, rng)
+        match action {
+            Action::KickOffResultChoice { result } => {
+                self.kickoff_result = Some(*result);
+                self.execute_step(game, rng)
+            }
+            // Java: UNHANDLED_COMMAND -- the dialog stays open.
+            _ => StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::KickOffResult {
+                team_id: game.active_team().id.clone(),
+            }),
+        }
     }
 
     fn set_parameter(&mut self, _param: &StepParameter) -> bool { false }
@@ -87,13 +95,14 @@ impl StepKickoffResultRoll {
             } else if overtime_option == "solidDefence" {
                 self.kickoff_result = Some(KickoffResult::SolidDefence);
             } else {
-                // client-only: DialogKickOffResultChoice for blitzOrSolidDefence — headless auto-rolls
-                // DEVIATION: Java shows DialogKickOffResultParameter(actingTeam) and waits (CONTINUE);
-                // this Rust path auto-rolls instead, so no dialog is shown here (it would never be answered).
-                let d1 = rng.d6();
-                let d2 = rng.d6();
-                self.kickoff_roll = vec![d1, d2];
-                self.kickoff_result = Some(kickoff_result_for_roll_in(game.rules, d1 + d2));
+                // Java: showDialog(new DialogKickOffResultParameter(actingTeam.getId()), false); CONTINUE.
+                let team_id = game.active_team().id.clone();
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::KickOffResult(
+                        ffb_model::dialog::dialog_kick_off_result_parameter::DialogKickOffResultParameter {
+                            team_id: Some(team_id.clone()),
+                        }), false);
+                return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::KickOffResult { team_id });
             }
         }
 
@@ -288,5 +297,23 @@ mod tests {
         for &die in &step.kickoff_roll {
             assert!((1..=6).contains(&die), "die value {die} out of range");
         }
+    }
+
+    /// Java: in overtime with OVERTIME_KICK_OFF_RESULTS = blitzOrSolidDefence the kicking coach
+    /// picks the result (DialogKickOffResultParameter), no dice.
+    #[test]
+    fn overtime_choice_asks_the_coach() {
+        let mut game = make_game();
+        game.half = 3;
+        game.options.set(game_option_id::OVERTIME_KICK_OFF_RESULTS, "blitzOrSolidDefence");
+        let mut step = StepKickoffResultRoll::new();
+        let mut rng = GameRng::new(0);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::KickOffResult { .. })));
+        assert_eq!(rng.call_count, 0);
+        let out = step.handle_command(&Action::KickOffResultChoice { result: KickoffResult::Charge }, &mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::KickoffResult(KickoffResult::Charge))));
     }
 }

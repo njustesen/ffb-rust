@@ -1269,6 +1269,41 @@ impl DriverGameState {
         self.forwarded = None;
     }
 
+    /// Java `AbstractStep.handleCommand` CLIENT_CONCEDE_GAME -- every step handles it, so it lives
+    /// here rather than in a step. REQUESTED: the playing coach gets DialogConcedeGameParameter
+    /// while a concession is possible; CONFIRMED: that team concedes (legally or not, per
+    /// `GameMechanic.isLegalConcession`); DENIED: hide the dialog. A concession clears the step
+    /// stack and runs the EndGame sequence. Returns true when the game was conceded.
+    pub fn concede_game(&mut self, status: ffb_model::model::ConcedeGameStatus, home_command: bool) -> bool {
+        use ffb_model::model::ConcedeGameStatus;
+        use crate::util::util_server_dialog::UtilServerDialog;
+        let game = &mut self.game;
+        match status {
+            ConcedeGameStatus::REQUESTED => {
+                if game.concession_possible && game.home_playing == home_command {
+                    UtilServerDialog::show_dialog(game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::ConcedeGame(Default::default()), false);
+                }
+            }
+            ConcedeGameStatus::CONFIRMED => {
+                game.concession_possible = false;
+                game.game_result.home.conceded = game.home_playing && home_command;
+                game.game_result.away.conceded = !game.home_playing && !home_command;
+                let acting_team = game.active_team().clone();
+                game.conceded_legally = crate::mechanic::game_mechanic_for(game.rules).is_legal_concession(game, &acting_team);
+            }
+            ConcedeGameStatus::DENIED => UtilServerDialog::hide_dialog(game),
+        }
+        if self.game.game_result.home.conceded || self.game.game_result.away.conceded {
+            self.clear_step_stack();
+            self.waiting_for_command = false;
+            self.push_end_game_sequence(false);
+            self.drive();
+            return true;
+        }
+        false
+    }
+
     /// Java: `((EndGame) factory.forName("EndGame")).pushSequence(new EndGame.SequenceParams(gameState, adminMode))`.
     /// Reuses the same `end_game_sequence` helper the in-engine `StepEndTurn` variants push.
     pub fn push_end_game_sequence(&mut self, admin_mode: bool) {
@@ -1698,6 +1733,32 @@ mod tests {
         assert_eq!(gs.stack.len(), 7);
         gs.run_until_prompt();
         assert!(gs.is_finished());
+    }
+
+    /// Java AbstractStep CLIENT_CONCEDE_GAME: REQUESTED by the playing coach shows the concede
+    /// dialog; CONFIRMED concedes for the playing team and runs the EndGame sequence; a request
+    /// from the other coach does nothing.
+    #[test]
+    fn conceding_ends_the_game_for_the_playing_team() {
+        use ffb_model::model::ConcedeGameStatus;
+        let mut gs = new_game(2);
+        gs.game.concession_possible = true;
+        let home = gs.game.home_playing;
+        assert!(!gs.concede_game(ConcedeGameStatus::REQUESTED, !home));
+        assert!(!matches!(gs.game.dialog_parameter,
+            Some(ffb_model::dialog::dialog_parameter_factory::DialogParameter::ConcedeGame(_))),
+            "only the playing coach may concede");
+        assert!(!gs.concede_game(ConcedeGameStatus::REQUESTED, home));
+        assert!(matches!(gs.game.dialog_parameter,
+            Some(ffb_model::dialog::dialog_parameter_factory::DialogParameter::ConcedeGame(_))));
+        assert!(!gs.concede_game(ConcedeGameStatus::DENIED, home));
+        assert!(gs.game.dialog_parameter.is_none());
+        assert!(gs.concede_game(ConcedeGameStatus::CONFIRMED, home));
+        let (conceded, other) = if home { (&gs.game.game_result.home, &gs.game.game_result.away) }
+            else { (&gs.game.game_result.away, &gs.game.game_result.home) };
+        assert!(conceded.conceded && !other.conceded);
+        assert!(!gs.game.concession_possible);
+        assert!(gs.is_finished() || gs.current_prompt().is_some(), "the EndGame sequence ran");
     }
 
     #[test]

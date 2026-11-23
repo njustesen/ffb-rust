@@ -409,8 +409,10 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
             }),
         AgentPrompt::SelectWeather { options } =>
             Some(WireDialog::SelectWeather { options: options.iter().map(|w| format!("{:?}", w)).collect() }),
-        AgentPrompt::ArgueTheCall { player_id } =>
-            Some(WireDialog::ArgueTheCall { player_id: player_id.clone() }),
+        AgentPrompt::ArgueTheCall { player_ids, .. } =>
+            Some(WireDialog::ArgueTheCall { player_id: player_ids.first().cloned().unwrap_or_default() }),
+        // Legacy hand-made wire layer (not used by the Java-protocol server path, BACKLOG §P).
+        AgentPrompt::Bribes { .. } | AgentPrompt::KickOffResult { .. } | AgentPrompt::PuntToCrowd { .. } | AgentPrompt::PickUpChoice { .. } => None,
         AgentPrompt::BriberyAndCorruption { team_id } =>
             Some(WireDialog::BriberyAndCorruption { team_id: team_id.clone() }),
         AgentPrompt::ConcedeGame { team_id } =>
@@ -549,7 +551,7 @@ mod tests {
 
     #[test]
     fn argue_the_call_prompt_converts() {
-        let prompt = AgentPrompt::ArgueTheCall { player_id: "p".into() };
+        let prompt = AgentPrompt::ArgueTheCall { team_id: "t".into(), player_ids: vec!["p".into()] };
         let json = jsn(&prompt_to_wire(&prompt).unwrap());
         assert!(json.contains("\"dialogId\":\"ARGUE_THE_CALL\""));
     }
