@@ -14,6 +14,20 @@ use ffb_engine::action::Action;
 use ffb_engine::legal_actions::TeamSide;
 use ffb_engine::game_log::GameLog;
 
+/// Java: the `Game` that `GameCache.createGameState` builds -- `setHomePlaying(true)`,
+/// `setTurnMode(START_GAME)`, `setDialogParameter(new DialogStartGameParameter())` (the
+/// client answers that dialog with CLIENT_START_GAME), `setWeather(NICE)`.
+fn new_server_game() -> Game {
+    let mut game = Game::new(Team::default(), Team::default(), Rules::Bb2025);
+    game.home_playing = true;
+    game.turn_mode = ffb_model::enums::TurnMode::StartGame;
+    game.dialog_parameter = Some(ffb_model::dialog::dialog_parameter_factory::DialogParameter::StartGame(
+        Default::default(),
+    ));
+    game.weather = ffb_model::enums::Weather::Nice;
+    game
+}
+
 /// Server-side wrapper around `DriverGameState`.
 pub struct GameState {
     /// Java: `fGame` — the live game model (accessed via driver)
@@ -29,6 +43,10 @@ pub struct GameState {
     /// constructor initializer, so it defaults to `null` — modeled here as
     /// `None`).
     status: Option<GameStatus>,
+    /// Java: `fGame` before the game starts -- `new GameState(server)` always holds a blank
+    /// `Game` that `GameCache.addTeamToGame` fills at join. Moved into the engine driver by
+    /// `start_joined_game`; `get_game` reads the driver's game from then on.
+    pending_game: Game,
 }
 
 impl GameState {
@@ -40,7 +58,20 @@ impl GameState {
             command_nr: 0,
             game_log: GameLog::new(),
             status: None,
+            pending_game: new_server_game(),
         }
+    }
+
+    /// Java: `UtilServerStartGame.startGame` for a fresh game whose teams joined through
+    /// `GameCache.addTeamToGame`: hands the joined `Game` to the engine, which pushes the
+    /// edition's `StartGame` sequence and runs to the first prompt.
+    pub fn start_joined_game(&mut self, seed: u64) {
+        let mut game = std::mem::replace(
+            &mut self.pending_game,
+            new_server_game(),
+        );
+        game.id = self.game_id as u64;
+        self.driver = Some(DriverGameState::start_joined_game(game, seed));
     }
 
     /// Java: `getId()`
@@ -54,12 +85,18 @@ impl GameState {
 
     /// Java: `getGame()`
     pub fn get_game(&self) -> Option<&Game> {
-        self.driver.as_ref().map(|d| &d.game)
+        Some(match &self.driver {
+            Some(d) => &d.game,
+            None => &self.pending_game,
+        })
     }
 
     /// Java: `getGame()` — mutable
     pub fn get_game_mut(&mut self) -> Option<&mut Game> {
-        self.driver.as_mut().map(|d| &mut d.game)
+        Some(match &mut self.driver {
+            Some(d) => &mut d.game,
+            None => &mut self.pending_game,
+        })
     }
 
     /// Whether both teams have joined and the engine is initialized.

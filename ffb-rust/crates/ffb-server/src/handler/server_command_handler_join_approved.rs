@@ -401,27 +401,38 @@ impl ServerCommandHandlerJoinApproved {
         .await;
 
         if ready {
-            // Java: `UtilServerStartGame.addDefaultGameOptions(gameState)` /
-            // `pGameState.initRulesDependentMembers()` / `pGameState.getGame().initializeRules()` /
-            // `UtilSkillBehaviours.registerBehaviours(...)` — no `GameOptions`/rules-
-            // reinitialization/skill-behaviour-registry subsystems exist in this crate to call
-            // into (documented gap, matching this file's other `// java:` notes). What *is*
-            // ported: re-resolving both teams by id and re-attaching them, exactly as Java's
-            // `getTeamById`/`addTeamToGame` pair does immediately before `startGame`.
-            let (home_id, away_id) = {
-                let gc = self.game_cache.lock().unwrap();
-                gc.get_game_state_by_id(game_id)
-                    .and_then(|gs| gs.get_game())
-                    .map(|g| (g.team_home.id.clone(), g.team_away.id.clone()))
-                    .unwrap_or_default()
+            // Java (STANDALONE): `UtilServerStartGame.addDefaultGameOptions(gameState)`;
+            // `initRulesDependentMembers()` / `initializeRules()` pick the ruleset from the
+            // `rulesVersion` option it sets (BB2025); then both teams are re-read with
+            // `getTeamById(id, game)` -- parsed against that ruleset, so skills it does not
+            // know are dropped -- and re-attached with `addTeamToGame` before `startGame`.
+            // (`UtilSkillBehaviours.registerBehaviours` has no Rust counterpart: skill
+            // behaviour is static in the engine.)
+            let snapshot = {
+                let mut gc = self.game_cache.lock().unwrap();
+                gc.get_game_state_by_id_mut(game_id).and_then(|gs| gs.get_game_mut()).map(|game| {
+                    ffb_engine::util::util_server_start_game::UtilServerStartGame::add_default_game_options(game);
+                    game.rules = ffb_model::enums::Rules::Bb2025;
+                    game.clone()
+                })
             };
-            let resolved_home = GameCache::get_team_by_id(&home_id, &self.team_cache, &self.roster_cache);
-            let resolved_away = GameCache::get_team_by_id(&away_id, &self.team_cache, &self.roster_cache);
-            if let (Ok(resolved_home), Ok(resolved_away)) = (resolved_home, resolved_away) {
+            if let Some(snapshot) = snapshot {
+                let resolved_home = GameCache::get_team_by_id_for_game(
+                    &snapshot.team_home.id, Some(&snapshot), &self.team_cache, &self.roster_cache);
+                let resolved_away = GameCache::get_team_by_id_for_game(
+                    &snapshot.team_away.id, Some(&snapshot), &self.team_cache, &self.roster_cache);
                 let mut gc = self.game_cache.lock().unwrap();
                 if let Some(game) = gc.get_game_state_by_id_mut(game_id).and_then(|gs| gs.get_game_mut()) {
-                    GameCache::add_team_to_game(game, resolved_home, true);
-                    GameCache::add_team_to_game(game, resolved_away, false);
+                    match (resolved_home, resolved_away) {
+                        (Ok(home), Ok(away)) => {
+                            GameCache::add_team_to_game(game, home, true);
+                            GameCache::add_team_to_game(game, away, false);
+                        }
+                        (home, away) => log::error!(
+                            "game {game_id}: re-resolving teams failed: home {:?} away {:?}",
+                            home.err(), away.err()
+                        ),
+                    }
                 }
             }
 
@@ -438,6 +449,15 @@ impl ServerCommandHandlerJoinApproved {
     async fn run_start_game(&self, game_id: i64, db: &DbConnectionManager) {
         let mut taken = { self.game_cache.lock().unwrap().take_game_state(game_id) };
         if let Some(gs) = taken.as_mut() {
+            if !gs.is_started() {
+                // Java: `startGame` on a fresh game pushes the `StartGame` sequence and runs
+                // `startNextStep()` (the dice come from the server's own `DiceRoller`).
+                let seed = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_nanos() as u64)
+                    .unwrap_or(0);
+                gs.start_joined_game(seed);
+            }
             let _ = start_game(gs, false, &self.session_manager, db, false, true, None).await;
         }
         if let Some(gs) = taken {

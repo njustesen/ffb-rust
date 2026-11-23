@@ -12028,28 +12028,65 @@ parity, which §I-§M closed.
 - **P5 done-check** `scripts/gui_check.py` (written before P4 closes) + docs + push.
 
 ### RESUME HERE
-**2026-11-23, P1 in progress. Login works against the real Java client.**
+**2026-11-23 (2), P1 gate reached: two real Java clients log in, pick teams, get the field, start the game.**
 
-Done:
-- LZString (`798ea1a15`).
-- `/command` socket ported 1:1 (`net/command_socket.rs`):
-  - Binary and text frames; LZString on both directions.
-  - Decode via `NetCommandFactory.for_json_value`; `ReceivedCommand` carries `AnyClientCommand`.
-  - Pre-join sessions get an outgoing channel (`SessionManager::register_socket`).
-  - Compression defaults to true, as in Java's shipped `server.ini`/`client.ini`.
-- Factory dispatches the Java-mirror command structs directly. `decode_command(AnyClientCommand)` covers
-  the obvious game commands; the rest are `NotImplemented` until P4.
-- Wire fixes:
-  - `VERSION` = 3.2.0 (Java pom), not the Cargo version.
-  - `serverVersion` and `serverPasswordChallenge` built from the mirror `to_json_value`
-    (`"challenge":null` in standalone).
-- DEVIATION: no DB (`FFB_DB_URL` unset) means every targeted join is approved.
+Done this unit:
+- Team/roster loading: the factory runs Java `GameCache.init()` (STANDALONE) -- `RosterCache.init("rosters")`,
+  `TeamCache.init("teams")`, relative to the working directory. Run the server FROM
+  `ffb-java/ffb/ffb-server` (as Java's). `serverTeamList` now lists the coach's teams.
+- `GameState` holds Java's blank pre-start `Game` (`GameCache.createGameState`: homePlaying, START_GAME
+  turn mode, `DialogStartGameParameter`, NICE weather); `get_game()` is never `None`. `start_joined_game`
+  hands it to the engine (`DriverGameState::start_joined_game`: edition `StartGame` sequence, no
+  synthesized CLIENT_START_GAME).
+- Join-with-team ready branch = Java order: `addDefaultGameOptions` (engine port fixed: it used
+  `"PITCH_URL"`-style keys and was dead; now the Java ids), rules BB2025, teams re-read with
+  `getTeamById(id, game)` -- skills the ruleset does not know are DROPPED, as Java's
+  `RosterPlayer.endXmlElement` does (Kalimar's LRB6 humans carry `KickOffReturn`) -- then `startGame`.
+- `serverGameState` = `Game::to_json_value()` (Java keys); `from_json` = `Game::init_from`.
+- `serverGameTime` carries `gameTime`/`turnTime` (`ServerCommandGameTime`).
 
-Live probe: `ffb-server.exe 127.0.0.1:22227` + Java `AiMain -coach Kalimar -password test -server localhost
--port 22227` (jar copied to the scratchpad). Result: version 3.2.0 accepted, null challenge, join of
-"LocalGame" approved, `serverTeamList` sent in Java shape, but the list is EMPTY.
+Live probe (two clients): `scratchpad/run_server.cmd` (cd to ffb-java/ffb/ffb-server, RUST_LOG=debug,
+`target/debug/ffb-server.exe 127.0.0.1:22227`), then two `AiMain` (`-coach Kalimar ... -teamId teamHumanKalimar
+-teamName "Kalimar's Humans" -home` and `-coach BattleLore ... -teamId teamHumanBattleLore`). Result: both
+`serverJoin`, both get a full Java-shaped `serverGameState`, both send `ClientStartGame`.
 
-Next unit: team loading. Java standalone builds the team list from `ffb-server/teams/*.xml` (filtered by
-`<coach>`) and the rosters from `rosters/`. Then join-with-team → `serverUserSettings` + `serverJoin`,
-second coach → `serverGameState` from `Game::to_json_value()` (+ `transform` for away). Note: AiMain
-with an empty team list spams `clientActingPlayer` (harness quirk, not a server bug).
+Next units, in order:
+1. **`Game.transform()`** (Java `Game.transform`, `FieldModel.transform`, ...): the AWAY session gets
+   `gameStateCommand.transform()` / `syncCommand.transform(rules)` (`ServerCommunication.sendGameState` /
+   `sendModelSync`). Not ported anywhere yet (the dialog parameters already have `transform`).
+2. **P3 model sync.** Today every engine command produces an EMPTY `serverModelSync` from the hand-rolled
+   `net/wire.rs` bridge (non-Java key order too), so the clients never see the pregame advance. Plan:
+   snapshot `Game` before each command, diff after -> Java `ModelChangeList`; self-check every sync by
+   applying it with the ported `ModelChangeProcessor` to the before-game and comparing
+   `to_json_value()` with the after-game (a built-in oracle). Reports: the report JSON the report-parity
+   runs already produce. Port `ServerCommandModelSync.toJsonValue` (key order) instead of wire.rs.
+3. AiMain spams `clientActingPlayer` whenever it has nothing to do; each one is decoded as
+   `EndPlayerAction` and handed to the engine. Java steps ignore unhandled commands -- check the driver
+   rejects them without side effects (P4).
+
+> History -- RESUME HERE of 2026-11-23 (P1 login), superseded:
+> **2026-11-23, P1 in progress. Login works against the real Java client.**
+>
+> Done:
+> - LZString (`798ea1a15`).
+> - `/command` socket ported 1:1 (`net/command_socket.rs`):
+>   - Binary and text frames; LZString on both directions.
+>   - Decode via `NetCommandFactory.for_json_value`; `ReceivedCommand` carries `AnyClientCommand`.
+>   - Pre-join sessions get an outgoing channel (`SessionManager::register_socket`).
+>   - Compression defaults to true, as in Java's shipped `server.ini`/`client.ini`.
+> - Factory dispatches the Java-mirror command structs directly. `decode_command(AnyClientCommand)` covers
+>   the obvious game commands; the rest are `NotImplemented` until P4.
+> - Wire fixes:
+>   - `VERSION` = 3.2.0 (Java pom), not the Cargo version.
+>   - `serverVersion` and `serverPasswordChallenge` built from the mirror `to_json_value`
+>     (`"challenge":null` in standalone).
+> - DEVIATION: no DB (`FFB_DB_URL` unset) means every targeted join is approved.
+>
+> Live probe: `ffb-server.exe 127.0.0.1:22227` + Java `AiMain -coach Kalimar -password test -server localhost
+> -port 22227` (jar copied to the scratchpad). Result: version 3.2.0 accepted, null challenge, join of
+> "LocalGame" approved, `serverTeamList` sent in Java shape, but the list is EMPTY.
+>
+> Next unit: team loading. Java standalone builds the team list from `ffb-server/teams/*.xml` (filtered by
+> `<coach>`) and the rosters from `rosters/`. Then join-with-team → `serverUserSettings` + `serverJoin`,
+> second coach → `serverGameState` from `Game::to_json_value()` (+ `transform` for away). Note: AiMain
+> with an empty team list spams `clientActingPlayer` (harness quirk, not a server bug).

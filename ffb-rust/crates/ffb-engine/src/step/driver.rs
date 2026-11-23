@@ -737,6 +737,24 @@ impl DriverGameState {
     /// report stream gains Java's `pettyCash` / `cardsBought` / `*InducementsBought` /
     /// `freePettyCash` reports. `new`/`new_with_options` keep the flattened sequence for the
     /// remaining non-parity callers.
+    /// Java `UtilServerStartGame.startGame` (fresh game) on a server `Game` whose teams were
+    /// attached at join (`GameCache.addTeamToGame` already boxed the players): push the
+    /// edition's `StartGame` sequence and `startNextStep()`. Unlike `new_full_pregame` no
+    /// CLIENT_START_GAME is synthesized -- the connected clients send their own.
+    pub fn start_joined_game(game: Game, seed: u64) -> Self {
+        let rules = game.rules;
+        let mut gs = DriverGameState::from_game(game, seed);
+        gs.initial_hash = state_hash(&gs.game);
+        let seq = match rules {
+            Rules::Bb2016 => crate::step::generator::bb2016::start_game::StartGame::build_sequence(),
+            Rules::Bb2020 => crate::step::generator::bb2020::start_game::StartGame::build_sequence(),
+            Rules::Bb2025 | Rules::Common => crate::step::generator::bb2025::start_game::StartGame::build_sequence(),
+        };
+        gs.stack.push_sequence(seq);
+        gs.run_until_prompt();
+        gs
+    }
+
     pub fn new_full_pregame(home: Team, away: Team, rules: Rules, seed: u64, options: &[(&str, &str)]) -> Self {
         let mut game = Game::new(home, away, rules);
         for (key, value) in options { game.options.set(*key, *value); }

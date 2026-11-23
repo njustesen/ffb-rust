@@ -66,10 +66,17 @@ impl ServerGameTimeTask {
 
             // Java: `fServer.getCommunication().sendGameTime(gameState)` — broadcasts
             // `ServerCommandGameTime(game.getGameTime(), game.getTurnTime())` to every
-            // session in the game. `Game` (ffb-model) has no `game_time`/`turn_time`
-            // fields yet (matching `UtilServerTimer`'s "no game clock" stance), so the
-            // broadcast below carries only the command id until those fields exist.
-            let message = serde_json::json!({ "netCommandId": "serverGameTime" }).to_string();
+            // session in the game.
+            let times = {
+                let gc = game_cache.lock().unwrap();
+                gc.get_game_state_by_id(game_id)
+                    .and_then(|gs| gs.get_game())
+                    .map(|g| (g.game_time, g.turn_time))
+                    .unwrap_or((0, 0))
+            };
+            let message = ffb_protocol::commands::server_command_game_time::ServerCommandGameTime::new(times.0, times.1)
+                .to_json_value()
+                .to_string();
             session_manager.lock().unwrap().send_all(game_id, &message);
 
             let timeout_possible_after = {

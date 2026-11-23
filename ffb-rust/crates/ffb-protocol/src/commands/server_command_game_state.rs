@@ -35,15 +35,18 @@ impl ServerCommandGameState {
         Self::ID
     }
 
-    /// Java: `ServerCommandGameState.toJsonValue()`. `Game` has no
-    /// Java-matching `to_json_value()` of its own yet, so its serde derive
-    /// is used for the nested `game` object — every field is preserved but
-    /// under Rust field names rather than Java's camelCase keys.
+    /// Java: `ServerCommandGameState.toJsonValue()` -- the nested `game` is
+    /// `Game.toJsonValue()` (Java keys, BACKLOG §O). A game the Java model cannot
+    /// express is logged and sent as null (Java would have thrown).
     pub fn to_json_value(&self) -> serde_json::Value {
         let base = ServerCommand { command_nr: self.command_nr };
         let mut map = base.base_json_fields(self.get_id());
         if let Some(game) = &self.game {
-            map.insert("game".to_string(), serde_json::to_value(game.as_ref()).unwrap_or(serde_json::Value::Null));
+            let value = game.to_json_value().unwrap_or_else(|e| {
+                eprintln!("serverGameState: Game.toJsonValue failed: {e}");
+                serde_json::Value::Null
+            });
+            map.insert("game".to_string(), value);
         }
         serde_json::Value::Object(map)
     }
@@ -53,7 +56,18 @@ impl ServerCommandGameState {
         let base = ServerCommand::base_from_json(json);
         let game = json
             .get("game")
-            .and_then(|v| if v.is_null() { None } else { serde_json::from_value(v.clone()).ok() })
+            .and_then(|v| {
+                if v.is_null() {
+                    return None;
+                }
+                // Java: `new Game(source).initFrom(source, json)`.
+                let mut game = Game::new(
+                    ffb_model::model::team::Team::default(),
+                    ffb_model::model::team::Team::default(),
+                    ffb_model::enums::Rules::Bb2025,
+                );
+                game.init_from(v).ok().map(|_| game)
+            })
             .map(Box::new);
         Self { command_nr: base.command_nr, game }
     }

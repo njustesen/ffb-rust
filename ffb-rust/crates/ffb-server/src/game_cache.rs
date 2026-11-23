@@ -193,8 +193,18 @@ impl GameCache {
     /// module doc comment) rather than owned as a `GameCache` field, since `TeamCache`/
     /// `RosterCache` are read-only lookup tables built once at server startup.
     pub fn get_team_by_id(team_id: &str, team_cache: &TeamCache, roster_cache: &RosterCache) -> std::io::Result<Team> {
+        Self::get_team_by_id_for_game(team_id, None, team_cache, roster_cache)
+    }
+
+    /// Java: `GameCache.getTeamById(String, Game)` -- the team XML is parsed against `game`.
+    pub fn get_team_by_id_for_game(
+        team_id: &str,
+        game: Option<&Game>,
+        team_cache: &TeamCache,
+        roster_cache: &RosterCache,
+    ) -> std::io::Result<Team> {
         let mut team = team_cache
-            .get_team_by_id(team_id)
+            .get_team_by_id_for_game(team_id, game)
             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, format!("no team found for id {team_id}")))??;
         Self::update_roster(&mut team, roster_cache)?;
         Ok(team)

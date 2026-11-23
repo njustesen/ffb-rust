@@ -18,6 +18,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use ffb_model::model::game::Game;
 use ffb_model::model::team::Team;
 use ffb_model::model::team_skeleton::TeamSkeleton;
 use ffb_model::util::file_iterator::FileIterator;
@@ -40,10 +41,16 @@ impl TeamCache {
     /// Java throws via `.get()` on an empty `Optional` (`NoSuchElementException`) when no
     /// match is found; that is modeled here as `None`.
     pub fn get_team_by_id(&self, team_id: &str) -> Option<io::Result<Team>> {
+        self.get_team_by_id_for_game(team_id, None)
+    }
+
+    /// Java: `getTeamById(String teamId, Game game)` with the game the team is parsed
+    /// against (its ruleset decides which skills exist).
+    pub fn get_team_by_id_for_game(&self, team_id: &str, game: Option<&Game>) -> Option<io::Result<Team>> {
         self.team_files
             .iter()
             .find(|(skeleton, _)| skeleton.get_id() == team_id)
-            .map(|(_, file)| map_to_team(file))
+            .map(|(_, file)| map_to_team(file, game))
     }
 
     /// Java: `getSkeleton(String teamId)`.
@@ -61,7 +68,7 @@ impl TeamCache {
             .team_files
             .iter()
             .filter(|(skeleton, _)| skeleton.get_coach() == coach)
-            .map(|(_, file)| map_to_team(file))
+            .map(|(_, file)| map_to_team(file, None))
             .collect::<io::Result<Vec<_>>>()?;
         matches.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(matches)
@@ -104,7 +111,7 @@ fn parse_team_skeleton(xml: &str) -> TeamSkeleton {
 }
 
 /// Java: `mapToTeam(File)` — `XmlHandler.parse(game, xmlSource, new Team(source))`.
-fn map_to_team(file: &Path) -> io::Result<Team> {
+fn map_to_team(file: &Path, game: Option<&Game>) -> io::Result<Team> {
     let content = fs::read_to_string(file)?;
     let empty = Team {
         id: String::new(), name: String::new(), race: String::new(),
@@ -115,7 +122,7 @@ fn map_to_team(file: &Path) -> io::Result<Team> {
         team_value: 0, treasury: 0, special_rules: vec![], players: vec![],
         vampire_lord: false, roster: None, base_icon_path: None, logo_url: None, necromancer: false,
     };
-    let parsed = XmlHandler::parse(None, &content, Box::new(empty));
+    let parsed = XmlHandler::parse(game, &content, Box::new(empty));
     parsed.into_any().downcast::<Team>().map(|t| *t).map_err(|_| {
         io::Error::new(io::ErrorKind::InvalidData, "Team XML did not parse into a Team")
     })

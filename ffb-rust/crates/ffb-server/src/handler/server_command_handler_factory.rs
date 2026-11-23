@@ -220,8 +220,21 @@ impl ServerCommandHandlerFactory {
         // `client.*` server properties — a real deployment would build these once at server
         // startup and share them here (no such startup wiring exists yet for this trio, same
         // as `ServerCommandHandlerScheduleGame`'s own `Default` impl).
-        let team_cache = Arc::new(TeamCache::new());
-        let roster_cache = Arc::new(RosterCache::new());
+        // Java: `GameCache.init()` (STANDALONE) — `rosterCache.init(new File("rosters"))`,
+        // `teamCache.init(new File("teams"), server)`, relative to the server's working
+        // directory (run it from `ffb-java/ffb/ffb-server`, as Java's is). Java throws on an
+        // IOException; a missing directory here just leaves the cache empty (unit tests run
+        // from the crate directory) and is logged.
+        let mut team_cache = TeamCache::new();
+        let mut roster_cache = RosterCache::new();
+        if let Err(e) = roster_cache.init(std::path::Path::new("rosters")) {
+            log::warn!("roster cache: {e}");
+        }
+        if let Err(e) = team_cache.init(std::path::Path::new("teams")) {
+            log::warn!("team cache: {e}");
+        }
+        let team_cache = Arc::new(team_cache);
+        let roster_cache = Arc::new(roster_cache);
         let client_properties: Arc<Vec<(String, String)>> = Arc::new(Vec::new());
         let join_handler = ServerCommandHandlerJoin::new(
             Arc::clone(&game_cache),

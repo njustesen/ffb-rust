@@ -18,6 +18,10 @@ impl GameStateService {
     /// exposed yet, so that half of the reset is not performed here — this ports the `Game`
     /// field resets only.
     pub fn reset_step_stack(&self, game_state: &mut crate::game_state::GameState) -> Result<(), String> {
+        // No engine step stack to reset before the game has started.
+        if !game_state.is_started() {
+            return Err("game not started".to_string());
+        }
         let game = match game_state.get_game_mut() {
             Some(game) => game,
             None => return Err("game not started".to_string()),

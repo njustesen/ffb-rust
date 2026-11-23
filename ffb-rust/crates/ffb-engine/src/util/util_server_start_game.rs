@@ -9,27 +9,9 @@
 
 use ffb_model::model::game::Game;
 
-/// Option key constants — mirror Java's GameOptionId names.
+/// Option key constants: Java GameOptionId names (the ffb-model ids, e.g. "pitchUrl").
 pub mod opt {
-    pub const PITCH_URL: &str = "PITCH_URL";
-    pub const WIZARD_AVAILABLE: &str = "WIZARD_AVAILABLE";
-    pub const INDUCEMENT_IGORS_MAX: &str = "INDUCEMENT_IGORS_MAX";
-    pub const INDUCEMENT_APOS_MAX: &str = "INDUCEMENT_APOS_MAX";
-    pub const MVP_NOMINATIONS: &str = "MVP_NOMINATIONS";
-    pub const RULESVERSION: &str = "RULESVERSION";
-    pub const INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG: &str =
-        "INDUCEMENT_PRAYERS_AVAILABLE_FOR_UNDERDOG";
-    pub const INDUCEMENT_PRAYERS_MAX: &str = "INDUCEMENT_PRAYERS_MAX";
-    pub const INDUCEMENT_PRAYERS_COST: &str = "INDUCEMENT_PRAYERS_COST";
-    pub const CLAW_DOES_NOT_STACK: &str = "CLAW_DOES_NOT_STACK";
-    pub const ALLOW_STAFF_ON_BOTH_TEAMS: &str = "ALLOW_STAFF_ON_BOTH_TEAMS";
-    pub const ALLOW_BALL_AND_CHAIN_RE_ROLL: &str = "ALLOW_BALL_AND_CHAIN_RE_ROLL";
-    pub const ENABLE_TACKLEZONE_OVERLAYS: &str = "ENABLE_TACKLEZONE_OVERLAYS";
-    pub const INDUCEMENT_BRIBES_REDUCED_MAX: &str = "INDUCEMENT_BRIBES_REDUCED_MAX";
-    pub const INDUCEMENT_CHEFS_REDUCED_MAX: &str = "INDUCEMENT_CHEFS_REDUCED_MAX";
-    pub const MB_STACKS_AGAINST_CHAINSAW: &str = "MB_STACKS_AGAINST_CHAINSAW";
-    pub const FORCE_TREASURY_TO_PETTY_CASH: &str = "FORCE_TREASURY_TO_PETTY_CASH";
-    pub const PETTY_CASH_AFFECTS_TV: &str = "PETTY_CASH_AFFECTS_TV";
+    pub use ffb_model::option::game_option_id::*;
 }
 
 pub struct UtilServerStartGame;
