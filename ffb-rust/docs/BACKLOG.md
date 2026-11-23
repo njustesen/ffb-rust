@@ -12028,6 +12028,49 @@ parity, which §I-§M closed.
 - **P5 done-check** `scripts/gui_check.py` (written before P4 closes) + docs + push.
 
 ### RESUME HERE
+**2026-11-23 (4): P4 GATE MET -- AiMain vs AiMain plays whole games on the Rust server, 10/10 on one
+build** (`python -I scripts/gui_check.py --start N --games 3 --timeout 180`, logs
+`D:/ffb_gui_check/p4final`: every Kalimar/BattleLore team with a saved setup, 0 panics, 0 client
+exceptions, 0 undecoded commands, 0 prompts without a Java dialog; 0-4 whole-game fallbacks per game).
+
+Done (4):
+- **P2 dialogs** (`f…` "§P P2"): `UtilServerDialog.showDialog/hideDialog` carry the `DialogParameter`
+  and are called at the Java lines in the bb2025/mixed/phase steps, skill behaviours, the re-roll offer
+  (`DialogReRollPropertiesParameter`, Java's properties) and setup errors. Parity smoke after it:
+  bb2025 x2 / bb2020 / bb2016 10/10 steps + 10/10 reports. Not ported (the Rust step decides inline and
+  never waits, so the coach is not asked -- DEVIATION comments at each): argue-the-call / bribes /
+  B&C in StepEndTurn + StepBribes, punt-to-crowd, multi-block roll choices, apothecary-multiple
+  sub-dialogs, Charge / Solid Defence player choices, overtime kick-off result, Trickster pick-up
+  choice, GFI/Jump modifier-ignoring skills, concede (no concede handling in the engine).
+- **P3**: the diff now covers used skills (player + acting player), inducement sets + prayers,
+  `removePlayer`, blood-spot multisets, old player state, the same dialog asked again
+  (`Game::dialog_set_count` = Java's notify count), and skips Java's non-notifying team-result fields.
+  `ffb-replay sync-check <replays>` (UNCOMMITTED -- it needs `replay_observe` from the parallel
+  `ml/setup_bc` work in `states.rs`; commit together with that): on 15 corpus replays 33,588 real Java
+  syncs, 0 wrong lists (home and away views), 11 whole-game fallbacks (temporary skills/modifiers/
+  properties of prayers & enhancements, Getting Even hatred, chomps).
+- **P4 commands**: setups (`TeamSetup` 1:1 + `setups/` cache standing in for the DB rows,
+  `loadTeamSetup`, setup END_TURN -> `setPlayerCoordinates`), away-coordinate mirroring (move,
+  blitz move, pushback, pass -- the Rust kickoff/setup/TTM/swoop/punt/wizard steps mirror
+  themselves), BuyInducements, PlayerChoice (by mode), TargetSelected, Touchback (player on the
+  square), ApothecaryChoice, BloodlustAction, display-name skills; StartGame unhandled while a prompt
+  waits; actions with no waiting step rejected; engine panics isolated (no poisoned mutex).
+- Data/model fixes the clients exposed: team carries its roster; team/roster XML parsed against the
+  game (unknown skills and special rules dropped, as Java); Get the Ref uses Java's `bribes` type;
+  `game.started` in Java's date form. Test: all 538 loadable standalone teams serialize in a BB2025 game.
+- Harness (AiMain): answers SELECT_BLITZ_TARGET with CLIENT_TARGET_SELECTED; puts 3 on the LOS when a
+  saved (older-rules) setup holds fewer. Teams without a saved setup (dark elf, halfling, nurgle) are
+  skipped by gui_check -- AiMain can only set up by loading one, on the Java server too.
+
+Open, in order:
+1. **Human smoke test** (needs the user): two GUI windows (`FantasyFootballClientAwt`) against
+   `target/debug/ffb-server.exe 127.0.0.1:22227` started from `ffb-java/ffb/ffb-server`.
+2. Reports (game log): `serverModelSync.reportList` is empty -- send the Java-shaped reports the
+   report-parity runs already write.
+3. The un-ported "decided inline" dialogs above (P2 tail), then the P2 gate (client-view hash in the
+   parity harness).
+4. Diff coverage for the 11 fallback kinds; commit `sync-check` with the setups work.
+
 **2026-11-23 (3), P3 sync machinery live; the pregame runs to the coin toss. Next: P2 dialogs.**
 
 Done (3):
