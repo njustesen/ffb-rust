@@ -11658,7 +11658,87 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
   (the final certified run over the whole corpus on ONE frozen exe happens in O4).
   `cargo test --workspace` green (15,137 passed, 0 failed).
 
+### O3 log — iteration 16 (2026-11-23 ~05:15): every non-MDE action record, 19/19 identical (`bd6a2a1b2`)
+- **Ported (ffb-parity/src/replay/):** `game_state_serializer.rs` = harness `GameStateSerializer` 1:1 (the
+  `state` object; insertion-ordered `CanonicalJson` objects = minimal-json `toString()`); `replay_report.rs`
+  = the sync's reports as Java decodes them: per-ruleset report CLASS (`instanceof ReportSkillRoll`,
+  `mixed.ReportInjury` vs `bb2016.ReportInjury`) from an ORACLE table dumped by the new harness
+  `ReplayReportClassDump` (`D:/ffb_replay_parity/report_classes.tsv`, 492 rows; BB2016 has no
+  SELECT_GAZE_TARGET / BRIBERY_AND_CORRUPTION_RE_ROLL class) + the getters the records read with
+  IJsonOption semantics (primitive boolean absent = NPE); `scripts/gen_replay_java_names.py` generates
+  `java_names.rs` (Java enum CONSTANT <-> getName for TurnMode, Weather, PlayerAction, Direction,
+  SpecialEffect, ReportId, + the class table) -- records print `name()`, the model holds `getName()`;
+  `actions.rs` = parseFile's pre-sync checks, pre-change switch, post-change pass and every
+  `build*Record`, `recordError` kinds (Java's `rec` survives a later throw in the same case -- kept);
+  `states.rs` now also does `dropUnknownReports` (`report=<id>`), counts the start-state
+  `dropUnknownInducements` keys (`prayers=...`, was silently dropped from Rust's unknown map) and the end
+  check; `actions_gate.rs` = **`ffb-replay actions <out> <java_dir> <inputs>`**: writes Java-format
+  `<id>.states/.actions.jsonl/.status.json`, diffs states + every record EXCEPT `player_select` /
+  `move_target` (the MoveDecisionEngine records) + record_errors / end_check / unknown_model_changes;
+  first diff -> `<out>/<id>.actions.diff.txt` (read with `D:/ffb_replay_parity/tools/rec_diff.py`).
+- **Engine model bug found + fixed:** Java Team JSON `specialRules` are enum CONSTANT names
+  (`BRAWLIN_BRUTES`); the Rust loader (iteration 7) stored them verbatim, but every engine check
+  (`SppMechanic` Brawlin' Brutes, bb2020 injury mechanic Favoured of Nurgle / Masters of Undeath,
+  Bribery and Corruption inducements) compares `getRuleName()` -> bb2025 Brawlin' Brutes casualty SPP 2
+  instead of 3 (`spp_earned` diff in 5 of the 10 fumbbl/ replays). Loader now stores rule names, writer
+  maps back to constants (state JSON unchanged).
+- **Result:** fumbbl/ + partial/ + window/ **19/19 identical** (states + 2,196 non-MDE records; 5,753
+  Java MDE records left out). `cargo test --workspace` 15,147 passed, 0 failed.
+- **Scope note:** report decode is per-getter, not every field of every report class (Java decodes all
+  and a throw skips the sync); run5 has 0 skipped syncs, so Java never threw on this corpus.
+- **MDE findings (for the next unit, verified in the source):** no Rust port of `MoveDecisionEngine` /
+  `PathProbabilityFinder` / `ActionScore` / `PolicySampler` exists (the parity "heuristic agent" is a
+  different code path -- the old RESUME note "reuse it" was wrong). The parser calls both with
+  `argmax = true`, so **`java.util.Random` is never drawn** (no Random port needed). BUT
+  `selectMoveTarget`'s candidate order = `new ArrayList<>(pathMap.keySet())` of a fresh
+  `HashMap<FieldCoordinate, PathEntry>` (hash `31x + y`) filled from the iteration of a **ThreadLocal**
+  `bestNode` HashMap that is `clear()`ed, never shrunk: within-bucket order (and treeified bins once a
+  bucket reaches 8 at capacity 64) depends on that map's capacity HISTORY across every earlier replay of
+  the JVM run -- a cross-replay dependency of the same kind as the RNG fixed in O1 (records must depend
+  on their replay alone). The Dijkstra `PriorityQueue` tie order also fixes which equal-probability path
+  (and its last-ulp product) is kept -> port `java.util.PriorityQueue` siftUp/siftDown 1:1.
+
 ### RESUME HERE
+**This iteration (2026-11-23, loop iteration 16):** O3(a) done -- every non-MDE action record identical on
+the 19 replays of fumbbl/partial/window (see "O3 log -- iteration 16"), committed `bd6a2a1b2`.
+**RUNNING (detached, PID 31392, started 05:15):** whole-corpus `D:/ffb_replay_parity/bin/ffb-replay-o3a.exe
+actions D:/ffb_replay_parity/rust_actions_all D:/ffb_replay_parity/run5_java <5 corpus dirs>` (launcher
+`D:/ffb_replay_parity/tools/launch_actions_all.ps1`; = `bd6a2a1b2`), ~10 replays/min -> ~09:00. It gates
+STATES and every non-MDE record at once. **The lifted run window ends 08:00:** if it is still running
+after 08:00, stop it (`powershell Stop-Process -Id 31392`) and work from the partial log; rerun the rest
+in tonight's 21:00-07:00 window. Read `D:/ffb_replay_parity/rust_actions_all.log` (DIFF/ERROR lines, then
+"first-diff kinds", "error kinds" and the final `actions (without MDE records): N identical ...` line;
+progress every 100 in `.err`); classify each DIFF kind with `tools/rec_diff.py <out>/<id>.actions.diff.txt`.
+No `.loop_wait.json` (the next unit below does not need the run's result).
+**Next unit: O3(b) the MoveDecisionEngine records** (`player_select`, `move_target`), in this order:
+1. **Harness first (decision, same precedent as the canonical state form and the O1 RNG reseed):** make
+   the move_target record independent of HashMap/ThreadLocal history -- in `FumbblReplayParser` sort
+   `mr.candidates` (with `mr.rawScores` permuted in parallel, the end-option score stays LAST) by
+   coordinate (x, then y) before storing them; `action` = index of the reached square in that order.
+   Selection semantics are untouched (argmax picks by score; the record's action is the square actually
+   reached). Then a new frozen jar (`bin/ffb-ai-replay-o3.jar`, private classes dir, never `mvn package`
+   over the o1 jar) and a new whole-corpus Java run (run6; night window) -- run5 stays the states oracle
+   until run6 is green.
+2. Rust 1:1 ports (ffb-parity/src/replay/mde/ or ffb-ai-like module): `ActionScore` (clamps,
+   `softmaxScore`), `PolicySampler.argmax`, `PathProbabilityFinder.findAllPaths` (Dijkstra with a 1:1
+   `java.util.PriorityQueue`, DIRS order, 1e-12 tolerances, the ruleset's DodgeModifierFactory /
+   GoForItModifierFactory / AgilityMechanic.minimumRollDodge -- the engine has these per ruleset; check
+   `ffb-mechanics/src/mechanics/path_probability.rs` is NOT the same algorithm before reusing anything),
+   `MoveDecisionEngine.selectPlayer` / `selectMoveTarget` + helpers (`UtilPlayer.findAdjacentBlockable
+   Players`, `findAdjacentPronePlayers`, `findAdjacentPlayersWithTacklezones`, `findTacklezones`,
+   `findFoulAssists`, `getStrengthWithModifiers(game)`, `getMovementWithModifiers`, `hasSkillProperty`,
+   `canCancel`) on the replay Game, then `flushMoveTarget` / `buildPlayerSelectRecord` in `actions.rs`
+   (the hooks are marked "MoveDecisionEngine (not ported)").
+3. Number printing: `scores` are doubles printed by minimal-json `JsonArray.add(double)` =
+   `Double.toString` with a trailing `.0` CUT (check minimal-json 0.9.5 `JsonNumber`/`JsonValue.valueOf
+   (double)` first) on Temurin 21 = shortest repr (JDK19+). Rust's `{:e}` gives the shortest digits;
+   port Java's layout rules (plain for 1e-3 <= |d| < 1e7, else `d.dddE±n`), unit-test against a Java
+   probe of a few thousand doubles from run5 records.
+4. Gate: `ffb-replay actions` without the MDE filter (drop `MDE_TYPES`), fumbbl/ 10/10, then the corpus.
+Open engine findings for later gates: `SkillId::usage_type_for` (iteration 13), prayer-name compare
+(iteration 6); the Rust XML team loader pushes the raw `<rule>` text where Java does `SpecialRule.from`.
+
+> History -- RESUME HERE of 2026-11-23 (loop iteration 15), superseded:
 **This iteration (2026-11-23, loop iteration 15):** O2 COMPLETE -- states 2,224/2,224 (see "O2 log --
 iteration 15"). Nothing running; no `.loop_wait.json`.
 **Next: O3 (Rust actions)**, the checker's `actions identical` line + Rust `status.json`. Scope (read
