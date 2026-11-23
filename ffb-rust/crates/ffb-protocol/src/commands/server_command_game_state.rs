@@ -26,6 +26,12 @@ impl ServerCommandGameState {
         }
     }
 
+    /// Java: `transform()` -- `new ServerCommandGameState(getGame().transform())`, the
+    /// command the AWAY coach is sent.
+    pub fn transform(&self) -> Self {
+        Self::new(self.game.as_ref().map(|g| g.transform()))
+    }
+
     /// Java: `isReplayable()` — game state snapshots are NOT stored in replays.
     pub fn is_replayable(&self) -> bool {
         false

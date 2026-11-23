@@ -840,6 +840,57 @@ impl FieldModel {
     }
 }
 
+impl FieldModel {
+    /// Java: `FieldModel.transform()` -- the model as the AWAY coach sees it (x mirrored). A
+    /// FRESH model: only what Java copies survives (ball in play / moving, weather, every
+    /// player state and card unchanged; ball, player, blood spot, pushback, move square, track
+    /// number, range ruler, field / player marker, dice decoration and trap door coordinates
+    /// mirrored). Everything else -- the bomb, out-of-bounds, target selection, chomps,
+    /// multi-block targets, card effects, prayer enhancements -- is NOT carried over.
+    pub fn transform(&self) -> FieldModel {
+        let mut t = FieldModel::new();
+        t.ball_in_play = self.ball_in_play;
+        t.ball_moving = self.ball_moving;
+        t.weather = self.weather;
+        t.player_states = self.player_states.clone();
+        t.player_cards = self.player_cards.clone();
+        t.ball_coordinate = self.ball_coordinate.map(FieldCoordinate::transform);
+        t.player_coordinates = self
+            .player_coordinates
+            .iter()
+            .map(|(id, c)| (id.clone(), c.transform()))
+            .collect();
+        // `getPlayerCoordinates()` is replayed in arrival order, so the order is kept.
+        t.coordinate_arrival = self.coordinate_arrival.clone();
+        t.arrival_counter = self.arrival_counter;
+        t.bloodspots = self
+            .bloodspots
+            .iter()
+            .map(|b| BloodSpot { injury: b.injury, coordinate: b.coordinate.map(FieldCoordinate::transform) })
+            .collect();
+        t.pushback_squares = self.pushback_squares.iter().map(|p| p.clone().transform()).collect();
+        t.move_squares = self
+            .move_squares
+            .values()
+            .map(|m| {
+                let m = m.clone().transform();
+                (m.coordinate, m)
+            })
+            .collect();
+        t.track_numbers = self
+            .track_numbers
+            .iter()
+            .map(|n| TrackNumber { coordinate: n.coordinate.map(FieldCoordinate::transform), number: n.number })
+            .collect();
+        t.range_ruler = self.range_ruler.clone().map(RangeRuler::transform);
+        t.field_markers = self.field_markers.iter().map(|m| m.transform()).collect();
+        t.player_markers = self.player_markers.iter().map(|m| m.transform()).collect();
+        t.dice_decorations = self.dice_decorations.iter().map(|d| d.transform()).collect();
+        t.trap_doors = self.trap_doors.iter().map(|c| c.transform()).collect();
+        t
+    }
+}
+
 impl Default for FieldModel {
     fn default() -> Self {
         Self::new()

@@ -432,6 +432,52 @@ impl Game {
     }
 }
 
+/// Java `Game.transform()` (BACKLOG §P): the game as the AWAY coach's client sees it.
+impl Game {
+    /// Java: `Game.transform()` -- a NEW game: the listed values copied unchanged, then home and
+    /// away swapped (teams, turn data, game result, homePlaying / homeFirstOffense negated), the
+    /// field model and the pass coordinate mirrored. Values Java does not copy keep the fresh
+    /// game's defaults. `zapped_players` rides along with the teams (Java keeps zapped players
+    /// inside the `Team`).
+    pub fn transform(&self) -> Game {
+        let mut t = Game::new(self.team_away.clone(), self.team_home.clone(), self.rules);
+        // unmodified values
+        t.id = self.id;
+        t.turn_mode = self.turn_mode;
+        t.turn_mode_null = self.turn_mode_null;
+        t.last_turn_mode = self.last_turn_mode;
+        t.half = self.half;
+        t.acting_player = self.acting_player.clone();
+        t.scheduled = self.scheduled.clone();
+        t.started = self.started.clone();
+        t.finished = self.finished.clone();
+        t.setup_offense = self.setup_offense;
+        t.waiting_for_opponent = self.waiting_for_opponent;
+        t.dialog_parameter = self.dialog_parameter.clone();
+        t.defender_id = self.defender_id.clone();
+        t.defender_action = self.defender_action;
+        t.turn_time = self.turn_time;
+        t.game_time = self.game_time;
+        t.timeout_possible = self.timeout_possible;
+        t.timeout_enforced = self.timeout_enforced;
+        t.testing = self.testing;
+        t.thrower_id = self.thrower_id.clone();
+        t.thrower_action = self.thrower_action;
+        t.options = self.options.clone();
+        t.zapped_players = self.zapped_players.clone();
+        // transformed values
+        t.home_playing = !self.home_playing;
+        t.home_first_offense = !self.home_first_offense;
+        t.field_model = self.field_model.transform();
+        t.turn_data_home = self.turn_data_away.clone();
+        t.turn_data_away = self.turn_data_home.clone();
+        t.pass_coordinate = self.pass_coordinate.map(FieldCoordinate::transform);
+        t.game_result = GameResult { home: self.game_result.away.clone(), away: self.game_result.home.clone() };
+        t.conceded_legally = self.conceded_legally;
+        t
+    }
+}
+
 /// Java `Game.toJsonValue()` / `Game.initFrom(source, json)` (BACKLOG §O O2(a)).
 impl Game {
     /// Java: `Game.toJsonValue()`. Every key is written (null where the Java field is null);
@@ -646,6 +692,32 @@ mod tests {
 
         odd["teamState"] = "SKELETON".into();
         assert!(Game::from_java_json(&odd).is_err());
+    }
+
+    /// Java `Game.transform`: home/away swapped, homePlaying / homeFirstOffense negated, ball and
+    /// pass coordinate mirrored, the bomb NOT carried over (Java's FieldModel.transform drops
+    /// it); transforming twice restores the Java JSON of a game that holds only copied state.
+    #[test]
+    fn transform_swaps_sides_and_mirrors_the_field() {
+        let mut g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2025);
+        g.id = 7;
+        g.home_playing = true;
+        g.home_first_offense = false;
+        g.turn_data_home.turn_nr = 3;
+        g.game_result.home.score = 2;
+        g.field_model.ball_coordinate = Some(FieldCoordinate::new(5, 6));
+        g.pass_coordinate = Some(FieldCoordinate::new(1, 2));
+        let t = g.transform();
+        assert_eq!((t.team_home.id.as_str(), t.team_away.id.as_str()), ("away", "home"));
+        assert!(!t.home_playing && t.home_first_offense);
+        assert_eq!((t.turn_data_away.turn_nr, t.game_result.away.score), (3, 2));
+        assert_eq!(t.field_model.ball_coordinate, Some(FieldCoordinate::new(5, 6).transform()));
+        assert_eq!(t.pass_coordinate, Some(FieldCoordinate::new(1, 2).transform()));
+        assert_eq!(t.id, 7);
+        assert_eq!(t.transform().to_json_value().unwrap(), g.to_json_value().unwrap());
+
+        g.field_model.bomb_coordinate = Some(FieldCoordinate::new(4, 4));
+        assert_eq!(g.transform().field_model.bomb_coordinate, None);
     }
 
     #[test]

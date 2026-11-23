@@ -328,9 +328,12 @@ pub async fn start_game(
 
     {
         let game = game_state.get_game().cloned();
+        // Java: `communication.sendGameState(gameState)` -- home and spectators get the game,
+        // the away coach `gameStateCommand.transform()`.
         let command = ServerCommandGameState::new(game);
-        let json = command.to_json_value().to_string();
-        session_manager.lock().unwrap().send_all(game_id, &json);
+        let sm = session_manager.lock().unwrap();
+        sm.send_home_and_spectators(game_id, &command.to_json_value().to_string());
+        sm.send_away(game_id, &command.transform().to_json_value().to_string());
     }
     // Java: `gameState.fetchChanges()` clears the pending model-change list after
     // broadcasting the whole model; this crate's `GameState` has no such change-tracking
