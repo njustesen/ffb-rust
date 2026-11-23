@@ -11078,6 +11078,9 @@ fumbbl.com contact. Do NOT start N1+ while the §M cert8 chain is running.
 
 ## §O — 2026-11-22: REPLAY PROCESSING PARITY — every downloaded replay, all states + actions, Rust == Java (ACTIVE)
 
+**Progress report 2026-11-23:** [PROGRESS_REPLAY_PROCESSING.md](PROGRESS_REPLAY_PROCESSING.md) — O1 + O2
+complete on the whole corpus, O3 identical on 63/63 checked, O4 proof run scheduled for the 11-23 night.
+
 **Goal (user, 2026-11-22, after §M closed):** "check all the downloaded replays and make sure we can
 process all of them; get all states and actions. Make sure Rust engine does the same as Java in that
 respect. That is the next phase."
