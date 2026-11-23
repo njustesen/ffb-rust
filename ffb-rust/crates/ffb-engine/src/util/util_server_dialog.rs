@@ -7,15 +7,18 @@
 // Skipped (touch WebSocket timer):
 //   UtilServerTimer.stopTurnTimer, UtilServerTimer.startTurnTimer
 
-use ffb_model::dialog::dialog_id::DialogId;
+use ffb_model::dialog::dialog_parameter_factory::DialogParameter;
 use ffb_model::model::game::Game;
 
 pub struct UtilServerDialog;
 
 impl UtilServerDialog {
     /// Java: UtilServerDialog.showDialog(GameState, IDialogParameter, boolean stopTurnTimer)
-    pub fn show_dialog(game: &mut Game, dialog_id: DialogId, stop_turn_timer: bool) {
-        game.dialog_id = Some(dialog_id);
+    /// `game.setDialogParameter(dialogParameter)` -- the Java client reacts to the parameter
+    /// (BACKLOG §P: it reaches the client as the `gameSetDialogParameter` model change).
+    pub fn show_dialog(game: &mut Game, dialog_parameter: DialogParameter, stop_turn_timer: bool) {
+        game.dialog_id = Some(dialog_parameter.get_id());
+        game.dialog_parameter = Some(dialog_parameter);
         if stop_turn_timer {
             game.waiting_for_opponent = true;
             // UtilServerTimer::stop_turn_timer — skipped (WebSocket layer)
@@ -25,6 +28,7 @@ impl UtilServerDialog {
     /// Java: UtilServerDialog.hideDialog(GameState)
     pub fn hide_dialog(game: &mut Game) {
         game.dialog_id = None;
+        game.dialog_parameter = None;
         game.waiting_for_opponent = false;
         // UtilServerTimer::start_turn_timer — skipped (WebSocket layer)
     }
@@ -39,6 +43,8 @@ impl Default for UtilServerDialog {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffb_model::dialog::dialog_id::DialogId;
+    fn p(id: DialogId) -> DialogParameter { ffb_model::dialog::dialog_parameter_factory::DialogParameterFactory.create_dialog_parameter(Some(id)).unwrap() }
     use ffb_model::enums::Rules;
     use ffb_model::model::game::Game;
     use ffb_model::model::team::Team;
@@ -78,14 +84,14 @@ mod tests {
     fn show_dialog_sets_dialog_id() {
         let mut game = empty_game();
         assert!(game.dialog_id.is_none());
-        UtilServerDialog::show_dialog(&mut game, DialogId::RE_ROLL, false);
+        UtilServerDialog::show_dialog(&mut game, p(DialogId::RE_ROLL), false);
         assert_eq!(game.dialog_id, Some(DialogId::RE_ROLL));
     }
 
     #[test]
     fn show_dialog_with_stop_timer_sets_waiting_for_opponent() {
         let mut game = empty_game();
-        UtilServerDialog::show_dialog(&mut game, DialogId::SKILL_USE, true);
+        UtilServerDialog::show_dialog(&mut game, p(DialogId::SKILL_USE), true);
         assert!(game.waiting_for_opponent);
         assert_eq!(game.dialog_id, Some(DialogId::SKILL_USE));
     }
@@ -94,14 +100,14 @@ mod tests {
     fn show_dialog_without_stop_timer_leaves_waiting_for_opponent_unchanged() {
         let mut game = empty_game();
         game.waiting_for_opponent = false;
-        UtilServerDialog::show_dialog(&mut game, DialogId::SKILL_USE, false);
+        UtilServerDialog::show_dialog(&mut game, p(DialogId::SKILL_USE), false);
         assert!(!game.waiting_for_opponent);
     }
 
     #[test]
     fn hide_dialog_clears_dialog_id_and_waiting() {
         let mut game = empty_game();
-        UtilServerDialog::show_dialog(&mut game, DialogId::RE_ROLL, true);
+        UtilServerDialog::show_dialog(&mut game, p(DialogId::RE_ROLL), true);
         UtilServerDialog::hide_dialog(&mut game);
         assert!(game.dialog_id.is_none());
         assert!(!game.waiting_for_opponent);
@@ -118,7 +124,7 @@ mod tests {
     #[test]
     fn show_then_hide_round_trips() {
         let mut game = empty_game();
-        UtilServerDialog::show_dialog(&mut game, DialogId::USE_APOTHECARY, true);
+        UtilServerDialog::show_dialog(&mut game, p(DialogId::USE_APOTHECARY), true);
         assert!(game.waiting_for_opponent);
         UtilServerDialog::hide_dialog(&mut game);
         assert!(!game.waiting_for_opponent);

@@ -308,6 +308,8 @@ impl StepBlockRoll {
                     self.block_roll.clone(),
                     None,
                 ));
+                // Java: UtilServerDialog.showDialog(..., new DialogBlockRollPropertiesParameter(...), (fNrOfDice < 0))
+                self.show_block_roll_dialog(game, false);
             }
             // Coverage event mirroring ReportBlock: emitted once per block action
             // (initial roll only — re-roll passes have re_rolled_action set).
@@ -361,6 +363,8 @@ impl StepBlockRoll {
             // Java `showBlockRollDialog(getReRollSource() == null)`.
             let team_id = self.block_roll_report_team(game, self.re_roll_source.is_none());
             game.report_list.add(ReportBlockRoll::new(team_id, self.block_roll.clone(), None));
+            // Java: UtilServerDialog.showDialog(..., new DialogBlockRollPropertiesParameter(...), (fNrOfDice < 0))
+            self.show_block_roll_dialog(game, self.re_roll_source.is_none());
         }
         // The re-shown dialog may still carry skill options (bb2020 after a failed Pro offers
         // Brawler); bb2025 builds none once a source is set.
@@ -669,6 +673,106 @@ impl StepBlockRoll {
             }
         }
         false
+    }
+
+    /// Java bb2025 `showBlockRollDialog(noReRollUsed)`: the dialog itself --
+    /// `UtilServerDialog.showDialog(getGameState(), new DialogBlockRollPropertiesParameter(teamId,
+    /// fNrOfDice, fBlockRoll, properties, convertActionsMap(actionToSource)), (fNrOfDice < 0))`.
+    /// Rebuilds `properties` / `actionToSource` exactly as Java does (read-only; no state change).
+    fn show_block_roll_dialog(&self, game: &mut Game, no_re_roll_used: bool) {
+        use ffb_model::enums::ReRollProperty;
+        use std::collections::HashMap;
+        if game.rules != ffb_model::enums::Rules::Bb2025 {
+            // DEVIATION: the bb2020/bb2016 Java steps show a different block dialog; the GUI
+            // server runs bb2025 only.
+            return;
+        }
+        let mut properties: Vec<ReRollProperty> = Vec::new();
+        let mut action_to_source: Vec<(&'static str, String)> = Vec::new();
+        if self.re_roll_source.is_none() {
+            if let Some(player) = game.acting_player.player_id.as_deref().and_then(|pid| game.player(pid)) {
+                let blitzing = game.acting_player.player_action.map(|a| a.is_blitzing()).unwrap_or(false);
+                let unused_id = |id: ffb_model::enums::SkillId| !player.used_skills.contains(&id)
+                    && !game.acting_player.used_skills.contains(&id);
+                let skill_name = |id: ffb_model::enums::SkillId| id.category_and_name_for(game.rules).1.to_string();
+                // Java UtilCards.getUnusedRerollSource(actingPlayer, action) -> ReRollSource.getName(game)
+                let source_for = |action: &str| player.all_skill_ids()
+                    .filter(|id| unused_id(*id))
+                    .find(|id| id.reroll_sources_for(game.rules).iter().any(|(a, _)| *a == action))
+                    .map(skill_name);
+                // singleBlock (SINGLE_BLOCK_DIE), in Java's if/else order.
+                if let Some(single) = self.explicit_die_options(game).0 {
+                    action_to_source.push(("Single Block Die", single));
+                }
+                for (action, name) in [("SINGLE_DIE", "Single Die"), ("MULTI_BLOCK_DICE", "Multi Block Dice"),
+                                       ("SINGLE_DIE_PER_ACTIVATION", "Single Die Per Activation")] {
+                    if let Some(s) = source_for(action) {
+                        action_to_source.push((name, s));
+                    }
+                }
+                if crate::util::util_server_re_roll::UtilServerReRoll::is_team_re_roll_available(game, player) {
+                    properties.push(ReRollProperty::Trr);
+                }
+                let factory = ffb_model::factory::block_result_factory::BlockResultFactory;
+                let results: Vec<Option<BlockResult>> = self.block_roll.iter().map(|r| factory.for_roll(*r)).collect();
+                // evaluateBrawlerAvailability
+                if let Some(brawler) = player.skill_id_with_property(NamedProperties::CAN_REROLL_SINGLE_BOTH_DOWN) {
+                    let allowed = !blitzing
+                        && (ffb_model::option::util_game_option::is_option_enabled(
+                                game, ffb_model::option::game_option_id::ALLOW_BRAWLER_ON_BOTH_BLOCKS)
+                            || unused_id(brawler));
+                    if allowed && results.contains(&Some(BlockResult::BothDown)) {
+                        if let Some(s) = source_for("SINGLE_BOTH_DOWN") {
+                            action_to_source.push(("Single BothDown", s));
+                        }
+                    }
+                }
+                // evaluateHatredAvailability
+                if let Some(hatred) = player.skill_id_with_property(NamedProperties::CAN_REROLL_SINGLE_SKULL) {
+                    let hated = player.skill_value_excluding_temporary_ones(hatred).unwrap_or_default().to_lowercase();
+                    let hated_present = game.defender_id.as_deref().and_then(|d| game.player(d))
+                        .map(|def| def.keywords.iter().any(|k| !hated.is_empty() && hated.contains(&k.to_lowercase())))
+                        .unwrap_or(false);
+                    if hated_present && results.contains(&Some(BlockResult::Skull)) {
+                        if let Some(s) = source_for("SINGLE_SKULL") {
+                            action_to_source.push(("Single Skull", s));
+                        }
+                    }
+                }
+                let mechanic = crate::mechanic::roll_mechanic_for(game.rules);
+                if let Some(p) = mechanic.find_additional_re_roll_property(game.turn_data()) {
+                    properties.push(p);
+                }
+                if mechanic.is_mascot_available(game, player) {
+                    properties.push(ReRollProperty::Mascot);
+                }
+            }
+        }
+        let mut team_id = if game.home_playing { game.team_home.id.clone() } else { game.team_away.id.clone() };
+        if self.nr_of_dice < 0
+            && (no_re_roll_used || (!properties.iter().any(|p| p.is_actual_reroll()) && action_to_source.is_empty()))
+        {
+            properties.retain(|p| !p.is_actual_reroll());
+            action_to_source.clear();
+            team_id = if game.home_playing { game.team_away.id.clone() } else { game.team_home.id.clone() };
+        }
+        let rr_action_to_source: HashMap<String, Option<String>> = action_to_source.into_iter()
+            .map(|(k, v)| (k.to_string(), Some(v)))
+            .collect();
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+            game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::BlockRollProperties(
+                ffb_model::dialog::dialog_block_roll_properties_parameter::DialogBlockRollPropertiesParameter {
+                    choosing_team_id: Some(team_id),
+                    nr_of_dice: self.nr_of_dice,
+                    block_roll: self.block_roll.clone(),
+                    re_roll_properties: properties.into_iter().map(Some).collect(),
+                    rr_action_to_source,
+                    ..Default::default()
+                },
+            ),
+            self.nr_of_dice < 0,
+        );
     }
 
     /// Java `UtilPlayer.blockWouldKnockDownAttacker(game, actingPlayer, blockRoll, defenderChooses)`.

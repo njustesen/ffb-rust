@@ -109,6 +109,20 @@ impl StepWrestle {
                 has_skill
             };
             if attacker_can_use {
+                // Java: UtilServerDialog.showDialog(step.getGameState(),
+                //   new DialogSkillUseParameter(actingPlayer.getPlayer().getId(), skill, 0), false)
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                        ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                            player_id: Some(player_id.clone()),
+                            skill: Some(SkillId::Wrestle),
+                            minimum_roll: 0,
+                            ..Default::default()
+                        },
+                    ),
+                    false,
+                );
                 return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
                     player_id,
                     skill_id: SkillId::Wrestle as u16,
@@ -151,6 +165,20 @@ impl StepWrestle {
             let attacker_declined = self.using_wrestle_attacker == Some(false);
             if attacker_declined && defender_can_use && !wrestle_prevented {
                 if let Some(did) = defender_id {
+                    // Java: UtilServerDialog.showDialog(step.getGameState(),
+                    //   new DialogSkillUseParameter(game.getDefenderId(), skill, 0), true)
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                            ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                player_id: Some(did.clone()),
+                                skill: Some(SkillId::Wrestle),
+                                minimum_roll: 0,
+                                ..Default::default()
+                            },
+                        ),
+                        true,
+                    );
                     return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
                         player_id: did,
                         skill_id: SkillId::Wrestle as u16,

@@ -77,6 +77,31 @@ impl UtilServerSetup {
         game.field_model.set_player_state(player_id, new_state);
         game.field_model.set_player_coordinate(player_id, mapped_coordinate);
     }
+
+    /// Java: `AbstractStep.setPlayerCoordinates(Map<String, FieldCoordinate>)` -- the positions a
+    /// setup-phase CLIENT_END_TURN carries: every player that can be moved during setup goes to
+    /// its square (mirrored for the away team), RESERVE in a box square else STANDING, and active
+    /// when it moved.
+    pub fn set_player_coordinates(game: &mut Game, player_coordinates: &[(String, FieldCoordinate)]) {
+        for (player_id, coordinate) in player_coordinates {
+            if game.player(player_id).is_none() {
+                continue;
+            }
+            let player_state = game.field_model.player_state(player_id).unwrap_or(PlayerState(0));
+            if !player_state.can_be_moved_during_setup() {
+                continue;
+            }
+            let coordinate = if game.team_away.has_player(player_id) { coordinate.transform() } else { *coordinate };
+            let old_coordinate = game.field_model.player_coordinate(player_id);
+            game.field_model.set_player_coordinate(player_id, coordinate);
+            let base = if coordinate.is_box_coordinate() { PS_RESERVE } else { PS_STANDING };
+            let mut new_state = game.field_model.player_state(player_id).unwrap_or(player_state).change_base(base);
+            if old_coordinate != Some(coordinate) {
+                new_state = new_state.change_active(true);
+            }
+            game.field_model.set_player_state(player_id, new_state);
+        }
+    }
 }
 
 impl Default for UtilServerSetup {

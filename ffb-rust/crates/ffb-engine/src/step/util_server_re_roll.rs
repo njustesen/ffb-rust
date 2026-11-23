@@ -39,7 +39,7 @@ use ffb_model::util::rng::GameRng;
 /// opponent after a scattered ball is the common one — and those must pass the real player through
 /// [`ask_for_reroll_if_available_for`].
 pub fn ask_for_reroll_if_available(
-    game: &Game,
+    game: &mut Game,
     rerolled_action: &str,
     minimum_roll: i32,
     fumble: bool,
@@ -59,7 +59,7 @@ pub fn ask_for_reroll_if_available(
 /// Leap): the action-keyed skill lookup skips those skills, so the dialog carries no `reRollSkill`
 /// for them.
 pub fn ask_for_reroll_if_available_ignoring(
-    game: &Game,
+    game: &mut Game,
     rerolled_action: &str,
     minimum_roll: i32,
     fumble: bool,
@@ -78,7 +78,7 @@ pub fn ask_for_reroll_if_available_ignoring(
 /// `None` means "no particular player", which skips the membership gate; use it only where Java
 /// itself has no player to pass.
 pub fn ask_for_reroll_if_available_for(
-    game: &Game,
+    game: &mut Game,
     player_id: Option<&str>,
     rerolled_action: &str,
     minimum_roll: i32,
@@ -96,7 +96,232 @@ pub fn ask_for_reroll_if_available_for(
 ///        Skill modificationSkill, Skill reRollSkill, …)` — the single method both public
 /// overloads funnel into. `reroll_skill` is the caller-supplied source: `Some` only from the
 /// ACTING-PLAYER overload, which resolves it from the acting player's skills by action.
+///
+/// Java `if (dialogShown) UtilServerDialog.showDialog(gameState, new
+/// DialogReRollPropertiesParameter(...), !actingTeam.hasPlayer(player))` -- shown here (bb2025)
+/// whenever the offer is raised; see [`show_re_roll_properties_dialog`].
 fn ask_for_reroll_if_available_inner(
+    game: &mut Game,
+    player_id: Option<&str>,
+    rerolled_action: &str,
+    minimum_roll: i32,
+    fumble: bool,
+    reroll_skill: Option<ReRollSource>,
+) -> Option<AgentPrompt> {
+    let prompt = re_roll_offer(game, player_id, rerolled_action, minimum_roll, fumble, reroll_skill.clone());
+    if prompt.is_some() {
+        // Java `reRollSkill`: the caller-supplied (action-keyed) skill, resolved to its Skill.
+        let dialog_re_roll_skill = reroll_skill.as_ref().and_then(|src| {
+            player_id.and_then(|pid| game.player(pid))
+                .and_then(|p| p.all_skill_ids().find(|id| format!("{:?}", id) == src.name))
+        });
+        show_re_roll_properties_dialog(
+            game, player_id, rerolled_action, minimum_roll, fumble, dialog_re_roll_skill, None, Vec::new());
+    }
+    prompt
+}
+
+/// Java `ReRolledActions` constant name for a Rust re-roll action key (the keys the steps pass and
+/// `SkillId::reroll_sources` registers). bb2025's Rush is keyed "GFI" in Rust.
+pub fn java_re_rolled_action_name(rules: ffb_model::enums::Rules, key: &str) -> Option<&'static str> {
+    Some(match key {
+        "GFI" | "GO_FOR_IT" if rules == ffb_model::enums::Rules::Bb2025 => "Rush",
+        "GFI" | "GO_FOR_IT" => "Go For It",
+        "RUSH" => "Rush",
+        "DODGE" => "Dodge",
+        "CATCH" => "Catch",
+        "PICKUP" | "PICK_UP" => "Pick Up",
+        "PASS" => "com.fumbbl.ffb.skill.common.Pass",
+        "DAUNTLESS" => "com.fumbbl.ffb.skill.common.Dauntless",
+        "JUMP" => "Jump",
+        "FOUL_APPEARANCE" => "com.fumbbl.ffb.skill.common.FoulAppearance",
+        "BLOCK" => "Block",
+        "REALLY_STUPID" => "Really Stupid",
+        "BONE_HEAD" => "Bone Head",
+        "BONEHEAD" => "Bone-Head",
+        "WILD_ANIMAL" => "com.fumbbl.ffb.skill.bb2016.WildAnimal",
+        "ANIMAL_SAVAGERY" => "com.fumbbl.ffb.skill.mixed.AnimalSavagery",
+        "TAKE_ROOT" => "Take Root",
+        "WINNINGS" => "Winnings",
+        "ALWAYS_HUNGRY" => "Always Hungry",
+        "THROW_TEAM_MATE" => "Throw Team-Mate",
+        "KICK_TEAM_MATE" => "Kick Team-Mate",
+        "RIGHT_STUFF" => "Right Stuff",
+        "SHADOWING" => "Shadowing",
+        "SHADOWING_ESCAPE" => "Shadowing Escape",
+        "TENTACLES" => "Tentacles",
+        "TENTACLES_ESCAPE" => "Tentacles Escape",
+        "ESCAPE" => "Escape",
+        "SAFE_THROW" => "Safe Throw",
+        "INTERCEPTION" => "Interception",
+        "JUMP_UP" => "com.fumbbl.ffb.skill.common.JumpUp",
+        "STAND_UP" => "standUp",
+        "CHAINSAW" => "Chainsaw",
+        "CHOMP" => "Chomp",
+        "BLOOD_LUST" | "BLOODLUST" => "Bloodlust",
+        "HYPNOTIC_GAZE" => "Hypnotic Gaze",
+        "ANIMOSITY" => "Animosity",
+        "UNCHANNELLED_FURY" | "UNCHANNELED_FURY" => "com.fumbbl.ffb.skill.mixed.UnchannelledFury",
+        "PROJECTILE_VOMIT" => "Projectile Vomit",
+        "BREATHE_FIRE" => "Breathe Fire",
+        "TRAP_DOOR" | "TRAPDOOR" => "Trapdoor",
+        "ARGUE_THE_CALL" => "Argue the Call",
+        "OLD_PRO" => "Old Pro",
+        "THROW_KEG" => "Throw Keg",
+        "DIRECTION" => "Direction",
+        "LOOK_INTO_MY_EYES" => "Look Into My Eyes",
+        "BALEFUL_HEX" => "Baleful Hex",
+        "SINGLE_DIE" => "Single Die",
+        "ALL_YOU_CAN_EAT" => "All You Can Eat",
+        "CATCH_OF_THE_DAY" => "com.fumbbl.ffb.skill.mixed.special.CatchOfTheDay",
+        "SINGLE_BLOCK_DIE" => "Single Block Die",
+        "THEN_I_STARTED_BLASTIN" => "com.fumbbl.ffb.skill.bb2020.special.ThenIStartedBlastin",
+        "MULTI_BLOCK_DICE" => "Multi Block Dice",
+        "STEADY_FOOTING" => "Steady Footing",
+        "SINGLE_BOTH_DOWN" => "Single BothDown",
+        "SINGLE_DIE_PER_ACTIVATION" => "Single Die Per Activation",
+        "GETTING_EVEN" => "Getting Even",
+        "SINGLE_SKULL" => "Single Skull",
+        "REGENERATION" => "Regeneration",
+        "BLASTIN_SOLVES_EVERYTHING" => "com.fumbbl.ffb.skill.bb2025.special.BlastinSolvesEverything",
+        "PUNT_DIRECTION" => "Punt Direction",
+        "PUNT_DISTANCE" => "Punt Distance",
+        "SWOOP_DIRECTION" => "Swoop Direction",
+        "SWOOP_DISTANCE" => "Swoop Distance",
+        _ => return None,
+    })
+}
+
+/// Java bb2025 `RollMechanic.askForReRollIfAvailable` (:250-289), the dialog half:
+/// ```java
+/// List<ReRollProperty> properties = new ArrayList<>();
+/// if (isMascotAvailable(gameState, player)) properties.add(MASCOT);
+/// if (isTeamReRollAvailable(gameState, player)) properties.add(TRR);
+/// findAdditionalReRollProperty(game.getTurnData()).ifPresent(properties::add);
+/// if (player.hasSkillProperty(hasToRollToUseTeamReroll)) properties.add(LONER);
+/// if (!passiveReRollActions.contains(reRolledAction) && isProReRollAvailable(...)) properties.add(PRO);
+/// if (reRollSkill == null) reRollSkill = getUnusedSkillWithProperty(player, canRerollSingleDieOncePerPeriod);
+/// ...
+/// UtilServerDialog.showDialog(gameState, new DialogReRollPropertiesParameter(playerId, reRolledAction,
+///     minimumRoll, properties, fumble, reRollSkill, modificationSkill, menuProperty, defaultValueKey,
+///     messages), !actingTeam.hasPlayer(player));
+/// ```
+/// Called only where the offer is raised (Rust's `dialogShown`). bb2025 only: bb2016/bb2020 show
+/// `DialogReRollParameter`, which the GUI server (bb2025) never needs. Pure computation plus
+/// `game.dialog_parameter`; no RNG, no state the engine reads.
+#[allow(clippy::too_many_arguments)]
+pub fn show_re_roll_properties_dialog(
+    game: &mut Game,
+    player_id: Option<&str>,
+    rerolled_action: &str,
+    minimum_roll: i32,
+    fumble: bool,
+    re_roll_skill: Option<ffb_model::enums::SkillId>,
+    modification_skill: Option<ffb_model::enums::SkillId>,
+    messages: Vec<Option<String>>,
+) {
+    use ffb_model::enums::ReRollProperty;
+    use ffb_model::model::property::named_properties::NamedProperties;
+    if game.rules != ffb_model::enums::Rules::Bb2025 || minimum_roll < 0 {
+        return;
+    }
+    let Some(player) = player_id.and_then(|pid| game.player(pid)) else { return };
+    let mechanic = crate::mechanic::roll_mechanic_for(game.rules);
+    let on_acting_team = if game.home_playing {
+        game.team_home.has_player(&player.id)
+    } else {
+        game.team_away.has_player(&player.id)
+    };
+    let mut properties: Vec<Option<ReRollProperty>> = Vec::new();
+    if mechanic.is_mascot_available(game, player) {
+        properties.push(Some(ReRollProperty::Mascot));
+    }
+    // Java isTeamReRollAvailable(gameState, player): actingTeam.hasPlayer(player) && ...
+    if on_acting_team && team_re_roll_available(game, Some(&player.id)) {
+        properties.push(Some(ReRollProperty::Trr));
+    }
+    if let Some(p) = mechanic.find_additional_re_roll_property(game.turn_data()) {
+        properties.push(Some(p));
+    }
+    if player.has_skill_property(NamedProperties::HAS_TO_ROLL_TO_USE_TEAM_REROLL) {
+        properties.push(Some(ReRollProperty::Loner));
+    }
+    let passive_action = matches!(rerolled_action, "SWOOP_DISTANCE" | "SWOOP_DIRECTION");
+    if !passive_action
+        && crate::util::util_server_re_roll::UtilServerReRoll::is_pro_re_roll_available(game, player)
+    {
+        properties.push(Some(ReRollProperty::Pro));
+    }
+    let re_roll_skill = re_roll_skill.or_else(|| {
+        player.all_skill_ids()
+            .filter(|id| !player.used_skills.contains(id))
+            .find(|id| id.properties().contains(&NamedProperties::CAN_REROLL_SINGLE_DIE_ONCE_PER_PERIOD))
+    });
+    let parameter = ffb_model::dialog::dialog_re_roll_properties_parameter::DialogReRollPropertiesParameter {
+        player_id: Some(player.id.clone()),
+        re_rolled_action: java_re_rolled_action_name(game.rules, rerolled_action).map(str::to_owned),
+        minimum_roll,
+        fumble,
+        re_roll_skill,
+        modifying_skill: modification_skill,
+        re_roll_properties: properties,
+        // Java `if (messages != null) this.messages.addAll(messages)`.
+        messages,
+        // Java: menuProperty / defaultValueKey are null for every caller ported here.
+        ..Default::default()
+    };
+    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+        game,
+        ffb_model::dialog::dialog_parameter_factory::DialogParameter::ReRollProperties(parameter),
+        !on_acting_team,
+    );
+}
+
+/// Java (bb2025 StepPuntDirection / StepPuntDistance): when
+/// `UtilCards.getUnusedRerollSource(actingPlayer, action)` finds a skill source, the step shows
+/// `new DialogSkillUseParameter(actingPlayerId, skillReRoll.getSkill(game), 0, skillUse)` (stop
+/// timer false) INSTEAD of the re-roll dialog. Rust folds that skill into the `ReRollOffer`, so
+/// this re-shows the dialog Java shows when such a source exists (no-op otherwise). Same lookup as
+/// `find_skill_reroll_source`, minus its §M telemetry touch.
+pub fn show_skill_re_roll_dialog(
+    game: &mut Game,
+    rerolled_action: &str,
+    skill_use: ffb_model::model::skill_use::SkillUse,
+) {
+    if game.turn_mode != ffb_model::enums::TurnMode::Regular {
+        return;
+    }
+    let Some(acting_id) = game.acting_player.player_id.clone() else { return };
+    let Some(player) = game.player(&acting_id) else { return };
+    let skill = player.all_skill_ids()
+        .filter(|id| !player.used_skills.contains(id))
+        .filter_map(|id| {
+            id.reroll_sources_for(game.rules)
+                .iter()
+                .find(|(action, _)| *action == rerolled_action)
+                .map(|(_, priority)| (id, *priority))
+        })
+        .min_by_key(|(id, priority)| (*priority, *id as i32))
+        .map(|(id, _)| id);
+    let Some(skill) = skill else { return };
+    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+        game,
+        ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+            ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                player_id: Some(acting_id),
+                skill: Some(skill),
+                minimum_roll: 0,
+                skill_use: Some(skill_use.get_name().to_string()),
+                ..Default::default()
+            },
+        ),
+        false,
+    );
+}
+
+/// The offer half of [`ask_for_reroll_if_available_inner`] (pure: decides whether Java's
+/// `dialogShown` holds and builds the agent prompt).
+fn re_roll_offer(
     game: &Game,
     player_id: Option<&str>,
     rerolled_action: &str,
@@ -677,7 +902,7 @@ mod tests {
             game.acting_player.has_moved = true;
 
             let offer = ask_for_reroll_if_available_inner(
-                &game, Some("pro1"), "GFI", 2, false, None);
+                &mut game, Some("pro1"), "GFI", 2, false, None);
             // Only bb2025's dialog reaches the agent; see the edition note on the Pro branch.
             assert_eq!(offer.is_some(), rules == Rules::Bb2025,
                 "{rules:?}: only bb2025 consults the agent for a Pro-only offer");
@@ -690,7 +915,7 @@ mod tests {
             });
             game.acting_player.player_id = Some("plain".into());
             assert!(ask_for_reroll_if_available_inner(
-                &game, Some("plain"), "GFI", 2, false, None).is_none(),
+                &mut game, Some("plain"), "GFI", 2, false, None).is_none(),
                 "{rules:?}: without Pro there is nothing left to offer");
         }
     }
@@ -722,10 +947,10 @@ mod tests {
         };
         for action in ["SWOOP_DISTANCE", "SWOOP_DIRECTION"] {
             assert!(ask_for_reroll_if_available_inner(
-                &mk(Rules::Bb2025), Some("pro1"), action, 2, false, None).is_none(),
+                &mut mk(Rules::Bb2025), Some("pro1"), action, 2, false, None).is_none(),
                 "bb2025 must not offer Pro for the passive {action}");
             assert!(ask_for_reroll_if_available_inner(
-                &mk(Rules::Bb2020), Some("pro1"), action, 2, false, None).is_none(),
+                &mut mk(Rules::Bb2020), Some("pro1"), action, 2, false, None).is_none(),
                 "bb2020 never consults the agent for a Pro-only offer at all");
         }
     }
@@ -808,17 +1033,17 @@ mod tests {
 
         // The acting team's own roll is offered a re-roll…
         assert!(
-            ask_for_reroll_if_available_for(&game, Some("home_01"), "CATCH", 4, false).is_some(),
+            ask_for_reroll_if_available_for(&mut game, Some("home_01"), "CATCH", 4, false).is_some(),
             "the acting team's own roll must be offered its team re-roll"
         );
         // …the opponent's is not, even though the away team has re-rolls of its own: the offer is
         // always drawn from the ACTING team's bank, so Java refuses rather than dipping into it.
         assert!(
-            ask_for_reroll_if_available_for(&game, Some("away_01"), "CATCH", 4, false).is_none(),
+            ask_for_reroll_if_available_for(&mut game, Some("away_01"), "CATCH", 4, false).is_none(),
             "a roll by the non-acting team must NOT be offered the acting team's re-roll"
         );
         // `None` means "no particular player" and keeps the old unguarded behaviour.
-        assert!(ask_for_reroll_if_available_for(&game, None, "CATCH", 4, false).is_some());
+        assert!(ask_for_reroll_if_available_for(&mut game, None, "CATCH", 4, false).is_some());
     }
 
     /// `reroll_used` -- the "one team re-roll per turn" latch -- is set by Java in exactly ONE
@@ -913,7 +1138,7 @@ mod tests {
             // …and the consequence: a SECOND team re-roll in the same turn is offered in
             // bb2020/bb2025 and refused in bb2016. `ask_for_reroll_if_available` is the caller
             // that matters, and it gates on `!reroll_used` for every edition.
-            let offer = ask_for_reroll_if_available(&game, "DODGE", 4, false);
+            let offer = ask_for_reroll_if_available(&mut game, "DODGE", 4, false);
             assert_eq!(
                 offer.is_some(), !expect_latch,
                 "{rules:?}: a second team re-roll must be offered iff the latch is unset"
@@ -1018,14 +1243,14 @@ mod tests {
 
         // The ACTING-PLAYER overload still finds the acting player's Catch — unchanged.
         assert!(
-            matches!(ask_for_reroll_if_available(&game, "CATCH", 4, false),
+            matches!(ask_for_reroll_if_available(&mut game, "CATCH", 4, false),
                      Some(AgentPrompt::ReRollOffer { .. })),
             "the acting-player overload must still resolve the acting player's own Catch"
         );
         // The PLAYER overload, asked about the CATCHER, must offer nothing: the catcher has no
         // Catch, there is no team re-roll left, and Java never consults the acting player here.
         assert!(
-            ask_for_reroll_if_available_for(&game, Some("catcher"), "CATCH", 4, false).is_none(),
+            ask_for_reroll_if_available_for(&mut game, Some("catcher"), "CATCH", 4, false).is_none(),
             "a Catch-less catcher with an empty bank must be offered no re-roll, \
              regardless of what the thrower holds"
         );
@@ -1045,7 +1270,7 @@ mod tests {
         game.turn_data_home.rerolls = 0;
         add_player_with_skill(&mut game, "eldril", SkillId::MesmerizingDance);
         game.acting_player.player_id = Some("eldril".into());
-        match ask_for_reroll_if_available(&game, "HYPNOTIC_GAZE", 4, false) {
+        match ask_for_reroll_if_available(&mut game, "HYPNOTIC_GAZE", 4, false) {
             Some(AgentPrompt::ReRollOffer { re_roll_skill, team_re_roll_option, .. }) => {
                 assert_eq!(re_roll_skill, Some(SkillId::MesmerizingDance));
                 assert!(!team_re_roll_option);
@@ -1055,13 +1280,13 @@ mod tests {
         // Another action-keyed skill is NOT handed to the agent as a dialog skill.
         add_player_with_skill(&mut game, "dodger", SkillId::Dodge);
         game.acting_player.player_id = Some("dodger".into());
-        assert!(ask_for_reroll_if_available(&game, "DODGE", 3, false).is_none());
+        assert!(ask_for_reroll_if_available(&mut game, "DODGE", 3, false).is_none());
     }
 
     #[test]
     fn no_reroll_available_when_no_trr_and_no_skill() {
-        let game = make_game();
-        let result = ask_for_reroll_if_available(&game, "DODGE", 3, false);
+        let mut game = make_game();
+        let result = ask_for_reroll_if_available(&mut game, "DODGE", 3, false);
         assert!(result.is_none());
     }
 
@@ -1071,7 +1296,7 @@ mod tests {
         game.turn_mode = TurnMode::Regular;
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
-        let result = ask_for_reroll_if_available(&game, "DODGE", 3, false);
+        let result = ask_for_reroll_if_available(&mut game, "DODGE", 3, false);
         assert!(result.is_some());
     }
 
@@ -1084,11 +1309,11 @@ mod tests {
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         game.turn_mode = TurnMode::Kickoff;
-        assert!(ask_for_reroll_if_available(&game, "CATCH", 3, false).is_none(),
+        assert!(ask_for_reroll_if_available(&mut game, "CATCH", 3, false).is_none(),
             "no team re-roll may be offered during KICKOFF");
         // Sanity: the same TRR IS offered on a regular turn.
         game.turn_mode = TurnMode::Regular;
-        assert!(ask_for_reroll_if_available(&game, "CATCH", 3, false).is_some(),
+        assert!(ask_for_reroll_if_available(&mut game, "CATCH", 3, false).is_some(),
             "a team re-roll IS available on a regular turn");
     }
 
@@ -1098,7 +1323,7 @@ mod tests {
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         game.turn_data_home.reroll_used = true;
-        let result = ask_for_reroll_if_available(&game, "DODGE", 3, false);
+        let result = ask_for_reroll_if_available(&mut game, "DODGE", 3, false);
         assert!(result.is_none());
     }
 

@@ -84,6 +84,7 @@ impl Step for StepPrayer {
 impl StepPrayer {
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
         // Java: UtilServerDialog.hideDialog(gameState)
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         // Java: lookup PrayerHandler from factories (not yet translated)
         //
         // Stub: PrayerHandlerFactory not translated → treat as "no handler found" path.

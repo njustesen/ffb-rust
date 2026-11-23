@@ -61,7 +61,7 @@ impl SingleReRollUseState {
 pub fn re_roll_source_successfully(
     state: &mut SingleReRollUseState,
     source: &str,
-    game: &Game,
+    game: &mut Game,
 ) -> bool {
     if source == "LORD_OF_CHAOS" {
         state.set_re_roll_source(source);
@@ -79,8 +79,26 @@ pub fn re_roll_source_successfully(
                 true
             }
             _ => {
-                // client-only: DialogPlayerChoiceParameter / LORD_OF_CHAOS —
-                // Java shows a dialog for coach to choose; headless falls through without dialog
+                // Java: UtilServerDialog.showDialog(getGameState(),
+                //   new DialogPlayerChoiceParameter(actingTeam.getId(), PlayerChoiceMode.LORD_OF_CHAOS,
+                //     lords.toArray(new String[0]), null, 1, 1), false)
+                let team_id = game.active_team().id.clone();
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                        ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                            team_id: Some(team_id),
+                            player_choice_mode: Some(
+                                ffb_model::model::player_choice_mode::PlayerChoiceMode::LORD_OF_CHAOS.get_name().to_string(),
+                            ),
+                            player_ids: lords,
+                            descriptions: Vec::new(),
+                            max_selects: 1,
+                            min_selects: 1,
+                        },
+                    ),
+                    false,
+                );
                 false
             }
         }
@@ -105,7 +123,7 @@ pub fn re_roll_source_successfully(
 /// registers one at all) — a documented simplification, not a fabricated value.
 #[allow(clippy::too_many_arguments)]
 pub fn build_reroll_prompt(
-    game: &Game,
+    game: &mut Game,
     player_id: &str,
     re_rolled_action: &str,
     block_targets: &[String],
@@ -125,6 +143,37 @@ pub fn build_reroll_prompt(
     if !team_re_roll_available && !pro_re_roll_available && !consummate_available && single_use_re_roll_source.is_none() {
         return None;
     }
+
+    // Java: UtilServerDialog.showDialog(step.getGameState(), createDialogParameter(actingPlayer.getPlayer(),
+    //   state, reRollSkill.orElse(null)), false) -- new DialogReRollForTargetsParameter(player.getId(),
+    //   state.blockTargets, reRolledAction(), state.minimumRolls, state.reRollAvailableAgainst,
+    //   state.proReRollAvailable, state.teamReRollAvailable, skill, state.singleUseReRollSource,
+    //   state.consummateAvailable)
+    // DEVIATION: `re_roll_skill` stays None, as in the prompt below (see the doc comment).
+    let java_re_rolled_action = match re_rolled_action {
+        // Java ReRolledAction(Dauntless.class / FoulAppearance.class): named after the skill.
+        "DAUNTLESS" => "Dauntless",
+        "FOUL_APPEARANCE" => "Foul Appearance",
+        other => other,
+    };
+    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+        game,
+        ffb_model::dialog::dialog_parameter_factory::DialogParameter::ReRollForTargets(
+            ffb_model::dialog::dialog_re_roll_for_targets_parameter::DialogReRollForTargetsParameter {
+                player_id: Some(player_id.to_string()),
+                target_ids: block_targets.to_vec(),
+                minimum_rolls: minimum_rolls.clone(),
+                re_rolled_action: Some(java_re_rolled_action.to_string()),
+                re_roll_available_against: re_roll_available_against.to_vec(),
+                pro_re_roll_available,
+                team_re_roll_available,
+                consummate_available,
+                re_roll_skill: None,
+                single_use_re_roll_source: single_use_re_roll_source.clone(),
+            },
+        ),
+        false,
+    );
 
     Some(AgentPrompt::ReRollForTargets {
         player_id: player_id.to_string(),
@@ -221,12 +270,12 @@ mod tests {
     #[test]
     fn re_roll_source_non_lord_always_succeeds() {
         let mut state = SingleReRollUseState::new();
-        let game = ffb_model::model::game::Game::new(
+        let mut game = ffb_model::model::game::Game::new(
             crate::step::framework::test_team("home", 0),
             crate::step::framework::test_team("away", 0),
             ffb_model::enums::Rules::Bb2025,
         );
-        let result = re_roll_source_successfully(&mut state, "PRO", &game);
+        let result = re_roll_source_successfully(&mut state, "PRO", &mut game);
         assert!(result);
         assert_eq!(state.re_roll_source.as_deref(), Some("PRO"));
     }
@@ -234,16 +283,16 @@ mod tests {
     #[test]
     fn re_roll_source_lord_zero_returns_true() {
         let mut state = SingleReRollUseState::new();
-        let game = make_game_with_lords(0);
-        let result = re_roll_source_successfully(&mut state, "LORD_OF_CHAOS", &game);
+        let mut game = make_game_with_lords(0);
+        let result = re_roll_source_successfully(&mut state, "LORD_OF_CHAOS", &mut game);
         assert!(result);
     }
 
     #[test]
     fn re_roll_source_lord_single_sets_id() {
         let mut state = SingleReRollUseState::new();
-        let game = make_game_with_lords(1);
-        let result = re_roll_source_successfully(&mut state, "LORD_OF_CHAOS", &game);
+        let mut game = make_game_with_lords(1);
+        let result = re_roll_source_successfully(&mut state, "LORD_OF_CHAOS", &mut game);
         assert!(result);
         assert_eq!(state.id.as_deref(), Some("lord0"));
     }
@@ -251,8 +300,8 @@ mod tests {
     #[test]
     fn re_roll_source_lord_multiple_returns_false() {
         let mut state = SingleReRollUseState::new();
-        let game = make_game_with_lords(2);
-        let result = re_roll_source_successfully(&mut state, "LORD_OF_CHAOS", &game);
+        let mut game = make_game_with_lords(2);
+        let result = re_roll_source_successfully(&mut state, "LORD_OF_CHAOS", &mut game);
         assert!(!result);
     }
 
@@ -274,18 +323,18 @@ mod tests {
 
     #[test]
     fn build_reroll_prompt_none_when_no_targets_available() {
-        let game = make_game_with_acting(ffb_model::enums::Rules::Bb2025);
+        let mut game = make_game_with_acting(ffb_model::enums::Rules::Bb2025);
         let minimum_rolls = HashMap::new();
-        let prompt = build_reroll_prompt(&game, "p1", "DAUNTLESS", &["t1".to_string()], &minimum_rolls, &[]);
+        let prompt = build_reroll_prompt(&mut game, "p1", "DAUNTLESS", &["t1".to_string()], &minimum_rolls, &[]);
         assert!(prompt.is_none());
     }
 
     #[test]
     fn build_reroll_prompt_none_when_no_reroll_source_available() {
-        let game = make_game_with_acting(ffb_model::enums::Rules::Bb2025);
+        let mut game = make_game_with_acting(ffb_model::enums::Rules::Bb2025);
         let minimum_rolls = HashMap::new();
         let targets = vec!["t1".to_string()];
-        let prompt = build_reroll_prompt(&game, "p1", "DAUNTLESS", &targets, &minimum_rolls, &targets);
+        let prompt = build_reroll_prompt(&mut game, "p1", "DAUNTLESS", &targets, &minimum_rolls, &targets);
         assert!(prompt.is_none(), "no TRR/pro/consummate/single-use source → no dialog");
     }
 
@@ -296,7 +345,7 @@ mod tests {
         let mut minimum_rolls = HashMap::new();
         minimum_rolls.insert("t1".to_string(), 4);
         let targets = vec!["t1".to_string()];
-        let prompt = build_reroll_prompt(&game, "p1", "DAUNTLESS", &targets, &minimum_rolls, &targets);
+        let prompt = build_reroll_prompt(&mut game, "p1", "DAUNTLESS", &targets, &minimum_rolls, &targets);
         match prompt {
             Some(AgentPrompt::ReRollForTargets { team_re_roll_available, target_ids, minimum_rolls, re_rolled_action, .. }) => {
                 assert!(team_re_roll_available);
@@ -310,10 +359,10 @@ mod tests {
 
     #[test]
     fn build_reroll_prompt_none_for_unknown_player() {
-        let game = make_game_with_acting(ffb_model::enums::Rules::Bb2025);
+        let mut game = make_game_with_acting(ffb_model::enums::Rules::Bb2025);
         let minimum_rolls = HashMap::new();
         let targets = vec!["t1".to_string()];
-        let prompt = build_reroll_prompt(&game, "missing", "DAUNTLESS", &targets, &minimum_rolls, &targets);
+        let prompt = build_reroll_prompt(&mut game, "missing", "DAUNTLESS", &targets, &minimum_rolls, &targets);
         assert!(prompt.is_none());
     }
 }

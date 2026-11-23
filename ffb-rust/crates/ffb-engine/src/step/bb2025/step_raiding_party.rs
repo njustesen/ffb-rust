@@ -139,6 +139,23 @@ impl StepRaidingParty {
             } else {
                 // Java: DialogPlayerChoiceParameter(actingTeam, RAIDING_PARTY, eligible, null, 1)
                 // + prepareClientData(eligible squares of ALL eligible players).
+                // Java: UtilServerDialog.showDialog(getGameState(), new DialogPlayerChoiceParameter(
+                //   game.getActingTeam().getId(), PlayerChoiceMode.RAIDING_PARTY, eligiblePlayers, null, 1), false)
+                let dialog_team_id = if game.home_playing { game.team_home.id.clone() } else { game.team_away.id.clone() };
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                        ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                            team_id: Some(dialog_team_id),
+                            player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::RAIDING_PARTY.get_name().to_string()),
+                            player_ids: eligible.clone(),
+                            descriptions: vec![],
+                            max_selects: 1,
+                            min_selects: 0,
+                        },
+                    ),
+                    false,
+                );
                 let squares: Vec<ffb_model::types::FieldCoordinate> = eligible.iter()
                     .flat_map(|pid| Self::find_squares(game, pid))
                     .collect();

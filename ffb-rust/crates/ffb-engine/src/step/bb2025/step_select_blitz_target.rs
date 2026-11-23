@@ -160,6 +160,12 @@ impl StepSelectBlitzTarget {
                     game.last_turn_mode = Some(game.turn_mode);
                     game.turn_mode = TurnMode::SelectBlitzTarget;
                 }
+                // Java: UtilServerDialog.showDialog(getGameState(), new DialogSelectBlitzTargetParameter(), false)
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::SelectBlitzTarget(Default::default()),
+                    false,
+                );
                 let gain_skill = if self.used_skill.is_none() {
                     Self::unused_blitz_gain_skill(game, &acting_id)
                 } else {

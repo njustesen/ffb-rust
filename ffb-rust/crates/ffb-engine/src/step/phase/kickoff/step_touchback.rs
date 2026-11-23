@@ -75,6 +75,12 @@ impl StepTouchback {
                 game.turn_mode = TurnMode::Touchback;
                 // Java: game.setDialogParameter(new DialogTouchbackParameter())
                 // → in Rust: build eligible-players list and return cont() with prompt
+                // (show_dialog with stop_turn_timer=false is exactly game.setDialogParameter)
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::Touchback(Default::default()),
+                    false,
+                );
                 do_next_step = false;
                 let receiving_team = if game.home_playing { &game.team_away } else { &game.team_home };
                 let eligible: Vec<(String, FieldCoordinate)> = receiving_team
@@ -96,7 +102,8 @@ impl StepTouchback {
                 let coord = self.touchback_coordinate.unwrap();
                 // Java: game.getFieldModel().setOutOfBounds(false)
                 game.field_model.out_of_bounds = false;
-                // client-only: UtilServerDialog.hideDialog(getGameState())
+                // Java: UtilServerDialog.hideDialog(getGameState())
+                crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
                 // Java: game.getFieldModel().setBallCoordinate(fTouchbackCoordinate)
                 game.field_model.ball_coordinate = Some(coord);
                 // Java: Player<?> player = game.getFieldModel().getPlayer(fTouchbackCoordinate)

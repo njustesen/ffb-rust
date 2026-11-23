@@ -268,6 +268,22 @@ impl StepMoveDodge {
                         p.skill_id_with_property_in(game.rules, ffb_model::model::property::named_properties::NamedProperties::CAN_ADD_STRENGTH_TO_DODGE));
                     game.report_list.add(
                         ffb_model::report::mixed::report_modified_dodge_result_successful::ReportModifiedDodgeResultSuccessful::new(skill));
+                    // Java showUseModifyingSkillDialog: if (modifyingSkill != null) UtilServerDialog.showDialog(
+                    //   getGameState(), new DialogSkillUseParameter(actingPlayerId, modifyingSkill, 0), false)
+                    if let Some(skill) = skill {
+                        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                            game,
+                            ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                                ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                    player_id: Some(pid.clone()),
+                                    skill: Some(skill),
+                                    minimum_roll: 0,
+                                    ..Default::default()
+                                },
+                            ),
+                            false,
+                        );
+                    }
                 }
                 return self.fail_dodge(game);
             }
@@ -701,7 +717,7 @@ impl StepMoveDodge {
                     //   showDialog(DialogSkillUseParameter(pid, modifyingSkill, 0)); WAITING }` —
                     // Incorporeal is offered BEFORE the Dodge skill re-roll is spent.
                     if let (Some(skill), None) = (modifying_skill, self.using_modifying_skill) {
-                        return self.modifying_skill_prompt(game, skill).with_event(roll_event);
+                        return self.modifying_skill_prompt(game, skill, 0).with_event(roll_event);
                     }
                     // Java: `else if (ignoreModifierSkill.isPresent()) { addReport(
                     // ReportModifiedDodgeResultSuccessful(skill)); showDialog(DialogSkillUse
@@ -709,7 +725,7 @@ impl StepMoveDodge {
                     // The Breeze is offered BEFORE the Dodge skill re-roll is spent.
                     if let Some(skill) = ignore_modifier_skill {
                         self.using_modifier_ignoring_skill = None;
-                        return self.modifying_skill_prompt(game, skill).with_event(roll_event);
+                        return self.modifying_skill_prompt(game, skill, 0).with_event(roll_event);
                     }
                     // Java `RollMechanic.askForReRollIfAvailable` only SETS reRolledAction +
                     // reRollSource for a skill source; the single `useReRoll` happens on the
@@ -789,12 +805,12 @@ impl StepMoveDodge {
                 // Successful); showDialog(DialogSkillUseParameter(pid, modifyingSkill, minimumRoll)) }`
                 // — e.g. after Incorporeal was DECLINED, the Dodge re-roll spent and the fresh die
                 // failed again.
-                return self.modifying_skill_prompt(game, skill).with_event(roll_event);
+                return self.modifying_skill_prompt(game, skill, minimum_roll).with_event(roll_event);
             } else if let Some(skill) = ignore_modifier_skill {
                 // Java: `else if (ignoreModifierSkill.isPresent()) { …report; showDialog(…);
                 // usingModifierIgnoringSkill = null; }`
                 self.using_modifier_ignoring_skill = None;
-                return self.modifying_skill_prompt(game, skill).with_event(roll_event);
+                return self.modifying_skill_prompt(game, skill, 0).with_event(roll_event);
             }
 
             // Java: if (UtilGameOption.isOptionEnabled(game, GameOptionId.STAND_FIRM_NO_DROP_ON_FAILED_DODGE))
@@ -809,10 +825,24 @@ impl StepMoveDodge {
 
     /// Java: `addReport(new ReportModifiedDodgeResultSuccessful(modifyingSkill));
     /// UtilServerDialog.showDialog(DialogSkillUseParameter(pid, modifyingSkill, …))` — WAITING.
-    fn modifying_skill_prompt(&mut self, game: &mut Game, skill: ffb_model::enums::SkillId) -> StepOutcome {
+    fn modifying_skill_prompt(&mut self, game: &mut Game, skill: ffb_model::enums::SkillId, minimum_roll: i32) -> StepOutcome {
         game.report_list.add(
             ffb_model::report::mixed::report_modified_dodge_result_successful::ReportModifiedDodgeResultSuccessful::new(Some(skill)));
         let pid = game.acting_player.player_id.clone().unwrap_or_default();
+        // Java: UtilServerDialog.showDialog(getGameState(),
+        //   new DialogSkillUseParameter(actingPlayer.getPlayerId(), skill, minimumRoll), false)
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+            game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                    player_id: Some(pid.clone()),
+                    skill: Some(skill),
+                    minimum_roll,
+                    ..Default::default()
+                },
+            ),
+            false,
+        );
         StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
             player_id: pid,
             skill_id: skill as u16,
@@ -820,7 +850,7 @@ impl StepMoveDodge {
         })
     }
 
-    fn fail_dodge(&mut self, game: &Game) -> StepOutcome {
+    fn fail_dodge(&mut self, game: &mut Game) -> StepOutcome {
         use ffb_model::util::util_player::UtilPlayer;
         use ffb_model::model::property::NamedProperties;
         // BB2020 runs this shared step (its own twin is dead — driver.rs routes MoveDodge here for
@@ -880,6 +910,24 @@ impl StepMoveDodge {
                 // (0 rng) — the Rust agent's generic PlayerChoice arm mirrors that, so a
                 // multi-candidate Arm Bar never applies in parity games (chaos seed 29 i=3: two
                 // adjacent Chosen → no Arm Bar; one adjacent → auto-applied, seed 3 i=15).
+                // Java: String teamId = game.getOtherTeam(game.getActingTeam()).getId();
+                // UtilServerDialog.showDialog(getGameState(), new DialogPlayerChoiceParameter(teamId,
+                //   PlayerChoiceMode.ARM_BAR, armBarPlayers, null, 1), true)
+                let team_id = if game.home_playing { game.team_away.id.clone() } else { game.team_home.id.clone() };
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                        ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                            team_id: Some(team_id),
+                            player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::ARM_BAR.get_name().to_string()),
+                            player_ids: self.arm_bar_players.clone(),
+                            descriptions: vec![],
+                            max_selects: 1,
+                            min_selects: 0,
+                        },
+                    ),
+                    true,
+                );
                 return StepOutcome::cont().with_prompt(
                     ffb_model::prompts::AgentPrompt::PlayerChoice {
                         eligible_players: self.arm_bar_players.clone(),

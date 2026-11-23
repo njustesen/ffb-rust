@@ -127,6 +127,12 @@ impl StepPuntDistance {
         if self.re_rolled_action.is_none() {
             self.re_rolled_action = Some("PUNT_DISTANCE".into());
             if let Some(prompt) = ask_for_reroll_if_available(game, "PUNT_DISTANCE", 0, false) {
+                // Java: skillReRoll = getUnusedRerollSource(actingPlayer, PUNT_DISTANCE); if != null
+                //   showDialog(new DialogSkillUseParameter(actingPlayerId, skillReRoll.getSkill(game), 0,
+                //   SkillUse.RE_ROLL_PUNT_DISTANCE), false); else askForReRollIfAvailable(...) (shown
+                //   inside the helper).
+                crate::step::util_server_re_roll::show_skill_re_roll_dialog(
+                    game, "PUNT_DISTANCE", ffb_model::model::skill_use::SkillUse::RE_ROLL_PUNT_DISTANCE);
                 self.re_roll_source = Some("TRR".into());
                 return StepOutcome::cont().with_prompt(prompt);
             }

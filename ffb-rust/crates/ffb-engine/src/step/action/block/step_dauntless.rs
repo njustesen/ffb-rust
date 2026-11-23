@@ -271,6 +271,22 @@ impl StepDauntless {
             let skill = game.player(player_id)
                 .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_DOUBLE_STRENGTH_AFTER_DAUNTLESS))
                 .unwrap_or(SkillId::Indomitable);
+            // Java: UtilServerDialog.showDialog(step.getGameState(),
+            //   new DialogSkillUseParameter(actingPlayer.getPlayerId(), indomitable, 0),
+            //   actingTeam.hasPlayer(actingPlayer.getPlayer()))
+            let stop_turn_timer = game.active_team().players.iter().any(|p| p.id == player_id);
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                    ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                        player_id: Some(player_id.to_string()),
+                        skill: Some(skill),
+                        minimum_roll: 0,
+                        ..Default::default()
+                    },
+                ),
+                stop_turn_timer,
+            );
             outcome.action = crate::step::framework::StepAction::Continue;
             return outcome.with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
                 player_id: player_id.to_string(),

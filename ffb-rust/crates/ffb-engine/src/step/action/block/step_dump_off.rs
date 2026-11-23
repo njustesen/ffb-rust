@@ -66,6 +66,8 @@ impl Step for StepDumpOff {
 impl StepDumpOff {
     /// Java: DumpOffBehaviour.handleExecuteStepHook (logic identical across editions).
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        // Java bb2025 DumpOffBehaviour: UtilServerDialog.hideDialog(step.getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         // Java: if (turnMode == DUMP_OFF) → restore old turn mode and clear thrower.
         if game.turn_mode == TurnMode::DumpOff {
             if let Some(old) = self.old_turn_mode {
@@ -80,6 +82,19 @@ impl StepDumpOff {
             let can_dump_off = self.can_use_dump_off(game);
             if can_dump_off {
                 let defender_id = self.dump_off_defender(game).unwrap_or_default();
+                // Java: showDialog(new DialogSkillUseParameter(defender.getId(), skill, 0), true)
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                        ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                            player_id: Some(defender_id.clone()),
+                            skill: Some(SkillId::DumpOff),
+                            minimum_roll: 0,
+                            ..Default::default()
+                        },
+                    ),
+                    true,
+                );
                 return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
                     player_id: defender_id,
                     skill_id: SkillId::DumpOff as u16,
@@ -129,6 +144,12 @@ impl StepDumpOff {
             // resolving the dump-off pass.
             game.thrower_action = Some(PlayerAction::DumpOff);
             game.defender_action = Some(PlayerAction::DumpOff);
+            // Java: showDialog(new DialogDefenderActionParameter(), true)
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::DefenderAction(Default::default()),
+                true,
+            );
             let event = GameEvent::SkillUse {
                 player_id: defender_id.unwrap_or_default(),
                 skill_id: skill_num,

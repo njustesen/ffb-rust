@@ -157,6 +157,7 @@ impl StepUnchannelledFury {
             {
                 // Java: showDialog(DialogSkillUseParameter(actingPlayer, furyOfTheBloodGod, 0)).
                 // Rust parked with NO prompt -- a stall (star tier: Scyla Anfingrimm, bb2025).
+                Self::show_fury_dialog(game, &player_id);
                 return StepOutcome::cont().with_prompt(Self::fury_prompt(&player_id));
             }
             cancel_unchannelled_fury_action(game, &player_id);
@@ -247,11 +248,30 @@ impl StepUnchannelledFury {
             && player_action.map(|a| a.is_block_action()).unwrap_or(false)
         {
             // Java: showDialog(DialogSkillUseParameter(actingPlayer, furyOfTheBloodGod, 0)).
+            Self::show_fury_dialog(game, &player_id);
             return StepOutcome::cont().with_event(event).with_prompt(Self::fury_prompt(&player_id));
         }
 
         cancel_unchannelled_fury_action(game, &player_id);
         self.goto_failure(&player_id).with_event(event)
+    }
+
+    /// Java: `UtilServerDialog.showDialog(step.getGameState(), new DialogSkillUseParameter(
+    /// actingPlayer.getPlayerId(), furySkill, 0), true)` -- furySkill is the unused
+    /// canPerformTwoBlocksAfterFailedFury skill (Fury of the Blood God, as in `fury_prompt`).
+    fn show_fury_dialog(game: &mut Game, player_id: &str) {
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+            game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                    player_id: Some(player_id.to_string()),
+                    skill: Some(SkillId::FuryOfTheBloodGod),
+                    minimum_roll: 0,
+                    ..Default::default()
+                },
+            ),
+            true,
+        );
     }
 
     fn fury_prompt(player_id: &str) -> ffb_model::prompts::AgentPrompt {

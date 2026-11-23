@@ -139,6 +139,7 @@ impl Step for StepEndPassing {
 impl StepEndPassing {
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Java: UtilServerDialog.hideDialog(gameState)
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         // Java: fieldModel.setRangeRuler(null)
         game.field_model.range_ruler = None;
         // Java: fieldModel.setOutOfBounds(false)

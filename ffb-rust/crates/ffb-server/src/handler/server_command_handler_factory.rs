@@ -88,6 +88,8 @@ pub struct ServerCommandHandlerFactory {
     pub db_connection_manager: Arc<Mutex<DbConnectionManager>>,
     pub team_cache: Arc<TeamCache>,
     pub roster_cache: Arc<RosterCache>,
+    /// Java: the standalone team-setup rows (see `team_setup_cache.rs`).
+    pub team_setup_cache: Arc<crate::team_setup_cache::TeamSetupCache>,
     pub client_properties: Arc<Vec<(String, String)>>,
     ping_handler: ServerCommandHandlerPing,
     socket_closed_handler: ServerCommandHandlerSocketClosed,
@@ -234,6 +236,11 @@ impl ServerCommandHandlerFactory {
         }
         let team_cache = Arc::new(team_cache);
         let roster_cache = Arc::new(roster_cache);
+        let mut team_setup_cache = crate::team_setup_cache::TeamSetupCache::new();
+        if let Err(e) = team_setup_cache.init(std::path::Path::new("setups")) {
+            log::warn!("team setup cache: {e}");
+        }
+        let team_setup_cache = Arc::new(team_setup_cache);
         let client_properties: Arc<Vec<(String, String)>> = Arc::new(Vec::new());
         let join_handler = ServerCommandHandlerJoin::new(
             Arc::clone(&game_cache),
@@ -424,6 +431,7 @@ impl ServerCommandHandlerFactory {
             db_connection_manager,
             team_cache,
             roster_cache,
+            team_setup_cache,
             client_properties,
             ping_handler,
             socket_closed_handler,
@@ -604,6 +612,16 @@ impl ServerCommandHandlerFactory {
             _ => {}
         }
 
+        // Java StepSetup: CLIENT_TEAM_SETUP_LOAD -> UtilServerSetup.loadTeamSetup (a server-side
+        // lookup the engine step cannot do; save/delete need the DB and are ignored).
+        if let AnyClientCommand::ClientTeamSetupLoad(cmd) = &client_command {
+            self.load_team_setup(game_id, session_id, cmd.setup_name.as_deref());
+            return;
+        }
+        if matches!(client_command, AnyClientCommand::ClientTeamSetupSave(_) | AnyClientCommand::ClientTeamSetupDelete(_)) {
+            return;
+        }
+
         let side = {
             let sm = self.session_manager.lock().unwrap();
             if sm.get_session_of_home_coach(game_id) == Some(session_id) {
@@ -613,6 +631,15 @@ impl ServerCommandHandlerFactory {
             }
         };
 
+        // Java StepSetup CLIENT_END_TURN: setPlayerCoordinates(command.getPlayerCoordinates()).
+        let end_turn_coordinates: Option<Vec<(String, ffb_model::types::FieldCoordinate)>> = match &client_command {
+            AnyClientCommand::ClientEndTurn(e) => {
+                let mut v: Vec<_> = e.player_coordinates.iter().map(|(k, c)| (k.clone(), *c)).collect();
+                v.sort_by(|a, b| a.0.cmp(&b.0));
+                Some(v)
+            }
+            _ => None,
+        };
         let action = match decode_command(client_command, side) {
             Ok(a) => a,
             Err(e) => {
@@ -626,6 +653,25 @@ impl ServerCommandHandlerFactory {
             log::warn!("session {} sent command but game {} not found", session_id, game_id);
             return;
         };
+        // Java: a step returns UNHANDLED_COMMAND for a command it does not wait for and nothing
+        // happens. CLIENT_START_GAME is only waited for by StepInitStartGame, which raises no prompt.
+        let prompt = gs.driver.as_ref().and_then(|d| d.current_prompt()).cloned();
+        let mut action = action;
+        if let (Some(ffb_model::prompts::AgentPrompt::TeamSetup { .. }), Some(coordinates)) = (&prompt, &end_turn_coordinates) {
+            // UtilServerSteps.checkCommandIsFromCurrentPlayer
+            let home_playing = gs.get_game().map(|g| g.home_playing).unwrap_or(true);
+            if (side == TeamSide::Home) != home_playing {
+                return;
+            }
+            if let Some(game) = gs.get_game_mut() {
+                ffb_engine::util::util_server_setup::UtilServerSetup::set_player_coordinates(game, coordinates);
+            }
+            action = Action::ConfirmSetup;
+        }
+        if matches!(action, Action::StartGame { .. }) && prompt.is_some() {
+            log::debug!("game {game_id}: {action:?} unhandled while the engine waits for a prompt");
+            return;
+        }
         log::debug!("game {game_id}: engine <- {action:?} ({side:?})");
         if let Err(e) = gs.handle_action(side, action) {
             log::warn!("engine rejected action from session {}: {}", session_id, e);
@@ -637,6 +683,37 @@ impl ServerCommandHandlerFactory {
         );
         // Java: the step's model changes reach the clients via `UtilServerGame.syncGameModel`.
         crate::util::server_game_sync::sync_game(gs, &self.session_manager);
+    }
+
+    /// Java: `UtilServerSetup.loadTeamSetup(gameState, setupName)` while the setup step waits.
+    fn load_team_setup(&self, game_id: i64, session_id: crate::model::received_command::SessionId, setup_name: Option<&str>) {
+        let mut gc = self.game_cache.lock().unwrap();
+        let Some(gs) = gc.get_game_state_by_id_mut(game_id) else { return };
+        let waiting = matches!(
+            gs.driver.as_ref().and_then(|d| d.current_prompt()),
+            Some(ffb_model::prompts::AgentPrompt::TeamSetup { .. })
+        );
+        if !waiting {
+            return;
+        }
+        let Some(game) = gs.get_game_mut() else { return };
+        let team_id = if game.home_playing { game.team_home.id.clone() } else { game.team_away.id.clone() };
+        match setup_name.filter(|n| !n.is_empty()) {
+            Some(name) => {
+                if let Some(setup) = self.team_setup_cache.get(&team_id, name) {
+                    setup.apply_to(game);
+                    ffb_model::util::util_box::UtilBox::refresh_boxes(game);
+                }
+                crate::util::server_game_sync::sync_game(gs, &self.session_manager);
+            }
+            None => {
+                let names = self.team_setup_cache.names_for_team(&team_id);
+                let json = ffb_protocol::commands::server_command_team_setup_list::ServerCommandTeamSetupList::new(names)
+                    .to_json_value()
+                    .to_string();
+                self.session_manager.lock().unwrap().send_to(session_id, &json);
+            }
+        }
     }
 
     /// Java: the `InternalServerCommand` half of `handleCommand`'s dispatch — routes each
@@ -797,11 +874,18 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
     fn missing(what: &str) -> DecodeError {
         DecodeError::NotImplemented(format!("missing field {what}"))
     }
+    // Java: a command from the away coach carries coordinates in the away client's MIRRORED view;
+    // the consuming step transforms them (`checkCommandIsFromHomePlayer ? c : c.transform()`,
+    // UtilServerPlayerMove.fetchMoveStack, StepPushback, StepInitPassing). The Rust steps that
+    // consume these actions do not, so it happens here. Kickoff, setup, throw team-mate, swoop,
+    // punt and wizard steps transform themselves in Rust (as in Java) and are left alone.
+    let away = side == TeamSide::Away;
+    let m = |c: ffb_model::types::FieldCoordinate| if away { c.transform() } else { c };
     match cmd {
         AnyClientCommand::ClientEndTurn(_) => Ok(Action::EndTurn),
 
-        AnyClientCommand::ClientMove(m) => Ok(Action::Move { path: m.coordinates_to }),
-        AnyClientCommand::ClientBlitzMove(m) => Ok(Action::Move { path: m.coordinates_to }),
+        AnyClientCommand::ClientMove(c) => Ok(Action::Move { path: c.coordinates_to.into_iter().map(m).collect() }),
+        AnyClientCommand::ClientBlitzMove(c) => Ok(Action::Move { path: c.coordinates_to.into_iter().map(m).collect() }),
 
         AnyClientCommand::ClientActingPlayer(a) => {
             // Java: a null playerId is a deselect — ends the acting player's activation.
@@ -821,7 +905,7 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
             target_id: None,
         }),
         AnyClientCommand::ClientPushback(p) => Ok(Action::PushTo {
-            coord: p.pushback.and_then(|p| p.coordinate).ok_or_else(|| missing("pushback"))?,
+            coord: m(p.pushback.and_then(|p| p.coordinate).ok_or_else(|| missing("pushback"))?),
         }),
         AnyClientCommand::ClientFollowupChoice(f) => Ok(Action::FollowUp { follow_up: f.choice_followup }),
 
@@ -830,7 +914,7 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
         }),
 
         AnyClientCommand::ClientPass(p) => Ok(Action::Pass {
-            coord: p.target_coordinate.ok_or_else(|| missing("targetCoordinate"))?,
+            coord: m(p.target_coordinate.ok_or_else(|| missing("targetCoordinate"))?),
         }),
         AnyClientCommand::ClientHandOver(h) => Ok(Action::HandOff {
             receiver_id: h.catcher_id.ok_or_else(|| missing("catcherId"))?,
@@ -860,6 +944,20 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
             coord: s.coordinate.ok_or_else(|| missing("coordinate"))?,
         }),
         AnyClientCommand::ClientStartGame(_) => Ok(Action::StartGame { home: side == TeamSide::Home }),
+        // Java StepBuyInducements: the command's InducementSet (type -> count bought).
+        AnyClientCommand::ClientBuyInducements(c) => {
+            let mut purchases: Vec<ffb_engine::action::InducementPurchase> = c
+                .inducement_set
+                .as_ref()
+                .map(|set| set.get_inducements())
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|i| i.value > 0)
+                .map(|i| ffb_engine::action::InducementPurchase { id: i.type_id, count: i.value as u32 })
+                .collect();
+            purchases.sort_by(|a, b| a.id.cmp(&b.id));
+            Ok(Action::BuyInducements { home: side == TeamSide::Home, purchases })
+        }
 
         AnyClientCommand::ClientThrowTeamMate(t) => Ok(Action::ThrowTeamMate {
             player_id: t.thrown_player_id.ok_or_else(|| missing("thrownPlayerId"))?,

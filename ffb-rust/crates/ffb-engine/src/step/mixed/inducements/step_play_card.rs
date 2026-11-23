@@ -44,6 +44,8 @@ impl StepPlayCard {
     pub fn new() -> Self { Self::default() }
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         if self.end_card_playing {
             // Java: getResult().setNextAction(StepAction.NEXT_STEP)
             return StepOutcome::next();
@@ -59,6 +61,23 @@ impl StepPlayCard {
         if card.get_target().is_played_on_player() {
             // Java: step initInducement has already checked if this card can be played.
             let allowed_players = UtilServerCards::find_allowed_players_for_card(game, &card);
+            // Java: game.setDialogParameter(new DialogPlayerChoiceParameter(ownTeam.getId(),
+            //   PlayerChoiceMode.CARD, allowedPlayers, null, 1)) -- show_dialog(.., false) is the same.
+            let own_team_id = if self.home_team { game.team_home.id.clone() } else { game.team_away.id.clone() };
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                    ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                        team_id: Some(own_team_id),
+                        player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::CARD.get_name().to_string()),
+                        player_ids: allowed_players.clone(),
+                        descriptions: vec![],
+                        max_selects: 1,
+                        min_selects: 0,
+                    },
+                ),
+                false,
+            );
             return StepOutcome::cont().with_prompt(AgentPrompt::PlayerChoice {
                 eligible_players: allowed_players,
                 reason: "card".to_string(),

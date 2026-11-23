@@ -146,6 +146,8 @@ impl StepWisdomOfTheWhiteDwarf {
 
     /// Java: `executeStep()`.
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         let Some(acting_id) = game.acting_player.player_id.clone() else {
             return StepOutcome::next();
         };
@@ -176,6 +178,23 @@ impl StepWisdomOfTheWhiteDwarf {
             if wise_players.len() == 1 {
                 self.player_id = Some(wise_players[0].clone());
             } else {
+                // Java: showDialog(new DialogPlayerChoiceParameter(game.getActingTeam().getId(),
+                //   PlayerChoiceMode.WISDOM, wisePlayers, null, 1, 1), false)
+                let acting_team_id = game.active_team().id.clone();
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                        ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                            team_id: Some(acting_team_id),
+                            player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::WISDOM.get_name().to_string()),
+                            player_ids: wise_players.clone(),
+                            descriptions: vec![],
+                            max_selects: 1,
+                            min_selects: 1,
+                        },
+                    ),
+                    false,
+                );
                 return StepOutcome::cont().with_prompt(AgentPrompt::PlayerChoice {
                     eligible_players: wise_players,
                     reason: "WISDOM".into(),
@@ -222,6 +241,19 @@ impl StepWisdomOfTheWhiteDwarf {
                 // The old bare `cont()` was the driver's stall shape: nothing was ever asked, so
                 // the sequence could not advance. `gain_able_skills` is already in Java's order —
                 // sorted by skill NAME — so index 0 is a genuine contract for the answer.
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::SelectSkill(
+                        ffb_model::dialog::dialog_select_skill_parameter::DialogSelectSkillParameter {
+                            skills: gain_able_skills.iter().map(|(id, _)| *id).collect(),
+                            player_id: Some(target_id.clone()),
+                            skill_choice_mode: Some(
+                                ffb_model::model::skill_choice_mode::SkillChoiceMode::WISDOM_OF_THE_WHITE_DWARF.name().to_string()),
+                            null_skill_slots: Vec::new(),
+                        },
+                    ),
+                    false,
+                );
                 return StepOutcome::cont().with_prompt(AgentPrompt::SelectSkill {
                     player_id: target_id.clone(),
                     skill_ids: gain_able_skills.iter().map(|(id, _)| *id as u16).collect(),

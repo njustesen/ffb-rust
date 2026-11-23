@@ -161,6 +161,14 @@ impl StepApothecaryMultiple {
         if self.injury_results.is_empty() {
             return StepOutcome::next();
         }
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        // DEVIATION: the step's showDialog calls (DialogUseApothecariesParameter,
+        // DialogApothecaryChoiceParameter, DialogReRollRegenerationMultipleParameter,
+        // DialogUseInducementParameter, DialogSelectKeywordParameter, DialogSelectPositionParameter)
+        // and the hideDialogs on CLIENT_KEYWORD_SELECTION / CLIENT_POSITION_SELECTION are not
+        // ported: this Rust step answers every one of those decisions inline (headless) and never
+        // waits, so there is no point at which the dialog would be open.
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
 
         // Phase 1: Regeneration — for each injury, roll Regeneration if player has the skill.
         // Successful regeneration: remove from injury_results (injury nullified).

@@ -200,6 +200,20 @@ impl StepInitBomb {
                     let pid = game.acting_player.player_id.clone().unwrap_or_default();
                     let sid = game.player(&pid).and_then(|p| UtilCards::get_unused_skill_with_property(
                         p, NamedProperties::CAN_FORCE_BOMB_EXPLOSION)).unwrap_or(SkillId::Kaboom);
+                    // Java: showDialog(new DialogSkillUseParameter(actingPlayer.getPlayerId(),
+                    //   explodeSkill, 0), false)
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                            ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                player_id: game.acting_player.player_id.clone(),
+                                skill: Some(sid),
+                                minimum_roll: 0,
+                                ..Default::default()
+                            },
+                        ),
+                        false,
+                    );
                     return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
                         player_id: pid,
                         skill_id: sid as u16,

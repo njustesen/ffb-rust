@@ -37,6 +37,47 @@ impl StepDoubleStrength {
         }
         // Java: show UseSkill or PlayerChoice dialog → CONTINUE
         // The command handler resolves by publishing DoubleTargetStrengthForPlayer
+        use crate::util::util_server_dialog::UtilServerDialog;
+        use ffb_model::dialog::dialog_parameter_factory::DialogParameter;
+        let acting_player_id = game.acting_player.player_id.clone();
+        if self.player_ids.len() == 1 {
+            // Java: UtilServerDialog.showDialog(getGameState(),
+            //   new DialogSkillUseParameter(actingPlayer.getPlayerId(), indomitable, 0), true)
+            let indomitable = acting_player_id.as_deref()
+                .and_then(|id| game.player(id))
+                .and_then(|p| p.all_skill_ids().find(|s| {
+                    !p.used_skills.contains(s)
+                        && s.properties().contains(&NamedProperties::CAN_DOUBLE_STRENGTH_AFTER_DAUNTLESS)
+                }));
+            UtilServerDialog::show_dialog(
+                game,
+                DialogParameter::SkillUse(ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                    player_id: acting_player_id,
+                    skill: indomitable,
+                    minimum_roll: 0,
+                    ..Default::default()
+                }),
+                true,
+            );
+        } else {
+            // Java: UtilServerDialog.showDialog(getGameState(), new DialogPlayerChoiceParameter(
+            //   game.getActingTeam().getId(), PlayerChoiceMode.INDOMITABLE, players, null, 1), true)
+            let team_id = game.active_team().id.clone();
+            UtilServerDialog::show_dialog(
+                game,
+                DialogParameter::PlayerChoice(ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                    team_id: Some(team_id),
+                    player_choice_mode: Some(
+                        ffb_model::model::player_choice_mode::PlayerChoiceMode::INDOMITABLE.get_name().to_string(),
+                    ),
+                    player_ids: self.player_ids.clone(),
+                    descriptions: Vec::new(),
+                    max_selects: 1,
+                    min_selects: 0,
+                }),
+                true,
+            );
+        }
         StepOutcome::cont()
     }
 }

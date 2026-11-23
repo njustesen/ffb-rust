@@ -87,6 +87,8 @@ impl StepKickTeamMate {
         game.acting_player.has_blocked = true;
         game.concession_possible = false;
         game.turn_data_mut().blitz_used = true;
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
 
         let kicker_id = match game.acting_player.player_id.clone() {
             Some(id) => id,

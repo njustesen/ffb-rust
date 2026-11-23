@@ -61,6 +61,7 @@ impl StepWizard {
 
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
         // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
 
         if self.end_inducement {
             // Java: cancel spellcasting — restore old turn mode
@@ -153,7 +154,17 @@ impl StepWizard {
             self.old_turn_mode = Some(game.turn_mode);
         }
         game.turn_mode = TurnMode::Wizard;
-        // client-only: DialogWizardSpellParameter — headless skips spell selection dialog
+        // Java: showDialog(new DialogWizardSpellParameter((fHomeTeam ? teamHome : teamAway).getId()), false)
+        let team_id = if self.home_team { game.team_home.id.clone() } else { game.team_away.id.clone() };
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+            game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::WizardSpell(
+                ffb_model::dialog::dialog_wizard_spell_parameter::DialogWizardSpellParameter {
+                    team_id: Some(team_id),
+                },
+            ),
+            false,
+        );
         StepOutcome::cont()
     }
 }

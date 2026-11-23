@@ -208,6 +208,8 @@ impl Step for StepPushback {
 impl StepPushback {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let mut do_push = false;
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         // Java: crowd-push params (INJURY_RESULT, THROW_IN mode/coord, END_TURN) that must be
         // published alongside DEFENDER_PUSHED once execution reaches the unified `if (state.doPush)`
         // block at the bottom of the method — Java does NOT return early from the crowd-push branch.

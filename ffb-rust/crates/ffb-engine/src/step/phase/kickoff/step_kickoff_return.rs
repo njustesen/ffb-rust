@@ -239,6 +239,11 @@ impl StepKickoffReturn {
                 game.turn_mode = TurnMode::KickoffReturn;
                 self.window_open = true;
                 // Java: UtilServerDialog.showDialog(…, new DialogKickoffReturnParameter(), false)
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::KickoffReturn(Default::default()),
+                    false,
+                );
                 let eligible: Vec<String> = kickoff_return_player.into_iter().collect();
                 // Java: `pushCurrentStepOnStack()` + `Select.pushSequence(...)`. That is
                 // `push_self`, NOT `repeat`: the step must resume BELOW the pushed sequence, once

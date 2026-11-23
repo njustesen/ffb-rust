@@ -73,6 +73,11 @@ impl Step for StepBribes {
 
 impl StepBribes {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        // DEVIATION: Java's showDialog calls (DialogArgueTheCallParameter,
+        // DialogBriberyAndCorruptionParameter, DialogBribesParameter) are not ported -- this Rust
+        // step decides argue/bribes inline and never waits for an answer.
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         let fouler_id = match game.acting_player.player_id.clone() {
             Some(id) => id,
             None => return StepOutcome::next(),

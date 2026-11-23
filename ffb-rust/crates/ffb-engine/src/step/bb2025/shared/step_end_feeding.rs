@@ -58,6 +58,8 @@ impl Step for StepEndFeeding {
 
 impl StepEndFeeding {
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         // Java: fEndTurn |= UtilServerSteps.checkTouchdown(getGameState())
         self.end_turn |= check_touchdown(game);
 

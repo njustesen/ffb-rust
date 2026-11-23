@@ -149,6 +149,20 @@ impl StepModifierTrait for GrabStepModifier {
             // answer into `grabbing`.
             if state.grabbing.is_none() {
                 if let Some(attacker) = game.acting_player.player_id.clone() {
+                    // Java: UtilServerDialog.showDialog(step.getGameState(),
+                    //   new DialogSkillUseParameter(actingPlayer.getPlayerId(), skill, 0), false)
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                            ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                player_id: Some(attacker.clone()),
+                                skill: Some(SkillId::Grab),
+                                minimum_roll: 0,
+                                ..Default::default()
+                            },
+                        ),
+                        false,
+                    );
                     state.pending_skill_use = Some((attacker, SkillId::Grab));
                     return true;
                 }

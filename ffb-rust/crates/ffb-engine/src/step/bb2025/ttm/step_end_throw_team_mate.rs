@@ -111,7 +111,8 @@ impl Step for StepEndThrowTeamMate {
 
 impl StepEndThrowTeamMate {
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // Java: UtilServerDialog.hideDialog — no-op in headless Rust
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         game.pass_coordinate = None;
         game.field_model.range_ruler = None;
         game.defender_id = None;

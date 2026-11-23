@@ -76,6 +76,8 @@ impl Step for StepJuggernaut {
 impl StepJuggernaut {
     /// Java: JuggernautBehaviour.handleExecuteStepHook
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        // Java (bb2025 + mixed JuggernautBehaviour): UtilServerDialog.hideDialog(step.getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         let player_id = match game.acting_player.player_id.clone() {
             Some(id) => id,
             None => return StepOutcome::next(),
@@ -96,6 +98,20 @@ impl StepJuggernaut {
         let using = match self.using_juggernaut {
             Some(v) => v,
             None => {
+                // Java: UtilServerDialog.showDialog(step.getGameState(),
+                //   new DialogSkillUseParameter(actingPlayer.getPlayer().getId(), skill, 0), false)
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                        ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                            player_id: Some(player_id.clone()),
+                            skill: Some(SkillId::Juggernaut),
+                            minimum_roll: 0,
+                            ..Default::default()
+                        },
+                    ),
+                    false,
+                );
                 return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
                     player_id,
                     skill_id: skill_num,

@@ -46,6 +46,11 @@ impl StepCoinChoice {
     fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         if self.coin_choice_heads.is_none() {
             // Java: UtilServerDialog.showDialog(getGameState(), new DialogCoinChoiceParameter(), false)
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::CoinChoice(Default::default()),
+                false,
+            );
             return StepOutcome::cont().with_prompt(AgentPrompt::CoinChoice { is_home: game.home_playing });
         }
         let coin_choice_heads = self.coin_choice_heads.unwrap();
@@ -69,6 +74,16 @@ impl StepCoinChoice {
         } else {
             game.team_home.id.clone()
         };
+        // Java: UtilServerDialog.showDialog(getGameState(), new DialogReceiveChoiceParameter(choosingTeam.getId()), false)
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+            game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::ReceiveChoice(
+                ffb_model::dialog::dialog_receive_choice_parameter::DialogReceiveChoiceParameter {
+                    choosing_team_id: Some(choosing_team_id.clone()),
+                },
+            ),
+            false,
+        );
         StepOutcome::next().publish(StepParameter::ChoosingTeamId(Some(choosing_team_id)))
     }
 }

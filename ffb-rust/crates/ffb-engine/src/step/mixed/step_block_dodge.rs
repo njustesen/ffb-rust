@@ -194,6 +194,8 @@ impl StepBlockDodge {
         // `AbstractDodgingBehaviour`, which has no chain-push analysis of its own -- it asks iff
         // `askForSkill` (which IS the chain/sideline/half risk, computed by the step) AND the
         // defender had tackle zones.
+        // Java: UtilServerDialog.hideDialog(getGameState()) -- before executeStepHooks.
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         if self.using_dodge.is_none() {
             let defender_has_dodge = game
                 .defender_id
@@ -204,6 +206,20 @@ impl StepBlockDodge {
             let old_has_tz = self.old_defender_state.map(|s| s.has_tacklezones()).unwrap_or(false);
             if defender_has_dodge && self.ask_for_skill.unwrap_or(false) && old_has_tz {
                 if let Some(defender_id) = game.defender_id.clone() {
+                    // Java AbstractDodgingBehaviour: UtilServerDialog.showDialog(step.getGameState(),
+                    //   new DialogSkillUseParameter(game.getDefenderId(), skill, 0), true)
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                            ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                player_id: Some(defender_id.clone()),
+                                skill: Some(ffb_model::enums::SkillId::Dodge),
+                                minimum_roll: 0,
+                                ..Default::default()
+                            },
+                        ),
+                        true,
+                    );
                     return StepOutcome::cont().with_prompt(
                         ffb_model::prompts::AgentPrompt::SkillUse {
                             player_id: defender_id,

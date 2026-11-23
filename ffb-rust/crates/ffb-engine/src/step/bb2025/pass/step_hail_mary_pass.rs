@@ -164,6 +164,8 @@ impl StepHailMaryPass {
         // so this doesn't change gameplay outcomes in bb2025 — only report/log fidelity.
         // Java line 149: raw ACCURATE result -> INACCURATE (Hail Mary always deviates).
         // Routing: FUMBLE / SAVED_FUMBLE -> GOTO_LABEL; INACCURATE -> NEXT_STEP.
+        // Java PassBehaviour(bb2025) :80: UtilServerDialog.hideDialog(step.getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         if self.minimum_roll == 0 {
             let thrower = game.thrower_id.clone().and_then(|id| game.player(&id)).cloned();
             self.minimum_roll = thrower.as_ref().map(|t| {
@@ -333,6 +335,28 @@ impl StepHailMaryPass {
                     self.pass_skill_source = Some(source.name.clone());
                     let skill_id = ffb_model::enums::SkillId::from_class_name(&source.name)
                         .unwrap_or(ffb_model::enums::SkillId::Pass);
+                    // Java: showDialog(..., actingTeam.hasPlayer(game.getThrower()))
+                    // DEVIATION: modificationSkill is None -- Java's getModifyingSkill adds a
+                    // ReportModifiedPassResult (a side effect) and this step does not port it.
+                    let thrower = game.thrower_id.clone();
+                    let stop = thrower.as_deref().map(|t| if game.home_playing {
+                        game.team_home.has_player(t)
+                    } else {
+                        game.team_away.has_player(t)
+                    }).unwrap_or(false);
+                    let minimum_roll = self.minimum_roll;
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                            ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                player_id: thrower,
+                                skill: Some(skill_id),
+                                minimum_roll,
+                                ..Default::default()
+                            },
+                        ),
+                        stop,
+                    );
                     return StepOutcome::cont().with_prompt(
                         ffb_model::prompts::AgentPrompt::SkillUse {
                             player_id: game.thrower_id.clone().unwrap_or_default(),
@@ -342,7 +366,10 @@ impl StepHailMaryPass {
                     );
                 }
             }
-            if let Some(prompt) = ask_for_reroll_if_available(game, REROLLED_ACTION_PASS, self.minimum_roll, true) {
+            // Java bb2025 PassBehaviour: askForReRollIfAvailable(gameState, actingPlayer, PASS,
+            // minimumRoll, false, modificationSkill) -- `fumble` only feeds the dialog.
+            // DEVIATION: modificationSkill not ported here (see the pass-skill dialog above).
+            if let Some(prompt) = ask_for_reroll_if_available(game, REROLLED_ACTION_PASS, self.minimum_roll, false) {
                 self.re_rolled_action = Some(REROLLED_ACTION_PASS.into());
                 self.re_roll_source = Some("TRR".into());
                 return StepOutcome::cont().with_prompt(prompt);
@@ -365,6 +392,22 @@ impl StepHailMaryPass {
                     .unwrap_or(SkillId::SafePass);
                 match self.using_safe_pass {
                     None => {
+                        // Java: showDialog(new DialogSkillUseParameter(throwerId, safePass, 0, false),
+                        //   game.getTeamHome().hasPlayer(game.getThrower()))
+                        let stop = game.team_home.has_player(&thrower_id);
+                        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                            game,
+                            ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                                ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                    player_id: Some(thrower_id.clone()),
+                                    skill: Some(safe_pass),
+                                    minimum_roll: 0,
+                                    show_never_use: false,
+                                    ..Default::default()
+                                },
+                            ),
+                            stop,
+                        );
                         return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
                             player_id: thrower_id,
                             skill_id: safe_pass as u16,

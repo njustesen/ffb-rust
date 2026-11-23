@@ -92,6 +92,20 @@ impl StepQuickBite {
             if let Some(skill) = skill {
                 if self.player_ids.len() == 1 {
                     // Java: DialogSkillUseParameter(firstOpponent.getId(), skill, 0)
+                    // Java: UtilServerDialog.showDialog(getGameState(), new DialogSkillUseParameter(
+                    //   firstOpponent.getId(), skill, 0), true)
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                            ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                player_id: Some(first_opponent.clone()),
+                                skill: Some(skill),
+                                minimum_roll: 0,
+                                ..Default::default()
+                            },
+                        ),
+                        true,
+                    );
                     return StepOutcome::cont().with_prompt(
                         ffb_model::prompts::AgentPrompt::SkillUse {
                             player_id: first_opponent,
@@ -102,6 +116,27 @@ impl StepQuickBite {
                 }
                 // Java: DialogPlayerChoiceParameter(firstOpponent.getTeam().getId(),
                 //       PlayerChoiceMode.QUICK_BITE, opponents, null, 1)
+                // Java: UtilServerDialog.showDialog(getGameState(), new DialogPlayerChoiceParameter(
+                //   firstOpponent.getTeam().getId(), QUICK_BITE, opponents, null, 1), true)
+                let team_id = if game.team_home.players.iter().any(|p| p.id == first_opponent) {
+                    game.team_home.id.clone()
+                } else {
+                    game.team_away.id.clone()
+                };
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                        ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                            team_id: Some(team_id),
+                            player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::QUICK_BITE.get_name().to_string()),
+                            player_ids: self.player_ids.clone(),
+                            descriptions: vec![],
+                            max_selects: 1,
+                            min_selects: 0,
+                        },
+                    ),
+                    true,
+                );
                 return StepOutcome::cont().with_prompt(
                     ffb_model::prompts::AgentPrompt::PlayerChoice {
                         eligible_players: self.player_ids.clone(),

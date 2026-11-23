@@ -309,6 +309,23 @@ impl StepMissedPass {
                     && !self.re_rolling
                 {
                     self.report_direction_roll(game);
+                    // Java: showDialog(new DialogSkillUseParameter(throwerId,
+                    //   thrower.getSkillWithProperty(canReRollHmpScatter), 0, usingBlastIt == null), false)
+                    let thrower_skill = game.thrower_id.as_deref().and_then(|t| game.player(t))
+                        .and_then(|p| p.skill_id_with_property(NP::CAN_RE_ROLL_HMP_SCATTER));
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                            ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                player_id: game.thrower_id.clone(),
+                                skill: thrower_skill,
+                                minimum_roll: 0,
+                                show_never_use: self.using_blast_it.is_none(),
+                                ..Default::default()
+                            },
+                        ),
+                        false,
+                    );
                     self.re_rolling = true;
                     game.field_model.move_squares.clear();
                     let sk = blast_skill.unwrap();

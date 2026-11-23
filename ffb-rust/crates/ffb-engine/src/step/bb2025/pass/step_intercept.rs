@@ -502,6 +502,20 @@ impl StepIntercept {
                     found
                 })
             };
+            // Java: foundSkill.isPresent()
+            //   ? showDialog(new DialogInterceptionParameter(throwerId, foundSkill.get(), 'o'), true)
+            //   : showDialog(new DialogInterceptionParameter(throwerId), true)
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::Interception(
+                    ffb_model::dialog::dialog_interception_parameter::DialogInterceptionParameter {
+                        thrower_id: game.thrower_id.clone(),
+                        interception_skill,
+                        skill_mnemonic: if interception_skill.is_some() { 'o' as i32 } else { 0 },
+                    },
+                ),
+                true,
+            );
             self.enter_interception_mode(game);
             return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::Interception {
                 player_id: possible_interceptors[0].clone(),

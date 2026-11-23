@@ -132,6 +132,23 @@ impl StepBlackInk {
                 // More than one target: Java shows DialogPlayerChoiceParameter(BLACK_INK, …).
                 // Surface it as a PlayerChoice prompt; the harness contract answers with the
                 // MANDATORY min-(x,y) pick (ANIMAL_SAVAGERY rule) on both sides.
+                // Java: UtilServerDialog.showDialog(getGameState(), new DialogPlayerChoiceParameter(
+                //   game.getActingTeam().getId(), PlayerChoiceMode.BLACK_INK, eligiblePlayers, null, 1), false)
+                let dialog_team_id = if game.home_playing { game.team_home.id.clone() } else { game.team_away.id.clone() };
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                        ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                            team_id: Some(dialog_team_id),
+                            player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::BLACK_INK.get_name().to_string()),
+                            player_ids: eligibles.clone(),
+                            descriptions: vec![],
+                            max_selects: 1,
+                            min_selects: 0,
+                        },
+                    ),
+                    false,
+                );
                 return StepOutcome::cont().with_prompt(
                     ffb_model::prompts::AgentPrompt::PlayerChoice {
                         eligible_players: eligibles,

@@ -81,6 +81,23 @@ impl StepWeatherMage {
         game.report_list.add(ReportWeatherMageRoll::new(roll.to_vec()));
 
         if options.len() > 1 {
+            // Java: showDialog(new DialogSelectWeatherParameter(weatherOptions), false), where
+            // weatherOptions maps Weather.name() (the enum constant) -> its first modifier
+            // (base 0, then +1, -1, +2, -2; only absent keys are inserted).
+            let mut weather_options: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
+            for modifier in [0, 1, -1, 2, -2] {
+                let w = Weather::for_roll((sum + modifier).max(2).min(12));
+                weather_options.entry(java_weather_constant(w).to_string()).or_insert(modifier);
+            }
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::SelectWeather(
+                    ffb_model::dialog::dialog_select_weather_parameter::DialogSelectWeatherParameter {
+                        options: weather_options,
+                    },
+                ),
+                false,
+            );
             return StepOutcome::cont()
                 .with_prompt(AgentPrompt::SelectWeather { options });
         }
@@ -109,6 +126,18 @@ impl StepWeatherMage {
                 } else {
                     "The weather did not change.".into()
                 };
+                // Java: showDialog(new DialogInformationOkayParameter(DIALOG_TITLE, message, true), false)
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::InformationOkay(
+                        ffb_model::dialog::dialog_information_okay_parameter::DialogInformationOkayParameter {
+                            title: Some(DIALOG_TITLE.to_string()),
+                            messages: Some(vec![Some(msg.clone())]),
+                            confirm: true,
+                        },
+                    ),
+                    false,
+                );
                 StepOutcome::cont()
                     .with_prompt(AgentPrompt::InformationOkay { message: msg })
             }
@@ -131,6 +160,21 @@ impl StepWeatherMage {
                 }
             }
         }
+    }
+}
+
+/// Java: `StepWeatherMage.DIALOG_TITLE`.
+pub const DIALOG_TITLE: &str = "Weather Mage";
+
+/// Java `Weather.name()` -- the enum constant name (the key of `DialogSelectWeatherParameter`).
+fn java_weather_constant(w: Weather) -> &'static str {
+    match w {
+        Weather::SwelteringHeat => "SWELTERING_HEAT",
+        Weather::VerySunny => "VERY_SUNNY",
+        Weather::Nice => "NICE",
+        Weather::PouringRain => "POURING_RAIN",
+        Weather::Blizzard => "BLIZZARD",
+        Weather::Intro => "INTRO",
     }
 }
 

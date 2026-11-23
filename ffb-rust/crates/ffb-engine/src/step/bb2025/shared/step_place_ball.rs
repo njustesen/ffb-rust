@@ -133,6 +133,8 @@ impl StepPlaceBall {
 
     /// Java: executeStep().
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         // Java: if (playerId == null || catchScatterThrowInMode != SCATTER_BALL) → NEXT_STEP
         let player_id = match self.player_id.as_deref() {
             Some(id) if self.catch_scatter_throw_in_mode == Some(CatchScatterThrowInMode::ScatterBall) => id,
@@ -236,6 +238,23 @@ impl StepPlaceBall {
         if std::env::var_os("FFB_TRACE").is_some() {
             eprintln!("RPLACEBALL prompt pid={player_id:?} carrier_team_turn={}", self.ball_carrier_team_turn);
         }
+        // Java: UtilServerDialog.showDialog(getGameState(), new DialogSkillUseParameter(playerId, skill, 0),
+        //   !game.isHomePlaying()) -- skill = ballCarrier.getSkillWithProperty(canPlaceBallWhenKnockedDownOrPlacedProne)
+        let skill = game.player(player_id).and_then(|p| p.skill_id_with_property_in(
+            game.rules, NamedProperties::CAN_PLACE_BALL_WHEN_KNOCKED_DOWN_OR_PLACED_PRONE));
+        let stop_timer = !game.home_playing;
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+            game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                    player_id: Some(player_id.to_string()),
+                    skill,
+                    minimum_roll: 0,
+                    ..Default::default()
+                },
+            ),
+            stop_timer,
+        );
         StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
             player_id: player_id.to_string(),
             skill_id: ffb_model::enums::SkillId::SafePairOfHands as u16,

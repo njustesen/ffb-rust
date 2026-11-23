@@ -203,6 +203,19 @@ impl StepFollowup {
                         let (sk_id, sk_name) = fend_skill_id
                             .map(|s| (s as u16, s.class_name().to_string()))
                             .unwrap_or((SkillId::Fend as u16, "Fend".to_string()));
+                        let defender_id = game.defender_id.clone();
+                        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                            game,
+                            ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                                ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                    player_id: defender_id,
+                                    skill: fend_skill_id,
+                                    minimum_roll: 0,
+                                    ..Default::default()
+                                },
+                            ),
+                            true,
+                        );
                         let prompt = ffb_model::prompts::AgentPrompt::SkillUse {
                             player_id: game.defender_id.clone().unwrap_or_default(),
                             skill_id: sk_id,
@@ -268,6 +281,19 @@ impl StepFollowup {
                     let (sk_id, sk_name) = taunt_skill_id
                         .map(|s| (s as u16, s.class_name().to_string()))
                         .unwrap_or((SkillId::Taunt as u16, "Taunt".to_string()));
+                    let defender_id = game.defender_id.clone();
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                            ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                player_id: defender_id,
+                                skill: taunt_skill_id,
+                                minimum_roll: 0,
+                                ..Default::default()
+                            },
+                        ),
+                        true,
+                    );
                     let prompt = ffb_model::prompts::AgentPrompt::SkillUse {
                         player_id: game.defender_id.clone().unwrap_or_default(),
                         skill_id: sk_id,
@@ -300,6 +326,11 @@ impl StepFollowup {
             {
                 // Java: UtilServerDialog.showDialog(DialogFollowupChoiceParameter) — emit the
                 // prompt so the agent can answer with Action::FollowUp.
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::FollowupChoice(Default::default()),
+                    false,
+                );
                 let prompt = ffb_model::prompts::AgentPrompt::FollowUp {
                     attacker_id: acting_player_id.clone().unwrap_or_default(),
                     target_coord: self.defender_position.unwrap_or(FieldCoordinate::new(0, 0)),

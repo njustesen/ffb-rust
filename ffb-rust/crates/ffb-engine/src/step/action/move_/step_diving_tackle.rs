@@ -344,6 +344,24 @@ impl StepDivingTackle {
                         }
 
                         if should_prompt {
+                            // Java DivingTackleBehaviour.promptForDT: teamId = isHomePlaying ? teamAway : teamHome;
+                            // UtilServerDialog.showDialog(step.getGameState(), new DialogPlayerChoiceParameter(
+                            //   teamId, PlayerChoiceMode.DIVING_TACKLE, divingTacklers, descriptions, 1), true)
+                            let dialog_team_id = if game.home_playing { game.team_away.id.clone() } else { game.team_home.id.clone() };
+                            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                                game,
+                                ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                                    ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                                        team_id: Some(dialog_team_id),
+                                        player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::DIVING_TACKLE.get_name().to_string()),
+                                        player_ids: diving_tacklers.clone(),
+                                        descriptions: descriptions.clone(),
+                                        max_selects: 1,
+                                        min_selects: 0,
+                                    },
+                                ),
+                                true,
+                            );
                                                         self.using_diving_tackle = None;
                             return Some(StepOutcome::cont().with_prompt(
                                 ffb_model::prompts::AgentPrompt::PlayerChoice {

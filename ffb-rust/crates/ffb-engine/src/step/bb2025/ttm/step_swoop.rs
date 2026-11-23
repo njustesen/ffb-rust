@@ -305,6 +305,24 @@ impl StepSwoop {
             let sk = game.player(&player_id)
                 .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::TTM_SCATTERS_IN_SINGLE_DIRECTION))
                 .unwrap_or(ffb_model::enums::SkillId::Swoop);
+            // Java: showDialog(new DialogSkillUseParameter(thrownPlayer.getId(),
+            //   thrownPlayer.getSkillWithProperty(ttmScattersInSingleDirection), 0),
+            //   !game.getActingTeam().hasPlayer(thrownPlayer))
+            let dialog_skill = game.player(&player_id)
+                .and_then(|p| p.skill_id_with_property(NamedProperties::TTM_SCATTERS_IN_SINGLE_DIRECTION));
+            let stop = !game.active_team().has_player(&player_id);
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                    ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                        player_id: Some(player_id.clone()),
+                        skill: dialog_skill,
+                        minimum_roll: 0,
+                        ..Default::default()
+                    },
+                ),
+                stop,
+            );
             return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
                 player_id: player_id.clone(),
                 skill_id: sk as u16,

@@ -291,6 +291,34 @@ impl StepPass {
         skill
     }
 
+    /// Java `UtilServerDialog.showDialog(gameState, new DialogSkillUseParameter(playerId, skill,
+    /// minimumRoll, modifyingSkill / showNeverUse), stopTurnTimer)`.
+    #[allow(clippy::too_many_arguments)]
+    fn show_skill_use_dialog(
+        game: &mut Game,
+        player_id: Option<String>,
+        skill: Option<ffb_model::enums::SkillId>,
+        minimum_roll: i32,
+        modifying_skill: Option<ffb_model::enums::SkillId>,
+        show_never_use: bool,
+        stop_turn_timer: bool,
+    ) {
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+            game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                    player_id,
+                    skill,
+                    minimum_roll,
+                    modifying_skill,
+                    show_never_use,
+                    ..Default::default()
+                },
+            ),
+            stop_turn_timer,
+        );
+    }
+
     /// Java `DialogSkillUseParameter(throwerId, modifyingSkill, …)`.
     fn modifying_skill_prompt(game: &Game, skill: ffb_model::enums::SkillId) -> ffb_model::prompts::AgentPrompt {
         ffb_model::prompts::AgentPrompt::SkillUse {
@@ -344,6 +372,20 @@ impl StepPass {
                 None
             };
             if let Some(prompt) = self.pass_skill_offer(game) {
+                // Java: showDialog(new DialogSkillUseParameter(throwerId, passingReroll.getSkill(game),
+                //   minimumRoll, modificationSkill), actingTeam.hasPlayer(thrower))
+                {
+                    let skill = self.pass_skill_source.as_deref().map(|name|
+                        ffb_model::enums::SkillId::from_class_name(name)
+                            .unwrap_or(ffb_model::enums::SkillId::Pass));
+                    let thrower = game.thrower_id.clone();
+                    let acting_team_has = thrower.as_deref().map(|t| if game.home_playing {
+                        game.team_home.has_player(t)
+                    } else {
+                        game.team_away.has_player(t)
+                    }).unwrap_or(false);
+                    Self::show_skill_use_dialog(game, thrower, skill, self.minimum_roll, modifying, false, acting_team_has);
+                }
                 return Some(wrap(prompt));
             }
             // Java bb2020/bb2025 PassBehaviour: `askForReRollIfAvailable(gameState,
@@ -378,6 +420,13 @@ impl StepPass {
                     team_id,
                 });
             }
+            if prompt.is_some() && modifying.is_some() {
+                // Java: the same DialogReRollPropertiesParameter, carrying `modificationSkill`
+                // (`askForReRollIfAvailable(…, PASS, minimumRoll, fumble, modificationSkill, null)`).
+                let acting = game.acting_player.player_id.clone();
+                crate::step::util_server_re_roll::show_re_roll_properties_dialog(
+                    game, acting.as_deref(), "PASS", self.minimum_roll, fumble, None, modifying, Vec::new());
+            }
             if let Some(prompt) = prompt {
                 self.re_rolled_action = Some("PASS".into());
                 self.re_roll_source = Some("TRR".into());
@@ -387,6 +436,10 @@ impl StepPass {
         }
         if modifying_enabled && self.using_modifying_skill.is_none() {
             if let Some(skill) = self.modifying_skill(game, passing_dist, pass_modifiers, is_bomb) {
+                // Java showUseModifyingSkillDialog: showDialog(new DialogSkillUseParameter(
+                //   throwerId, modifyingSkill, 0), false)
+                let thrower = game.thrower_id.clone();
+                Self::show_skill_use_dialog(game, thrower, Some(skill), 0, None, false, false);
                 return Some(wrap(Self::modifying_skill_prompt(game, skill)));
             }
         }
@@ -525,6 +578,9 @@ impl StepPass {
 
         if reroll_unspent && game.rules != ffb_model::enums::Rules::Bb2016 {
             if let Some(skill) = self.modifying_skill(game, passing_dist, &pass_modifiers, is_bomb) {
+                // Java showUseModifyingSkillDialog: DialogSkillUseParameter(throwerId, modifyingSkill, 0), false
+                let thrower = game.thrower_id.clone();
+                Self::show_skill_use_dialog(game, thrower, Some(skill), 0, None, false, false);
                 return StepOutcome::cont().with_prompt(Self::modifying_skill_prompt(game, skill));
             }
         }
@@ -766,6 +822,12 @@ impl StepPass {
                 // (bb2020 amazon 100 -> 94) and moved the random control too (100 -> 99).
                 if game.rules == ffb_model::enums::Rules::Bb2025 {
                     if self.using_safe_pass.is_none() {
+                        // Java: showDialog(new DialogSkillUseParameter(throwerId, safePass, 0, false),
+                        //   game.getTeamHome().hasPlayer(game.getThrower()))
+                        let safe_pass = game.player(&thrower_id).and_then(|p| p.skill_id_with_property(
+                            ffb_model::model::property::named_properties::NamedProperties::DONT_DROP_FUMBLES));
+                        let stop = game.team_home.has_player(&thrower_id);
+                        Self::show_skill_use_dialog(game, Some(thrower_id.clone()), safe_pass, 0, None, false, stop);
                         let mut out = StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
                             player_id: thrower_id.clone(),
                             skill_id: ffb_model::enums::SkillId::SafePass as u16,

@@ -48,6 +48,31 @@ pub fn eligible_players_for_dialog(
     selector.eligible_players(game, team_id, added_skills)
 }
 
+/// Java: `SelectPlayerPrayerHandler.createDialog(players, gameState, prayingTeam)`:
+/// `UtilServerDialog.showDialog(gameState, new DialogPlayerChoiceParameter(prayingTeam.getId(),
+/// choiceMode(), playerIds, null, 1, 1), false)`.
+pub fn create_dialog(
+    game: &mut Game,
+    praying_team_id: &str,
+    choice_mode: ffb_model::model::player_choice_mode::PlayerChoiceMode,
+    player_ids: Vec<String>,
+) {
+    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+        game,
+        ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+            ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                team_id: Some(praying_team_id.to_string()),
+                player_choice_mode: Some(choice_mode.get_name().to_string()),
+                player_ids,
+                descriptions: Vec::new(),
+                max_selects: 1,
+                min_selects: 1,
+            },
+        ),
+        false,
+    );
+}
+
 /// Java: `SelectPlayerPrayerHandler.applySelection(Game, PrayerDialogSelection)`.
 pub fn apply_selection_select_player(game: &mut Game, player_id: &str, prayer_name: &str) {
     if player_id.is_empty() || game.player(player_id).is_none() {

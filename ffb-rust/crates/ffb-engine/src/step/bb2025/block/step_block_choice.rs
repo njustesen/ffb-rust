@@ -83,6 +83,8 @@ impl Step for StepBlockChoice {
 
 impl StepBlockChoice {
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         let block_result = match self.block_result {
             Some(r) => r,
             None => return StepOutcome::cont(),

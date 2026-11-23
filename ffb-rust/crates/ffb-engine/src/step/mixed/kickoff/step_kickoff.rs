@@ -57,6 +57,8 @@ impl Step for StepKickoff {
 impl StepKickoff {
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         if let Some(coord) = self.kickoff_start_coordinate {
+            // Java: UtilServerDialog.hideDialog(getGameState())
+            crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
             let home = game.home_playing;
             // Java: push Inducement BEFORE_KICKOFF_SCATTER for both teams (home first, then away)
             return StepOutcome::next()

@@ -178,6 +178,18 @@ impl StepKickoffScatterRoll {
                 // by a draw-free decline, so a Kick kicker desynced the agents' streams
                 // (BACKLOG §M phase 2 skill sweep: imperial_nobility_sk / chaos_ogre_sk /
                 // chaos_troll_sk bb2025 -- Java reported `skillUse Kick halveKickoffScatter`).
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                        ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                            player_id: self.kicking_player_id.clone(),
+                            skill: Some(skill),
+                            minimum_roll: 0,
+                            ..Default::default()
+                        },
+                    ),
+                    false,
+                );
                 return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
                     player_id: self.kicking_player_id.clone().unwrap_or_default(),
                     skill_id: skill as u16,

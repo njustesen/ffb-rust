@@ -171,6 +171,21 @@ impl StepKickoffScatterRollAskAfter {
                 // Java: showDialog(DialogKickSkillParameter) and wait for CLIENT_USE_SKILL. This was
                 // a bare cont() with NO prompt -- the stall shape -- reached as soon as a Kick
                 // kicker stands in the centre field (star tier: Dolfar Longstride).
+                // Java: ballCoordinateEndWithKick = findScatterCoordinate(start, dir, ceil(dist / 2));
+                //       showDialog(new DialogKickSkillParameter(kicker, ballCoordinateEnd, ballCoordinateEndWithKick), false)
+                let dir = self.scatter_direction.unwrap_or(Direction::North);
+                let ball_end_with_kick = start.step(dir, (self.scatter_distance as f64 / 2.0).ceil() as i32);
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::KickSkill(
+                        ffb_model::dialog::dialog_kick_skill_parameter::DialogKickSkillParameter {
+                            player_id: self.kicking_player_id.clone(),
+                            ball_coordinate: Some(ball_end_report),
+                            ball_coordinate_with_kick: Some(ball_end_with_kick),
+                        },
+                    ),
+                    false,
+                );
                 return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::KickSkill {
                     player_id: self.kicking_player_id.clone().unwrap_or_default(),
                 });

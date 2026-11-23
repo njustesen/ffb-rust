@@ -56,6 +56,18 @@ impl StepPileDriver {
                     .unwrap_or(false);
                 if has_unused_chainsaw {
                     // Java: UtilServerDialog.showDialog → CONTINUE waiting for CLIENT_USE_CHAINSAW
+                    // Java: UtilServerDialog.showDialog(getGameState(),
+                    //   new DialogUseChainsawParameter(game.getActingTeam().getId()), false)
+                    let team_id = game.active_team().id.clone();
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::UseChainsaw(
+                            ffb_model::dialog::dialog_use_chainsaw_parameter::DialogUseChainsawParameter {
+                                team_id: Some(team_id),
+                            },
+                        ),
+                        false,
+                    );
                     StepOutcome::cont()
                 } else {
                     self.leave_step(game)

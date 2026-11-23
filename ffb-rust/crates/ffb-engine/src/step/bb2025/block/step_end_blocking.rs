@@ -210,6 +210,8 @@ impl Step for StepEndBlocking {
 
 impl StepEndBlocking {
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         // Java: fEndTurn |= UtilServerSteps.checkTouchdown(getGameState())
         self.end_turn |= check_touchdown(game);
 
@@ -511,6 +513,18 @@ impl StepEndBlocking {
                     s.properties().contains(&NamedProperties::CAN_USE_VOMIT_AFTER_BLOCK)
                 }))
                 .unwrap_or(SkillId::PutridRegurgitation);
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                    ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                        player_id: Some(player_id.clone()),
+                        skill: Some(skill_id),
+                        minimum_roll: 0,
+                        ..Default::default()
+                    },
+                ),
+                false,
+            );
             return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
                 player_id,
                 skill_id: skill_id as u16,
@@ -572,6 +586,18 @@ impl StepEndBlocking {
                     s.properties().contains(&NamedProperties::CAN_MOVE_AFTER_BLOCK)
                 }))
                 .unwrap_or(SkillId::HitAndRun);
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                    ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                        player_id: Some(player_id.clone()),
+                        skill: Some(skill_id),
+                        minimum_roll: 0,
+                        ..Default::default()
+                    },
+                ),
+                false,
+            );
             return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
                 player_id,
                 skill_id: skill_id as u16,
@@ -593,6 +619,17 @@ impl StepEndBlocking {
             // Java: UtilServerDialog.showDialog(... DialogPileDriverParameter(teamId, knockedDownPlayers) ...)
             // Java: getResult().setNextAction(CONTINUE)
             let eligible = self.knocked_down_players.iter().cloned().collect();
+            let acting_team_id = if game.home_playing { game.team_home.id.clone() } else { game.team_away.id.clone() };
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::PileDriver(
+                    ffb_model::dialog::dialog_pile_driver_parameter::DialogPileDriverParameter {
+                        knocked_down_players: self.knocked_down_players.clone(),
+                        team_id: Some(acting_team_id),
+                    },
+                ),
+                false,
+            );
             return StepOutcome::cont().with_prompt(AgentPrompt::PlayerChoice {
                 eligible_players: eligible,
                 reason: "pileDriver".to_string(),

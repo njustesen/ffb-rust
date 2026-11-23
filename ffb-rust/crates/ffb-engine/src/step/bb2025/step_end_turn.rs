@@ -514,6 +514,10 @@ impl StepEndTurn {
         use ffb_model::model::property::named_properties::NamedProperties;
         use ffb_model::report::mixed::report_argue_the_call_roll::ReportArgueTheCallRoll;
 
+        // DEVIATION (dialogs): Java asks via DialogBribesParameter (askForSecretWeaponBribes),
+        // DialogArgueTheCallParameter (askForArgueTheCall), DialogBriberyAndCorruptionParameter and
+        // DialogPlayerChoiceParameter(BRIBERY_AND_CORRUPTION) (reRollArgueFailures) and waits; this
+        // port resolves those choices inline (always argue, auto B&C re-roll), so none is shown.
         // Phase B — argueTheCall: AWAY team first, then HOME. ParityRunner argues each flagged SW player.
         for is_home in [false, true] {
             let team_id = { let t = if is_home { &game.team_home } else { &game.team_away }; t.id.clone() };
@@ -708,6 +712,8 @@ impl StepEndTurn {
     }
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         // Java: if (turnNr == 0) capture turnNr + half for later send-to-box use
         if self.turn_nr == 0 {
             self.turn_nr = game.turn_data().turn_nr;
@@ -748,6 +754,20 @@ impl StepEndTurn {
             };
             match skill {
                 Some((player_id, skill)) => {
+                    // Java: showDialog(new DialogSkillUseParameter(touchdownPlayer.getId(),
+                    //   touchdownPlayer.getSkillWithProperty(canGrantReRollAfterTouchdown), 0), false)
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                            ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                player_id: Some(player_id.clone()),
+                                skill: Some(skill),
+                                minimum_roll: 0,
+                                ..Default::default()
+                            },
+                        ),
+                        false,
+                    );
                     return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
                         player_id,
                         skill_id: skill as u16,

@@ -146,6 +146,20 @@ impl StepModifierTrait for StandFirmStepModifier {
         // prevention event in the accepted branch; no StepParameter variants exist for the first
         // two. Recorded in docs/PARITY_DWARF_CAMPAIGN.md.
         if !state.standing_firm.contains_key(&defender_id) {
+            // Java: UtilServerDialog.showDialog(step.getGameState(),
+            //   new DialogSkillUseParameter(state.defender.getId(), skill, 0), true)
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                    ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                        player_id: Some(defender_id.clone()),
+                        skill: Some(SkillId::StandFirm),
+                        minimum_roll: 0,
+                        ..Default::default()
+                    },
+                ),
+                true,
+            );
             state.pending_skill_use = Some((defender_id.clone(), SkillId::StandFirm));
             return true;
         }

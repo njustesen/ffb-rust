@@ -46,6 +46,8 @@ impl StepInitKickoff {
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
         let mut events: Vec<GameEvent> = Vec::new();
         if game.turn_mode == TurnMode::StartGame {
+            // Java: UtilServerDialog.hideDialog(getGameState())
+            crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
             // Java: stateMechanic.startHalf(step, 1) — returns inducement-registration events
             let half_events = StateMechanic::new().start_half(game, 1);
             events.extend(half_events);

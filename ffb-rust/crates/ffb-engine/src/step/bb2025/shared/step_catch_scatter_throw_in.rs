@@ -239,6 +239,7 @@ impl StepCatchScatterThrowIn {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: getResult().reset(); replay pending reports
         // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         self.pending_events.clear();
         self.pending_published.clear();
         self.pending_prompt = None;
@@ -787,9 +788,18 @@ impl StepCatchScatterThrowIn {
             let home_catchers = UtilServerCatchScatterThrowIn::find_diving_catchers(game, &home_team, coord);
             if !home_catchers.is_empty() {
                 // Java: DialogParameterDivingCatch (declare home-team diving catchers)
+                // Java: UtilServerDialog.showDialog(getGameState(), new DialogPlayerChoiceParameter(
+                //   game.getTeamHome().getId(), DECLARE_DIVING_CATCH, divingCatchers, null,
+                //   divingCatchers.length), !game.isHomePlaying())
+                let stop_timer = !game.home_playing;
+                let home_catcher_ids: Vec<String> = home_catchers.iter().map(|p| p.id.clone()).collect();
+                let max_selects = home_catcher_ids.len() as i32;
+                show_player_choice_dialog(game, &home_team.id,
+                    ffb_model::model::player_choice_mode::PlayerChoiceMode::DECLARE_DIVING_CATCH,
+                    home_catcher_ids.clone(), max_selects, 0, stop_timer);
                 self.pending_prompt = Some(AgentPrompt::SwarmingPlayers {
                     team_id: home_team.id.clone(),
-                    eligible_players: home_catchers.iter().map(|p| p.id.clone()).collect(),
+                    eligible_players: home_catcher_ids,
                 });
                 return self.catch_scatter_throw_in_mode;
             } else {
@@ -801,9 +811,18 @@ impl StepCatchScatterThrowIn {
             let away_catchers = UtilServerCatchScatterThrowIn::find_diving_catchers(game, &away_team, coord);
             if !away_catchers.is_empty() {
                 // Java: DialogParameterDivingCatch (declare away-team diving catchers)
+                // Java: UtilServerDialog.showDialog(getGameState(), new DialogPlayerChoiceParameter(
+                //   game.getTeamAway().getId(), DECLARE_DIVING_CATCH, divingCatchers, null,
+                //   divingCatchers.length), game.isHomePlaying())
+                let stop_timer = game.home_playing;
+                let away_catcher_ids: Vec<String> = away_catchers.iter().map(|p| p.id.clone()).collect();
+                let max_selects = away_catcher_ids.len() as i32;
+                show_player_choice_dialog(game, &away_team.id,
+                    ffb_model::model::player_choice_mode::PlayerChoiceMode::DECLARE_DIVING_CATCH,
+                    away_catcher_ids.clone(), max_selects, 0, stop_timer);
                 self.pending_prompt = Some(AgentPrompt::SwarmingPlayers {
                     team_id: away_team.id.clone(),
-                    eligible_players: away_catchers.iter().map(|p| p.id.clone()).collect(),
+                    eligible_players: away_catcher_ids,
                 });
                 return self.catch_scatter_throw_in_mode;
             } else {
@@ -854,6 +873,16 @@ impl StepCatchScatterThrowIn {
                 let ctrl_team = self.diving_catch_control_team.clone()
                     .unwrap_or_else(|| game.team_home.id.clone());
                 // Java: DialogParameterDivingCatch (coach picks which declared diver attempts)
+                // Java: UtilServerDialog.showDialog(getGameState(), new DialogPlayerChoiceParameter(
+                //   divingCatchControlTeam, DIVING_CATCH, divingCatchers, null, 1, 1),
+                //   !game.getActingTeam().getId().equals(divingCatchControlTeam))
+                // DEVIATION: Java passes divingCatchControlTeam as is (may be null); Rust uses the
+                // same fallback (home team id) as the prompt below.
+                let acting_team_id = if game.home_playing { game.team_home.id.clone() } else { game.team_away.id.clone() };
+                let stop_timer = acting_team_id != ctrl_team;
+                show_player_choice_dialog(game, &ctrl_team,
+                    ffb_model::model::player_choice_mode::PlayerChoiceMode::DIVING_CATCH,
+                    self.diving_catchers.clone(), 1, 1, stop_timer);
                 self.pending_prompt = Some(AgentPrompt::PlayerChoice {
                     eligible_players: self.diving_catchers.clone(),
                     reason: ctrl_team,
@@ -1042,6 +1071,33 @@ impl StepCatchScatterThrowIn {
 }
 
 /// Convert framework's CatchScatterThrowInMode (PascalCase) to model's (SCREAMING_SNAKE_CASE).
+/// Java: `UtilServerDialog.showDialog(getGameState(), new DialogPlayerChoiceParameter(teamId, mode,
+/// playerIds, null, maxSelects, minSelects), stopTurnTimer)`.
+fn show_player_choice_dialog(
+    game: &mut Game,
+    team_id: &str,
+    mode: ffb_model::model::player_choice_mode::PlayerChoiceMode,
+    player_ids: Vec<String>,
+    max_selects: i32,
+    min_selects: i32,
+    stop_turn_timer: bool,
+) {
+    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+        game,
+        ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+            ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                team_id: Some(team_id.to_string()),
+                player_choice_mode: Some(mode.get_name().to_string()),
+                player_ids,
+                descriptions: vec![],
+                max_selects,
+                min_selects,
+            },
+        ),
+        stop_turn_timer,
+    );
+}
+
 fn to_model_mode(m: CatchScatterThrowInMode) -> CatchScatterThrowInMode {
     match m {
         CatchScatterThrowInMode::CatchAccurateBomb => CatchScatterThrowInMode::CatchAccurateBomb,

@@ -63,6 +63,8 @@ impl Step for StepKickoffResultRoll {
 
 impl StepKickoffResultRoll {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         if self.kickoff_result.is_none() {
             let overtime_option = game.options.get(game_option_id::OVERTIME_KICK_OFF_RESULTS).unwrap_or("all");
             if game.half < 3 || overtime_option == "all" {
@@ -86,6 +88,8 @@ impl StepKickoffResultRoll {
                 self.kickoff_result = Some(KickoffResult::SolidDefence);
             } else {
                 // client-only: DialogKickOffResultChoice for blitzOrSolidDefence — headless auto-rolls
+                // DEVIATION: Java shows DialogKickOffResultParameter(actingTeam) and waits (CONTINUE);
+                // this Rust path auto-rolls instead, so no dialog is shown here (it would never be answered).
                 let d1 = rng.d6();
                 let d2 = rng.d6();
                 self.kickoff_roll = vec![d1, d2];

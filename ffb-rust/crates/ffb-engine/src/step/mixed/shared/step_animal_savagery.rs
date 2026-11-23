@@ -235,6 +235,20 @@ impl StepAnimalSavagery {
                     let opponent_team: &Team = if home_active { &game.team_away } else { &game.team_home };
                     let adjacent = adjacent_targets(game, opponent_team, player_coordinate);
                     if !adjacent.is_empty() {
+                        // Java: UtilServerDialog.showDialog(step.getGameState(), new DialogSkillUseParameter(
+                        //   actingPlayer.getPlayerId(), player.getSkillWithProperty(canLashOutAgainstOpponents), 0), false)
+                        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                            game,
+                            ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                                ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                    player_id: Some(acting_player_id.clone()),
+                                    skill: Some(skill_id),
+                                    minimum_roll: 0,
+                                    ..Default::default()
+                                },
+                            ),
+                            false,
+                        );
                         return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
                             player_id: acting_player_id.clone(),
                             skill_id: skill_id as u16,
@@ -292,6 +306,24 @@ impl StepAnimalSavagery {
             self.lash_out(game, rng, only)
         } else {
             self.state.player_ids = players.clone();
+            // Java: UtilServerDialog.showDialog(step.getGameState(), new DialogPlayerChoiceParameter(
+            //   game.getActingTeam().getId(), ANIMAL_SAVAGERY, state.playerIds, null, 1, 1), false)
+            // DEVIATION: Java's id order is its HashSet iteration order; Rust's is its own set order.
+            let dialog_team_id = if home_active { game.team_home.id.clone() } else { game.team_away.id.clone() };
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                    ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                        team_id: Some(dialog_team_id),
+                        player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::ANIMAL_SAVAGERY.get_name().to_string()),
+                        player_ids: players.iter().cloned().collect(),
+                        descriptions: vec![],
+                        max_selects: 1,
+                        min_selects: 1,
+                    },
+                ),
+                false,
+            );
             StepOutcome::cont().with_prompt(AgentPrompt::PlayerChoice {
                 eligible_players: players.into_iter().collect(),
                 reason: "ANIMAL_SAVAGERY".into(),

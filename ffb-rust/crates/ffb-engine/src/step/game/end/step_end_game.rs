@@ -37,8 +37,19 @@ impl Step for StepEndGame {
 impl StepEndGame {
     /// Java: `executeStep()` — sets the game finished and transitions to FINISHED status.
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
+        // Java shows the dialog only inside `if (game.getFinished() == null)`; the not-yet-finished
+        // status stands in for the unset finished timestamp.
+        let first_finish = game.status != GameStatus::Finished;
         game.status = GameStatus::Finished;
-        // client-only: show GameStatistics dialog
+        // Java: UtilServerDialog.showDialog(getGameState(),
+        //   new DialogParameterFactory().createDialogParameter(DialogId.GAME_STATISTICS), false)
+        if first_finish {
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::GameStatistics(Default::default()),
+                false,
+            );
+        }
         // no-op: replay file save requires file I/O — headless engine has no file system access
         StepOutcome::next()
     }

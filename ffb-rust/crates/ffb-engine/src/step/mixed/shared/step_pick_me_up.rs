@@ -58,6 +58,8 @@ impl StepPickMeUp {
                 return StepOutcome::next();
             }
 
+            // Java: UtilServerDialog.hideDialog(getGameState())
+            crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
             // Java: hideDialog; find opposing team; find pick-me-up players on pitch with tacklezones
             // For each pick-me-up player (canStandUpTeamMates): find prone team-mates within 3 steps.
             let player_ids_on_other_team: Vec<String> = {
@@ -92,6 +94,8 @@ impl StepPickMeUp {
             self.player_ids = eligible.into_iter().collect();
             self.first_run = false;
         } else {
+            // Java: UtilServerDialog.hideDialog(getGameState()) (runs before the roll on re-entry too)
+            crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
             // Java: for each selected player: roll D6; success → STANDING; add report
             let mut events: Vec<GameEvent> = vec![];
             for id in self.player_ids_selected.drain(..).collect::<Vec<_>>() {
@@ -129,6 +133,23 @@ impl StepPickMeUp {
         // the prompt the drive STALLED (cont() with no prompt) whenever a Pick-me-up player sat
         // within 3 squares of a prone team-mate at turn-end — norse seed 13 i=8: away_01's
         // no-target blitz turnover left the home Beer Boar (Pick-me-up) beside prone home_00/01/02.
+        // Java: UtilServerDialog.showDialog(getGameState(), new DialogPlayerChoiceParameter(team.getId(),
+        //   PICK_ME_UP, playerIds, null, playerIds.size(), 0), false) -- team = other team of the acting team
+        let team_id = game.inactive_team().id.clone();
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+            game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                    team_id: Some(team_id),
+                    player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::PICK_ME_UP.get_name().to_string()),
+                    player_ids: self.player_ids.clone(),
+                    descriptions: vec![],
+                    max_selects: self.player_ids.len() as i32,
+                    min_selects: 0,
+                },
+            ),
+            false,
+        );
         let prompt = ffb_model::prompts::AgentPrompt::PlayerChoice {
             eligible_players: self.player_ids.clone(),
             reason: "PICK_ME_UP".into(),

@@ -29,7 +29,13 @@ impl PrayerHandler for IronManHandler {
     fn init_effect(&self, _prayer_state: &mut PrayerState, game: &mut Game, _rng: &mut GameRng, team_id: &str) -> bool {
         // Java DialogPrayerHandler.initEffect: an empty eligible list →
         // `reports.add(new ReportPrayerWasted(handledPrayer().getName()))` (display name, no player).
-        let wasted = self.eligible_dialog_players(game, team_id).is_empty();
+        let players = self.eligible_dialog_players(game, team_id);
+        let wasted = players.is_empty();
+        if !wasted {
+            // Java SelectPlayerPrayerHandler.createDialog (choiceMode() = IRON_MAN)
+            select_player_base::create_dialog(game, team_id,
+                ffb_model::model::player_choice_mode::PlayerChoiceMode::IRON_MAN, players);
+        }
         if wasted {
             let display = ffb_model::inducement::bb2020::prayer::Prayer::for_enum_name("IRON_MAN")
                 .map(|p| p.get_name().to_string());

@@ -115,7 +115,17 @@ impl StepSwarming {
                 };
 
                 if placed > self.rolled_amount {
-                    // client-only: show DialogSwarmingErrorParameter — dialog is client-side
+                    // Java: showDialog(new DialogSwarmingErrorParameter(state.rolledAmount, placedSwarmingPlayers), false)
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::SwarmingError(
+                            ffb_model::dialog::dialog_swarming_error_parameter::DialogSwarmingErrorParameter {
+                                allowed: self.rolled_amount,
+                                actual: placed,
+                            },
+                        ),
+                        false,
+                    );
                     // For now: reject and continue.
                     return StepOutcome::cont();
                 }
@@ -231,6 +241,19 @@ impl StepSwarming {
             _ => game.report_list.add(ReportSwarmingRoll::new(team_id.clone(), self.rolled_amount)),
         }
 
+        // Java (bb2025): showDialog(new DialogSwarmingPlayersParameter(state.rolledAmount, false), false).
+        // The immediate leave() below hides it again, exactly as Java's leave() does.
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+            game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::SwarmingPlayers(
+                ffb_model::dialog::dialog_swarming_players_parameter::DialogSwarmingPlayersParameter {
+                    amount: self.rolled_amount,
+                    restrict_placement: false,
+                },
+            ),
+            false,
+        );
+
         // Java pushes itself back on the stack and shows DialogSwarmingPlayersParameter, then
         // waits for the coach to place swarmers and end the turn. **ParityRunner has no SWARMING
         // case**, so it falls to the UNHANDLED_STEP default, which injects
@@ -273,6 +296,8 @@ impl StepSwarming {
         }
 
         game.turn_mode = TurnMode::Kickoff;
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
     }
 
     fn swarming_team_id(&self, game: &Game) -> String {

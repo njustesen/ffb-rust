@@ -59,6 +59,8 @@ impl StepReceiveChoice {
             return StepOutcome::cont().with_prompt(AgentPrompt::ReceiveChoice { team_id });
         }
         let receive_choice = self.receive_choice.unwrap();
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         // Java: if (game.getTeamHome().getId().equals(fChoosingTeamId)) { game.setHomePlaying(!fReceiveChoice); }
         //       else { game.setHomePlaying(fReceiveChoice); }
         if self.choosing_team_id.as_deref() == Some(game.team_home.id.as_str()) {

@@ -98,6 +98,8 @@ impl StepThrowTeamMate {
         } else {
             turn_data.ttm_used = true; // BB2025 uses ttm_used, not pass_used
         }
+        // Java ThrowTeamMateBehaviour: UtilServerDialog.hideDialog(step.getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
 
         let mut do_roll = true;
         if self.re_rolled_action.as_deref() == Some(rerolled_action_key) {
@@ -246,6 +248,33 @@ impl StepThrowTeamMate {
                     ask_for_reroll_if_available(game, rerolled_action_key, self.minimum_roll, is_fumble)
                 };
                 if let Some(prompt) = ask {
+                    if game.rules == Rules::Bb2025 {
+                        // Java bb2025: askForReRollIfAvailable(gameState, thrower, rerolledAction,
+                        //   minimumRoll, false, null, null, null, null, messages) with
+                        //   superbTarget = thrower.getPassingWithModifiers() + modifierSum and
+                        //   messages = buildTtmRerollMessage(thrower, superbTarget, passResult).
+                        let messages: Vec<Option<String>> = if pass_result == PassOutcome::Inaccurate {
+                            let superb_target = passing_value + modifier_sum;
+                            let target_text = if superb_target > 6 {
+                                "a natural 6".to_string()
+                            } else {
+                                format!("{}+", superb_target)
+                            };
+                            let has_bullseye = game.player(&thrower_id)
+                                .map(|p| p.has_skill_property(NamedProperties::CAN_SKIP_TTM_SCATTER_ON_SUPERB_THROW))
+                                .unwrap_or(false);
+                            vec![Some(if has_bullseye {
+                                format!("This is a Subpar result. Re-roll needed: {} for a Superb result and to trigger Bullseye.", target_text)
+                            } else {
+                                format!("This is a Subpar result. Re-roll for a chance at a Superb result ({}, SPP and easier landing).", target_text)
+                            })]
+                        } else {
+                            Vec::new()
+                        };
+                        crate::step::util_server_re_roll::show_re_roll_properties_dialog(
+                            game, Some(&thrower_id), rerolled_action_key, self.minimum_roll, false,
+                            None, None, messages);
+                    }
                     self.re_rolled_action = Some(rerolled_action_key.into());
                     self.re_roll_source = Some("TRR".into());
                     return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
@@ -265,6 +294,20 @@ impl StepThrowTeamMate {
                     let sid = game.player(&thrower_id)
                         .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_SKIP_TTM_SCATTER_ON_SUPERB_THROW))
                         .unwrap_or(SkillId::Bullseye);
+                    // Java: showDialog(new DialogSkillUseParameter(thrower.getId(),
+                    //   thrower.getSkillWithProperty(canSkipTtmScatterOnSuperbThrow), 0), false)
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                            ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                player_id: Some(thrower_id.clone()),
+                                skill: Some(sid),
+                                minimum_roll: 0,
+                                ..Default::default()
+                            },
+                        ),
+                        false,
+                    );
                     return StepOutcome::cont()
                         .with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
                             player_id: thrower_id.clone(),

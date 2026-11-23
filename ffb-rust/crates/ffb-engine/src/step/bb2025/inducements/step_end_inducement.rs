@@ -74,7 +74,8 @@ impl Step for StepEndInducement {
 
 impl StepEndInducement {
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // Java: UtilServerDialog.hideDialog(getGameState()) — no-op in headless Rust
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         let phase = match self.inducement_phase {
             Some(p) => p,
             None => return StepOutcome::next(),

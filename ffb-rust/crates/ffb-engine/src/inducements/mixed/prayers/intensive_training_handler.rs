@@ -50,7 +50,25 @@ pub fn init_effect(_prayer_state: &mut PrayerState, game: &mut Game, _rng: &mut 
     // Java: `if (!skills.isEmpty()) showDialog(...) else reports.add(new ReportPrayerWasted(...))`.
     match chosen_player(game) {
         Some(player_id) => {
-            let wasted = eligible_skills(game, &player_id).is_empty();
+            let skills = eligible_skills(game, &player_id);
+            let wasted = skills.is_empty();
+            if !wasted {
+                // Java: UtilServerDialog.showDialog(gameState, new DialogSelectSkillParameter(
+                //   player.getId(), skills, SkillChoiceMode.INTENSIVE_TRAINING), false)
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::SelectSkill(
+                        ffb_model::dialog::dialog_select_skill_parameter::DialogSelectSkillParameter {
+                            skills,
+                            player_id: Some(player_id.clone()),
+                            skill_choice_mode: Some(
+                                ffb_model::model::skill_choice_mode::SkillChoiceMode::INTENSIVE_TRAINING.name().to_string()),
+                            null_skill_slots: Vec::new(),
+                        },
+                    ),
+                    false,
+                );
+            }
             if wasted {
                 // Java: reports.add(new ReportPrayerWasted(handledPrayer().getName(), player.getId()))
                 // — the display name (gnome bb2020 seed 50: "Intensive Training").

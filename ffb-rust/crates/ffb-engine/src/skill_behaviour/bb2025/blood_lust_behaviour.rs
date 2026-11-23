@@ -162,6 +162,17 @@ fn fail_for_action(game: &mut Game, state: &mut StepBloodLustHookState) -> StepO
         .unwrap_or(false);
 
     if needs_dialog {
+        // Java: UtilServerDialog.showDialog(step.getGameState(), new DialogBloodlustActionParameter(changeToMove), false)
+        let change_to_move = current_action
+            .map(|a| crate::step::bb2025::shared::step_blood_lust::bloodlust_dialog_change_to_move(game.rules, a))
+            .unwrap_or(false);
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+            game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::BloodlustAction(
+                ffb_model::dialog::dialog_bloodlust_action_parameter::DialogBloodlustActionParameter { change_to_move },
+            ),
+            false,
+        );
         state.wait_for_action_change = true;
         let player_id = game.acting_player.player_id.clone().unwrap_or_default();
         return StepOutcome::cont()

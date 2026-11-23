@@ -95,6 +95,8 @@ impl Step for StepEndKickTeamMate {
 
 impl StepEndKickTeamMate {
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         // Java: game.setPassCoordinate(null)
         game.pass_coordinate = None;
         // Java: game.getFieldModel().setRangeRuler(null) — not yet implemented, skip.

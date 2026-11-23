@@ -148,6 +148,22 @@ impl StepMoveBallAndChain {
                         let pid = game.acting_player.player_id.clone().unwrap_or_default();
                         if let Some(sid) = unused_direction_reroll_skill(game, &pid) {
                             self.pending_skill_source = find_skill_reroll_source(game, RE_ROLLED_ACTION);
+                            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                                game,
+                                ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                                    ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                        player_id: Some(pid.clone()),
+                                        skill: Some(sid),
+                                        minimum_roll: 0,
+                                        // Java CommonProperty.SETTING_RE_ROLL_BALL_AND_CHAIN (key)
+                                        menu_property: Some("setting.reRollBallAndChain".to_string()),
+                                        // Java CommonPropertyValue.SETTING_RE_ROLL_BALL_AND_CHAIN_ALWAYS
+                                        default_value_key: Some("reRollBallAndChainAlways".to_string()),
+                                        ..Default::default()
+                                    },
+                                ),
+                                false,
+                            );
                             return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
                                 player_id: pid,
                                 skill_id: sid as u16,

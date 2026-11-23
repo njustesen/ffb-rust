@@ -143,6 +143,23 @@ impl StepBalefulHex {
                 self.player_id = Some(eligibles[0].clone());
             } else {
                 // Java: DialogPlayerChoiceParameter(actingTeam, BALEFUL_HEX, eligible, null, 1)
+                // Java: UtilServerDialog.showDialog(getGameState(), new DialogPlayerChoiceParameter(
+                //   game.getActingTeam().getId(), PlayerChoiceMode.BALEFUL_HEX, eligiblePlayers, null, 1), false)
+                let dialog_team_id = if game.home_playing { game.team_home.id.clone() } else { game.team_away.id.clone() };
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                        ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                            team_id: Some(dialog_team_id),
+                            player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::BALEFUL_HEX.get_name().to_string()),
+                            player_ids: eligibles.clone(),
+                            descriptions: vec![],
+                            max_selects: 1,
+                            min_selects: 0,
+                        },
+                    ),
+                    false,
+                );
                 return StepOutcome::cont().with_prompt(
                     ffb_model::prompts::AgentPrompt::PlayerChoice {
                         eligible_players: eligibles,

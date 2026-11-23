@@ -182,8 +182,16 @@ impl SetupMechanicTrait for SetupMechanic {
         if !messages.is_empty() {
             // Java: UtilServerDialog.showDialog(pGameState, new DialogSetupErrorParameter(team.getId(),
             //     messageList.toArray(new String[0])), false)
-            let _ = (team_id, messages);
-            UtilServerDialog::show_dialog(game, DialogId::SETUP_ERROR, false);
+            UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::SetupError(
+                    ffb_model::dialog::dialog_setup_error_parameter::DialogSetupErrorParameter {
+                        team_id: Some(team_id.to_string()),
+                        setup_errors: messages,
+                    },
+                ),
+                false,
+            );
             false
         } else {
             true

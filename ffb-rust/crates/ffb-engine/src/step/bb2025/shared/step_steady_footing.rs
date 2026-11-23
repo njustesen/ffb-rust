@@ -237,6 +237,20 @@ impl StepSteadyFooting {
             // 100 bb2025 sampled reds). Raise the prompt; the answer comes back through
             // `handle_command` as `Action::UseSkill` and re-enters `start`.
             let skill_id = avoid_fall_skill.unwrap_or(ffb_model::enums::SkillId::SteadyFooting);
+            let acting_team = if game.home_playing { &game.team_home } else { &game.team_away };
+            let stop_timer = !acting_team.players.iter().any(|p| p.id == player_id);
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                    ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                        player_id: Some(player_id.clone()),
+                        skill: avoid_fall_skill,
+                        minimum_roll: 6, // Java MINMUM_ROLL
+                        ..Default::default()
+                    },
+                ),
+                stop_timer,
+            );
             return StepOutcome::cont().with_prompt(
                 ffb_model::prompts::AgentPrompt::SkillUse {
                     player_id: player_id.clone(),

@@ -46,9 +46,51 @@ fn model_sync_json(command_nr: i64, changes: &ModelChangeList, game: &Game) -> S
     serde_json::Value::Object(o).to_string()
 }
 
+/// Prompts that Java answers without a dialog: the client acts from the turn mode, acting player
+/// or the field's move/pushback squares. Every other prompt corresponds to a Java
+/// `UtilServerDialog.showDialog`.
+fn prompt_without_dialog(prompt: &ffb_model::prompts::AgentPrompt) -> bool {
+    use ffb_model::prompts::AgentPrompt as P;
+    matches!(
+        prompt,
+        P::ActivatePlayer { .. }
+            | P::Move { .. }
+            | P::TeamSetup { .. }
+            | P::KickBall
+            | P::Pushback { .. }
+            | P::BlockTarget { .. }
+            | P::ThrowTeamMateTarget { .. }
+            | P::PuntTarget { .. }
+            | P::SwoopTarget { .. }
+            | P::HitAndRun { .. }
+            | P::FuriousOutburstSquare { .. }
+            | P::RaidingParty { .. }
+            | P::BlastinTarget { .. }
+            | P::TricksterMove { .. }
+            | P::PlaceBallSquare { .. }
+            | P::KickoffEventPlacement { .. }
+            | P::BombRethrow { .. }
+            | P::MultiBlockTargets { .. }
+            | P::BlitzBlockSkill { .. }
+            | P::StartGame
+    )
+}
+
 /// After an engine command: send the model changes since the last sync, or the whole game when
 /// they cannot be expressed (logged -- that log is the P3 worklist).
 pub fn sync_game(game_state: &mut GameState, session_manager: &Mutex<SessionManager>) {
+    if let (Some(prompt), Some(game)) = (
+        game_state.driver.as_ref().and_then(|d| d.current_prompt()),
+        game_state.get_game(),
+    ) {
+        if game.dialog_parameter.is_none() && !prompt_without_dialog(prompt) {
+            log::warn!(
+                "game {}: engine waits for {:?} but no Java dialog is set (P2 worklist)",
+                game_state.get_id(),
+                format!("{prompt:?}").chars().take(60).collect::<String>()
+            );
+        }
+    }
     let Some(after) = game_state.get_game().cloned() else { return };
     let Some(before) = game_state.synced.clone() else {
         send_game_state(game_state, session_manager);

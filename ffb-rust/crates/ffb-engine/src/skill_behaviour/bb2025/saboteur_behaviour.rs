@@ -142,6 +142,18 @@ impl StepModifierTrait for SaboteurStepModifier {
                     .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_SABOTAGE_BLOCKER_ON_KNOCKDOWN))
                 {
                     state.dialog = Some((attacker_id.clone(), skill, false));
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                            ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                player_id: Some(attacker_id.clone()),
+                                skill: Some(skill),
+                                minimum_roll: 0,
+                                ..Default::default()
+                            },
+                        ),
+                        false,
+                    );
                 }
                 return true;
             }
@@ -202,6 +214,18 @@ impl StepModifierTrait for SaboteurStepModifier {
                     .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_SABOTAGE_BLOCKER_ON_KNOCKDOWN))
                 {
                     state.dialog = Some((defender_id.clone(), skill, true));
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                            ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                player_id: Some(defender_id.clone()),
+                                skill: Some(skill),
+                                minimum_roll: 0,
+                                ..Default::default()
+                            },
+                        ),
+                        true,
+                    );
                 }
                 return true;
             }

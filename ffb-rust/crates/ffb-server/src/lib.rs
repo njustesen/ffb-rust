@@ -10,4 +10,5 @@ pub mod net;
 pub mod request;
 pub mod roster_cache;
 pub mod team_cache;
+pub mod team_setup_cache;
 pub mod util;

@@ -601,6 +601,9 @@ impl StepApplyKickoffResult {
             }
 
             // client-only: show DialogPlayerChoiceParameter(CHARGE) — dialog is client-side
+            // DEVIATION: Java shows DialogPlayerChoiceParameter(actingTeam, CHARGE, eligiblePlayers,
+            // null, nrOfPlayersAllowed) and waits; this path selects nobody and moves on at once,
+            // so no dialog is shown (it would never be answered).
             // For now (random-agent stub): no players selected → skip blitz.
             game.turn_mode = TurnMode::Kickoff;
             return StepOutcome::next();
@@ -642,6 +645,23 @@ impl StepApplyKickoffResult {
                 } else {
                     self.end_kickoff = false;
                     // client-only: DialogInvalidSolidDefenceParameter — headless allows overcount
+                    // Java validSolidDefence: showDialog(new DialogInvalidSolidDefenceParameter(
+                    //   actingTeam.getId(), movedPlayers.size(), nrOfPlayersAllowed), false) when too many moved.
+                    // DEVIATION: Rust's Solid Defence has no player-selection phase, so Java's
+                    // "moved minus selected" amount is the plain moved count here.
+                    if moved_players > self.nr_of_players_allowed {
+                        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                            game,
+                            ffb_model::dialog::dialog_parameter_factory::DialogParameter::InvalidSolidDefence(
+                                ffb_model::dialog::dialog_invalid_solid_defence_parameter::DialogInvalidSolidDefenceParameter {
+                                    team_id: Some(game.active_team().id.clone()),
+                                    amount: moved_players,
+                                    limit: self.nr_of_players_allowed,
+                                },
+                            ),
+                            false,
+                        );
+                    }
                     StepOutcome::cont()
                 }
             } else {
@@ -681,6 +701,9 @@ impl StepApplyKickoffResult {
                 self.nr_of_players_allowed,
             ));
             // client-only: setAnimation(KICKOFF_SOLID_DEFENSE)
+            // DEVIATION: Java bb2025 shows DialogPlayerChoiceParameter(actingTeam, SOLID_DEFENCE,
+            // eligiblePlayers, null, nrOfPlayersAllowed) here; Rust runs the free re-setup flow with
+            // no player-selection phase, so that dialog is not shown.
             StepOutcome::cont().with_event(GameEvent::SolidDefenceRoll {
                 team_id: acting_team_id,
                 roll,

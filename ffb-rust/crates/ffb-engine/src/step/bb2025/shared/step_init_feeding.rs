@@ -92,6 +92,8 @@ impl Step for StepInitFeeding {
 
 impl StepInitFeeding {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         let goto_label = match &self.goto_label_on_end {
             Some(l) => l.clone(),
             None => return StepOutcome::next(),
@@ -136,6 +138,22 @@ impl StepInitFeeding {
                 // ParityRunner) DECLINE every PlayerChoice with an empty selection → no feed/bite. The
                 // previous bare cont() carried no prompt, so the feed choice was resolved another way and
                 // Rust bit a thrall Java never bit (vampire seed 1 i=43: an extra InjuryTypeBitten roll).
+                // Java: UtilServerDialog.showDialog(getGameState(), new DialogPlayerChoiceParameter(
+                //   team.getId(), PlayerChoiceMode.FEED, victimIds, null, 1, 0), false)
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                        ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                            team_id: Some(acting_team.id.clone()),
+                            player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::FEED.get_name().to_string()),
+                            player_ids: all_victims.clone(),
+                            descriptions: vec![],
+                            max_selects: 1,
+                            min_selects: 0,
+                        },
+                    ),
+                    false,
+                );
                 return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::PlayerChoice {
                     eligible_players: all_victims,
                     reason: "FEED".to_string(),

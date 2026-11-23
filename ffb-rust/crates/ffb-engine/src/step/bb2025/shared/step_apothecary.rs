@@ -65,7 +65,8 @@ impl StepApothecary {
             return StepOutcome::next();
         }
 
-        // Java: UtilServerDialog.hideDialog(getGameState()) — no-op in Rust
+        // Java: UtilServerDialog.hideDialog(getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
 
         let mut do_next_step = true;
         let mut pending_events: Vec<GameEvent> = vec![];
@@ -183,6 +184,41 @@ impl StepApothecary {
                 let defender_id = self.injury_result.as_ref()
                     .and_then(|ir| ir.injury_context.defender_id.clone())
                     .unwrap_or_default();
+                {
+                    let (player_state, serious_injury) = {
+                        let ctx = &self.injury_result.as_ref().unwrap().injury_context;
+                        (ctx.injury, ctx.serious_injury)
+                    };
+                    // Java: ApothecaryType.forPlayer(game, defender, playerState)
+                    let apothecary_types = match (game.player(&defender_id), player_state) {
+                        (Some(defender), Some(ps)) => {
+                            use ffb_mechanics::apothecary_mechanic::ApothecaryMechanic as _;
+                            match game.rules {
+                                ffb_model::enums::Rules::Bb2016 => ffb_mechanics::bb2016::apothecary_mechanic::ApothecaryMechanic::new()
+                                    .apothecary_types(game, defender, ps),
+                                ffb_model::enums::Rules::Bb2020 => ffb_mechanics::bb2020::apothecary_mechanic::ApothecaryMechanic::new()
+                                    .apothecary_types(game, defender, ps),
+                                _ => ffb_mechanics::bb2025::apothecary_mechanic::ApothecaryMechanic::new()
+                                    .apothecary_types(game, defender, ps),
+                            }
+                        }
+                        _ => Vec::new(),
+                    };
+                    // Java: UtilServerDialog.showDialog(getGameState(), new DialogUseApothecaryParameter(defenderId,
+                    //   playerState, seriousInjury, apothecaryTypes), true)
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::UseApothecary(
+                            ffb_model::dialog::dialog_use_apothecary_parameter::DialogUseApothecaryParameter {
+                                player_id: Some(defender_id.clone()),
+                                player_state,
+                                serious_injury,
+                                apothecary_types,
+                            },
+                        ),
+                        true,
+                    );
+                }
                 self.injury_result.as_mut().unwrap().injury_context.apothecary_status =
                     ApothecaryStatus::WaitForApothecaryUse;
                 do_next_step = false;
@@ -537,6 +573,30 @@ impl StepApothecary {
                 new_state: Some(new_state_base as u16),
                 new_serious_injury: None,
             });
+            if apothecary_choice {
+                // Java: UtilServerDialog.showDialog(getGameState(), new DialogApothecaryChoiceParameter(
+                //   defender.getId(), fInjuryResult...getPlayerState(), fInjuryResult...getSeriousInjury(),
+                //   newInjuryResult...getPlayerState(), newInjuryResult...getSeriousInjury()), true)
+                // DEVIATION: this step does not interpret the new casualty's serious injury, so
+                // `serious_injury_new` is left None; `player_state_new` is the step's own reading
+                // of the new casualty roll.
+                let (player_state_old, serious_injury_old) = self.injury_result.as_ref()
+                    .map(|ir| (ir.injury_context.injury, ir.injury_context.serious_injury))
+                    .unwrap_or((None, None));
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::ApothecaryChoice(
+                        ffb_model::dialog::dialog_apothecary_choice_parameter::DialogApothecaryChoiceParameter {
+                            player_id: Some(player_id.clone()),
+                            player_state_old,
+                            serious_injury_old,
+                            player_state_new: Some(PlayerState::new(new_state_base)),
+                            serious_injury_new: None,
+                        },
+                    ),
+                    true,
+                );
+            }
         }
 
         if !apothecary_choice {

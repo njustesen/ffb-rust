@@ -186,6 +186,19 @@ impl StepHandleDropPlayerContext {
                 // Java: playerId = game.getActingPlayer().getPlayerId(); skill = modified.getUsedSkill().
                 self.player_id = game.acting_player.player_id.clone();
                 self.skill = skill;
+                // Java: UtilServerDialog.showDialog(getGameState(), new DialogSkillUseParameter(playerId, skill, 0), true)
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                        ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                            player_id: self.player_id.clone(),
+                            skill,
+                            minimum_roll: 0,
+                            ..Default::default()
+                        },
+                    ),
+                    true,
+                );
                 let skill = skill.unwrap_or(ffb_model::enums::SkillId::OldPro);
                 let mut out = StepOutcome::cont().with_prompt(
                     ffb_model::prompts::AgentPrompt::SkillUse {

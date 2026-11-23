@@ -332,7 +332,7 @@ impl StepBlockRoll {
             // `game.defender_id`, so every bb2016 block roll carried a `defenderId` key that
             // Java's report omits (IJsonOption drops nulls) — 2 payload diffs per block.
             game.report_list.add(ReportBlockRoll::new(
-                team_id,
+                team_id.clone(),
                 self.block_roll.clone(),
                 None,
             ));
@@ -340,7 +340,20 @@ impl StepBlockRoll {
 
         // Java: UtilServerDialog.showDialog(gameState, new DialogBlockRollParameter(teamId, fNrOfDice, fBlockRoll,
         //     teamReRollOption, proReRollOption), (fNrOfDice < 0))
-        UtilServerDialog::show_dialog(game, DialogId::BLOCK_ROLL, self.nr_of_dice < 0);
+        UtilServerDialog::show_dialog(
+            game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::BlockRoll(
+                ffb_model::dialog::dialog_block_roll_parameter::DialogBlockRollParameter {
+                    choosing_team_id: Some(team_id),
+                    nr_of_dice: self.nr_of_dice,
+                    block_roll: self.block_roll.clone(),
+                    team_re_roll_option: team_reroll_option,
+                    pro_re_roll_option: pro_reroll_option,
+                    ..Default::default()
+                },
+            ),
+            self.nr_of_dice < 0,
+        );
 
         team_reroll_option
     }

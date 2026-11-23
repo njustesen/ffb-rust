@@ -107,6 +107,23 @@ impl StepInitFuriousOutburst {
                             .map(|c| (c.x, c.y))
                             .unwrap_or((i32::MAX, i32::MAX))
                     });
+                    // DEVIATION: Java passes `foundPlayers` (HashSet order); the dialog gets the
+                    // same ids in the coordinate-sorted order used for the prompt.
+                    let team_id = if game.home_playing { game.team_home.id.clone() } else { game.team_away.id.clone() };
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                        game,
+                        ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                            ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                                team_id: Some(team_id),
+                                player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::FURIOUS_OUTBURST.get_name().to_string()),
+                                player_ids: eligibles.clone(),
+                                descriptions: vec![],
+                                max_selects: 1,
+                                min_selects: 0,
+                            },
+                        ),
+                        false,
+                    );
                     return StepOutcome::cont().with_prompt(
                         ffb_model::prompts::AgentPrompt::PlayerChoice {
                             eligible_players: eligibles,

@@ -212,6 +212,17 @@ impl StepLookIntoMyEyes {
             // Java: UtilServerDialog.showDialog(gameState, new DialogInformationOkayParameter(
             //         "Look Into My Eyes", "Look Into My Eyes failed, you may continue your action", false), false)
             //       if (pushSelect) { ... pushSequence(new Select.SequenceParams(gameState, true)) }
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::InformationOkay(
+                    ffb_model::dialog::dialog_information_okay_parameter::DialogInformationOkayParameter {
+                        title: Some("Look Into My Eyes".to_string()),
+                        messages: Some(vec![Some("Look Into My Eyes failed, you may continue your action".to_string())]),
+                        confirm: false,
+                    },
+                ),
+                false,
+            );
             self.awaiting_ack = true;
             StepOutcome::cont().with_prompt(AgentPrompt::InformationOkay {
                 message: "Look Into My Eyes failed, you may continue your action".into(),

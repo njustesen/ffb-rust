@@ -76,6 +76,8 @@ impl Step for StepTrickster {
                 Action::UseSkill { skill_id: _, use_skill } => {
                     // Java: CLIENT_USE_SKILL from passive player with canMoveBeforeBeingBlocked
                     self.using_trickster = Some(*use_skill);
+                    // Java: UtilServerDialog.hideDialog(getGameState())
+                    crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
                 }
                 Action::TricksterMove { coord } => {
                     if self.eligible_squares.contains(coord) {
@@ -153,6 +155,18 @@ impl StepTrickster {
                 let skill_id = defender_id.as_deref()
                     .and_then(|id| game.player(id))
                     .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_MOVE_BEFORE_BEING_BLOCKED));
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                        ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                            player_id: defender_id.clone(),
+                            skill: skill_id,
+                            minimum_roll: 0,
+                            ..Default::default()
+                        },
+                    ),
+                    true,
+                );
                 return StepOutcome::cont().with_prompt(AgentPrompt::SkillUse {
                     player_id: defender_id.clone().unwrap_or_default(),
                     skill_id: skill_id.map(|s| s as u16).unwrap_or_default(),
@@ -211,6 +225,9 @@ impl StepTrickster {
                     if game.rules == Rules::Bb2025 {
                         // Java bb2025: DialogPickUpChoiceParameter. Both harnesses DECLINE it with
                         // no draw (ParityRunner's PICK_UP_CHOICE arm), so `attemptPickUp = false`.
+                        // DEVIATION: Java's showDialog(DialogPickUpChoiceParameter, true) / the
+                        // matching hideDialog on CLIENT_PICK_UP_CHOICE are not ported -- Rust
+                        // answers the choice inline and never waits, so there is no open dialog.
                         if self.attempt_pick_up.is_none() {
                             self.attempt_pick_up = Some(false);
                         }

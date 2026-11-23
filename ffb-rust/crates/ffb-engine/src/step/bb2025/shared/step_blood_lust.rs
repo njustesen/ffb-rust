@@ -271,6 +271,17 @@ impl StepBloodLust {
             .unwrap_or(false);
 
         if needs_dialog {
+            // Java: UtilServerDialog.showDialog(step.getGameState(), new DialogBloodlustActionParameter(changeToMove), false)
+            let change_to_move = current_action
+                .map(|a| crate::step::bb2025::shared::step_blood_lust::bloodlust_dialog_change_to_move(game.rules, a))
+                .unwrap_or(false);
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::BloodlustAction(
+                    ffb_model::dialog::dialog_bloodlust_action_parameter::DialogBloodlustActionParameter { change_to_move },
+                ),
+                false,
+            );
             self.status = BloodLustStatus::WaitForActionChange;
             let player_id = acting_id.to_string();
             return StepOutcome::cont()

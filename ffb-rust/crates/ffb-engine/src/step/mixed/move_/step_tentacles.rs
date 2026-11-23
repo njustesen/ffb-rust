@@ -54,6 +54,8 @@ impl StepTentacles {
     pub fn new() -> Self { Self::default() }
 
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java TentaclesBehaviour.handleExecuteStepHook: UtilServerDialog.hideDialog(step.getGameState())
+        crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
         // Java: if (state.usingTentacles == null) { ... find tentacles players ... }
         if self.state.using_tentacles.is_none() {
             // Java bb2020: actingPlayer.isDodging() || actingPlayer.isJumping()
@@ -77,6 +79,43 @@ impl StepTentacles {
                     ).into_iter().cloned().collect();
 
                     if !tentaclers.is_empty() {
+                        // Java: teamId = isHomePlaying ? teamAway : teamHome; descriptionArray[i] =
+                        // "(n ST advantage)" / "(equal ST)" / "(n ST disadvantage)" from
+                        // playerArray[i].getStrengthWithModifiers() - actingPlayer.getStrength();
+                        // UtilServerDialog.showDialog(step.getGameState(), new DialogPlayerChoiceParameter(
+                        //   teamId, TENTACLES, playerArray, descriptionArray, 1), !actingTeam.getId().equals(teamId))
+                        let (team_id, acting_team_id) = if game.home_playing {
+                            (game.team_away.id.clone(), game.team_home.id.clone())
+                        } else {
+                            (game.team_home.id.clone(), game.team_away.id.clone())
+                        };
+                        let acting_strength = game.acting_player.strength;
+                        let descriptions: Vec<String> = tentaclers.iter().map(|id| {
+                            let st = game.player(id).map(|p| p.strength_with_modifiers()).unwrap_or(0);
+                            let attribute_diff = st - acting_strength;
+                            if attribute_diff > 0 {
+                                format!("({} ST advantage)", attribute_diff)
+                            } else if attribute_diff == 0 {
+                                "(equal ST)".to_string()
+                            } else {
+                                format!("({} ST disadvantage)", attribute_diff.abs())
+                            }
+                        }).collect();
+                        let stop_timer = acting_team_id != team_id;
+                        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                            game,
+                            ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                                ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                                    team_id: Some(team_id),
+                                    player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::TENTACLES.get_name().to_string()),
+                                    player_ids: tentaclers.clone(),
+                                    descriptions,
+                                    max_selects: 1,
+                                    min_selects: 0,
+                                },
+                            ),
+                            stop_timer,
+                        );
                         let prompt = ffb_model::prompts::AgentPrompt::PlayerChoice {
                             eligible_players: tentaclers,
                             reason: "TENTACLES".into(),

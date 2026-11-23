@@ -135,6 +135,8 @@ impl StepMvp {
                         self.nr_of_home_choices += 1;
                     } else {
                         // Java: showDialog(new DialogPlayerChoiceParameter(home, MVP, playersForMvp, ...))
+                        let team_id = game.team_home.id.clone();
+                        show_mvp_dialog(game, team_id, &players_for_mvp, mvp_nominations);
                         return StepOutcome::cont().with_prompt(mvp_prompt(players_for_mvp));
                     }
                 } else {
@@ -152,6 +154,8 @@ impl StepMvp {
                         self.nr_of_away_choices += 1;
                     } else {
                         // Java: showDialog(new DialogPlayerChoiceParameter(away, MVP, playersForMvp, ...))
+                        let team_id = game.team_away.id.clone();
+                        show_mvp_dialog(game, team_id, &players_for_mvp, mvp_nominations);
                         return StepOutcome::cont().with_prompt(mvp_prompt(players_for_mvp));
                     }
                 } else {
@@ -227,6 +231,27 @@ fn mvp_prompt(players_for_mvp: Vec<String>) -> ffb_model::prompts::AgentPrompt {
         reason: "MVP".into(),
         descriptions: Vec::new(),
     }
+}
+
+/// Java: `int maxSelects = Math.min(mvpNominations, playersForMvp.length);
+/// UtilServerDialog.showDialog(getGameState(), new DialogPlayerChoiceParameter(teamId,
+/// PlayerChoiceMode.MVP, playersForMvp, null, maxSelects, maxSelects), false)`.
+fn show_mvp_dialog(game: &mut Game, team_id: String, players_for_mvp: &[String], mvp_nominations: i32) {
+    let max_selects = mvp_nominations.min(players_for_mvp.len() as i32);
+    crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+        game,
+        ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+            ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                team_id: Some(team_id),
+                player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::MVP.get_name().to_string()),
+                player_ids: players_for_mvp.to_vec(),
+                descriptions: Vec::new(),
+                max_selects,
+                min_selects: max_selects,
+            },
+        ),
+        false,
+    );
 }
 
 fn find_eligible_player_ids(game: &Game, home: bool) -> Vec<String> {

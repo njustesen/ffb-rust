@@ -55,6 +55,8 @@ impl StepKickoff {
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         match self.kickoff_start_coordinate {
             Some(coord) => {
+                // Java: UtilServerDialog.hideDialog(getGameState()) (bb2025 and mixed StepKickoff alike)
+                crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
                 // Java bb2025.StepKickoff:78 `UtilServerGame.updatePlayerStateDependentProperties(this)`.
                 // BB2016/BB2020 run this shared file too, but their Java class is
                 // mixed.kickoff.StepKickoff, which has NO such call: under those editions a Leader

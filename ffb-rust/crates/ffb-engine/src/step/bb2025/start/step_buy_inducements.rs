@@ -122,7 +122,7 @@ pub struct StepBuyInducements {
     /// The dialog `showDialog` opened and that is still waiting for its answer:
     /// (home?, availableGold). Java hands it to `UtilServerDialog.showDialog`; here it becomes
     /// the step's prompt.
-    dialog: Option<(bool, i32)>,
+    dialog: Option<(bool, i32, bool)>,
 }
 
 impl StepBuyInducements {
@@ -154,6 +154,25 @@ impl StepBuyInducements {
 
         if self.phase_name == "DONE" {
             return self.leave_step(game);
+        }
+        if let Some((home, available_gold, uses_treasury)) = self.dialog {
+            // Java showDialog(...): UtilServerDialog.showDialog(getGameState(), new
+            // DialogBuyPrayersAndInducementsParameter(team.getId(), availableGold, usesUnlimitedTreasury,
+            // pettyCash, treasury), false)
+            let team_id = if home { game.team_home.id.clone() } else { game.team_away.id.clone() };
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::BuyPrayersAndInducements(
+                    ffb_model::dialog::dialog_buy_prayers_and_inducements_parameter::DialogBuyPrayersAndInducementsParameter {
+                        team_id: Some(team_id),
+                        available_gold,
+                        petty_cash: self.petty_cash,
+                        treasury: self.treasury,
+                        uses_treasury,
+                    },
+                ),
+                false,
+            );
         }
         self.build_prompt(game)
     }
@@ -244,7 +263,7 @@ impl StepBuyInducements {
         let team = if home { &game.team_home } else { &game.team_away };
         let can_buy_inducements = minimum_inducement_cost(game, team) <= available_gold;
         if can_buy_inducements {
-            self.dialog = Some((home, available_gold));
+            self.dialog = Some((home, available_gold, uses_unlimited_treasury));
             return true;
         }
         false
@@ -274,7 +293,7 @@ impl StepBuyInducements {
     /// dialog's `availableGold`.
     fn build_prompt(&self, game: &Game) -> StepOutcome {
         let (home, budget) = match self.dialog {
-            Some(d) => d,
+            Some((home, budget, _)) => (home, budget),
             // Java never leaves executeStep in HOME/AWAY without an open dialog.
             None => return StepOutcome::cont(),
         };
@@ -464,6 +483,10 @@ impl Step for StepBuyInducements {
         // team's purchase straight away: `addReport(generateReport(team, used, newTv, prayers))`.
         // headless: parallel-mode buffering not implemented — see module docs.
         let mut events = Vec::new();
+        // Java: any other command is UNHANDLED -- executeStep does not run again.
+        if !matches!(action, Action::BuyInducements { .. }) {
+            return self.build_prompt(game);
+        }
         if let Action::BuyInducements { home, purchases } = action {
             events = self.apply_purchase(game, *home, purchases);
             if !self.parallel {

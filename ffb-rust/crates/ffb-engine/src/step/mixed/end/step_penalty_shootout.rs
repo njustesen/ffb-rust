@@ -45,6 +45,8 @@ impl StepPenaltyShootout {
             const SHOOTOUT_LIMIT: i32 = 5;
             let mut penalty_score_home = 0i32;
             let mut penalty_score_away = 0i32;
+            // Java: DialogPenaltyShootoutParameter parameter = new DialogPenaltyShootoutParameter();
+            let mut parameter = ffb_model::dialog::dialog_penalty_shootout_parameter::DialogPenaltyShootoutParameter::default();
 
             while penalty_score_home + penalty_score_away < SHOOTOUT_LIMIT {
                 // Java: int currentPenalty = penaltyScoreAway + penaltyScoreHome + 1 (1-indexed round)
@@ -80,6 +82,11 @@ impl StepPenaltyShootout {
 
                 let round_str = Self::to_ordinal(current_penalty);
 
+                // Java: if (homeTeamWonPenalty != null) parameter.addShootout(rollHome, rollAway, homeTeamWonPenalty, round)
+                if let Some(home_won) = home_team_won_penalty {
+                    parameter.add_shootout(roll_home, roll_away, home_won, round_str.clone());
+                }
+
                 // Java: getResult().addReport(new ReportPenaltyShootout(rollHome, penaltyScoreHome, rollAway, penaltyScoreAway, homeTeamWonPenalty, round, teamId))
                 game.report_list.add(ReportPenaltyShootout::new(
                     roll_home,
@@ -91,6 +98,19 @@ impl StepPenaltyShootout {
                     winning_team,
                 ));
             }
+
+            // Java: parameter.setAwayScore/setHomeScore/setWinningSound(SPEC_CLAP)/setLosingSound(SPEC_AAH)/
+            //       setHomeTeamWins(home > away); UtilServerDialog.showDialog(getGameState(), parameter, false)
+            parameter.away_score = penalty_score_away;
+            parameter.home_score = penalty_score_home;
+            parameter.winning_sound = Some(ffb_model::model::SoundId::SPEC_CLAP);
+            parameter.losing_sound = Some(ffb_model::model::SoundId::SPEC_AAH);
+            parameter.home_team_wins = penalty_score_home > penalty_score_away;
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::PenaltyShootout(parameter),
+                false,
+            );
 
             // Java: after the loop sets CONTINUE (dialog); we skip the dialog
             // and fall through to NEXT_STEP since Rust has no client confirmation.
