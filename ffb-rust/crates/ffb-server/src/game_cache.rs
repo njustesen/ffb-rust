@@ -206,7 +206,7 @@ impl GameCache {
         let mut team = team_cache
             .get_team_by_id_for_game(team_id, game)
             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, format!("no team found for id {team_id}")))??;
-        Self::update_roster(&mut team, roster_cache)?;
+        Self::update_roster(&mut team, game, roster_cache)?;
         Ok(team)
     }
 
@@ -215,7 +215,7 @@ impl GameCache {
     pub fn get_teams_for_coach(coach: &str, team_cache: &TeamCache, roster_cache: &RosterCache) -> std::io::Result<Vec<Team>> {
         let mut teams = team_cache.get_teams_for_coach(coach)?;
         for team in &mut teams {
-            Self::update_roster(team, roster_cache)?;
+            Self::update_roster(team, None, roster_cache)?;
         }
         Ok(teams)
     }
@@ -223,10 +223,15 @@ impl GameCache {
     /// Java: `private Team updateRoster(Team team, Game game)` (standalone-mode branch only —
     /// `ServerMode.FUMBBL == getServer().getMode()` is a no-op in that mode, matching this
     /// crate's standalone-only disk-XML roster pipeline).
-    fn update_roster(team: &mut Team, roster_cache: &RosterCache) -> std::io::Result<()> {
-        let roster = roster_cache.get_roster_for_team(&team.id, &team.roster_id)?;
+    fn update_roster(team: &mut Team, game: Option<&Game>, roster_cache: &RosterCache) -> std::io::Result<()> {
+        let roster = roster_cache.get_roster_for_team_for_game(&team.id, &team.roster_id, game)?;
         let reroll_cost = roster.reroll_cost;
         team.update_roster(&roster);
+        // Java `Team.updateRoster`: `fRoster = pRoster` -- the team carries its roster (the
+        // client reads it from the game state: positions, icons).
+        team.vampire_lord = roster.has_vampire_lord();
+        team.necromancer = roster.has_necromancer();
+        team.roster = Some(Box::new(roster));
         team.team_value = ffb_model::util::util_team_value::UtilTeamValue::find_team_value_with_reroll_cost(team, reroll_cost);
         Ok(())
     }

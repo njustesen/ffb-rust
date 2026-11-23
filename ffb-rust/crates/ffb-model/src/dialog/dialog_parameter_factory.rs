@@ -292,6 +292,28 @@ impl DialogParameter {
         }
     }
 
+    /// Java `IDialogParameter.transform()` (the away coach's view). Every dialog but these four
+    /// returns a copy of itself in Java.
+    pub fn transform(&self) -> DialogParameter {
+        match self {
+            DialogParameter::KickSkill(p) => DialogParameter::KickSkill(p.transform_typed()),
+            DialogParameter::SelectKeyword(p) => DialogParameter::SelectKeyword(p.transform_typed()),
+            DialogParameter::SelectPosition(p) => DialogParameter::SelectPosition(p.transform_typed()),
+            DialogParameter::PenaltyShootout(p) => DialogParameter::PenaltyShootout(DialogPenaltyShootoutParameter {
+                home_rolls: p.away_rolls.clone(),
+                away_rolls: p.home_rolls.clone(),
+                home_won: p.home_won.iter().map(|w| !w).collect(),
+                descriptions: p.descriptions.clone(),
+                home_score: p.away_score,
+                away_score: p.home_score,
+                home_team_wins: !p.home_team_wins,
+                winning_sound: p.winning_sound,
+                losing_sound: p.losing_sound,
+            }),
+            other => other.clone(),
+        }
+    }
+
     /// Java `IDialogParameter.toJsonValue()`.
     pub fn to_json_value(&self, rules: Rules) -> Result<Value, String> {
         match self {

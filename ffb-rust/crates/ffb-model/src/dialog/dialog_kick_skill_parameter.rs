@@ -20,7 +20,7 @@ impl DialogKickSkillParameter {
 impl DialogKickSkillParameter {
     /// Mirrors Java's `transform()`: player id is passed through unchanged, but both
     /// ball coordinates are mirrored via `FieldCoordinate.transform()`.
-    fn transform_typed(&self) -> DialogKickSkillParameter {
+    pub fn transform_typed(&self) -> DialogKickSkillParameter {
         DialogKickSkillParameter {
             player_id: self.player_id.clone(),
             ball_coordinate: self.ball_coordinate.map(|c| c.transform()),

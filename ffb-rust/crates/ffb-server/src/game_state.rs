@@ -47,6 +47,9 @@ pub struct GameState {
     /// `Game` that `GameCache.addTeamToGame` fills at join. Moved into the engine driver by
     /// `start_joined_game`; `get_game` reads the driver's game from then on.
     pending_game: Game,
+    /// The game as the clients last received it (a `serverGameState` or the end state of the last
+    /// `serverModelSync`). BACKLOG §P P3: the next sync is `diff(synced, game)`.
+    pub synced: Option<Game>,
 }
 
 impl GameState {
@@ -59,6 +62,7 @@ impl GameState {
             game_log: GameLog::new(),
             status: None,
             pending_game: new_server_game(),
+            synced: None,
         }
     }
 

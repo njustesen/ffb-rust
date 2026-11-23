@@ -58,7 +58,6 @@ use crate::net::commands::any_internal_server_command::AnyInternalServerCommand;
 use crate::net::replay_session_manager::ReplaySessionManager;
 use crate::net::server_communication::ServerCommunication;
 use crate::net::session_manager::SessionManager;
-use crate::net::wire::{OutgoingModelSync, events_to_reports};
 use crate::request::fumbbl::util_fumbbl_request::{HttpClient, LazyReqwestHttpClient, ReqwestHttpClient};
 use crate::request::server_request_processor::ServerRequestProcessor;
 use crate::roster_cache::RosterCache;
@@ -622,37 +621,22 @@ impl ServerCommandHandlerFactory {
             }
         };
 
-        let events = {
-            let mut gc = self.game_cache.lock().unwrap();
-            match gc.get_game_state_by_id_mut(game_id) {
-                Some(gs) => match gs.handle_action(side, action) {
-                    Ok(evts) => evts,
-                    Err(e) => {
-                        log::warn!("engine rejected action from session {}: {}", session_id, e);
-                        return;
-                    }
-                },
-                None => {
-                    log::warn!("session {} sent command but game {} not found", session_id, game_id);
-                    return;
-                }
-            }
+        let mut gc = self.game_cache.lock().unwrap();
+        let Some(gs) = gc.get_game_state_by_id_mut(game_id) else {
+            log::warn!("session {} sent command but game {} not found", session_id, game_id);
+            return;
         };
-
-        let command_nr = {
-            let mut gc = self.game_cache.lock().unwrap();
-            gc.get_game_state_by_id_mut(game_id).map(|gs| gs.generate_command_nr()).unwrap_or(0)
-        };
-
-        let reports = events_to_reports(&events);
-        let sync = OutgoingModelSync::new(command_nr, reports);
-        match serde_json::to_string(&sync) {
-            Ok(json) => {
-                let sm = self.session_manager.lock().unwrap();
-                sm.send_all(game_id, &json);
-            }
-            Err(e) => log::error!("failed to serialize model sync: {}", e),
+        log::debug!("game {game_id}: engine <- {action:?} ({side:?})");
+        if let Err(e) = gs.handle_action(side, action) {
+            log::warn!("engine rejected action from session {}: {}", session_id, e);
+            return;
         }
+        log::debug!(
+            "game {game_id}: engine done, prompt {:?}",
+            gs.driver.as_ref().and_then(|d| d.current_prompt()).map(|p| format!("{p:?}").chars().take(160).collect::<String>())
+        );
+        // Java: the step's model changes reach the clients via `UtilServerGame.syncGameModel`.
+        crate::util::server_game_sync::sync_game(gs, &self.session_manager);
     }
 
     /// Java: the `InternalServerCommand` half of `handleCommand`'s dispatch — routes each

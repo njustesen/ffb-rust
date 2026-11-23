@@ -47,6 +47,17 @@ impl RosterCache {
     ///
     /// `team_id`/`roster_id` stand in for `team.getId()`/`team.getRosterId()`.
     pub fn get_roster_for_team(&self, team_id: &str, roster_id: &str) -> io::Result<Roster> {
+        self.get_roster_for_team_for_game(team_id, roster_id, None)
+    }
+
+    /// Java: `getRosterForTeam(Team team, Game game)` with the game the roster XML is parsed
+    /// against (its ruleset decides which position skills exist).
+    pub fn get_roster_for_team_for_game(
+        &self,
+        team_id: &str,
+        roster_id: &str,
+        game: Option<&ffb_model::model::game::Game>,
+    ) -> io::Result<Roster> {
         // In newer versions of the XML format, the `<rosterId>` is not used (but is still
         // present). So we first check for the presence of a roster matching the team id,
         // and only if no roster is found, do we fall back to looking up the roster using
@@ -59,7 +70,7 @@ impl RosterCache {
         match roster_file {
             Some(file) => {
                 let content = fs::read_to_string(file)?;
-                let parsed = XmlHandler::parse(None, &content, Box::new(Roster {
+                let parsed = XmlHandler::parse(game, &content, Box::new(Roster {
                     id: String::new(),
                     name: String::new(),
                     race: String::new(),

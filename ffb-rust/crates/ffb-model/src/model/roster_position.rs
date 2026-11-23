@@ -180,7 +180,12 @@ impl IXmlReadable for RosterPosition {
                 self.inside_skill_list_tag = false;
             }
             if tag == XML_TAG_SKILL {
-                if let Some(skill_id) = SkillFactory::new().for_name(value) {
+                // Java: `game.getRules().getFactory(SKILL).forName(pValue)` -- a skill the game's
+                // ruleset does not know is null and dropped. Without a game every known skill is kept.
+                let skill = SkillFactory::new().for_name(value).filter(|id| {
+                    game.map_or(true, |g| SkillFactory::name_in(g.rules, *id).is_some())
+                });
+                if let Some(skill_id) = skill {
                     let sw = match self.current_skill_value.take() {
                         Some(v) => SkillWithValue::with_value(skill_id, v),
                         None => SkillWithValue::new(skill_id),

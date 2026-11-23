@@ -12028,6 +12028,37 @@ parity, which §I-§M closed.
 - **P5 done-check** `scripts/gui_check.py` (written before P4 closes) + docs + push.
 
 ### RESUME HERE
+**2026-11-23 (3), P3 sync machinery live; the pregame runs to the coin toss. Next: P2 dialogs.**
+
+Done (3):
+- `ffb-model/src/model/change/model_change_diff.rs`: `diff` (Java-JSON, table per sub-model; uncovered
+  path -> `Err`), `self_check` (ModelChangeProcessor replay), `transform_change`/`transform_list` (Java
+  `ModelChangeProcessor.transform`), `list_to_json_value`; `DialogParameter::transform`. Property test: the
+  transformed list on the transformed game reproduces the transformed result.
+- `ffb-server/src/util/server_game_sync.rs`: `send_game_state` (home+spectators plain, away transformed,
+  sets `GameState::synced`), `sync_game` after every engine command (diff -> self-check -> `serverModelSync`
+  home/away, else whole game with a WARN naming the path). Reports are NOT sent yet (empty `reportList`:
+  the Java client decodes every report via ReportFactory -- only Java-shaped reports may go out).
+- Both Java clients crashed on the game state (NPE `Roster.getPositions`): Java `Team.updateRoster` keeps
+  `fRoster`; the server path now does too. Roster XML (like team XML) is parsed against the game, so
+  position skills the ruleset lacks (`Stakes` in BB2025) are dropped as `RosterPosition.endXmlElement` does.
+- `scratchpad/probe.ps1 -seconds N`: one-call live probe (server cwd ffb-java/ffb/ffb-server + two AiMain),
+  prints the filtered server log; the server logs each engine action and the pending prompt.
+
+Live result: both clients send ClientStartGame; the engine runs the pregame to `BuyPrayersAndInducements`
+(away, then home) and `CoinChoice`. First uncovered path: `teamResultHome.pettyCashFromTvDiff` (no Java
+model change -- check how Java's client learns it; probably the whole game is right there too).
+
+Next units:
+1. **P2 dialogs**: map the pending `AgentPrompt` to the `DialogParameter` the Java step's
+   `UtilServerDialog.showDialog` sets (CoinChoice -> DialogCoinChoiceParameter, BuyPrayersAndInducements ->
+   DialogBuyPrayersAndInducementsParameter, ...), set it on the game before `sync_game`; clear it (null) when
+   no prompt maps -- the client keeps re-sending ClientStartGame while START_GAME stays set.
+2. **Engine leniency (bug)**: the driver accepted the clients' stray `StartGame` actions as answers to the
+   `BuyPrayersAndInducements` prompts. Java steps ignore unhandled commands; the driver must reject an action
+   that does not answer the pending prompt, with no side effects.
+3. Reports in Java shape (the report-parity runs already produce Java report JSON -- reuse that writer).
+
 **2026-11-23 (2), P1 gate reached: two real Java clients log in, pick teams, get the field, start the game.**
 
 Done this unit:
@@ -12051,10 +12082,24 @@ Live probe (two clients): `scratchpad/run_server.cmd` (cd to ffb-java/ffb/ffb-se
 `serverJoin`, both get a full Java-shaped `serverGameState`, both send `ClientStartGame`.
 
 Next units, in order:
-1. **`Game.transform()`** (Java `Game.transform`, `FieldModel.transform`, ...): the AWAY session gets
-   `gameStateCommand.transform()` / `syncCommand.transform(rules)` (`ServerCommunication.sendGameState` /
-   `sendModelSync`). Not ported anywhere yet (the dialog parameters already have `transform`).
-2. **P3 model sync.** Today every engine command produces an EMPTY `serverModelSync` from the hand-rolled
+1. DONE (`Game.transform`/`FieldModel.transform` 1:1 + `ServerCommandGameState.transform`; startGame's
+   broadcast sends the away coach the transformed game). Still open: `ServerCommandModelSync.transform(rules)`
+   (comes with unit 2).
+2. **P3 model sync.** DESIGN (decided 2026-11-23):
+   - `ffb-model/src/model/change/model_change_diff.rs`: `diff(before: &Game, after: &Game) -> ModelChangeList`,
+     typed, one section per Java sub-model (game scalars incl. `dialogParameter`, turn data home/away,
+     acting player, field model: ball/bomb/weather, player coordinates + states, the square lists as
+     add/remove; team + player results; inducement sets; options). Emission ORDER follows the order a
+     Java step would set them as far as it matters to the client (state before coordinate for a player
+     entering the field is irrelevant to the end state; the client renders after the whole list).
+   - SELF-CHECK on every sync: decode + `ModelChangeProcessor.apply` the list onto a clone of `before`;
+     `to_json_value()` must equal `after.to_json_value()`. On mismatch (a not-yet-covered sub-model),
+     log it and send a full `serverGameState` (home + spectators plain, away transformed) instead of the
+     sync -- the clients stay correct while the diff's coverage grows; the mismatch log is the worklist.
+   - Dialogs: the engine returns `AgentPrompt`s and never sets `Game.dialog_parameter` -- map the pending
+     prompt to Java's `DialogParameter` (what `UtilServerDialog.showDialog` would have set) before the
+     diff; that's P2 and needs the Java step's dialog constructor per prompt.
+   Original note: Today every engine command produces an EMPTY `serverModelSync` from the hand-rolled
    `net/wire.rs` bridge (non-Java key order too), so the clients never see the pregame advance. Plan:
    snapshot `Game` before each command, diff after -> Java `ModelChangeList`; self-check every sync by
    applying it with the ported `ModelChangeProcessor` to the before-game and comparing
