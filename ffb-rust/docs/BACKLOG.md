@@ -11623,7 +11623,41 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
   **Result: `fumbbl/` 6/10 identical, 0 different, 4 stop at serverAddPlayer; 9 night replays chosen for
   Dodgy Snack / Intensive Training / prayers: 8 identical, 1 stops at serverAddPlayer.**
 
+### O2 log — iteration 14 (2026-11-23 ~01:00): serverAddPlayer + Zap/Unzap
+- **`replay/add_player.rs`** = `FumbblReplayParser.handleAddPlayer` (`ClientCommandHandlerAddPlayer`) 1:1 with
+  `ServerCommandAddPlayer.initFrom`: team by id (home if equal, else away); unknown id -> `Team::add_player`
+  (`Err` when another player holds the nr: Java's fPlayerByNr/fPlayerById split is not representable) +
+  `Player::update_position_with_stats` = `RosterPlayer.updatePosition(updateStats = true)`: position stats,
+  `addSkill` of the position skills (STAT_INCREASE skills -- the five `*Increase` -- always appended, others
+  only if absent), skill `PlayerModifier`s = NONE (no common Skill registers one; the stat-increase
+  `SkillBehaviour` modifiers exist only after `UtilSkillBehaviours.registerBehaviours`, which the parser JVM
+  never calls), lasting injuries through the ruleset's StatsMechanic (bb2016 `(old - cur) < 2` and max(v-1,min);
+  mixed always, AG/PA min(v+1,max)); a known RosterPlayer -> `Player::init_roster_player` = `RosterPlayer.init`.
+  Then `FieldModel.setPlayerState` (null state with no old state = `Err`, not representable), `UtilBox`, and
+  the player result's sendToBox reason/turn/half.
+- **`replay/zap_player.rs`** = handleZapPlayer / handleUnzapPlayer 1:1. Representation = the engine's
+  (`Game.add_zapped_player`: frog copy in the team, original in `Game.zapped_players`); `Team::to_json_value_with`
+  writes Java's `ZappedPlayer.toJsonValue` (`{"playerKind":"zappedPlayer","player":<original>}`); the
+  processor's `player_mut` returns the ORIGINAL for a zapped id (every mutator it calls delegates in Java),
+  the acting-player strength of a zapped player = position ST + the original's modifiers.
+- Results: `fumbbl/` **10/10 identical**, partial + window 9/9, the 15 corpus zap replays 15/15.
+  `cargo test --workspace` green (15,136). Commits `913281cae`, `8eac99a97`.
+
 ### RESUME HERE
+**This iteration (2026-11-23, loop iteration 14):** serverAddPlayer + Zap/Unzap ported (see "O2 log —
+iteration 14"). **RUNNING (detached, PID 16428, `.loop_wait.json` until 06:30):** the whole-corpus states run
+`D:/ffb_replay_parity/bin/ffb-replay-zap.exe states D:/ffb_replay_parity/rust_states_all2
+D:/ffb_replay_parity/run5_java <5 corpus dirs>` (launcher `D:/ffb_replay_parity/tools/launch_states_all.ps1`),
+started 01:00, ~9 replays/min -> done ~05:15. Read `D:/ffb_replay_parity/rust_states_all2.log` (DIFF/ERROR
+lines, then "error kinds" and the final `states: N identical, D different, E errors` line; progress every 100
+on `.err`). Diverging states are dumped as `rust_states_all2/<id>.<index>.rust.json`.
+**Next:** (1) classify every ERROR/DIFF kind of that run and fix them class by class (known still-`Err`:
+fieldModelAddWisdom (1 change), cards, gameOptionsAddOption; `Team::add_player` nr collision; null add-player
+state); (2) when states are 2,224/2,224 -> O3 (actions: `FumbblReplayParser.parseFile` record logic,
+`GameStateSerializer`, the builders).
+Open engine findings for later gates: `SkillId::usage_type_for` (iteration 13), prayer-name compare (iteration 6).
+
+> History -- RESUME HERE of 2026-11-23 (loop iteration 13), superseded:
 **This iteration (2026-11-23, loop iteration 13):** O2(b) started -- ModelChangeProcessor + `ffb-replay states`
 gate (see "O2 log — iteration 13"). Nothing running; no `.loop_wait.json`.
 **Next, in this order (each = 1:1 port from the .java + unit tests + `ffb-replay states` on `D:/ffb_replays/fumbbl`,
