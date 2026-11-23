@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use ffb_model::enums::NetCommandId;
 use ffb_model::types::constants::VERSION;
+use ffb_protocol::commands::server_command_version::ServerCommandVersion;
 
 use crate::model::received_command::SessionId;
 use crate::net::session_manager::SessionManager;
@@ -43,13 +44,9 @@ impl ServerCommandHandlerRequestVersion {
     pub fn handle_command(&self, session_id: SessionId) -> bool {
         // Java iterates `getServer().getPropertyKeys()` collecting the ones prefixed
         // `"client."`; `self.client_properties` already holds exactly that filtered set.
-        let version_msg = serde_json::json!({
-            "netCommandId": "serverVersion",
-            "serverVersion": VERSION,
-            "clientVersion": VERSION,
-            "clientProperties": self.client_properties,
-            "isTestServer": self.is_test_server,
-        });
+        // Java: `sendVersion(session, VERSION, VERSION, names, values, isServerInTestMode())`.
+        let version_msg = ServerCommandVersion::new(VERSION, VERSION, self.client_properties.clone(), self.is_test_server)
+            .to_json_value();
 
         self.session_manager
             .lock()
@@ -93,11 +90,9 @@ mod tests {
         assert_eq!(value["netCommandId"], "serverVersion");
         assert_eq!(value["serverVersion"], VERSION);
         assert_eq!(value["clientVersion"], VERSION);
-        assert_eq!(value["isTestServer"], true);
-        assert_eq!(
-            value["clientProperties"]["client.showReplayButton"],
-            "true"
-        );
+        assert_eq!(value["testing"], true);
+        assert_eq!(value["clientPropertyNames"][0], "client.showReplayButton");
+        assert_eq!(value["clientPropertyValues"][0], "true");
     }
 
     #[test]
@@ -109,7 +104,7 @@ mod tests {
 
         let msg = rx.try_recv().unwrap();
         let value: serde_json::Value = serde_json::from_str(&msg).unwrap();
-        assert_eq!(value["isTestServer"], false);
-        assert!(value["clientProperties"].as_object().unwrap().is_empty());
+        assert_eq!(value["testing"], false);
+        assert!(value["clientPropertyNames"].as_array().unwrap().is_empty());
     }
 }

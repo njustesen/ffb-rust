@@ -1,5 +1,7 @@
-/// Protocol version string (mirrors FantasyFootballConstants.VERSION from common.properties).
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+/// Java: `FantasyFootballConstants.VERSION` = `common.properties` `version=${project.version}`,
+/// i.e. the ffb-java Maven project version (`ffb-java/ffb/pom.xml`). The Java client refuses a
+/// server whose `serverVersion` is lower than its own, so this must track the Java pom, not Cargo.
+pub const VERSION: &str = "3.2.0";
 
 /// Maximum number of players per team on the field.
 pub const MAX_PLAYERS_ON_PITCH: usize = 11;

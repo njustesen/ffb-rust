@@ -1,38 +1,11 @@
 /// 1:1 translation of com.fumbbl.ffb.server.handler.ServerCommandHandlerFactory.
 ///
-/// Routes incoming `ClientCommand`s to the appropriate handler:
-/// - Ping → delegates to the real `ServerCommandHandlerPing`.
-/// - Join → the very first `ClientJoin` on a connection is handled upstream in
-///   `command_socket.rs` before enqueue (see that file's own doc comment); a *repeat*
-///   `ClientJoin` sent after the session already joined reaches this factory's
-///   `ClientCommand::ClientJoin` arm, which delegates to the same real
-///   `ServerCommandHandlerJoin` Java itself uses for every `Join` (Java's
-///   `ServerCommandHandlerJoin` doesn't special-case the first message the way
-///   `command_socket.rs` does — that split is a Rust-specific optimization, not a Java
-///   behavior difference), whose success path redispatches
-///   `InternalServerCommandJoinApproved` back through `handle_internal_command` below.
-/// - Talk, CloseSession, TransferReplayControl, RequestVersion,
-///   PasswordChallenge → delegate to their real `ServerCommandHandler*` structs
-///   (Phase ZVA, session/game-lifecycle family). Each needed its own
-///   `ffb_protocol::client_commands::ClientCommand` variant added (mirroring
-///   the field shape of the corresponding `ffb_protocol::commands::*` struct
-///   the handler was originally translated against) since that wire enum had
-///   no variant for them at all.
-/// - DeleteGame → an `AnyInternalServerCommand`, not a `ClientCommand`; wired
-///   into `handle_internal_command`'s match instead.
-/// - Gameplay commands → decoded to `Action` and fed to the engine directly
-///   (this pipeline doesn't correspond to any single Java `ServerCommandHandler*`
-///   class — it's the Rust-specific consolidated action dispatch).
-///
-/// **Command-hierarchy reconciliation: complete.** Every real `ServerCommandHandler*`
-/// struct under `crate::handler` is now reachable from live dispatch — either from this
-/// factory's `handle_command`/`handle_internal_command` (via a bridging
-/// `ffb_protocol::commands::*` struct built from the newer `ffb_protocol::client_commands::
-/// ClientCommand` wire enum, the pattern every prior batch of this effort used) or, for
-/// `SocketClosed` (which isn't a `ClientCommand` at all — it's an internal event on socket
-/// close), from `command_socket.rs`'s connection-cleanup path enqueuing
-/// `AnyInternalServerCommand::SocketClosed` onto this same dispatch queue (see that file's
-/// own doc comment).
+/// Routes each `ReceivedCommand` (a Java-mirror `AnyClientCommand` decoded by `command_socket`, or
+/// an internal server command) to its `ServerCommandHandler*`, as Java looks handlers up by
+/// `NetCommandId`. Session-level commands (ping, join, talk, version, password challenge, sketches,
+/// markings, replay, user settings) go to their handlers; game commands are turned into engine
+/// `Action`s by `decode_command` (the Rust engine takes `Action`s where Java hands the command to
+/// the current step; BACKLOG §P P4 completes that mapping).
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
@@ -43,7 +16,8 @@ use ffb_engine::replay_state::ReplayState;
 use ffb_engine::server_replayer::ServerReplayer;
 use ffb_engine::server_sketch_manager::ServerSketchManager;
 use ffb_model::enums::{PlayerAction, SkillId};
-use ffb_protocol::client_commands::ClientCommand;
+use ffb_protocol::commands::any_client_command::AnyClientCommand;
+use ffb_protocol::net_command::NetCommand;
 use crate::db::db_connection_manager::DbConnectionManager;
 use crate::game_cache::GameCache;
 use crate::handler::server_command_handler_add_loaded_team::ServerCommandHandlerAddLoadedTeam;
@@ -300,7 +274,10 @@ impl ServerCommandHandlerFactory {
             request_version_client_properties,
             false,
         );
-        let password_challenge_handler = ServerCommandHandlerPasswordChallenge::new(Arc::clone(&session_manager));
+        // The Rust server runs Java's `ServerMode.STANDALONE` only (no FUMBBL auth backend),
+        // so the challenge is always null, exactly as Java's standalone branch sends it.
+        let password_challenge_handler =
+            ServerCommandHandlerPasswordChallenge::with_fumbbl_mode(Arc::clone(&session_manager), false);
 
         // ── Sketch/marker handler family (Phase ZVB) ────────────────────────
         let add_sketch_handler = ServerCommandHandlerAddSketch::new(
@@ -509,67 +486,36 @@ impl ServerCommandHandlerFactory {
             sm.get_game_id_for_session(session_id)
         };
 
+        // Java: `ServerCommandHandlerFactory.handleCommand` looks the handler up by
+        // `NetCommandId` and hands it the decoded `NetCommand`; every handler below takes the
+        // Java-mirror `ClientCommand*` struct exactly as `NetCommandFactory.forJsonValue` built it.
         match &client_command {
-            ClientCommand::ClientPing(ping) => {
-                // Delegates to the real 1:1-translated ServerCommandHandlerPing
-                // (session/replay last-ping bookkeeping + pong reply), instead of
-                // duplicating that logic inline.
+            AnyClientCommand::ClientPing(ping) => {
                 self.ping_handler.handle_command(session_id, ping.timestamp);
                 return;
             }
-            ClientCommand::ClientJoin(j) => {
-                // The very first ClientJoin on a connection is handled upstream in
-                // command_socket.rs before being enqueued (see this file's module doc
-                // comment) — reaching this arm means a session already registered sent
-                // *another* Join, which Java's ServerCommandHandlerJoin (unlike
-                // command_socket.rs) doesn't special-case: it redispatches through the same
-                // handler every time, so this does too.
-                let cmd = ffb_protocol::commands::client_command_join::ClientCommandJoin {
-                    entropy: None,
-                    coach: Some(j.coach.clone()),
-                    password: j.password_hash.clone(),
-                    game_name: if j.game_id.is_empty() { None } else { Some(j.game_id.clone()) },
-                    team_id: if j.team_id.is_empty() { None } else { Some(j.team_id.clone()) },
-                    team_name: None,
-                    game_id: 0,
-                    // java: the wire `ClientJoin` struct (ffb_protocol::client_commands::ClientJoin)
-                    // has no `client_mode` field (unlike the older `ClientCommandJoin` this handler
-                    // was translated against), so a re-join can never resolve as REPLAY here —
-                    // documented gap in the wire struct itself, not fabricated logic.
-                    client_mode: None,
-                };
-                self.join_handler.handle_command(&cmd, session_id).await;
+            AnyClientCommand::ClientJoin(cmd) => {
+                self.join_handler.handle_command(cmd, session_id).await;
                 return;
             }
-            ClientCommand::ClientTalk(t) => {
-                let cmd = ffb_protocol::commands::client_command_talk::ClientCommandTalk {
-                    entropy: None,
-                    talk: t.talk.clone(),
-                };
-                self.talk_handler.handle_command(session_id, &cmd);
+            AnyClientCommand::ClientTalk(cmd) => {
+                self.talk_handler.handle_command(session_id, cmd);
                 return;
             }
-            ClientCommand::ClientCloseSession(_) => {
+            AnyClientCommand::ClientCloseSession(_) => {
                 self.close_session_handler.handle_command(session_id);
                 return;
             }
-            ClientCommand::ClientTransferReplayControl(t) => {
-                let cmd = ffb_protocol::commands::client_command_transfer_replay_control::ClientCommandTransferReplayControl {
-                    entropy: None,
-                    coach: t.coach.clone(),
-                };
-                self.transfer_control_handler.handle_command(session_id, &cmd);
+            AnyClientCommand::ClientTransferReplayControl(cmd) => {
+                self.transfer_control_handler.handle_command(session_id, cmd);
                 return;
             }
-            ClientCommand::ClientRequestVersion(_) => {
+            AnyClientCommand::ClientRequestVersion(_) => {
                 self.request_version_handler.handle_command(session_id);
                 return;
             }
-            ClientCommand::ClientPasswordChallenge(p) => {
-                let cmd = ffb_protocol::commands::client_command_password_challenge::ClientCommandPasswordChallenge {
-                    entropy: None,
-                    coach: p.coach.clone(),
-                };
+            AnyClientCommand::ClientPasswordChallenge(cmd) => {
+                let cmd = cmd.clone();
                 let handler = self.password_challenge_handler.clone();
                 // `ReqwestHttpClient` wraps `reqwest::blocking::Client`; building/dropping one
                 // from inside a live tokio runtime context panics ("Cannot drop a runtime in a
@@ -582,139 +528,65 @@ impl ServerCommandHandlerFactory {
                 .await;
                 return;
             }
-            ClientCommand::ClientAddSketch(a) => {
-                // `ClientAddSketch` (the internal Rust<->Rust wire enum) only ever carries a
-                // sketch id — the actual sketch-drawing UI that would populate rgb/label/path
-                // is Swing-only and out of scope, so there is no reachable source for those
-                // fields on this path. `ClientCommandAddSketch` (the 1:1-translated struct)
-                // does carry the full `Sketch` for the Java-wire-compatible decode path
-                // (`AnyClientCommand`/`ClientCommandAddSketch::from_json`).
-                let cmd = match a.sketch_id.clone() {
-                    Some(id) => ffb_protocol::commands::client_command_add_sketch::ClientCommandAddSketch::with_sketch_id(id),
-                    None => ffb_protocol::commands::client_command_add_sketch::ClientCommandAddSketch::new(),
-                };
-                self.add_sketch_handler.handle_command(session_id, &cmd);
+            AnyClientCommand::ClientAddSketch(cmd) => {
+                self.add_sketch_handler.handle_command(session_id, cmd);
                 return;
             }
-            ClientCommand::ClientClearSketches(_) => {
-                let cmd = ffb_protocol::commands::client_command_clear_sketches::ClientCommandClearSketches::new();
-                self.clear_sketches_handler.handle_command(session_id, &cmd);
+            AnyClientCommand::ClientClearSketches(cmd) => {
+                self.clear_sketches_handler.handle_command(session_id, cmd);
                 return;
             }
-            ClientCommand::ClientRemoveSketches(r) => {
-                let cmd = ffb_protocol::commands::client_command_remove_sketches::ClientCommandRemoveSketches {
-                    entropy: None,
-                    ids: r.ids.clone(),
-                };
-                self.remove_sketches_handler.handle_command(session_id, &cmd);
+            AnyClientCommand::ClientRemoveSketches(cmd) => {
+                self.remove_sketches_handler.handle_command(session_id, cmd);
                 return;
             }
-            ClientCommand::ClientSketchAddCoordinate(s) => {
-                let cmd = ffb_protocol::commands::client_command_sketch_add_coordinate::ClientCommandSketchAddCoordinate {
-                    entropy: None,
-                    sketch_id: s.sketch_id.clone(),
-                    coordinate: s.coordinate,
-                };
-                self.sketch_add_coordinate_handler.handle_command(session_id, &cmd);
+            AnyClientCommand::ClientSketchAddCoordinate(cmd) => {
+                self.sketch_add_coordinate_handler.handle_command(session_id, cmd);
                 return;
             }
-            ClientCommand::ClientSketchSetColor(s) => {
-                let cmd = ffb_protocol::commands::client_command_sketch_set_color::ClientCommandSketchSetColor {
-                    entropy: None,
-                    sketch_ids: s.sketch_ids.clone(),
-                    rgb: s.rgb,
-                };
-                self.sketch_set_color_handler.handle_command(session_id, &cmd);
+            AnyClientCommand::ClientSketchSetColor(cmd) => {
+                self.sketch_set_color_handler.handle_command(session_id, cmd);
                 return;
             }
-            ClientCommand::ClientSketchSetLabel(s) => {
-                let cmd = ffb_protocol::commands::client_command_sketch_set_label::ClientCommandSketchSetLabel {
-                    entropy: None,
-                    sketch_ids: s.sketch_ids.clone(),
-                    label: s.label.clone(),
-                };
-                self.sketch_set_label_handler.handle_command(session_id, &cmd);
+            AnyClientCommand::ClientSketchSetLabel(cmd) => {
+                self.sketch_set_label_handler.handle_command(session_id, cmd);
                 return;
             }
-            ClientCommand::ClientSetMarker(m) => {
-                let cmd = ffb_protocol::commands::client_command_set_marker::ClientCommandSetMarker {
-                    player_id: m.player_id.clone(),
-                    coordinate: m.coordinate,
-                    text: m.text.clone(),
-                    entropy: None,
-                };
-                self.set_marker_handler.handle_command(session_id, &cmd);
+            AnyClientCommand::ClientSetMarker(cmd) => {
+                self.set_marker_handler.handle_command(session_id, cmd);
                 return;
             }
-            ClientCommand::ClientSetPreventSketching(p) => {
-                let cmd = ffb_protocol::commands::client_command_set_prevent_sketching::ClientCommandSetPreventSketching {
-                    coach: p.coach.clone(),
-                    prevent_sketching: p.prevent_sketching,
-                    entropy: None,
-                };
-                self.set_prevent_sketching_handler.handle_command(session_id, &cmd);
+            AnyClientCommand::ClientSetPreventSketching(cmd) => {
+                self.set_prevent_sketching_handler.handle_command(session_id, cmd);
                 return;
             }
-            ClientCommand::ClientLoadAutomaticPlayerMarkings(l) => {
-                let cmd = ffb_protocol::commands::client_command_load_automatic_player_markings::ClientCommandLoadAutomaticPlayerMarkings {
-                    entropy: None,
-                    index: l.index,
-                    coach: l.coach.clone(),
-                    game: None,
-                };
-                self.load_automatic_player_markings_handler.handle_command(&cmd, session_id);
+            AnyClientCommand::ClientLoadAutomaticPlayerMarkings(cmd) => {
+                self.load_automatic_player_markings_handler.handle_command(cmd, session_id);
                 return;
             }
-            ClientCommand::ClientUpdatePlayerMarkings(u) => {
-                let cmd = ffb_protocol::commands::client_command_update_player_markings::ClientCommandUpdatePlayerMarkings {
-                    entropy: None,
-                    auto: u.auto,
-                    sort_mode_name: u.sort_mode_name.clone(),
-                };
+            AnyClientCommand::ClientUpdatePlayerMarkings(cmd) => {
                 // `ServerCommandHandlerUpdatePlayerMarkings::handle_command` takes the shared
                 // `Arc<Mutex<..>>`s directly and locks/drops internally around its own
                 // `.await` points, so no lock is held here across this call.
                 self.update_player_markings_handler
-                    .handle_command(&cmd, session_id, &self.game_cache, &self.session_manager)
+                    .handle_command(cmd, session_id, &self.game_cache, &self.session_manager)
                     .await;
                 return;
             }
-            ClientCommand::ClientJoinReplay(j) => {
-                let cmd = ffb_protocol::commands::client_command_join_replay::ClientCommandJoinReplay {
-                    entropy: None,
-                    replay_name: j.replay_name.clone(),
-                    coach: j.coach.clone(),
-                    game_id: j.game_id,
-                };
-                self.join_replay_handler.handle_command(&cmd, session_id);
+            AnyClientCommand::ClientJoinReplay(cmd) => {
+                self.join_replay_handler.handle_command(cmd, session_id);
                 return;
             }
-            ClientCommand::ClientReplay(r) => {
-                let cmd = ffb_protocol::commands::client_command_replay::ClientCommandReplay {
-                    entropy: None,
-                    game_id: r.game_id,
-                    replay_to_command_nr: r.replay_to_command_nr,
-                    coach: r.coach.clone(),
-                };
-                self.replay_handler.handle_command(&cmd, session_id).await;
+            AnyClientCommand::ClientReplay(cmd) => {
+                self.replay_handler.handle_command(cmd, session_id).await;
                 return;
             }
-            ClientCommand::ClientReplayStatus(s) => {
-                let cmd = ffb_protocol::commands::client_command_replay_status::ClientCommandReplayStatus {
-                    entropy: None,
-                    command_nr: s.command_nr,
-                    speed: s.speed,
-                    running: s.running,
-                    forward: s.forward,
-                    skip: s.skip,
-                };
-                self.replay_status_handler.handle_command(&cmd, session_id);
+            AnyClientCommand::ClientReplayStatus(cmd) => {
+                self.replay_status_handler.handle_command(cmd, session_id);
                 return;
             }
-            ClientCommand::ClientUserSettings(u) => {
-                let mut cmd = ffb_protocol::commands::client_command_user_settings::ClientCommandUserSettings::new();
-                cmd.settings = u.settings.clone();
-                self.user_settings_handler.handle_command(session_id, &cmd).await;
+            AnyClientCommand::ClientUserSettings(cmd) => {
+                self.user_settings_handler.handle_command(session_id, cmd).await;
                 return;
             }
             _ => {}
@@ -917,168 +789,102 @@ impl ServerCommandHandlerFactory {
 
 // ── ClientCommand → Action decoder ───────────────────────────────────────────
 
-/// Server-side inverse of `ffb-client/src/network_encoder/mod.rs`.
+/// Decodes a Java-wire `AnyClientCommand` into an engine `Action`.
 ///
-/// Decodes a `ClientCommand` into an engine `Action`.  Gameplay-routing
-/// commands that have no `Action` equivalent (e.g. `ClientJoin`, `ClientPing`)
-/// should be handled *before* this function is called.
-pub fn decode_command(cmd: ClientCommand, side: TeamSide) -> Result<Action, DecodeError> {
+/// Java has no such function: there the command is handed to the current step's
+/// `handleCommand`, which reads exactly the fields it needs. The Rust engine takes `Action`s
+/// instead, so this is the bridge; §P P4 replaces the mappings marked `NotImplemented` (and
+/// re-checks every mapping against the Java step that consumes the command). Session-level
+/// commands (join, ping, talk, ...) are routed before this is reached.
+pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, DecodeError> {
+    fn missing(what: &str) -> DecodeError {
+        DecodeError::NotImplemented(format!("missing field {what}"))
+    }
     match cmd {
-        ClientCommand::ClientEndTurn(_) => Ok(Action::EndTurn),
+        AnyClientCommand::ClientEndTurn(_) => Ok(Action::EndTurn),
 
-        ClientCommand::ClientMove(m) => Ok(Action::Move { path: m.move_squares }),
-        ClientCommand::ClientBlitzMove(m) => Ok(Action::Move { path: m.move_squares }),
+        AnyClientCommand::ClientMove(m) => Ok(Action::Move { path: m.coordinates_to }),
+        AnyClientCommand::ClientBlitzMove(m) => Ok(Action::Move { path: m.coordinates_to }),
 
-        ClientCommand::ClientActingPlayer(a) => {
+        AnyClientCommand::ClientActingPlayer(a) => {
             // Java: a null playerId is a deselect — ends the acting player's activation.
             let (Some(player_id), Some(raw_action)) = (a.player_id, a.player_action) else {
                 return Ok(Action::EndPlayerAction);
             };
             let player_action = player_action_to_choice(raw_action)
                 .ok_or(DecodeError::NotImplemented(format!("player_action {raw_action:?}")))?;
-            Ok(Action::ActivatePlayer {
-                player_id,
-                player_action,
-                block_defender_id: None,
-            })
+            Ok(Action::ActivatePlayer { player_id, player_action, block_defender_id: None })
         }
 
-        ClientCommand::ClientBlock(b) => Ok(Action::Block { defender_id: b.defender_id }),
-        ClientCommand::ClientBlockChoice(b) => Ok(Action::BlockChoice {
-            die_index: b.selected_die_index as usize,
+        AnyClientCommand::ClientBlock(b) => Ok(Action::Block {
+            defender_id: b.defender_id.ok_or_else(|| missing("defenderId"))?,
+        }),
+        AnyClientCommand::ClientBlockChoice(b) => Ok(Action::BlockChoice {
+            die_index: b.dice_index as usize,
             target_id: None,
         }),
-        ClientCommand::ClientPushback(p) => Ok(Action::PushTo { coord: p.pushback_square }),
-        ClientCommand::ClientFollowupChoice(f) => Ok(Action::FollowUp { follow_up: f.follow_up }),
-
-        ClientCommand::ClientKickoff(k) => Ok(Action::KickBall { coord: k.coordinate }),
-        ClientCommand::ClientTouchback(t) => Ok(Action::Touchback { player_id: t.player_id }),
-
-        ClientCommand::ClientPass(p) => Ok(Action::Pass { coord: p.target_coordinate }),
-        ClientCommand::ClientHandOver(h) => Ok(Action::HandOff { receiver_id: h.target_player_id }),
-        ClientCommand::ClientFoul(f) => Ok(Action::Foul { target_id: f.defender_id }),
-
-        ClientCommand::ClientInterceptorChoice(i) => Ok(Action::Intercept { attempt: i.attempt_interception }),
-        ClientCommand::ClientCoinChoice(c) => Ok(Action::CoinChoice { heads: c.home_choice }),
-        ClientCommand::ClientReceiveChoice(r) => Ok(Action::ReceiveChoice { receive: r.receive }),
-
-        ClientCommand::ClientUseReRoll(r) => Ok(Action::UseReRoll { use_reroll: r.use_reroll }),
-        ClientCommand::ClientUseSkill(s) => {
-            let skill_id = parse_skill_id(&s.skill)
-                .ok_or_else(|| DecodeError::UnknownSkill(s.skill.clone()))?;
-            Ok(Action::UseSkill { skill_id, use_skill: s.use_skill })
-        }
-
-        ClientCommand::ClientUseApothecary(a) => Ok(Action::UseApothecary {
-            player_id: a.player_id,
-            use_apothecary: a.use_apothecary,
+        AnyClientCommand::ClientPushback(p) => Ok(Action::PushTo {
+            coord: p.pushback.and_then(|p| p.coordinate).ok_or_else(|| missing("pushback"))?,
         }),
-        ClientCommand::ClientApothecaryChoice(a) => {
-            use ffb_protocol::client_commands::ApothecaryChoice;
-            Ok(Action::ApothecaryChoice {
-                player_state: match a.choice {
-                    ApothecaryChoice::Apothecary => 1,
-                    ApothecaryChoice::RollResult => 0,
-                },
-                serious_injury: None,
-            })
-        }
+        AnyClientCommand::ClientFollowupChoice(f) => Ok(Action::FollowUp { follow_up: f.choice_followup }),
 
-        ClientCommand::ClientSetupPlayer(s) => Ok(Action::PlacePlayer {
-            player_id: s.player_id,
-            coord: s.coordinate,
-        }),
-        ClientCommand::ClientStartGame(_) => Ok(Action::StartGame { home: side == TeamSide::Home }),
-
-        ClientCommand::ClientThrowTeamMate(t) => Ok(Action::ThrowTeamMate {
-            player_id: t.player_id,
-            coord: t.target_coordinate,
-        }),
-        ClientCommand::ClientKickTeamMate(k) => Ok(Action::KickTeamMate {
-            player_id: k.player_id,
-            coord: k.target_coordinate,
-        }),
-        ClientCommand::ClientSwoop(s) => Ok(Action::Pass { coord: s.target_coordinate }),
-
-        ClientCommand::ClientGaze(g) => Ok(Action::HypnoticGaze { target_id: g.target_id }),
-        ClientCommand::ClientConfirm(_) => Ok(Action::Acknowledge),
-        ClientCommand::ClientArgueTheCall(a) => Ok(Action::ArgueTheCall { argue: a.use_argue }),
-
-        ClientCommand::ClientPlayerChoice(p) => Ok(Action::SelectPlayer { player_id: p.player_id }),
-
-        ClientCommand::ClientBloodlustAction(b) => Ok(Action::BloodlustAction {
-            change: b.action.eq_ignore_ascii_case("change"),
+        AnyClientCommand::ClientKickoff(k) => Ok(Action::KickBall {
+            coord: k.ball_coordinate.ok_or_else(|| missing("ballCoordinate"))?,
         }),
 
-        ClientCommand::ClientBuyInducements(b) => Ok(Action::BuyInducements {
-            home: side == TeamSide::Home,
-            purchases: b.purchases.into_iter().map(|(id, count)| {
-                ffb_engine::action::InducementPurchase { id, count: count as u32 }
-            }).collect(),
+        AnyClientCommand::ClientPass(p) => Ok(Action::Pass {
+            coord: p.target_coordinate.ok_or_else(|| missing("targetCoordinate"))?,
+        }),
+        AnyClientCommand::ClientHandOver(h) => Ok(Action::HandOff {
+            receiver_id: h.catcher_id.ok_or_else(|| missing("catcherId"))?,
+        }),
+        AnyClientCommand::ClientFoul(f) => Ok(Action::Foul {
+            target_id: f.defender_id.ok_or_else(|| missing("defenderId"))?,
         }),
 
-        ClientCommand::ClientPettyCash(p) => Ok(Action::PettyCash {
-            home: side == TeamSide::Home,
-            amount: p.amount,
+        AnyClientCommand::ClientInterceptorChoice(i) => Ok(Action::Intercept { attempt: i.interceptor_id.is_some() }),
+        AnyClientCommand::ClientCoinChoice(c) => Ok(Action::CoinChoice { heads: c.choice_heads }),
+        AnyClientCommand::ClientReceiveChoice(r) => Ok(Action::ReceiveChoice { receive: r.choice_receive }),
+
+        AnyClientCommand::ClientUseReRoll(r) => Ok(Action::UseReRoll { use_reroll: r.re_roll_source.is_some() }),
+        AnyClientCommand::ClientUseSkill(s) => {
+            let name = s.skill_name.ok_or_else(|| missing("skill"))?;
+            let skill_id = parse_skill_id(&name).ok_or_else(|| DecodeError::UnknownSkill(name.clone()))?;
+            Ok(Action::UseSkill { skill_id, use_skill: s.skill_used })
+        }
+
+        AnyClientCommand::ClientUseApothecary(a) => Ok(Action::UseApothecary {
+            player_id: a.player_id.ok_or_else(|| missing("playerId"))?,
+            use_apothecary: a.apothecary_used,
         }),
 
-        ClientCommand::ClientKickOffResultChoice(_) => Ok(Action::Acknowledge),
-        ClientCommand::ClientSelectWeather(s) => {
-            // Parse weather name via serde camelCase
-            let camel = to_camel_case(&s.weather);
-            serde_json::from_str::<ffb_model::enums::Weather>(&format!("\"{}\"", camel))
-                .map(|w| Action::SelectWeather { weather: w })
-                .map_err(|_| DecodeError::NotImplemented(format!("weather {}", s.weather)))
-        }
+        AnyClientCommand::ClientSetupPlayer(s) => Ok(Action::PlacePlayer {
+            player_id: s.player_id.ok_or_else(|| missing("playerId"))?,
+            coord: s.coordinate.ok_or_else(|| missing("coordinate"))?,
+        }),
+        AnyClientCommand::ClientStartGame(_) => Ok(Action::StartGame { home: side == TeamSide::Home }),
 
-        ClientCommand::ClientPileDriver(_) => Err(DecodeError::NotImplemented("ClientPileDriver".into())),
-        ClientCommand::ClientWizardSpell(_) => Err(DecodeError::NotImplemented("ClientWizardSpell".into())),
-        ClientCommand::ClientJourneymen(_) => Err(DecodeError::NotImplemented("ClientJourneymen".into())),
+        AnyClientCommand::ClientThrowTeamMate(t) => Ok(Action::ThrowTeamMate {
+            player_id: t.thrown_player_id.ok_or_else(|| missing("thrownPlayerId"))?,
+            coord: t.target_coordinate.ok_or_else(|| missing("targetCoordinate"))?,
+        }),
+        AnyClientCommand::ClientSwoop(s) => Ok(Action::Pass {
+            coord: s.target_coordinate.ok_or_else(|| missing("targetCoordinate"))?,
+        }),
 
-        ClientCommand::ClientJoin(_) => Err(DecodeError::NotImplemented("ClientJoin".into())),
-        ClientCommand::ClientPing(_) => Err(DecodeError::NotImplemented("ClientPing".into())),
+        AnyClientCommand::ClientGaze(g) => Ok(Action::HypnoticGaze {
+            target_id: g.victim_id.ok_or_else(|| missing("victimId"))?,
+        }),
+        AnyClientCommand::ClientConfirm(_) => Ok(Action::Acknowledge),
+        AnyClientCommand::ClientArgueTheCall(a) => Ok(Action::ArgueTheCall { argue: !a.player_ids.is_empty() }),
 
-        // Handled earlier in `handle_command` before `decode_command` is reached (like
-        // `ClientJoin`/`ClientPing` above) — no `Action` equivalent exists for these.
-        ClientCommand::ClientTalk(_) => Err(DecodeError::NotImplemented("ClientTalk".into())),
-        ClientCommand::ClientCloseSession(_) => Err(DecodeError::NotImplemented("ClientCloseSession".into())),
-        ClientCommand::ClientTransferReplayControl(_) => {
-            Err(DecodeError::NotImplemented("ClientTransferReplayControl".into()))
-        }
-        ClientCommand::ClientRequestVersion(_) => Err(DecodeError::NotImplemented("ClientRequestVersion".into())),
-        ClientCommand::ClientPasswordChallenge(_) => {
-            Err(DecodeError::NotImplemented("ClientPasswordChallenge".into()))
-        }
-        ClientCommand::ClientAddSketch(_) => Err(DecodeError::NotImplemented("ClientAddSketch".into())),
-        ClientCommand::ClientClearSketches(_) => {
-            Err(DecodeError::NotImplemented("ClientClearSketches".into()))
-        }
-        ClientCommand::ClientRemoveSketches(_) => {
-            Err(DecodeError::NotImplemented("ClientRemoveSketches".into()))
-        }
-        ClientCommand::ClientSketchAddCoordinate(_) => {
-            Err(DecodeError::NotImplemented("ClientSketchAddCoordinate".into()))
-        }
-        ClientCommand::ClientSketchSetColor(_) => {
-            Err(DecodeError::NotImplemented("ClientSketchSetColor".into()))
-        }
-        ClientCommand::ClientSketchSetLabel(_) => {
-            Err(DecodeError::NotImplemented("ClientSketchSetLabel".into()))
-        }
-        ClientCommand::ClientSetMarker(_) => Err(DecodeError::NotImplemented("ClientSetMarker".into())),
-        ClientCommand::ClientSetPreventSketching(_) => {
-            Err(DecodeError::NotImplemented("ClientSetPreventSketching".into()))
-        }
-        ClientCommand::ClientUpdatePlayerMarkings(_) => {
-            Err(DecodeError::NotImplemented("ClientUpdatePlayerMarkings".into()))
-        }
-        ClientCommand::ClientLoadAutomaticPlayerMarkings(_) => {
-            Err(DecodeError::NotImplemented("ClientLoadAutomaticPlayerMarkings".into()))
-        }
-        ClientCommand::ClientJoinReplay(_) => Err(DecodeError::NotImplemented("ClientJoinReplay".into())),
-        ClientCommand::ClientReplay(_) => Err(DecodeError::NotImplemented("ClientReplay".into())),
-        ClientCommand::ClientReplayStatus(_) => Err(DecodeError::NotImplemented("ClientReplayStatus".into())),
-        ClientCommand::ClientUserSettings(_) => Err(DecodeError::NotImplemented("ClientUserSettings".into())),
+        AnyClientCommand::ClientPlayerChoice(p) => Ok(Action::SelectPlayer {
+            player_id: p.player_ids.into_iter().next().ok_or_else(|| missing("playerIds"))?,
+        }),
+
+        AnyClientCommand::ClientKickOffResultChoice(_) => Ok(Action::Acknowledge),
+
+        other => Err(DecodeError::NotImplemented(format!("{:?}", other.get_id()))),
     }
 }
 
@@ -1147,372 +953,102 @@ fn to_camel_case(s: &str) -> String {
 mod tests {
     use super::*;
     use ffb_model::types::FieldCoordinate;
-    use ffb_protocol::client_commands::*;
+    use crate::model::received_command::ReceivedCommand;
 
     fn coord(x: i32, y: i32) -> FieldCoordinate { FieldCoordinate { x, y } }
 
-    // ── decode_command: pre-game ───────────────────────────────────────────────
+    /// Builds a client command exactly as the Java client puts it on the wire, through the
+    /// same `NetCommandFactory.forJsonValue` decode `command_socket` uses.
+    fn wire(json: serde_json::Value) -> AnyClientCommand {
+        match ffb_protocol::net_command_factory::NetCommandFactory::new().for_json_value(&json) {
+            Some(ffb_protocol::net_command_factory::AnyNetCommand::Client(c)) => c,
+            other => panic!("not a client command: {other:?}"),
+        }
+    }
+
+    fn decode(json: serde_json::Value, side: TeamSide) -> Result<Action, DecodeError> {
+        decode_command(wire(json), side)
+    }
 
     #[test]
     fn decode_end_turn() {
-        let r = decode_command(ClientCommand::ClientEndTurn(ClientEndTurn), TeamSide::Home);
+        let r = decode(serde_json::json!({"netCommandId": "clientEndTurn"}), TeamSide::Home);
         assert!(matches!(r, Ok(Action::EndTurn)));
     }
 
     #[test]
-    fn decode_coin_choice_heads() {
-        let r = decode_command(
-            ClientCommand::ClientCoinChoice(ClientCoinChoice { home_choice: true }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::CoinChoice { heads: true })));
+    fn decode_coin_choice() {
+        let heads = decode(serde_json::json!({"netCommandId": "clientCoinChoice", "choiceHeads": true}), TeamSide::Away);
+        assert!(matches!(heads, Ok(Action::CoinChoice { heads: true })));
+        let tails = decode(serde_json::json!({"netCommandId": "clientCoinChoice", "choiceHeads": false}), TeamSide::Away);
+        assert!(matches!(tails, Ok(Action::CoinChoice { heads: false })));
     }
 
     #[test]
-    fn decode_coin_choice_tails() {
-        let r = decode_command(
-            ClientCommand::ClientCoinChoice(ClientCoinChoice { home_choice: false }),
-            TeamSide::Away,
-        );
-        assert!(matches!(r, Ok(Action::CoinChoice { heads: false })));
-    }
-
-    #[test]
-    fn decode_receive_choice_receive() {
-        let r = decode_command(
-            ClientCommand::ClientReceiveChoice(ClientReceiveChoice { receive: true }),
-            TeamSide::Home,
-        );
+    fn decode_receive_choice() {
+        let r = decode(serde_json::json!({"netCommandId": "clientReceiveChoice", "choiceReceive": true}), TeamSide::Home);
         assert!(matches!(r, Ok(Action::ReceiveChoice { receive: true })));
     }
 
     #[test]
-    fn decode_receive_choice_kick() {
-        let r = decode_command(
-            ClientCommand::ClientReceiveChoice(ClientReceiveChoice { receive: false }),
-            TeamSide::Away,
-        );
-        assert!(matches!(r, Ok(Action::ReceiveChoice { receive: false })));
-    }
-
-    #[test]
-    fn decode_start_game_home() {
-        let r = decode_command(ClientCommand::ClientStartGame(ClientStartGame), TeamSide::Home);
-        assert!(matches!(r, Ok(Action::StartGame { home: true })));
-    }
-
-    #[test]
-    fn decode_start_game_away() {
-        let r = decode_command(ClientCommand::ClientStartGame(ClientStartGame), TeamSide::Away);
-        assert!(matches!(r, Ok(Action::StartGame { home: false })));
-    }
-
-    // ── decode_command: movement ───────────────────────────────────────────────
-
-    #[test]
-    fn decode_move() {
-        let path = vec![coord(1, 1), coord(2, 2)];
-        let r = decode_command(
-            ClientCommand::ClientMove(ClientMove { move_squares: path.clone() }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::Move { path: p }) if p == path));
-    }
-
-    #[test]
-    fn decode_blitz_move_as_move() {
-        let path = vec![coord(3, 4)];
-        let r = decode_command(
-            ClientCommand::ClientBlitzMove(ClientBlitzMove { move_squares: path.clone() }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::Move { path: p }) if p == path));
+    fn decode_start_game_side() {
+        let h = decode(serde_json::json!({"netCommandId": "clientStartGame"}), TeamSide::Home);
+        assert!(matches!(h, Ok(Action::StartGame { home: true })));
+        let a = decode(serde_json::json!({"netCommandId": "clientStartGame"}), TeamSide::Away);
+        assert!(matches!(a, Ok(Action::StartGame { home: false })));
     }
 
     #[test]
     fn decode_setup_player() {
-        let r = decode_command(
-            ClientCommand::ClientSetupPlayer(ClientSetupPlayer {
-                player_id: "p1".into(),
-                coordinate: coord(5, 5),
-            }),
+        let r = decode(
+            serde_json::json!({"netCommandId": "clientSetupPlayer", "playerId": "p1", "coordinate": [3, 4]}),
             TeamSide::Home,
         );
-        assert!(matches!(r, Ok(Action::PlacePlayer { player_id, coord: c })
-            if player_id == "p1" && c == coord(5, 5)));
+        match r {
+            Ok(Action::PlacePlayer { player_id, coord: c }) => {
+                assert_eq!(player_id, "p1");
+                assert_eq!(c, coord(3, 4));
+            }
+            other => panic!("unexpected {other:?}"),
+        }
     }
 
-    // ── decode_command: block sequence ────────────────────────────────────────
-
     #[test]
-    fn decode_block() {
-        let r = decode_command(
-            ClientCommand::ClientBlock(ClientBlock { defender_id: "defender".into() }),
+    fn decode_block_and_block_choice() {
+        let b = decode(
+            serde_json::json!({"netCommandId": "clientBlock", "actingPlayerId": "a", "defenderId": "d"}),
             TeamSide::Home,
         );
-        assert!(matches!(r, Ok(Action::Block { defender_id: d }) if d == "defender"));
+        assert!(matches!(b, Ok(Action::Block { ref defender_id }) if defender_id == "d"));
+        let c = decode(serde_json::json!({"netCommandId": "clientBlockChoice", "diceIndex": 2}), TeamSide::Home);
+        assert!(matches!(c, Ok(Action::BlockChoice { die_index: 2, target_id: None })));
     }
 
     #[test]
-    fn decode_block_choice() {
-        let r = decode_command(
-            ClientCommand::ClientBlockChoice(ClientBlockChoice { selected_die_index: 2 }),
+    fn decode_acting_player_deselect_and_select() {
+        let deselect = decode(serde_json::json!({"netCommandId": "clientActingPlayer"}), TeamSide::Home);
+        assert!(matches!(deselect, Ok(Action::EndPlayerAction)));
+        let select = decode(
+            serde_json::json!({"netCommandId": "clientActingPlayer", "playerId": "p", "playerAction": "block"}),
             TeamSide::Home,
         );
-        assert!(matches!(r, Ok(Action::BlockChoice { die_index: 2, target_id: None })));
+        assert!(matches!(select, Ok(Action::ActivatePlayer { player_action: PlayerActionChoice::Block, .. })));
     }
 
     #[test]
-    fn decode_pushback() {
-        let r = decode_command(
-            ClientCommand::ClientPushback(ClientPushback { pushback_square: coord(7, 3) }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::PushTo { coord: c }) if c == coord(7, 3)));
-    }
-
-    #[test]
-    fn decode_followup_yes() {
-        let r = decode_command(
-            ClientCommand::ClientFollowupChoice(ClientFollowupChoice { follow_up: true }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::FollowUp { follow_up: true })));
-    }
-
-    #[test]
-    fn decode_followup_no() {
-        let r = decode_command(
-            ClientCommand::ClientFollowupChoice(ClientFollowupChoice { follow_up: false }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::FollowUp { follow_up: false })));
-    }
-
-    // ── decode_command: acting player / activation ────────────────────────────
-
-    #[test]
-    fn decode_acting_player_move() {
-        let r = decode_command(
-            ClientCommand::ClientActingPlayer(ClientActingPlayer {
-                player_id: Some("p1".into()),
-                player_action: Some(ffb_model::enums::PlayerAction::Move),
-                standing_up: false,
-            }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::ActivatePlayer {
-            player_id: ref pid,
-            player_action: PlayerActionChoice::Move,
-            ..
-        }) if pid == "p1"));
-    }
-
-    #[test]
-    fn decode_acting_player_block() {
-        let r = decode_command(
-            ClientCommand::ClientActingPlayer(ClientActingPlayer {
-                player_id: Some("p2".into()),
-                player_action: Some(ffb_model::enums::PlayerAction::Block),
-                standing_up: false,
-            }),
-            TeamSide::Away,
-        );
-        assert!(matches!(r, Ok(Action::ActivatePlayer { player_action: PlayerActionChoice::Block, .. })));
-    }
-
-    #[test]
-    fn decode_acting_player_foul() {
-        let r = decode_command(
-            ClientCommand::ClientActingPlayer(ClientActingPlayer {
-                player_id: Some("p3".into()),
-                player_action: Some(ffb_model::enums::PlayerAction::Foul),
-                standing_up: false,
-            }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::ActivatePlayer { player_action: PlayerActionChoice::Foul, .. })));
-    }
-
-    // ── decode_command: pass / handoff / foul ─────────────────────────────────
-
-    #[test]
-    fn decode_pass() {
-        let r = decode_command(
-            ClientCommand::ClientPass(ClientPass { target_coordinate: coord(10, 5), hail_mary: false }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::Pass { coord: c }) if c == coord(10, 5)));
-    }
-
-    #[test]
-    fn decode_handover() {
-        let r = decode_command(
-            ClientCommand::ClientHandOver(ClientHandOver { target_player_id: "receiver".into() }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::HandOff { receiver_id: ref id }) if id == "receiver"));
-    }
-
-    #[test]
-    fn decode_foul() {
-        let r = decode_command(
-            ClientCommand::ClientFoul(ClientFoul { defender_id: "prone".into() }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::Foul { target_id: ref id }) if id == "prone"));
-    }
-
-    // ── decode_command: kickoff ────────────────────────────────────────────────
-
-    #[test]
-    fn decode_kickoff() {
-        let r = decode_command(
-            ClientCommand::ClientKickoff(ClientKickoff { coordinate: coord(8, 8) }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::KickBall { coord: c }) if c == coord(8, 8)));
-    }
-
-    #[test]
-    fn decode_touchback() {
-        let r = decode_command(
-            ClientCommand::ClientTouchback(ClientTouchback { player_id: "catcher".into() }),
-            TeamSide::Away,
-        );
-        assert!(matches!(r, Ok(Action::Touchback { player_id: ref id }) if id == "catcher"));
-    }
-
-    // ── decode_command: skill / reroll ────────────────────────────────────────
-
-    #[test]
-    fn decode_use_reroll_yes() {
-        let r = decode_command(
-            ClientCommand::ClientUseReRoll(ClientUseReRoll { use_reroll: true }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::UseReRoll { use_reroll: true })));
-    }
-
-    #[test]
-    fn decode_use_reroll_no() {
-        let r = decode_command(
-            ClientCommand::ClientUseReRoll(ClientUseReRoll { use_reroll: false }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::UseReRoll { use_reroll: false })));
-    }
-
-    #[test]
-    fn decode_use_skill_block() {
-        let r = decode_command(
-            ClientCommand::ClientUseSkill(ClientUseSkill {
-                player_id: "p1".into(),
-                skill: "Block".into(),
-                use_skill: true,
-            }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::UseSkill { skill_id: SkillId::Block, use_skill: true })));
-    }
-
-    #[test]
-    fn decode_use_skill_sure_hands_declined() {
-        let r = decode_command(
-            ClientCommand::ClientUseSkill(ClientUseSkill {
-                player_id: "p1".into(),
-                skill: "SureHands".into(),
-                use_skill: false,
-            }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::UseSkill { skill_id: SkillId::SureHands, use_skill: false })));
-    }
-
-    #[test]
-    fn decode_use_skill_unknown_returns_error() {
-        let r = decode_command(
-            ClientCommand::ClientUseSkill(ClientUseSkill {
-                player_id: "p1".into(),
-                skill: "NotASkill".into(),
-                use_skill: true,
-            }),
+    fn decode_use_skill_unknown_is_error() {
+        let r = decode(
+            serde_json::json!({"netCommandId": "clientUseSkill", "skill": "NoSuchSkill", "skillUsed": true}),
             TeamSide::Home,
         );
         assert!(matches!(r, Err(DecodeError::UnknownSkill(_))));
     }
 
     #[test]
-    fn decode_use_apothecary() {
-        let r = decode_command(
-            ClientCommand::ClientUseApothecary(ClientUseApothecary {
-                player_id: "hurt".into(),
-                use_apothecary: true,
-            }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::UseApothecary { use_apothecary: true, .. })));
-    }
-
-    // ── decode_command: intercept / misc ──────────────────────────────────────
-
-    #[test]
-    fn decode_intercept_attempt() {
-        let r = decode_command(
-            ClientCommand::ClientInterceptorChoice(ClientInterceptorChoice { attempt_interception: true }),
-            TeamSide::Away,
-        );
-        assert!(matches!(r, Ok(Action::Intercept { attempt: true })));
-    }
-
-    #[test]
-    fn decode_confirm_acknowledges() {
-        let r = decode_command(ClientCommand::ClientConfirm(ClientConfirm), TeamSide::Home);
-        assert!(matches!(r, Ok(Action::Acknowledge)));
-    }
-
-    #[test]
-    fn decode_argue_the_call() {
-        let r = decode_command(
-            ClientCommand::ClientArgueTheCall(ClientArgueTheCall {
-                player_id: "captain".into(),
-                use_argue: true,
-            }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::ArgueTheCall { argue: true })));
-    }
-
-    #[test]
-    fn decode_player_choice() {
-        let r = decode_command(
-            ClientCommand::ClientPlayerChoice(ClientPlayerChoice { player_id: "chosen".into() }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Ok(Action::SelectPlayer { player_id: ref id }) if id == "chosen"));
-    }
-
-    #[test]
-    fn decode_ping_returns_not_implemented() {
-        let r = decode_command(
-            ClientCommand::ClientPing(ClientPing { timestamp: 123 }),
-            TeamSide::Home,
-        );
+    fn decode_session_commands_are_not_actions() {
+        let r = decode(serde_json::json!({"netCommandId": "clientPing", "timestamp": 1}), TeamSide::Home);
         assert!(matches!(r, Err(DecodeError::NotImplemented(_))));
     }
-
-    #[test]
-    fn decode_join_returns_not_implemented() {
-        let r = decode_command(
-            ClientCommand::ClientJoin(ClientJoin {
-                coach: "x".into(), team_id: "t".into(), game_id: "1".into(), password_hash: None,
-            }),
-            TeamSide::Home,
-        );
-        assert!(matches!(r, Err(DecodeError::NotImplemented(_))));
-    }
-
-    // ── parse_skill_id ────────────────────────────────────────────────────────
 
     #[test]
     fn parse_skill_block() {
@@ -1646,7 +1182,7 @@ mod tests {
             sm.add_session(42, 1, "TestCoach".into(), ClientMode::PLAYER, true, vec![], tx);
         }
         let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
-        factory.handle_command(ReceivedCommand::new(ClientCommand::ClientPing(ClientPing { timestamp: 9999 }), 42)).await;
+        factory.handle_command(ReceivedCommand::new(AnyClientCommand::ClientPing(ffb_protocol::commands::client_command_ping::ClientCommandPing { timestamp: 9999, ..Default::default() }), 42)).await;
         let sm = sm_arc.lock().unwrap();
         // ServerCommandHandlerPing stores the current wall-clock time as the
         // last-ping timestamp (matching Java's `System.currentTimeMillis()`)
@@ -1663,7 +1199,7 @@ mod tests {
         let factory = ServerCommandHandlerFactory::new(gc, sm, db());
         // session 99 was never registered — should log a warning and return cleanly
         factory.handle_command(crate::model::received_command::ReceivedCommand::new(
-            ClientCommand::ClientEndTurn(ClientEndTurn), 99,
+            AnyClientCommand::ClientEndTurn(ffb_protocol::commands::client_command_end_turn::ClientCommandEndTurn::default()), 99,
         )).await;
     }
 
@@ -1701,13 +1237,8 @@ mod tests {
         sm.lock().unwrap().add_session(11, 0, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
         let factory = ServerCommandHandlerFactory::new(gc, sm, db());
 
-        let join = ClientJoin {
-            coach: "Coach".into(),
-            team_id: String::new(),
-            game_id: String::new(),
-            password_hash: None,
-        };
-        factory.handle_command(ReceivedCommand::new(ClientCommand::ClientJoin(join), 11)).await;
+        let join = wire(serde_json::json!({"netCommandId": "clientJoin", "coach": "Coach"}));
+        factory.handle_command(ReceivedCommand::new(join, 11)).await;
 
         let msg = rx.try_recv().expect("expected a real ServerGameList reply from join_handler");
         assert!(msg.contains("serverGameList"));
@@ -1728,19 +1259,15 @@ mod tests {
         sm.lock().unwrap().add_session(12, 0, "Coach".into(), ClientMode::PLAYER, true, vec![], tx);
         let factory = ServerCommandHandlerFactory::new(gc, sm, db());
 
-        let join = ClientJoin {
-            coach: "Coach".into(),
-            team_id: String::new(),
-            game_id: "SomeGame".into(),
-            password_hash: Some(String::new()),
-        };
-        factory.handle_command(ReceivedCommand::new(ClientCommand::ClientJoin(join), 12)).await;
+        let join = wire(serde_json::json!({
+            "netCommandId": "clientJoin", "coach": "Coach", "gameName": "SomeGame", "password": ""
+        }));
+        factory.handle_command(ReceivedCommand::new(join, 12)).await;
 
-        // No DB pool configured, so a targeted join always fails the password check and
-        // reports wrong-password rather than a lobby list — proving `has_target` really
-        // saw the game name (an empty password on an unconfigured DB never matches).
-        let msg = rx.try_recv().expect("expected a ServerCommandStatus, not a lobby game list");
-        assert!(msg.contains("Wrong Password"));
+        // No DB pool configured: the targeted join is approved (BACKLOG §P deviation) and
+        // the redispatched JoinApproved creates the named game - proving `has_target` saw
+        // the game name rather than answering with a lobby list.
+        assert!(!rx.try_recv().map(|m| m.contains("serverGameList")).unwrap_or(false));
     }
 
     /// End-to-end dispatch test (Phase ZZ): enqueuing `AnyInternalServerCommand::JoinApproved`
@@ -1790,7 +1317,7 @@ mod tests {
         }
         let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientTalk(ffb_protocol::client_commands::ClientTalk { talk: Some("hello".into()) }),
+            AnyClientCommand::ClientTalk(ffb_protocol::commands::client_command_talk::ClientCommandTalk { talk: Some("hello".into()), ..Default::default() }),
             1,
         )).await;
 
@@ -1813,7 +1340,7 @@ mod tests {
 
         let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientCloseSession(ffb_protocol::client_commands::ClientCloseSession),
+            AnyClientCommand::ClientCloseSession(ffb_protocol::commands::client_command_close_session::ClientCommandCloseSession::default()),
             1,
         )).await;
 
@@ -1840,9 +1367,8 @@ mod tests {
         }
 
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientTransferReplayControl(ffb_protocol::client_commands::ClientTransferReplayControl {
-                coach: Some("coach2".into()),
-            }),
+            AnyClientCommand::ClientTransferReplayControl(ffb_protocol::commands::client_command_transfer_replay_control::ClientCommandTransferReplayControl {
+                coach: Some("coach2".into()), ..Default::default() }),
             1,
         )).await;
 
@@ -1864,7 +1390,7 @@ mod tests {
 
         let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientRequestVersion(ffb_protocol::client_commands::ClientRequestVersion),
+            AnyClientCommand::ClientRequestVersion(ffb_protocol::commands::client_command_request_version::ClientCommandRequestVersion::default()),
             1,
         )).await;
 
@@ -1887,9 +1413,8 @@ mod tests {
         // No coach supplied, so even the default fumbbl-mode-true handler sends the
         // password challenge directly rather than issuing a live HTTP fetch.
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientPasswordChallenge(ffb_protocol::client_commands::ClientPasswordChallenge {
-                coach: None,
-            }),
+            AnyClientCommand::ClientPasswordChallenge(ffb_protocol::commands::client_command_password_challenge::ClientCommandPasswordChallenge {
+                coach: None, ..Default::default() }),
             1,
         )).await;
 
@@ -1926,9 +1451,9 @@ mod tests {
         factory.replay_session_manager.lock().unwrap().add_session(1, "replay".into(), "Alice".into());
 
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientAddSketch(ffb_protocol::client_commands::ClientAddSketch {
-                sketch_id: Some("sk-1".into()),
-            }),
+            AnyClientCommand::ClientAddSketch(
+                ffb_protocol::commands::client_command_add_sketch::ClientCommandAddSketch::with_sketch_id("sk-1".to_string()),
+            ),
             1,
         )).await;
 
@@ -1947,7 +1472,7 @@ mod tests {
         factory.sketch_manager.lock().unwrap().add_sketch("1", ManagerSketch::new("sk-1"));
 
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientClearSketches(ffb_protocol::client_commands::ClientClearSketches),
+            AnyClientCommand::ClientClearSketches(ffb_protocol::commands::client_command_clear_sketches::ClientCommandClearSketches::default()),
             1,
         )).await;
 
@@ -1970,9 +1495,8 @@ mod tests {
         }
 
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientRemoveSketches(ffb_protocol::client_commands::ClientRemoveSketches {
-                ids: vec!["sk-1".into()],
-            }),
+            AnyClientCommand::ClientRemoveSketches(ffb_protocol::commands::client_command_remove_sketches::ClientCommandRemoveSketches {
+                ids: vec!["sk-1".into()], ..Default::default() }),
             1,
         )).await;
 
@@ -1994,10 +1518,9 @@ mod tests {
         factory.sketch_manager.lock().unwrap().add_sketch("1", ManagerSketch::new("sk-1"));
 
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientSketchAddCoordinate(ffb_protocol::client_commands::ClientSketchAddCoordinate {
+            AnyClientCommand::ClientSketchAddCoordinate(ffb_protocol::commands::client_command_sketch_add_coordinate::ClientCommandSketchAddCoordinate {
                 sketch_id: Some("sk-1".into()),
-                coordinate: Some(FieldCoordinate::new(3, 4)),
-            }),
+                coordinate: Some(FieldCoordinate::new(3, 4)), ..Default::default() }),
             1,
         )).await;
 
@@ -2023,10 +1546,9 @@ mod tests {
         }
 
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientSketchSetColor(ffb_protocol::client_commands::ClientSketchSetColor {
+            AnyClientCommand::ClientSketchSetColor(ffb_protocol::commands::client_command_sketch_set_color::ClientCommandSketchSetColor {
                 sketch_ids: vec!["sk-1".into()],
-                rgb: 0x00FF00,
-            }),
+                rgb: 0x00FF00, ..Default::default() }),
             1,
         )).await;
 
@@ -2050,10 +1572,9 @@ mod tests {
         }
 
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientSketchSetLabel(ffb_protocol::client_commands::ClientSketchSetLabel {
+            AnyClientCommand::ClientSketchSetLabel(ffb_protocol::commands::client_command_sketch_set_label::ClientCommandSketchSetLabel {
                 sketch_ids: vec!["sk-1".into()],
-                label: Some("Arrow".into()),
-            }),
+                label: Some("Arrow".into()), ..Default::default() }),
             1,
         )).await;
 
@@ -2090,11 +1611,10 @@ mod tests {
 
         let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientSetMarker(ffb_protocol::client_commands::ClientSetMarker {
+            AnyClientCommand::ClientSetMarker(ffb_protocol::commands::client_command_set_marker::ClientCommandSetMarker {
                 player_id: Some("p1".into()),
                 coordinate: Some(FieldCoordinate::new(1, 1)),
-                text: Some("Nice job".into()),
-            }),
+                text: Some("Nice job".into()), ..Default::default() }),
             1,
         )).await;
 
@@ -2123,10 +1643,9 @@ mod tests {
         }
 
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientSetPreventSketching(ffb_protocol::client_commands::ClientSetPreventSketching {
+            AnyClientCommand::ClientSetPreventSketching(ffb_protocol::commands::client_command_set_prevent_sketching::ClientCommandSetPreventSketching {
                 coach: Some("coach2".into()),
-                prevent_sketching: true,
-            }),
+                prevent_sketching: true, ..Default::default() }),
             1,
         )).await;
 
@@ -2152,10 +1671,9 @@ mod tests {
 
         let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientUpdatePlayerMarkings(ffb_protocol::client_commands::ClientUpdatePlayerMarkings {
+            AnyClientCommand::ClientUpdatePlayerMarkings(ffb_protocol::commands::client_command_update_player_markings::ClientCommandUpdatePlayerMarkings {
                 auto: false,
-                sort_mode_name: None,
-            }),
+                sort_mode_name: None, ..Default::default() }),
             1,
         )).await;
 
@@ -2175,10 +1693,11 @@ mod tests {
 
         let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientLoadAutomaticPlayerMarkings(
-                ffb_protocol::client_commands::ClientLoadAutomaticPlayerMarkings {
+            AnyClientCommand::ClientLoadAutomaticPlayerMarkings(
+                ffb_protocol::commands::client_command_load_automatic_player_markings::ClientCommandLoadAutomaticPlayerMarkings {
                     index: 1,
                     coach: Some("Coach".into()),
+                    ..Default::default()
                 },
             ),
             1,
@@ -2203,11 +1722,10 @@ mod tests {
         factory.replay_session_manager.lock().unwrap().register_sender(1, tx);
 
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientJoinReplay(ffb_protocol::client_commands::ClientJoinReplay {
+            AnyClientCommand::ClientJoinReplay(ffb_protocol::commands::client_command_join_replay::ClientCommandJoinReplay {
                 replay_name: Some("MyReplay".into()),
                 coach: Some("Alice".into()),
-                game_id: 42,
-            }),
+                game_id: 42, ..Default::default() }),
             1,
         )).await;
 
@@ -2229,11 +1747,10 @@ mod tests {
         let factory = ServerCommandHandlerFactory::new(Arc::clone(&gc), Arc::clone(&sm_arc), db());
 
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientReplay(ffb_protocol::client_commands::ClientReplay {
+            AnyClientCommand::ClientReplay(ffb_protocol::commands::client_command_replay::ClientCommandReplay {
                 game_id,
                 replay_to_command_nr: 0,
-                coach: Some("coach".into()),
-            }),
+                coach: Some("coach".into()), ..Default::default() }),
             1,
         )).await;
 
@@ -2263,13 +1780,12 @@ mod tests {
         );
 
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientReplayStatus(ffb_protocol::client_commands::ClientReplayStatus {
+            AnyClientCommand::ClientReplayStatus(ffb_protocol::commands::client_command_replay_status::ClientCommandReplayStatus {
                 command_nr: 10,
                 speed: 1,
                 running: true,
                 forward: true,
-                skip: false,
-            }),
+                skip: false, ..Default::default() }),
             1,
         )).await;
 
@@ -2504,7 +2020,7 @@ mod tests {
         let mut settings = std::collections::HashMap::new();
         settings.insert("soundVolume".to_string(), "80".to_string());
         factory.handle_command(ReceivedCommand::new(
-            ClientCommand::ClientUserSettings(ffb_protocol::client_commands::ClientUserSettings { settings }),
+            AnyClientCommand::ClientUserSettings(ffb_protocol::commands::client_command_user_settings::ClientCommandUserSettings { settings, ..Default::default() }),
             1,
         )).await;
 

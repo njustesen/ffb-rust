@@ -9,15 +9,19 @@ use crate::net_command::NetCommand;
 pub struct ServerCommandPasswordChallenge {
     /// Java: base-class `ServerCommand.fCommandNr`.
     pub command_nr: i32,
-    /// Java: `fChallenge` — the challenge string.
-    pub challenge: String,
+    /// Java: `fChallenge` — the challenge string; null in standalone mode (serialized as JSON null).
+    pub challenge: Option<String>,
 }
 
 impl ServerCommandPasswordChallenge {
     pub fn new(challenge: impl Into<String>) -> Self {
-        Self { command_nr: 0, challenge: challenge.into() }
+        Self { command_nr: 0, challenge: Some(challenge.into()) }
     }
-    pub fn get_challenge(&self) -> &str { &self.challenge }
+    /// Java: `new ServerCommandPasswordChallenge(String pChallenge)` with a possibly-null challenge.
+    pub fn with_challenge(challenge: Option<String>) -> Self {
+        Self { command_nr: 0, challenge }
+    }
+    pub fn get_challenge(&self) -> Option<&str> { self.challenge.as_deref() }
 
     /// Java: `isReplayable()`.
     pub fn is_replayable(&self) -> bool {
@@ -37,7 +41,7 @@ impl ServerCommandPasswordChallenge {
         let base = ServerCommand::base_from_json(json);
         Self {
             command_nr: base.command_nr,
-            challenge: json.get("challenge").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
+            challenge: json.get("challenge").and_then(|v| v.as_str()).map(str::to_string),
         }
     }
 }
@@ -60,13 +64,13 @@ mod tests {
     #[test]
     fn challenge_stored() {
         let cmd = ServerCommandPasswordChallenge::new("abc123");
-        assert_eq!(cmd.get_challenge(), "abc123");
+        assert_eq!(cmd.get_challenge(), Some("abc123"));
     }
 
     #[test]
-    fn default_empty() {
+    fn default_null() {
         let cmd = ServerCommandPasswordChallenge::default();
-        assert!(cmd.challenge.is_empty());
+        assert!(cmd.challenge.is_none());
     }
 
     #[test]
@@ -94,14 +98,16 @@ mod tests {
         let json = cmd.to_json_value();
         let restored = ServerCommandPasswordChallenge::from_json(&json);
         assert_eq!(restored.command_nr, 2);
-        assert_eq!(restored.challenge, "xyz789");
+        assert_eq!(restored.challenge.as_deref(), Some("xyz789"));
     }
 
     #[test]
     fn round_trip_with_no_challenge() {
         let cmd = ServerCommandPasswordChallenge::default();
         let json = cmd.to_json_value();
+        // Java: JsonStringOption.addTo(null) -> JsonValue.valueOf(null) = JSON null.
+        assert!(json["challenge"].is_null());
         let restored = ServerCommandPasswordChallenge::from_json(&json);
-        assert!(restored.challenge.is_empty());
+        assert!(restored.challenge.is_none());
     }
 }

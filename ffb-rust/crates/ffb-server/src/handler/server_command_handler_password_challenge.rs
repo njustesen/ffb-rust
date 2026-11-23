@@ -2,7 +2,7 @@
 use std::sync::{Arc, Mutex};
 use ffb_model::enums::NetCommandId;
 use ffb_protocol::commands::client_command_password_challenge::ClientCommandPasswordChallenge;
-use ffb_protocol::server_commands::{ServerCommand, ServerPasswordChallenge};
+use ffb_protocol::commands::server_command_password_challenge::ServerCommandPasswordChallenge;
 use crate::model::received_command::SessionId;
 use crate::net::session_manager::SessionManager;
 use crate::request::fumbbl::fumbbl_request_password_challenge::FumbblRequestPasswordChallenge;
@@ -85,12 +85,13 @@ impl ServerCommandHandlerPasswordChallenge {
             None
         };
 
-        let command = ServerCommand::ServerPasswordChallenge(ServerPasswordChallenge {
-            challenge: challenge.unwrap_or_default(),
-        });
-        if let Ok(json) = serde_json::to_string(&command) {
-            self.session_manager.lock().unwrap().send_to(session_id, &json);
-        }
+        // Java: `sendPasswordChallenge(session, challenge)` -> `new ServerCommandPasswordChallenge(challenge)`;
+        // a null challenge serializes as `"challenge":null`.
+        let command = ServerCommandPasswordChallenge::with_challenge(challenge);
+        self.session_manager
+            .lock()
+            .unwrap()
+            .send_to(session_id, &command.to_json_value().to_string());
 
         true
     }
@@ -158,7 +159,7 @@ mod tests {
         let client = MockHttpClient { response: Err("connection refused".to_string()) };
         assert!(handler.handle_command(&cmd, 1, &client));
         let msg = rx.try_recv().expect("expected a ServerPasswordChallenge message");
-        assert!(msg.contains("\"challenge\":\"\""));
+        assert!(msg.contains("\"challenge\":null"));
     }
 
 }

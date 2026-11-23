@@ -12028,5 +12028,28 @@ parity, which §I-§M closed.
 - **P5 done-check** `scripts/gui_check.py` (written before P4 closes) + docs + push.
 
 ### RESUME HERE
-P1 not started. First unit: LZString port with Java-generated vectors, then the `/command` endpoint
-answering `clientRequestVersion` / `clientPasswordChallenge` the Java way.
+**2026-11-23, P1 in progress. Login works against the real Java client.**
+
+Done:
+- LZString (`798ea1a15`).
+- `/command` socket ported 1:1 (`net/command_socket.rs`):
+  - Binary and text frames; LZString on both directions.
+  - Decode via `NetCommandFactory.for_json_value`; `ReceivedCommand` carries `AnyClientCommand`.
+  - Pre-join sessions get an outgoing channel (`SessionManager::register_socket`).
+  - Compression defaults to true, as in Java's shipped `server.ini`/`client.ini`.
+- Factory dispatches the Java-mirror command structs directly. `decode_command(AnyClientCommand)` covers
+  the obvious game commands; the rest are `NotImplemented` until P4.
+- Wire fixes:
+  - `VERSION` = 3.2.0 (Java pom), not the Cargo version.
+  - `serverVersion` and `serverPasswordChallenge` built from the mirror `to_json_value`
+    (`"challenge":null` in standalone).
+- DEVIATION: no DB (`FFB_DB_URL` unset) means every targeted join is approved.
+
+Live probe: `ffb-server.exe 127.0.0.1:22227` + Java `AiMain -coach Kalimar -password test -server localhost
+-port 22227` (jar copied to the scratchpad). Result: version 3.2.0 accepted, null challenge, join of
+"LocalGame" approved, `serverTeamList` sent in Java shape, but the list is EMPTY.
+
+Next unit: team loading. Java standalone builds the team list from `ffb-server/teams/*.xml` (filtered by
+`<coach>`) and the rosters from `rosters/`. Then join-with-team → `serverUserSettings` + `serverJoin`,
+second coach → `serverGameState` from `Game::to_json_value()` (+ `transform` for away). Note: AiMain
+with an empty team list spams `clientActingPlayer` (harness quirk, not a server bug).

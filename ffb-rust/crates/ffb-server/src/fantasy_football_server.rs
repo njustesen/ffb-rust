@@ -100,16 +100,19 @@ impl FantasyFootballServer {
             Arc::clone(&self.db_connection_manager),
         ));
 
+        // Java: `context.addServlet(new ServletHolder(new CommandServlet(this)), "/command/*")`.
+        // Default `true`: Java's shipped `ffb-server/server.ini` sets `server.command.compression=true`
+        // and the client's `client.ini` sets `client.command.compression=true`; both ends must agree.
+        let command_compression = std::env::var("FFB_SERVER_COMMAND_COMPRESSION")
+            .map(|v| v.eq_ignore_ascii_case("true"))
+            .unwrap_or(true);
+
         let state = AppState {
             game_cache: Arc::clone(&self.game_cache),
             session_manager: Arc::clone(&self.session_manager),
             dispatch_tx: server_comms.sender(),
+            command_compression,
         };
-
-        // Java: `context.addServlet(new ServletHolder(new CommandServlet(this)), "/command/*")`.
-        let command_compression = std::env::var("FFB_SERVER_COMMAND_COMPRESSION")
-            .map(|v| v.eq_ignore_ascii_case("true"))
-            .unwrap_or(false);
         let command_servlet = CommandServlet::new(command_compression);
         let mut app: Router = command_servlet.configure(Router::new()).with_state(state);
 

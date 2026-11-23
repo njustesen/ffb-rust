@@ -1,5 +1,5 @@
 /// 1:1 translation of com.fumbbl.ffb.server.net.ReceivedCommand.
-use ffb_protocol::client_commands::ClientCommand;
+use ffb_protocol::commands::any_client_command::AnyClientCommand;
 use crate::net::commands::any_internal_server_command::AnyInternalServerCommand;
 
 /// Identifier for a connected WebSocket session.
@@ -9,7 +9,7 @@ pub type SessionId = u64;
 /// an `InternalServerCommand` (Java: `isClientCommand()`/`isInternalCommand()`). This enum is
 /// the Rust equivalent of that union — see `AnyInternalServerCommand`'s doc comment.
 pub enum ReceivedNetCommand {
-    Client(ClientCommand),
+    Client(AnyClientCommand),
     Internal(AnyInternalServerCommand),
 }
 
@@ -34,7 +34,7 @@ pub struct ReceivedCommand {
 }
 
 impl ReceivedCommand {
-    pub fn new(command: ClientCommand, session_id: SessionId) -> Self {
+    pub fn new(command: AnyClientCommand, session_id: SessionId) -> Self {
         Self { command: ReceivedNetCommand::Client(command), session_id }
     }
 
@@ -47,17 +47,17 @@ impl ReceivedCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffb_protocol::client_commands::{ClientCommand, ClientEndTurn};
+    use ffb_protocol::commands::client_command_end_turn::ClientCommandEndTurn;
 
     #[test]
     fn stores_command_and_session() {
-        let cmd = ReceivedCommand::new(ClientCommand::ClientEndTurn(ClientEndTurn {}), 7);
+        let cmd = ReceivedCommand::new(AnyClientCommand::ClientEndTurn(ClientCommandEndTurn::default()), 7);
         assert_eq!(cmd.session_id, 7);
     }
 
     #[test]
     fn client_command_is_client_not_internal() {
-        let cmd = ReceivedCommand::new(ClientCommand::ClientEndTurn(ClientEndTurn {}), 1);
+        let cmd = ReceivedCommand::new(AnyClientCommand::ClientEndTurn(ClientCommandEndTurn::default()), 1);
         assert!(cmd.command.is_client_command());
         assert!(!cmd.command.is_internal_command());
     }

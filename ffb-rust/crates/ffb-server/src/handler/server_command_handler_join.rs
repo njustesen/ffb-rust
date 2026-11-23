@@ -80,9 +80,18 @@ impl ServerCommandHandlerJoin {
             let coach = join_command.get_coach().unwrap_or_default().to_string();
             let supplied_password = join_command.get_password().unwrap_or_default().to_string();
 
-            let stored_password = self.query_password_for_coach(&coach).await;
+            // DEVIATION (§P, documented in BACKLOG §P): Java standalone always has a coach
+            // database. The Rust server may run without one (`FFB_DB_URL` unset) for local play;
+            // then there is no stored password to compare against and every join is approved.
+            let db_configured = self.db_connection_manager.lock().unwrap().pool_ready();
+            let password_ok = if db_configured {
+                let stored_password = self.query_password_for_coach(&coach).await;
+                stored_password.as_deref() == Some(supplied_password.as_str())
+            } else {
+                true
+            };
 
-            if stored_password.as_deref() == Some(supplied_password.as_str()) {
+            if password_ok {
                 // Java: `Arrays.asList("DEV", "STATE_EDIT")`.
                 let join_approved = InternalServerCommandJoinApproved::new(
                     join_command.get_game_id(),
@@ -192,35 +201,29 @@ mod tests {
         assert!(msg.contains("\"games\":[]"));
     }
 
-    /// Without a DB pool configured (the test default), `query_password_for_coach` always
-    /// returns `None`, so any supplied password fails the equality check — the wrong-password
-    /// status is sent, not a redispatch.
+    /// Asserts the handler took the approved branch: nothing sent to the session, and an
+    /// `InternalServerCommandJoinApproved` redispatched onto the command queue.
+    fn assert_join_approved(
+        rx: &mut mpsc::UnboundedReceiver<String>,
+        drx: &mut mpsc::UnboundedReceiver<ReceivedCommand>,
+    ) {
+        assert!(rx.try_recv().is_err(), "no status/lobby message expected on approval");
+        let redispatched = drx.try_recv().expect("expected a JoinApproved redispatch");
+        assert!(matches!(
+            redispatched.command,
+            crate::model::received_command::ReceivedNetCommand::Internal(AnyInternalServerCommand::JoinApproved(_))
+        ));
+    }
+
+    /// DEVIATION (BACKLOG §P): without a DB pool there is no stored password, so a targeted
+    /// join is approved for any supplied password (Java standalone always has a DB).
     #[tokio::test]
-    async fn targeted_join_without_db_pool_sends_wrong_password_status() {
+    async fn targeted_join_without_db_pool_is_approved() {
         let (gc, sm, db, mut rx) = setup_session();
         let (handler, mut drx) = handler_with_dispatch(gc, sm, db);
         let join = ClientCommandJoin { game_id: 5, coach: Some("Coach".into()), password: Some("test".into()), ..Default::default() };
         assert!(handler.handle_command(&join, 1).await);
-        let msg = rx.try_recv().expect("expected a ServerCommandStatus message");
-        assert!(msg.contains("Wrong Password"));
-        assert!(drx.try_recv().is_err(), "no redispatch should have happened");
-    }
-
-    /// A live DB pool is required for `query_password_for_coach` to ever return `Some(..)`
-    /// (see `db_connection_manager.rs`'s `pool_ready()` gate); without one, every targeted
-    /// join fails the password check, regardless of the supplied password — including an
-    /// empty one. `DbPasswordForCoachQuery::execute`'s own SQL-shape coverage lives in
-    /// `db/query/db_password_for_coach_query.rs`; this test only proves the wiring reaches
-    /// the wrong-password path when no pool is configured.
-    #[tokio::test]
-    async fn targeted_join_with_empty_password_and_no_db_pool_still_fails() {
-        let (gc, sm, db, mut rx) = setup_session();
-        let (handler, mut drx) = handler_with_dispatch(gc, sm, db);
-        let join = ClientCommandJoin { game_id: 5, coach: Some("Coach".into()), password: Some(String::new()), ..Default::default() };
-        assert!(handler.handle_command(&join, 1).await);
-        let msg = rx.try_recv().expect("expected a ServerCommandStatus message");
-        assert!(msg.contains("Wrong Password"));
-        assert!(drx.try_recv().is_err(), "no redispatch should have happened without a DB pool");
+        assert_join_approved(&mut rx, &mut drx);
     }
 
     #[tokio::test]
@@ -229,11 +232,7 @@ mod tests {
         let (handler, mut drx) = handler_with_dispatch(gc, sm, db);
         let join = ClientCommandJoin { game_name: Some("SomeGame".into()), coach: Some("Coach".into()), password: Some(String::new()), ..Default::default() };
         assert!(handler.handle_command(&join, 1).await);
-        // Targeted-by-name is still gated by the same (unconfigured) password check, so it
-        // reaches the wrong-password status path rather than the lobby game list.
-        let msg = rx.try_recv().expect("expected a ServerCommandStatus message, not a lobby game list");
-        assert!(msg.contains("Wrong Password"));
-        assert!(drx.try_recv().is_err());
+        assert_join_approved(&mut rx, &mut drx);
     }
 
     #[tokio::test]
@@ -242,8 +241,6 @@ mod tests {
         let (handler, mut drx) = handler_with_dispatch(gc, sm, db);
         let join = ClientCommandJoin { client_mode: Some(ClientMode::REPLAY), coach: Some("Coach".into()), password: Some(String::new()), ..Default::default() };
         assert!(handler.handle_command(&join, 1).await);
-        let msg = rx.try_recv().expect("expected a ServerCommandStatus message, not a lobby game list");
-        assert!(msg.contains("Wrong Password"));
-        assert!(drx.try_recv().is_err());
+        assert_join_approved(&mut rx, &mut drx);
     }
 }

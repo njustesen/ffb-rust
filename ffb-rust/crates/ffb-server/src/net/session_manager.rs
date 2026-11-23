@@ -48,6 +48,14 @@ impl SessionManager {
         self.senders.insert(session_id, sender);
     }
 
+    /// Registers a connected socket's outgoing channel before it has joined a game. Java
+    /// needs no equivalent: there `ServerCommunication.send(Session, ...)` writes to the Jetty
+    /// `Session` directly, which exists from connect on. `add_session` later re-registers the
+    /// same channel; `remove_session` drops it.
+    pub fn register_socket(&mut self, session_id: SessionId, sender: mpsc::UnboundedSender<String>) {
+        self.senders.insert(session_id, sender);
+    }
+
     /// Java: `removeSession(Session)`
     pub fn remove_session(&mut self, session_id: SessionId) {
         let game_id = self.get_game_id_for_session(session_id);

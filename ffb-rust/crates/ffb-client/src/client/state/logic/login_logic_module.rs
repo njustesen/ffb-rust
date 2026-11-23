@@ -229,7 +229,7 @@ impl LoginLogicModule {
         client: &mut FantasyFootballClient,
         net_command: &ServerCommandPasswordChallenge,
     ) {
-        let response = self.create_response(net_command.get_challenge());
+        let response = self.create_response(net_command.get_challenge().unwrap_or_default());
         if let Some(response) = response {
             self.send_join(client, response);
         } else {
