@@ -889,7 +889,6 @@ public class AiDecisionEngine implements Runnable {
         // Target: field min(maxOnField, available) players.
         // If already at or above target, don't add (surplus roster players stay on bench).
         int target = Math.min(maxOnField, available);
-        if (onField >= target) return;
 
         // Second pass: place reserve players until target is reached
         for (Player<?> player : homeTeam.getPlayers()) {
@@ -907,6 +906,31 @@ public class AiDecisionEngine implements Runnable {
                 fieldModel.setPlayerState(player, ps.changeBase(PlayerState.STANDING).changeActive(true));
                 occupied.add(pos);
                 onField++;
+            }
+        }
+
+        // Third pass: a saved setup made for older rules may hold fewer than the 3 players the
+        // line of scrimmage needs; move field players onto empty central LOS squares.
+        int onLos = 0;
+        for (FieldCoordinate c : occupied) {
+            if (c.getX() == 12 && c.getY() >= 4 && c.getY() <= 10) onLos++;
+        }
+        for (Player<?> player : homeTeam.getPlayers()) {
+            if (onLos >= 3) break;
+            FieldCoordinate coord = fieldModel.getPlayerCoordinate(player);
+            if (coord == null || coord.isBoxCoordinate() || !FieldCoordinateBounds.HALF_HOME.isInBounds(coord)
+                    || coord.getX() == 12 || !fieldModel.getPlayerState(player).canBeMovedDuringSetup()) {
+                continue;
+            }
+            for (int y = 4; y <= 10; y++) {
+                FieldCoordinate los = new FieldCoordinate(12, y);
+                if (!occupied.contains(los)) {
+                    occupied.remove(coord);
+                    occupied.add(los);
+                    fieldModel.setPlayerCoordinate(player, los);
+                    onLos++;
+                    break;
+                }
             }
         }
     }

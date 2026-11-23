@@ -1016,6 +1016,8 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
         }),
 
         AnyClientCommand::ClientKickOffResultChoice(_) => Ok(Action::Acknowledge),
+        // Java StepBloodLust CLIENT_BLOODLUST_ACTION: change the action to a move or keep it.
+        AnyClientCommand::ClientBloodlustAction(b) => Ok(Action::BloodlustAction { change: b.change }),
         // Java StepApothecary CLIENT_APOTHECARY_CHOICE: the chosen state and serious injury.
         AnyClientCommand::ClientApothecaryChoice(a) => Ok(Action::ApothecaryChoice {
             player_state: a.player_state.ok_or_else(|| missing("playerState"))?.0,
@@ -1081,6 +1083,10 @@ fn player_action_to_choice(action: PlayerAction) -> Option<PlayerActionChoice> {
 /// `SkillId`'s serde impl uses `rename_all = "camelCase"`, so we lowercase the
 /// first character before deserializing.
 fn parse_skill_id(s: &str) -> Option<SkillId> {
+    // Java sends the skill's display name ("Stand Firm"); the factory knows every name.
+    if let Some(id) = ffb_model::factory::skill_factory::SkillFactory::new().for_name(s) {
+        return Some(id);
+    }
     let camel = to_camel_case(s);
     serde_json::from_str::<SkillId>(&format!("\"{}\"", camel)).ok()
 }
