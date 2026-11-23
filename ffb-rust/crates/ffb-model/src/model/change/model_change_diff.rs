@@ -187,6 +187,8 @@ fn get<'a>(o: &'a Map<String, Value>, k: &str) -> &'a Value {
 struct Differ {
     list: ModelChangeList,
     uncovered: Vec<String>,
+    /// Java would have notified GAME_SET_DIALOG_PARAMETER (see `Game::dialog_set_count`).
+    dialog_set: bool,
 }
 
 impl Differ {
@@ -221,7 +223,12 @@ impl Differ {
         ];
         // GAME_KEYS has Option ids; flatten the covered ones.
         let table: Vec<(&str, &str)> = GAME_KEYS.iter().filter_map(|(k, id)| id.map(|id| (*k, id))).collect();
+        let mut handled = handled.to_vec();
+        handled.push("dialogParameter");
         self.scalars("game", b, a, &table, None, &handled);
+        if self.dialog_set || get(b, "dialogParameter") != get(a, "dialogParameter") {
+            self.list.add(change("gameSetDialogParameter", None, get(a, "dialogParameter").clone()));
+        }
         // Java `setTurnMode` moves the old mode into lastTurnMode itself, so after a turn-mode
         // change the engine's lastTurnMode is set again explicitly.
         let turn_mode_changed = get(b, "turnMode") != get(a, "turnMode");
@@ -241,10 +248,10 @@ impl Differ {
             let (bt, at) = (obj(get(b, td), td)?, obj(get(a, td), td)?);
             self.scalars(td, bt, at, TURN_DATA_KEYS, Some(side), &["homeData", "inducementSet"]);
             if get(bt, "inducementSet") != get(at, "inducementSet") {
-                self.uncovered.push(format!("{td}.inducementSet"));
+                self.inducement_set(td, side, obj(get(bt, "inducementSet"), td)?, obj(get(at, "inducementSet"), td)?);
             }
             if get(b, team) != get(a, team) {
-                self.uncovered.push(team.to_string());
+                self.team(team, obj(get(b, team), team)?, obj(get(a, team), team)?)?;
             }
         }
         self.acting_player(obj(get(b, "actingPlayer"), "actingPlayer")?, obj(get(a, "actingPlayer"), "actingPlayer")?);
@@ -256,25 +263,116 @@ impl Differ {
         Ok(())
     }
 
+    /// `InducementSet.addInducement` / `removeInducement` / `addPrayer` / `removePrayer`, keyed
+    /// home / away; cards are not covered yet.
+    fn inducement_set(&mut self, path: &str, side: &str, b: &Map<String, Value>, a: &Map<String, Value>) {
+        for k in ["cardsAvailable", "cardsActive", "cardsDeactivated", "starPlayerPositionIds"] {
+            if get(b, k) != get(a, k) {
+                self.uncovered.push(format!("{path}.inducementSet.{k}"));
+            }
+        }
+        let empty = Vec::new();
+        let by_type = |o: &Map<String, Value>| -> Vec<(String, Value)> {
+            get(o, "inducementArray").as_array().unwrap_or(&empty).iter()
+                .map(|i| (i.get("inducementType").and_then(Value::as_str).unwrap_or("").to_string(), i.clone()))
+                .collect()
+        };
+        let (bi, ai) = (by_type(b), by_type(a));
+        for (t, v) in &bi {
+            if !ai.iter().any(|(at, _)| at == t) {
+                self.list.add(change("inducementSetRemoveInducement", Some(side), v.clone()));
+            }
+        }
+        for (t, v) in &ai {
+            if bi.iter().find(|(bt, _)| bt == t).map(|(_, bv)| bv) != Some(v) {
+                self.list.add(change("inducementSetAddInducement", Some(side), v.clone()));
+            }
+        }
+        let set = |o: &Map<String, Value>| get(o, "prayers").as_array().cloned().unwrap_or_default();
+        let (bp, ap) = (set(b), set(a));
+        for p in bp.iter().filter(|p| !ap.contains(p)) {
+            self.list.add(change("inducementSetRemovePrayer", Some(side), p.clone()));
+        }
+        for p in ap.iter().filter(|p| !bp.contains(p)) {
+            self.list.add(change("inducementSetAddPrayer", Some(side), p.clone()));
+        }
+    }
+
+    /// A team: only a player's used skills travel as model changes (Java `RosterPlayer.markUsed`
+    /// / `markUnused` -> PLAYER_MARK_SKILL_USED / UNUSED, keyed by the player id).
+    fn team(&mut self, path: &str, b: &Map<String, Value>, a: &Map<String, Value>) -> Result<(), String> {
+        let mut keys: Vec<&String> = b.keys().chain(a.keys()).collect();
+        keys.sort();
+        keys.dedup();
+        for k in keys {
+            if k != "playerArray" && get(b, k) != get(a, k) {
+                self.uncovered.push(format!("{path}.{k}"));
+            }
+        }
+        let empty = Vec::new();
+        let bp = get(b, "playerArray").as_array().unwrap_or(&empty);
+        let ap = get(a, "playerArray").as_array().unwrap_or(&empty);
+        if bp.len() != ap.len() {
+            self.uncovered.push(format!("{path}.playerArray (players added/removed)"));
+            return Ok(());
+        }
+        for (be, ae) in bp.iter().zip(ap) {
+            if be == ae {
+                continue;
+            }
+            let (bo, ao) = (obj(be, "player")?, obj(ae, "player")?);
+            let id = get(ao, "playerId").as_str().unwrap_or("").to_string();
+            if get(bo, "playerId") != get(ao, "playerId") {
+                self.uncovered.push(format!("{path}.playerArray (order)"));
+                continue;
+            }
+            for k in ao.keys().chain(bo.keys()) {
+                if k != "usedSkills" && get(bo, k) != get(ao, k) {
+                    self.uncovered.push(format!("{path}.player[{id}].{k}"));
+                }
+            }
+            let set = |v: &Value| v.as_array().cloned().unwrap_or_default();
+            let (bu, au) = (set(get(bo, "usedSkills")), set(get(ao, "usedSkills")));
+            for sk in au.iter().filter(|x| !bu.contains(x)) {
+                self.list.add(change("playerMarkSkillUsed", Some(&id), sk.clone()));
+            }
+            for sk in bu.iter().filter(|x| !au.contains(x)) {
+                self.list.add(change("playerMarkSkillUnused", Some(&id), sk.clone()));
+            }
+        }
+        Ok(())
+    }
+
     fn acting_player(&mut self, b: &Map<String, Value>, a: &Map<String, Value>) {
         let id_changed = get(b, "playerId") != get(a, "playerId");
         if id_changed {
             // Java `setPlayerId` resets the acting player; every value is then set again.
             self.list.add(change("actingPlayerSetPlayerId", None, get(a, "playerId").clone()));
             let empty = Map::new();
-            self.scalars("actingPlayer", &empty, a, ACTING_PLAYER_KEYS, None, &["playerId", "usedSkills", "skillsGrantedBy", "fumblerooskiePending"]);
+            self.scalars("actingPlayer", &empty, a, ACTING_PLAYER_KEYS, None, &["playerId", "usedSkills", "skillsGrantedBy", "fumblerooskiePending", "playerStateOld"]);
         } else {
-            self.scalars("actingPlayer", b, a, ACTING_PLAYER_KEYS, None, &["playerId", "usedSkills", "skillsGrantedBy"]);
+            self.scalars("actingPlayer", b, a, ACTING_PLAYER_KEYS, None, &["playerId", "usedSkills", "skillsGrantedBy", "playerStateOld"]);
         }
         let as_set = |v: &Value| -> Vec<Value> { v.as_array().cloned().unwrap_or_default() };
         let (bu, au) = (as_set(get(b, "usedSkills")), as_set(get(a, "usedSkills")));
-        if bu != au {
+        // setPlayerId clears the used skills, so a new acting player re-marks every one.
+        if id_changed || bu != au {
             let base = if id_changed { Vec::new() } else { bu };
             for s in au.iter().filter(|s| !base.contains(s)) {
                 self.list.add(change("actingPlayerMarkSkillUsed", None, s.clone()));
             }
             for s in base.iter().filter(|s| !au.contains(s)) {
                 self.list.add(change("actingPlayerMarkSkillUnused", None, s.clone()));
+            }
+        }
+        // Java `setOldPlayerState` ignores a non-null value over a non-null one: clear it first.
+        let (bo, ao) = (get(b, "playerStateOld"), get(a, "playerStateOld"));
+        if id_changed || bo != ao {
+            if !ao.is_null() && (id_changed || !bo.is_null()) {
+                self.list.add(change("actingPlayerSetOldPlayerState", None, Value::Null));
+            }
+            if !(ao.is_null() && bo.is_null() && !id_changed) {
+                self.list.add(change("actingPlayerSetOldPlayerState", None, ao.clone()));
             }
         }
         if get(b, "skillsGrantedBy") != get(a, "skillsGrantedBy") {
@@ -294,10 +392,25 @@ impl Differ {
             let empty = Vec::new();
             let bs = get(b, k).as_array().unwrap_or(&empty);
             let as_ = get(a, k).as_array().unwrap_or(&empty);
+            if remove.is_none() {
+                // A Java List (blood spots): add-only, duplicates allowed -- a multiset difference.
+                let mut rest: Vec<&Value> = bs.iter().collect();
+                for e in as_ {
+                    match rest.iter().position(|x| *x == e) {
+                        Some(pos) => {
+                            rest.remove(pos);
+                        }
+                        None => self.list.add(change(add, None, e.clone())),
+                    }
+                }
+                if !rest.is_empty() {
+                    self.uncovered.push(format!("fieldModel.{k} (removed)"));
+                }
+                continue;
+            }
             for e in bs.iter().filter(|e| !as_.contains(e)) {
-                match remove {
-                    Some(id) => self.list.add(change(id, None, e.clone())),
-                    None => self.uncovered.push(format!("fieldModel.{k} (removed)")),
+                if let Some(id) = remove {
+                    self.list.add(change(id, None, e.clone()));
                 }
             }
             for e in as_.iter().filter(|e| !bs.contains(e)) {
@@ -327,7 +440,13 @@ impl Differ {
                 self.list.add(change("fieldModelSetPlayerState", Some(id), get(ao, "playerState").clone()));
             }
             if get(bo, "playerCoordinate") != get(ao, "playerCoordinate") {
-                self.list.add(change("fieldModelSetPlayerCoordinate", Some(id), get(ao, "playerCoordinate").clone()));
+                // Java `setPlayerCoordinate(player, null)` is a no-op; leaving the pitch entirely is
+                // `FieldModel.remove(player)` -> FIELD_MODEL_REMOVE_PLAYER.
+                if get(ao, "playerCoordinate").is_null() {
+                    self.list.add(change("fieldModelRemovePlayer", Some(id), Value::Null));
+                } else {
+                    self.list.add(change("fieldModelSetPlayerCoordinate", Some(id), get(ao, "playerCoordinate").clone()));
+                }
             }
             for k in ["cards", "cardEffects"] {
                 if get(bo, k) != get(ao, k) {
@@ -344,7 +463,10 @@ impl Differ {
     fn game_result(&mut self, b: &Map<String, Value>, a: &Map<String, Value>) -> Result<(), String> {
         for (side, k) in [("home", "teamResultHome"), ("away", "teamResultAway")] {
             let (bt, at) = (obj(get(b, k), k)?, obj(get(a, k), k)?);
-            self.scalars(k, bt, at, TEAM_RESULT_KEYS, Some(side), &["playerResults"]);
+            // pettyCashFromTvDiff, treasuryUsedOnInducements and stalling have setters that do not
+            // notify in Java: they never travel in a model sync (only in a whole serverGameState).
+            self.scalars(k, bt, at, TEAM_RESULT_KEYS, Some(side),
+                &["playerResults", "pettyCashFromTvDiff", "treasuryUsedOnInducements", "stalling"]);
             let empty = Vec::new();
             let bp = get(bt, "playerResults").as_array().unwrap_or(&empty);
             let ap = get(at, "playerResults").as_array().unwrap_or(&empty);
@@ -373,7 +495,9 @@ impl Differ {
 pub fn diff(before: &Game, after: &Game) -> Result<ModelChangeList, Vec<String>> {
     let b = before.to_json_value().map_err(|e| vec![format!("before: {e}")])?;
     let a = after.to_json_value().map_err(|e| vec![format!("after: {e}")])?;
-    let mut d = Differ { list: ModelChangeList::default(), uncovered: Vec::new() };
+    let dialog_set = before.dialog_set_count != after.dialog_set_count
+        && !(before.dialog_parameter.is_none() && after.dialog_parameter.is_none());
+    let mut d = Differ { list: ModelChangeList::default(), uncovered: Vec::new(), dialog_set };
     d.game(&b, &a).map_err(|e| vec![e])?;
     if d.uncovered.is_empty() {
         Ok(d.list)
@@ -547,6 +671,14 @@ fn canonical(v: &Value) -> Value {
 /// Applies `list` to a copy of `before` with the Java `ModelChangeProcessor` and checks the result
 /// against `after` (game and turn time excluded: they travel in the sync command).
 pub fn self_check(before: &Game, after: &Game, list: &ModelChangeList) -> Result<(), String> {
+    self_check_with(before, after, list, |_| {})
+}
+
+/// `self_check` with `normalize` applied to both the replayed and the expected game first.
+pub fn self_check_with(before: &Game, after: &Game, list: &ModelChangeList, normalize: impl Fn(&mut Game)) -> Result<(), String> {
+    let mut expected = after.clone();
+    normalize(&mut expected);
+    let after = &expected;
     let mut game = before.clone();
     let processor = ModelChangeProcessor::new();
     for c in list.iter() {
@@ -555,13 +687,30 @@ pub fn self_check(before: &Game, after: &Game, list: &ModelChangeList) -> Result
     }
     game.turn_time = after.turn_time;
     game.game_time = after.game_time;
+    for (g, a) in [(&mut game.game_result.home, &after.game_result.home), (&mut game.game_result.away, &after.game_result.away)] {
+        g.petty_cash_from_tv_diff = a.petty_cash_from_tv_diff;
+        g.treasury_spent_on_inducements = a.treasury_spent_on_inducements;
+        g.stalled = a.stalled;
+    }
+    normalize(&mut game);
     let got = canonical(&game.to_json_value()?);
     let want = canonical(&after.to_json_value()?);
     if got == want {
         return Ok(());
     }
     let (g, w) = (got.as_object().cloned().unwrap_or_default(), want.as_object().cloned().unwrap_or_default());
-    let differing: Vec<&String> = w.keys().filter(|k| g.get(*k) != w.get(*k)).collect();
+    let mut differing: Vec<String> = Vec::new();
+    for k in w.keys().filter(|k| g.get(*k) != w.get(*k)) {
+        match (g.get(k).and_then(Value::as_object), w.get(k).and_then(Value::as_object)) {
+            (Some(go), Some(wo)) => {
+                for sk in wo.keys().filter(|sk| go.get(*sk) != wo.get(*sk)) {
+                    let show = |v: Option<&Value>| v.map(|v| v.to_string()).unwrap_or_default().chars().take(80).collect::<String>();
+                    differing.push(format!("{k}.{sk} got {} want {}", show(go.get(sk)), show(wo.get(sk))));
+                }
+            }
+            _ => differing.push(k.clone()),
+        }
+    }
     Err(format!("model change list does not reproduce the game; differing keys: {differing:?}"))
 }
 
@@ -638,6 +787,18 @@ mod tests {
         let before = game();
         let mut after = before.clone();
         after.team_home.name = "renamed".into();
-        assert_eq!(diff(&before, &after).unwrap_err(), vec!["teamHome".to_string()]);
+        assert_eq!(diff(&before, &after).unwrap_err(), vec!["teamHome.teamName".to_string()]);
+    }
+
+    /// Java RosterPlayer.markUsed -> playerMarkSkillUsed keyed by the player.
+    #[test]
+    fn used_skill_becomes_player_mark_skill_used() {
+        let mut before = game();
+        before.team_home.players[0].extra_skills.push(crate::model::skill_def::SkillWithValue::new(crate::enums::SkillId::Block));
+        let mut after = before.clone();
+        after.team_home.players[0].used_skills.insert(crate::enums::SkillId::Block);
+        let list = diff(&before, &after).unwrap();
+        assert!(list.iter().any(|c| c.change_id == ModelChangeId::PlayerMarkSkillUsed && c.get_key() == Some("h1")));
+        self_check(&before, &after, &list).unwrap();
     }
 }

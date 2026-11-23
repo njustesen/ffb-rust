@@ -640,6 +640,10 @@ impl ServerCommandHandlerFactory {
             }
             _ => None,
         };
+        let touchback_coordinate = match &client_command {
+            AnyClientCommand::ClientTouchback(t) => t.ball_coordinate.map(|c| if side == TeamSide::Away { c.transform() } else { c }),
+            _ => None,
+        };
         let action = match decode_command(client_command, side) {
             Ok(a) => a,
             Err(e) => {
@@ -668,14 +672,36 @@ impl ServerCommandHandlerFactory {
             }
             action = Action::ConfirmSetup;
         }
+        if let Action::Touchback { player_id } = &mut action {
+            if let (Some(c), Some(game)) = (touchback_coordinate, gs.get_game()) {
+                *player_id = game.field_model.player_at(c).map(|p| p.to_string()).unwrap_or_default();
+            }
+        }
+        // The engine steps for these player-choice modes match `Action::PlayerChoice` (by mode);
+        // every other PlayerChoice prompt is answered with `SelectPlayer` ("" = declined).
+        if let (Some(ffb_model::prompts::AgentPrompt::PlayerChoice { reason, .. }), Action::PlayerChoice { player_id, .. }) = (&prompt, &action) {
+            const BY_MODE: &[&str] = &["DIVING_TACKLE", "TENTACLES", "SHADOWING", "MVP", "ANIMAL_SAVAGERY", "PICK_ME_UP", "QUICK_BITE", "FURIOUS_OUTBURST"];
+            if !BY_MODE.contains(&reason.as_str()) {
+                action = Action::SelectPlayer { player_id: player_id.clone().unwrap_or_default() };
+            }
+        }
         if matches!(action, Action::StartGame { .. }) && prompt.is_some() {
             log::debug!("game {game_id}: {action:?} unhandled while the engine waits for a prompt");
             return;
         }
         log::debug!("game {game_id}: engine <- {action:?} ({side:?})");
-        if let Err(e) = gs.handle_action(side, action) {
-            log::warn!("engine rejected action from session {}: {}", session_id, e);
-            return;
+        // An engine panic must not poison the game cache (every later command would fail).
+        let applied = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| gs.handle_action(side, action)));
+        match applied {
+            Ok(Ok(_)) => {}
+            Ok(Err(e)) => {
+                log::warn!("engine rejected action from session {}: {}", session_id, e);
+                return;
+            }
+            Err(_) => {
+                log::error!("game {game_id}: engine panicked on a command from session {session_id}");
+                return;
+            }
         }
         log::debug!(
             "game {game_id}: engine done, prompt {:?}",
@@ -683,6 +709,14 @@ impl ServerCommandHandlerFactory {
         );
         // Java: the step's model changes reach the clients via `UtilServerGame.syncGameModel`.
         crate::util::server_game_sync::sync_game(gs, &self.session_manager);
+        if gs.is_finished() {
+            if let Some(g) = gs.get_game() {
+                log::info!(
+                    "GAME FINISHED game {game_id}: {} {} - {} {}",
+                    g.team_home.name, g.game_result.home.score, g.game_result.away.score, g.team_away.name
+                );
+            }
+        }
     }
 
     /// Java: `UtilServerSetup.loadTeamSetup(gameState, setupName)` while the setup step waits.
@@ -973,11 +1007,27 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
         AnyClientCommand::ClientConfirm(_) => Ok(Action::Acknowledge),
         AnyClientCommand::ClientArgueTheCall(a) => Ok(Action::ArgueTheCall { argue: !a.player_ids.is_empty() }),
 
-        AnyClientCommand::ClientPlayerChoice(p) => Ok(Action::SelectPlayer {
-            player_id: p.player_ids.into_iter().next().ok_or_else(|| missing("playerIds"))?,
+        // Java DialogPlayerChoice answer; an empty selection declines. Re-shaped per prompt in
+        // `handle_command` (some steps take `SelectPlayer`).
+        AnyClientCommand::ClientPlayerChoice(p) => Ok(Action::PlayerChoice {
+            player_id: p.player_ids.first().cloned(),
+            mode: p.player_choice_mode.map(|m| format!("{m:?}")).unwrap_or_default(),
+            player_ids: p.player_ids,
         }),
 
         AnyClientCommand::ClientKickOffResultChoice(_) => Ok(Action::Acknowledge),
+        // Java StepApothecary CLIENT_APOTHECARY_CHOICE: the chosen state and serious injury.
+        AnyClientCommand::ClientApothecaryChoice(a) => Ok(Action::ApothecaryChoice {
+            player_state: a.player_state.ok_or_else(|| missing("playerState"))?.0,
+            serious_injury: a.serious_injury.and_then(|si| serde_json::to_string(&si).ok()).map(|s| s.trim_matches('"').to_string()),
+        }),
+        // Java StepTouchback: the ball coordinate (mirrored from the away coach). The engine
+        // takes the receiving player; `handle_command` resolves the player on that square.
+        AnyClientCommand::ClientTouchback(_) => Ok(Action::Touchback { player_id: String::new() }),
+        // Java StepSelectBlitzTarget / StepSelectGazeTarget: CLIENT_TARGET_SELECTED.
+        AnyClientCommand::ClientTargetSelected(t) => Ok(Action::SelectPlayer {
+            player_id: t.target_player_id.ok_or_else(|| missing("targetPlayerId"))?,
+        }),
 
         other => Err(DecodeError::NotImplemented(format!("{:?}", other.get_id()))),
     }

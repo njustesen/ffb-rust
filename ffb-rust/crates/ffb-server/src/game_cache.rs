@@ -429,6 +429,48 @@ mod tests {
     use ffb_model::enums::Rules;
     use ffb_model::model::player::Player;
 
+    /// BACKLOG §P: every team the standalone server offers (Java's `ffb-server/teams` + `rosters`)
+    /// loads against a BB2025 game -- as `joinWithTeam` re-reads them -- and the game state the
+    /// clients receive serializes (`Game.toJsonValue`), for both sides.
+    #[test]
+    fn every_standalone_team_serializes_in_a_bb2025_game() {
+        let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../ffb-java/ffb/ffb-server");
+        if !base.join("teams").is_dir() {
+            return;
+        }
+        let mut teams = TeamCache::new();
+        teams.init(&base.join("teams")).unwrap();
+        let mut rosters = RosterCache::new();
+        rosters.init(&base.join("rosters")).unwrap();
+        let mut probe = Game::new(Team::default(), Team::default(), Rules::Bb2025);
+        ffb_engine::util::util_server_start_game::UtilServerStartGame::add_default_game_options(&mut probe);
+        let ids: Vec<String> = std::fs::read_dir(base.join("teams")).unwrap()
+            .filter_map(|e| e.ok())
+            .filter_map(|e| std::fs::read_to_string(e.path()).ok())
+            .filter_map(|xml| xml.split("<team id=\"").nth(1).and_then(|r| r.split('"').next()).map(str::to_string))
+            .collect();
+        let mut failures = Vec::new();
+        for id in &ids {
+            let team = match GameCache::get_team_by_id_for_game(id, Some(&probe), &teams, &rosters) {
+                Ok(t) => t,
+                // A team without its roster file fails in Java's RosterCache too.
+                Err(e) if e.to_string().starts_with("No roster found") => continue,
+                Err(e) => {
+                    failures.push(format!("{id}: load {e}"));
+                    continue;
+                }
+            };
+            let mut game = probe.clone();
+            GameCache::add_team_to_game(&mut game, team.clone(), true);
+            GameCache::add_team_to_game(&mut game, team, false);
+            if let Err(e) = game.to_json_value() {
+                failures.push(format!("{id}: {e}"));
+            }
+        }
+        assert!(ids.len() > 50, "only {} teams found", ids.len());
+        assert!(failures.is_empty(), "{} of {} teams fail:\n{}", failures.len(), ids.len(), failures.join("\n"));
+    }
+
     #[test]
     fn create_and_lookup() {
         let mut cache = GameCache::new();

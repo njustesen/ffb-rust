@@ -1275,6 +1275,12 @@ impl DriverGameState {
         self.stack.insert(insert_at, entry);
     }
 
+    /// Whether a step is waiting for a command (Java: the current step can handle one). After the
+    /// game has ended nothing waits, and Java's commands then fall on no step at all.
+    pub fn has_waiting_step(&self) -> bool {
+        self.current.is_some()
+    }
+
     pub fn apply_action(&mut self, action: Action) {
         let mut entry = self.current.take().expect("apply_action() with no waiting step");
         let def_before_cmd = self.game.defender_id.clone();

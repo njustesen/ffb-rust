@@ -472,7 +472,8 @@ public class AiDecisionEngine implements Runnable {
                     blitzCands.toArray(new Player<?>[0]), bArr, null, "SELECT_BLITZ_TARGET");
                 movePolicy.recordAction();
                 int chosen = PolicySampler.sample(bArr, T_PLAYER, random);
-                client.getCommunication().sendActingPlayer(blitzCands.get(chosen), PlayerAction.BLITZ, false);
+                // StepSelectBlitzTarget waits for CLIENT_TARGET_SELECTED (not CLIENT_ACTING_PLAYER).
+                client.getCommunication().sendTargetSelected(blitzCands.get(chosen).getId());
                 break;
             }
 
@@ -844,7 +845,10 @@ public class AiDecisionEngine implements Runnable {
     private boolean isActiveStateContinueDialog(IDialogParameter param) {
         if (param == null) return false;
         DialogId id = param.getId();
-        return id == DialogId.START_GAME || id == DialogId.TEAM_SETUP;
+        // Target-selection dialogs are answered from the active state (SELECT_BLITZ_TARGET /
+        // SELECT_GAZE_TARGET) with CLIENT_TARGET_SELECTED; the server clears the dialog afterwards.
+        return id == DialogId.START_GAME || id == DialogId.TEAM_SETUP
+            || id == DialogId.SELECT_BLITZ_TARGET || id == DialogId.SELECT_GAZE_TARGET;
     }
 
     /**

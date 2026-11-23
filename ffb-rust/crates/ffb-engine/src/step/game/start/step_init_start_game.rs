@@ -91,7 +91,8 @@ impl StepInitStartGame {
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis())
                 .unwrap_or(0);
-            game.started = Some(millis.to_string());
+            // Java writes the Date as `yyyy-MM-dd'T'HH:mm:ss.SSS` (UtilJson).
+            game.started = Some(ffb_model::util::java_json::format_date_millis(millis as i64));
         }
         game.status = GameStatus::Active;
         StepOutcome::next()

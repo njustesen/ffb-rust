@@ -19,6 +19,7 @@ impl UtilServerDialog {
     pub fn show_dialog(game: &mut Game, dialog_parameter: DialogParameter, stop_turn_timer: bool) {
         game.dialog_id = Some(dialog_parameter.get_id());
         game.dialog_parameter = Some(dialog_parameter);
+        game.dialog_set_count += 1;
         if stop_turn_timer {
             game.waiting_for_opponent = true;
             // UtilServerTimer::stop_turn_timer — skipped (WebSocket layer)
@@ -28,7 +29,9 @@ impl UtilServerDialog {
     /// Java: UtilServerDialog.hideDialog(GameState)
     pub fn hide_dialog(game: &mut Game) {
         game.dialog_id = None;
-        game.dialog_parameter = None;
+        if game.dialog_parameter.take().is_some() {
+            game.dialog_set_count += 1;
+        }
         game.waiting_for_opponent = false;
         // UtilServerTimer::start_turn_timer — skipped (WebSocket layer)
     }

@@ -125,6 +125,7 @@ impl GameState {
     /// Java: `gameState.handleCommand(receivedCommand)` → step dispatch
     pub fn handle_action(&mut self, side: TeamSide, action: Action) -> Result<Vec<GameEvent>, String> {
         match &mut self.driver {
+            Some(driver) if !driver.has_waiting_step() => Err("no step waits for a command".to_string()),
             Some(driver) => driver.apply(side, action),
             None => Err("game not started".to_string()),
         }

@@ -185,6 +185,12 @@ pub struct Game {
     /// writes null). Only the replay `ModelChangeProcessor` sets it (BACKLOG §O).
     #[serde(skip)]
     pub turn_mode_null: bool,
+    /// BACKLOG §P: how often Java's `setDialogParameter` would have notified its observers (every
+    /// non-null set, and a set to null from non-null). The server's model-change diff re-sends the
+    /// dialog when this moved even if the parameter's content did not -- a client sees a NEW
+    /// dialog for the same question asked again (e.g. Shadowing on the next square). Not state.
+    #[serde(skip)]
+    pub dialog_set_count: u64,
 }
 
 impl Game {
@@ -248,6 +254,7 @@ impl Game {
             zapped_players: Vec::new(),
             command_re_roll_source: None,
             turn_mode_null: false,
+            dialog_set_count: 0,
         }
     }
 
@@ -454,6 +461,7 @@ impl Game {
         t.setup_offense = self.setup_offense;
         t.waiting_for_opponent = self.waiting_for_opponent;
         t.dialog_parameter = self.dialog_parameter.clone();
+        t.dialog_set_count = self.dialog_set_count;
         t.defender_id = self.defender_id.clone();
         t.defender_action = self.defender_action;
         t.turn_time = self.turn_time;

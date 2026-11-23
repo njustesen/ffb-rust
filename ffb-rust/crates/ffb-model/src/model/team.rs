@@ -353,7 +353,10 @@ impl IXmlReadable for Team {
             // Java: `<division>`/`<baseIconPath>`/`<logo>` — administrative/cosmetic-only
             // fields with no field on this struct; discarded, same treatment as elsewhere.
             if tag == XML_TAG_RULE {
-                self.special_rules.push(value.to_string());
+                // Java: `SpecialRule.from(pValue)`; an unknown rule is logged and dropped.
+                if SpecialRule::from(value).is_some() {
+                    self.special_rules.push(value.to_string());
+                }
             }
         }
         complete

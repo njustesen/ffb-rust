@@ -371,7 +371,7 @@ impl StepApplyKickoffResult {
                       else   { &mut game.turn_data_away.inducement_set };
             let type_id = set.for_usage(Usage::AVOID_BAN)
                 .map(|s| s.to_string())
-                .unwrap_or_else(|| "BRIBE".to_string());
+                .unwrap_or_else(|| "bribes".to_string()); // Java InducementType "bribes"
             let mut ind = set.get(&type_id)
                 .unwrap_or_else(|| Inducement::new(type_id.clone(), 0, vec![Usage::AVOID_BAN]));
             ind.value += 1;

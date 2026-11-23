@@ -84,6 +84,29 @@ pub fn get_date(obj: &JsonObject, key: &str) -> Result<Option<String>, String> {
     }
 }
 
+/// The canonical `yyyy-MM-dd'T'HH:mm:ss.SSS` text of a UTC instant in epoch milliseconds (what
+/// `UtilJson` writes for a `new Date()`; the server runs in UTC).
+pub fn format_date_millis(millis: i64) -> String {
+    let (days, ms) = (millis.div_euclid(86_400_000), millis.rem_euclid(86_400_000));
+    // H. Hinnant's civil_from_days.
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + if m <= 2 { 1 } else { 0 };
+    format!(
+        "{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}.{:03}",
+        ms / 3_600_000,
+        ms / 60_000 % 60,
+        ms / 1000 % 60,
+        ms % 1000
+    )
+}
+
 /// `yyyy-MM-dd'T'HH:mm:ss.SSS`, ASCII digits, every field in its calendar range (so the lenient
 /// Java parse does not roll it over).
 fn is_canonical_timestamp(s: &str) -> bool {
@@ -348,6 +371,14 @@ pub fn string_map(map: &[(String, Option<String>)]) -> Value {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn format_date_millis_is_canonical_utc() {
+        assert_eq!(format_date_millis(0), "1970-01-01T00:00:00.000");
+        assert_eq!(format_date_millis(951_782_400_123), "2000-02-29T00:00:00.123");
+        assert_eq!(format_date_millis(1_795_453_448_027), "2026-11-23T17:04:08.027");
+        assert!(is_canonical_timestamp(&format_date_millis(1_795_453_448_027)));
+    }
 
     #[test]
     fn get_long_and_get_date_follow_the_java_options() {
