@@ -34,6 +34,7 @@ mod ffbr;
 mod game_state_serializer;
 mod java_double;
 mod java_names;
+mod mde;
 mod replay_report;
 mod start_check;
 mod start_of_game;

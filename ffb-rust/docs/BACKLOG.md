@@ -11722,26 +11722,66 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
   patterns, 6,000 tie-prone binary fractions). New gate **`ffb-replay double-check <java_dir>`**: every number
   text in `"scores":[...]` == `json_double(parse(text))`; o3_fumbbl_java: **225,498 numbers, 1,991 distinct,
   0 different**. Not yet run on run5 (9.5 GB; held back while the corpus actions run is reading the disk).
-- `cargo test --workspace` green (15,149 passed).
+- `cargo test --workspace` green (15,149 passed). Commit `0e3554140`.
+- **O3(b) step 2 DONE (same session): the MoveDecisionEngine records in Rust.** `replay/mde.rs` = 1:1
+  `ActionScore`, `PolicySampler.argmax`, `PathProbabilityFinder.findAllPaths` (with a 1:1
+  `java.util.PriorityQueue` siftUp/siftDownComparable -- tie order decides which node, hence which step
+  count, a square keeps, which feeds the GFI probabilities further out; the ruleset's DodgeModifierFactory
+  find_applicable + find_skill_modifiers, AgilityMechanic min roll via `minimum_roll_edition` with the
+  *_with_modifiers stats, GoForIt applicable + card + skill with an EMPTY moles set), `selectPlayer` /
+  `selectMoveTarget` + helpers (`getStrengthWithModifiers(game)` = minus this game's SI/SI-decay ST
+  decreases; `canCancel(p)` = the skill's per-edition properties contain `cancels<P>` over
+  `getSkills()` without temporary ones; `hasSkillProperty` = `has_skill_property_in(game.rules, ..)`).
+  `actions.rs`: `flushMoveTarget` at PLAYER_ACTION / TURN_END / the end (`MOVE_TARGET_FLUSH`),
+  `buildPlayerSelectRecord`, move-target setup post-change (`MOVE_TARGET_SETUP`). Gate `ffb-replay actions`
+  now compares EVERY record (`FFB_REPLAY_NO_MDE=1` = the old filter, for comparisons with run5) and writes
+  `run_info.json` {tool, tool_sha256 = sha256 of the running exe} like the Java run (the done-check needs it).
+- **Engine-model fix found by the gate:** `UtilPlayer::find_adjacent_prone_players` walked
+  `adjacent_on_pitch` (compass order N, NE, E, ...) where Java `findAdjacentCoordinates` walks rows (y outer,
+  x inner); MDE fouls `proneTargets[0]` -> another target (1965895 record 52: Java FOUL 1.098175, Rust
+  1.01134). Fixed with `UtilPlayer::java_adjacent_coordinates` (+ test). Engine callers: `server_util_block`
+  (dice-decoration ids, no RNG) and an `is_empty` check -- no certified behaviour depends on the order.
+  **Open (not goal-blocking, recorded for a later engine pass):** every other `UtilPlayer` 1:1 port built on
+  `adjacent_on_pitch` (`find_adjacent_players_with_tacklezones`, `find_adjacent_players`,
+  `find_adjacent_players_to_feed_on`, `find_blockable_players` distance 1) has the same order difference, and
+  `find_adjacent_coordinates` for distance > 1 walks x outer / y inner (Java: y outer); any engine caller that
+  takes the first element or draws per element is a latent divergence.
+- **Results (all records, MDE included, Java = o3 jar):** fumbbl/ **10/10** (5,409 records), partial+window
+  **9/9** (2,540), a spread sample of 44 night replays (every 50th, `D:/ffb_replay_parity/sample50`)
+  **44/44** (22,652 records); sample Java side: `o3_sort_check` vs run5 OK 0 (5,772 move_target lines
+  reordered, nothing else changed), `double-check` 1,024,826 numbers / 3,775 distinct / 0 different.
+  `cargo test --workspace` green (15,152 passed).
+- **Frozen Rust tool: `D:/ffb_replay_parity/bin/ffb-replay-o3b.exe`** (sha256 `b49763071e78...`, built from
+  this iteration's commit), re-verified 10/10 on fumbbl/ as the frozen copy.
 
 ### RESUME HERE
-**This iteration (2026-11-23, loop iteration 17):** O3(b) steps 1 + 3 done (see "O3 log -- iteration 17").
-**STILL RUNNING (detached, PID 31392, started 05:15):** the whole-corpus Rust actions run from iteration 16
-(`ffb-replay-o3a.exe actions D:/ffb_replay_parity/rust_actions_all D:/ffb_replay_parity/run5_java <5 dirs>`,
-~10 replays/min -> ~09:00; at 05:26 it was 100/100 identical). **The lifted run window ends 08:00:** if it is
-still running after 08:00, stop it (`powershell Stop-Process -Id 31392`) and work from the partial log (DIFF/ERROR
-lines, "first-diff kinds", final line; `tools/rec_diff.py` per DIFF); rerun the rest tonight.
-**Tonight (21:00-07:00, one corpus process at a time):** (a) run6 = the o3 jar over the whole corpus:
-`java -cp D:/ffb_replay_parity/bin/ffb-ai-replay-o3.jar com.fumbbl.ffb.ai.simulation.FumbblReplayParser
---per-replay D:/ffb_replay_parity/run6_java <the 5 corpus dirs>` (detached, affinity 0x7FF; see
-`tools/launch_actions_all.ps1` for the dir list), then `tools/o3_sort_check.py run6 run5` (must be OK 0) and
-`ffb-replay double-check D:/ffb_replay_parity/run6_java` (0 different). run5 stays the oracle until then.
-**Next unit (daytime OK, no corpus run needed): O3(b) step 2 = the Rust MDE ports** (see the plan in the
-iteration-16 block below: ActionScore, PolicySampler.argmax, PathProbabilityFinder.findAllPaths, selectPlayer /
-selectMoveTarget + UtilPlayer helpers, then `flushMoveTarget` / `buildPlayerSelectRecord` in `actions.rs`;
-the Rust candidates must be emitted in the same (x, y) order; print scores with `java_double::json_double`
-into `CanonicalJson::Number`). Gate: `ffb-replay actions` against `o3_fumbbl_java` (already the o3 format)
-for fumbbl/ 10/10 first.
+**This iteration (2026-11-23, loop iteration 17):** O3(b) COMPLETE -- canonical move_target order (harness),
+Java number printing, the Rust MDE port; every record identical on 63/63 checked replays (see "O3 log --
+iteration 17"). **RUNNING (detached, `.loop_wait.json` = pids 14612 cmd + 26088 chain, until 2026-11-24 07:30):**
+`scripts/replay_night_chain.ps1` (launched via `D:/ffb_replay_parity/tools/launch_night_chain.ps1` ->
+`night_chain.cmd`, `start /AFFINITY 7FF`, verified mask 0x7FF): (0) waits for the iteration-16 o3a day run
+(PID 31392, states + non-MDE vs run5, log `D:/ffb_replay_parity/rust_actions_all.log`) and stops it at 08:00
+if still alive; (1) sleeps until 21:00; (2) **run6** = o3 jar `--per-replay D:/ffb_replay_parity/run6_java`
+over the 5 corpus dirs (~3.5 h); (3) if >= 4 h remain before 07:00, **rust6** = `ffb-replay-o3b.exe actions
+D:/ffb_replay_parity/rust6 D:/ffb_replay_parity/run6_java <5 dirs>` (~3.7 h); every phase stopped at 07:00.
+Chain log `D:/ffb_replay_parity/run6_java.chain.log`.
+**When it has finished, in this order:**
+1. Chain log: both phases "exited with code ..." (not STOPPED / NOT started). If rust6 was not started or
+   was stopped, run it the next night (same command, detached + affinity) -- run6 stays valid.
+2. Java side: `python -I D:/ffb_replay_parity/tools/o3_sort_check.py D:/ffb_replay_parity/run6_java
+   D:/ffb_replay_parity/run5_java` must print `OK 0` (states identical to run5, only move_target order
+   changed); `ffb-replay-o3b.exe double-check D:/ffb_replay_parity/run6_java` 0 different; `.log` "Done.
+   2224 replays, 0 incomplete", record-building errors `{}`.
+3. Rust side: `D:/ffb_replay_parity/rust6.log` final line `actions (all records): 2224 identical, 0
+   different, 0 errors`. Any DIFF -> `tools/rec_diff.py D:/ffb_replay_parity/rust6/<id>.actions.diff.txt`,
+   fix Rust 1:1, new frozen exe, rerun the reds then the corpus.
+4. All green -> write `ffb-rust/docs/replay_manifest.json` =
+   `{"java": {"tool": "D:/ffb_replay_parity/bin/ffb-ai-replay-o3.jar", "out": "D:/ffb_replay_parity/run6_java"},
+   "rust": {"tool": "D:/ffb_replay_parity/bin/ffb-replay-o3b.exe", "out": "D:/ffb_replay_parity/rust6"}}`,
+   run `python -I scripts/replay_parity_check.py` (must print DONE; it re-hashes both tools against the
+   run_info files and compares every states/actions file byte for byte), commit the manifest, push.
+Note the done-check compares the WHOLE actions file bytes incl. the `{"replay_id",...,"final_score_*"}`
+prefix -- the Rust gate writes the same prefix, and its own per-record compare already covers it.
 
 > History -- RESUME HERE of 2026-11-23 (loop iteration 16), superseded:
 **This iteration (2026-11-23, loop iteration 16):** O3(a) done -- every non-MDE action record identical on

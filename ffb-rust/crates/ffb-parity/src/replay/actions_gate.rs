@@ -3,10 +3,11 @@
 //! `--per-replay` formats) and compare with the Java run (`<java_dir>/<id>.actions.jsonl`,
 //! `.status.json`).
 //!
-//! Until the MoveDecisionEngine records are ported, the comparison leaves out the Java
-//! `player_select` / `move_target` lines and compares every OTHER record byte for byte (after the
-//! `replay_id/seq/final_score_*` prefix; the final score itself is compared separately), plus
-//! `record_errors`, `end_check` and `unknown_model_changes` of the status.
+//! Every record is compared byte for byte (after the `replay_id/seq/final_score_*` prefix; the
+//! final score itself is compared separately), plus `record_errors`, `end_check` and
+//! `unknown_model_changes` of the status. The MoveDecisionEngine records (`player_select`,
+//! `move_target`) need a Java run of the o3 harness (canonical move_target candidate order);
+//! `FFB_REPLAY_NO_MDE=1` leaves them out on both sides (to compare with an older Java run).
 
 use super::actions::Recorder;
 use super::canonical::write_json_string;
@@ -16,7 +17,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-/// The MDE record types, left out of the comparison while MDE is not ported.
+/// The MDE record types, left out of the comparison under `FFB_REPLAY_NO_MDE=1`.
 const MDE_TYPES: [&str; 2] = ["\"type\":\"player_select\"", "\"type\":\"move_target\""];
 
 /// A Java action line split into (final score, record text without its leading `{`).
@@ -75,12 +76,28 @@ pub fn actions(out_dir: &Path, java_dir: &Path, inputs: &[PathBuf]) -> i32 {
         eprintln!("cannot create {}: {e}", out_dir.display());
         return 2;
     }
+    // run_info.json like the Java --per-replay run: the done-check (scripts/replay_parity_check.py)
+    // only counts outputs whose tool_sha256 is the sha256 of the tool the manifest names.
+    let exe = std::env::current_exe().ok();
+    let tool_sha = exe.as_ref().and_then(|p| std::fs::read(p).ok()).map(|b| super::canonical::sha256_hex(&b));
+    let tool_path = exe.as_ref().map(|p| p.to_string_lossy().replace('\\', "/"));
+    let _ = std::fs::write(
+        out_dir.join("run_info.json"),
+        format!(
+            "{{\"tool\":{},\"tool_sha256\":{},\"replays\":{}}}\n",
+            json_string(tool_path.as_deref()),
+            json_string(tool_sha.as_deref()),
+            replays.len()
+        ),
+    );
     let (mut identical, mut different, mut errors) = (0u64, 0u64, 0u64);
     let (mut compared_records, mut skipped_mde) = (0u64, 0u64);
     let mut diff_kinds: BTreeMap<String, u64> = BTreeMap::new();
     let mut error_kinds: BTreeMap<String, u64> = BTreeMap::new();
+    let mde = std::env::var("FFB_REPLAY_NO_MDE").map_or(true, |v| v != "1");
     for (n, (id, path)) in replays.iter().enumerate() {
         let mut recorder = Recorder::new();
+        recorder.mde = mde;
         let result = replay_with(path, false, Some(&mut recorder));
         // Rust outputs, Java formats.
         let mut actions = String::new();
@@ -138,7 +155,7 @@ pub fn actions(out_dir: &Path, java_dir: &Path, inputs: &[PathBuf]) -> i32 {
                         problems.push(format!("final score java {score:?} rust {:?}", result.end_score));
                         break;
                     }
-                    if is_mde(record) {
+                    if !mde && is_mde(record) {
                         skipped_mde += 1;
                     } else {
                         java_records.push(record);
@@ -201,7 +218,8 @@ pub fn actions(out_dir: &Path, java_dir: &Path, inputs: &[PathBuf]) -> i32 {
         println!("  {c:6} {k}");
     }
     println!(
-        "actions (without MDE records): {identical} identical, {different} different, {errors} errors, of {} replays ({compared_records} records compared, {skipped_mde} java MDE records left out)",
+        "actions ({}): {identical} identical, {different} different, {errors} errors, of {} replays ({compared_records} records compared, {skipped_mde} java MDE records left out)",
+        if mde { "all records" } else { "without MDE records" },
         replays.len()
     );
     if different == 0 && errors == 0 && identical > 0 { 0 } else { 1 }

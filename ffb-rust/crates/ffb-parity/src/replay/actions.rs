@@ -9,13 +9,15 @@
 //! `record_errors[kind]` -- statements before the failing one keep their side effects, exactly
 //! as in Java.
 //!
-//! The two MoveDecisionEngine records (`player_select`, `move_target`) need the MDE scorers
-//! (DOUBLE scores, `java.util.Random`); until they are ported [`Recorder::mde`] is `false` and
-//! those records -- and only those -- are not produced (the gate then compares every other record).
+//! The two MoveDecisionEngine records (`player_select`, `move_target`) come from [`super::mde`]
+//! (argmax mode: no `java.util.Random` draw; DOUBLE scores printed by [`super::java_double`]);
+//! [`Recorder::mde`] = `false` leaves them out (to compare with a pre-o3 Java run).
 
 use super::canonical::CanonicalJson;
 use super::game_state_serializer::{self as gss, field_player_at, field_player_state, int, team_players, Obj};
+use super::java_double;
 use super::java_names;
+use super::mde;
 use super::replay_report::ReplayReport;
 use ffb_model::enums::TurnMode;
 use ffb_model::model::game::Game;
@@ -42,9 +44,8 @@ const CLASS_BB2016_ARGUE: &str = "com.fumbbl.ffb.report.bb2016.ReportArgueTheCal
 type R<T> = Result<T, String>;
 
 /// The record writer + every pending-state variable of `parseFile`.
-#[allow(dead_code)] // next_move_action is read by the MoveDecisionEngine records (not ported yet)
 pub struct Recorder {
-    /// Whether the MoveDecisionEngine records are produced (not ported yet: always false).
+    /// Whether the MoveDecisionEngine records (player_select, move_target) are produced.
     pub mde: bool,
     /// The record lines (`rec.toString()`), in write order.
     pub records: Vec<String>,
@@ -90,12 +91,18 @@ pub struct Recorder {
     // ── move_target (MDE) ──
     next_move_player_id: Option<String>,
     next_move_action: Option<&'static str>,
+    pending_move_player_id: Option<String>,
+    pending_move_action_type: Option<String>,
+    pending_move_state: Option<CanonicalJson>,
+    pending_move_cands: Option<Vec<FieldCoordinate>>,
+    pending_move_scores: Vec<f64>,
+    pending_move_has_end: bool,
 }
 
 impl Default for Recorder {
     fn default() -> Self {
         Recorder {
-            mde: false,
+            mde: true,
             records: Vec::new(),
             record_errors: BTreeMap::new(),
             first_errors: BTreeMap::new(),
@@ -128,6 +135,12 @@ impl Default for Recorder {
             touchback_pending: false,
             next_move_player_id: None,
             next_move_action: None,
+            pending_move_player_id: None,
+            pending_move_action_type: None,
+            pending_move_state: None,
+            pending_move_cands: None,
+            pending_move_scores: Vec::new(),
+            pending_move_has_end: false,
         }
     }
 }
@@ -444,7 +457,12 @@ impl Recorder {
             "PLAYER_ACTION" => {
                 let acting_player_id = report.string("actingPlayerId")?;
                 let action = report.enum_constant("playerAction", java_names::PLAYER_ACTION)?;
-                // flushMoveTarget: MoveDecisionEngine (not ported) -- nothing pending without it.
+                // Flush pending move_target
+                if self.pending_move_player_id.is_some() {
+                    let move_rec = self.flush_move_target(game)?;
+                    self.write_opt(move_rec);
+                    self.pending_move_player_id = None;
+                }
                 if action == Some("CHAINSAW") {
                     self.pending_chainsaw = true;
                     self.pending_chainsaw_state = Some(gss::serialize(game)?);
@@ -452,7 +470,9 @@ impl Recorder {
                     self.pending_chainsaw = false;
                     self.pending_chainsaw_state = None;
                 }
-                // rec = buildPlayerSelectRecord(game, pa): MoveDecisionEngine (not ported).
+                if self.mde {
+                    *rec = self.build_player_select_record(game, acting_player_id.as_deref(), action)?;
+                }
                 if action.is_some_and(is_movement_action) {
                     self.next_move_player_id = acting_player_id;
                     self.next_move_action = action;
@@ -462,7 +482,11 @@ impl Recorder {
                 }
             }
             "TURN_END" => {
-                // flushMoveTarget: MoveDecisionEngine (not ported) -- nothing pending without it.
+                if self.pending_move_player_id.is_some() {
+                    let move_rec = self.flush_move_target(game)?;
+                    self.write_opt(move_rec);
+                    self.pending_move_player_id = None;
+                }
             }
             _ => {}
         }
@@ -541,15 +565,144 @@ impl Recorder {
             self.touchback_state = None;
         }
 
-        // Move target setup: MoveDecisionEngine.selectMoveTarget (not ported).
+        // Move target setup (post-change)
         if self.next_move_player_id.is_some() {
+            if self.mde {
+                if let Err(e) = self.move_target_setup(game) {
+                    self.record_error("MOVE_TARGET_SETUP", e);
+                }
+            }
             self.next_move_player_id = None;
             self.next_move_action = None;
         }
     }
 
-    /// The final `flushMoveTarget` (MDE only; nothing pending without it).
-    pub fn finish(&mut self, _game: &Game) {}
+    /// `MoveDecisionEngine.selectMoveTarget` for the activated mover, kept pending until the
+    /// player's final square is known.
+    fn move_target_setup(&mut self, game: &Game) -> R<()> {
+        let ap = &game.acting_player;
+        let next_id = self.next_move_player_id.clone().expect("checked by the caller");
+        if ap.player_id.as_deref() != Some(next_id.as_str()) {
+            return Ok(());
+        }
+        let Some(p) = game.player(&next_id) else { return Ok(()) };
+        let is_home = game.team_home.has_player(&p.id);
+        let (my_team, op_team) = if is_home { (&game.team_home, &game.team_away) } else { (&game.team_away, &game.team_home) };
+        let mr = mde::select_move_target(game, ap, p, my_team, op_team, is_home);
+        if !mr.candidates.is_empty() {
+            // Java assigns field by field; a failing serialize leaves the older fields in place.
+            self.pending_move_player_id = Some(next_id);
+            self.pending_move_action_type = self.next_move_action.map(str::to_string);
+            self.pending_move_state = Some(gss::serialize(game)?);
+            // The harness sorts the candidates by (x, y); mde::select_move_target returns that order.
+            self.pending_move_cands = Some(mr.candidates);
+            self.pending_move_scores = mr.raw_scores;
+            self.pending_move_has_end = mr.has_end_option;
+        }
+        Ok(())
+    }
+
+    /// `flushMoveTarget`.
+    fn flush_move_target(&self, game: &Game) -> R<Option<CanonicalJson>> {
+        let (Some(player_id), Some(candidates), Some(state)) =
+            (self.pending_move_player_id.as_deref(), self.pending_move_cands.as_ref(), self.pending_move_state.as_ref())
+        else {
+            return Ok(None);
+        };
+        let Some(p) = game.player(player_id) else { return Ok(None) };
+        let final_coord = game.field_model.player_coordinate(&p.id);
+        let chosen = final_coord.and_then(|fc| candidates.iter().position(|c| *c == fc));
+        let Some(chosen) = chosen else { return Ok(None) };
+        let mut rec = Obj::new();
+        rec.str("type", "move_target");
+        rec.str("agent_mode", AGENT_MODE);
+        rec.str("player_id", player_id);
+        rec.str("action_type", self.pending_move_action_type.as_deref().unwrap_or("null"));
+        rec.bool("has_end_option", self.pending_move_has_end);
+        rec.int("action", chosen as i32);
+        rec.add("scores", double_array(&self.pending_move_scores)?);
+        let coords = candidates.iter().map(|fc| CanonicalJson::Array(vec![int(fc.x), int(fc.y)])).collect();
+        rec.add("candidates", CanonicalJson::Array(coords));
+        rec.add("state", state.clone());
+        Ok(Some(rec.build()))
+    }
+
+    /// `buildPlayerSelectRecord(game, report)` (on the pre-sync game).
+    fn build_player_select_record(&mut self, game: &Game, player_id: Option<&str>, action: Option<&str>) -> R<Option<CanonicalJson>> {
+        let (Some(player_id), Some(action)) = (player_id, action) else { return Ok(None) };
+        let Some(acting_player) = game.player(player_id) else { return Ok(None) };
+        let is_home = game.team_home.has_player(&acting_player.id);
+        let (my_team, opponent_team) = if is_home { (&game.team_home, &game.team_away) } else { (&game.team_away, &game.team_home) };
+        let sel = mde::select_player(game, my_team, opponent_team, is_home);
+        let chosen = (0..sel.candidate_players.len()).find(|&i| {
+            sel.candidate_players[i].as_deref() == Some(player_id) && sel.candidate_actions[i].map(mde_action_name) == Some(action)
+        });
+        if let Some(chosen) = chosen {
+            let mut rec = Obj::new();
+            rec.str("type", "player_select");
+            rec.str("agent_mode", AGENT_MODE);
+            rec.int("action", chosen as i32);
+            rec.add("scores", double_array(&sel.raw_scores)?);
+            rec.bool("in_mde_candidates", true);
+            let mut candidates = Vec::new();
+            for (cp, pa) in sel.candidate_players.iter().zip(sel.candidate_actions.iter()) {
+                let Some(cp) = cp else { continue };
+                let mut c = Obj::new();
+                c.str("player_id", cp);
+                c.str("action", pa.map(mde_action_name).unwrap_or("END_TURN"));
+                candidates.push(c.build());
+            }
+            rec.add("candidates", CanonicalJson::Array(candidates));
+            rec.bool("end_turn_option", true);
+            rec.add("state", gss::serialize(game)?);
+            return Ok(Some(rec.build()));
+        }
+        // Fallback: action not in MDE candidates (PASS, HAND_OVER, TTM, STAB, etc.)
+        let mut rec = Obj::new();
+        rec.str("type", "player_select");
+        rec.str("agent_mode", AGENT_MODE);
+        rec.int("action", 0);
+        rec.add("scores", empty_array());
+        rec.bool("in_mde_candidates", false);
+        let mut c = Obj::new();
+        c.str("player_id", player_id);
+        c.str("action", action);
+        rec.add("candidates", CanonicalJson::Array(vec![c.build()]));
+        rec.bool("end_turn_option", false);
+        rec.add("state", gss::serialize(game)?);
+        Ok(Some(rec.build()))
+    }
+
+    /// The final `flushMoveTarget`.
+    pub fn finish(&mut self, game: &Game) {
+        if self.pending_move_player_id.is_some() {
+            match self.flush_move_target(game) {
+                Ok(rec) => self.write_opt(rec),
+                Err(e) => self.record_error("MOVE_TARGET_FLUSH", e),
+            }
+        }
+    }
+}
+
+/// The Java name of the four actions `MoveDecisionEngine.selectPlayer` proposes.
+fn mde_action_name(a: ffb_model::enums::PlayerAction) -> &'static str {
+    use ffb_model::enums::PlayerAction as A;
+    match a {
+        A::Move => "MOVE",
+        A::Block => "BLOCK",
+        A::Blitz => "BLITZ",
+        A::Foul => "FOUL",
+        _ => unreachable!("selectPlayer proposes MOVE/BLOCK/BLITZ/FOUL only"),
+    }
+}
+
+/// `doubleArray(double[])`: minimal-json `JsonArray.add(double)` per element.
+fn double_array(values: &[f64]) -> R<CanonicalJson> {
+    let mut out = Vec::with_capacity(values.len());
+    for v in values {
+        out.push(CanonicalJson::Number(java_double::json_double(*v)?));
+    }
+    Ok(CanonicalJson::Array(out))
 }
 
 /// `isMovementAction`: every `*_MOVE` constant and MOVE.

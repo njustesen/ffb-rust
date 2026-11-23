@@ -81,7 +81,10 @@ impl UtilPlayer {
         result
     }
 
-    /// 1:1 translation of findAdjacentPronePlayers.
+    /// 1:1 translation of findAdjacentPronePlayers, in Java's ORDER: `findAdjacentCoordinates(coord,
+    /// FIELD, 1, false)` walks rows (y outer, x inner). The harness's MoveDecisionEngine fouls
+    /// `proneTargets[0]`, so the compass order of `adjacent_on_pitch` picked another target (replay
+    /// 1965895 record 52: FOUL scores 1.098175 Java vs 1.01134).
     pub fn find_adjacent_prone_players<'a>(
         game: &'a Game,
         team: &'a Team,
@@ -89,7 +92,7 @@ impl UtilPlayer {
     ) -> Vec<&'a PlayerId> {
         let field_model = &game.field_model;
         let mut result = Vec::new();
-        for adj_coord in field_model.adjacent_on_pitch(coord) {
+        for adj_coord in Self::java_adjacent_coordinates(coord, 1) {
             if let Some(id) = field_model.player_at(adj_coord) {
                 if team.has_player(id) {
                     if let Some(state) = field_model.player_state(id) {
@@ -790,6 +793,24 @@ impl UtilPlayer {
 
     /// Returns all coordinates within `distance` from `coord` that are on the pitch
     /// (Chebyshev distance — matches Java FieldModel.findAdjacentCoordinates).
+    /// Java `FieldModel.findAdjacentCoordinates(coord, FieldCoordinateBounds.FIELD, steps, false)`
+    /// in Java's order: `for y in -steps..=steps { for x in -steps..=steps { .. } }`, start
+    /// excluded, on-field only.
+    pub fn java_adjacent_coordinates(coord: FieldCoordinate, steps: i32) -> Vec<FieldCoordinate> {
+        let mut result = Vec::new();
+        for y in -steps..=steps {
+            for x in -steps..=steps {
+                if x != 0 || y != 0 {
+                    let c = FieldCoordinate::new(coord.x + x, coord.y + y);
+                    if c.is_on_pitch() {
+                        result.push(c);
+                    }
+                }
+            }
+        }
+        result
+    }
+
     pub fn find_adjacent_coordinates(
         field_model: &FieldModel,
         coord: FieldCoordinate,
@@ -845,6 +866,17 @@ impl Default for UtilPlayer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn java_adjacent_coordinates_walk_rows_like_field_model() {
+        let c = |x, y| FieldCoordinate::new(x, y);
+        assert_eq!(
+            UtilPlayer::java_adjacent_coordinates(c(5, 5), 1),
+            vec![c(4, 4), c(5, 4), c(6, 4), c(4, 5), c(6, 5), c(4, 6), c(5, 6), c(6, 6)]
+        );
+        // corner: only the on-field squares, same order
+        assert_eq!(UtilPlayer::java_adjacent_coordinates(c(0, 0), 1), vec![c(1, 0), c(0, 1), c(1, 1)]);
+    }
     use crate::enums::{PlayerAction, PlayerType, PlayerGender, Rules};
     use crate::model::game::Game;
     use crate::model::player::Player;
