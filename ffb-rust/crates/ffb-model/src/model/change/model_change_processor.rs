@@ -482,6 +482,42 @@ fn java_skill_enhancements(rules: crate::enums::Rules, skill: SkillId) -> Result
     }
 }
 
+/// Java `Constant.getGrantAbleSkills(skillFactory)` filtered by `swv.getSkill().equals(skill)`:
+/// the `GRANT_ABLE_SKILLS` entries whose name the ruleset's factory knows; the matching entry's
+/// `SkillWithValue`. A null skill (unknown name) matches nothing.
+fn java_grant_able_skill(rules: crate::enums::Rules, skill: Option<SkillId>) -> Option<crate::model::skill_def::SkillWithValue> {
+    use crate::factory::skill_factory::SkillFactory;
+    const GRANT_ABLE_SKILLS: [(&str, Option<&str>); 4] =
+        [("Break Tackle", None), ("Dauntless", None), ("Mighty Blow", Some("1")), ("Sure Feet", None)];
+    let skill = skill?;
+    GRANT_ABLE_SKILLS.iter().find_map(|(name, value)| {
+        let id = SkillFactory::for_name_in(rules, name)?;
+        (id == skill).then(|| crate::model::skill_def::SkillWithValue { skill_id: id, value: value.map(str::to_string) })
+    })
+}
+
+/// Java `FieldModel.addWisdomSkill(playerId, skillWithValue)`: `getPlayerById(playerId)` (null ->
+/// NPE), the ruleset's "Wisdom of the White Dwarf" skill (null in BB2016 -> NPE), then
+/// `player.addTemporarySkills(wisdomSkill.enhancementSourceName(), singleton(swv))` -- the source
+/// key is created when absent and the element appended (`SkillWithValue` has identity equality).
+/// `enhancementSourceName()` = `getName()`, overridden by the BB2025 class.
+fn java_add_wisdom_skill(game: &mut Game, change: &DecodedModelChange, swv: crate::model::skill_def::SkillWithValue) -> Result<(), String> {
+    use crate::enums::Rules;
+    let rules = game.rules;
+    let source = match rules {
+        Rules::Bb2020 => "Wisdom of the White Dwarf",
+        Rules::Bb2025 => "Granted by Wisdom of the White Dwarf",
+        other => return Err(format!("fieldModelAddWisdom: no Wisdom of the White Dwarf in {other:?} (NPE)")),
+    };
+    let player = require_player(game, change)?;
+    match player.temporary_skills_map.iter_mut().find(|(s, _)| s == source) {
+        Some((_, set)) => set.push(swv.clone()),
+        None => player.temporary_skills_map.push((source.to_string(), vec![swv.clone()])),
+    }
+    player.add_prayer_skill(source, swv.skill_id, swv.value);
+    Ok(())
+}
+
 /// Java `game.getEnhancementRegistry().forName(name)`: the game's prayers (`allPrayerRolls`, by
 /// `getName()`) and kick-off results (by `getName()`) -> their `enhancements(mechanic)`. Only the
 /// names the corpus uses are ported: prayer names, and bb2025 "Dodgy Snack" (AV-1, MA-1); any other
@@ -742,7 +778,6 @@ impl ModelChangeProcessor {
             | Id::FieldModelKeepDeactivatedCard
             | Id::FieldModelRemoveCard
             | Id::FieldModelRemoveCardEffect
-            | Id::FieldModelAddWisdom
             | Id::GameOptionsAddOption
             | Id::InducementSetActivateCard
             | Id::InducementSetAddAvailableCard
@@ -802,6 +837,14 @@ impl ModelChangeProcessor {
                     )),
                 }
                 player.add_prayer_skill(source, skill, value);
+            }
+            // Constant.getGrantAbleSkills(skillFactory).stream().filter(swv.getSkill().equals(value))
+            //   .findFirst().ifPresent(swv -> FieldModel.addWisdomSkill(key, swv)).
+            Id::FieldModelAddWisdom => {
+                let rules = game.rules;
+                if let Some(value) = java_grant_able_skill(rules, opt_skill(change)?) {
+                    java_add_wisdom_skill(game, change, value)?;
+                }
             }
             // FieldModel.removePrayerEnhancements: player.removeEnhancements(prayer) (= by getName()).
             Id::FieldModelRemovePrayer => {
@@ -1171,6 +1214,34 @@ mod tests {
         // bb2020 has no Getting Even skill: Java NPE
         let mut g = game();
         assert!(apply(&mut g, "fieldModelAddHatred", Some("h1"), json!("Elf")).is_err());
+    }
+
+    #[test]
+    fn wisdom_grants_only_the_four_grant_able_skills_under_the_ruleset_source() {
+        // bb2020: source = getName(); Mighty Blow carries "1"; two adds = two elements (identity equality)
+        let mut g = game();
+        apply(&mut g, "fieldModelAddWisdom", Some("h1"), json!("Mighty Blow")).unwrap();
+        apply(&mut g, "fieldModelAddWisdom", Some("h1"), json!("Dauntless")).unwrap();
+        let skills = skills_of(g.team_home.player("h1").unwrap(), "Wisdom of the White Dwarf").unwrap();
+        assert_eq!(skills.len(), 2);
+        assert_eq!((skills[0].skill_id, skills[0].value.as_deref()), (SkillId::MightyBlow, Some("1")));
+        assert_eq!((skills[1].skill_id, skills[1].value.as_deref()), (SkillId::Dauntless, None));
+        // a skill outside GRANT_ABLE_SKILLS: filter finds nothing, no source created
+        apply(&mut g, "fieldModelAddWisdom", Some("a1"), json!("Block")).unwrap();
+        assert!(g.team_away.player("a1").unwrap().temporary_skills_map.is_empty());
+        // ifPresent runs before the player lookup: an unknown skill on an unknown player is a no-op
+        apply(&mut g, "fieldModelAddWisdom", Some("zz"), json!("Block")).unwrap();
+        assert!(apply(&mut g, "fieldModelAddWisdom", Some("zz"), json!("Sure Feet")).is_err());
+        // bb2025: enhancementSourceName() is overridden
+        let mut g = game();
+        g.rules = Rules::Bb2025;
+        apply(&mut g, "fieldModelAddWisdom", Some("a1"), json!("Break Tackle")).unwrap();
+        let skills = skills_of(g.team_away.player("a1").unwrap(), "Granted by Wisdom of the White Dwarf").unwrap();
+        assert_eq!(skills[0].skill_id, SkillId::BreakTackle);
+        // bb2016 has no Wisdom of the White Dwarf class: forName null -> NPE
+        let mut g = game();
+        g.rules = Rules::Bb2016;
+        assert!(apply(&mut g, "fieldModelAddWisdom", Some("h1"), json!("Dauntless")).is_err());
     }
 
     #[test]
