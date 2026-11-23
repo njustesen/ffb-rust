@@ -694,6 +694,13 @@ pub struct DriverGameState {
     waiting_for_command: bool,
     pub events: Vec<GameEvent>,
     initial_hash: String,
+    /// Server only (BACKLOG §P): Java's `GameState.executeStep` calls
+    /// `UtilServerGame.syncGameModel(fCurrentStep)` after EVERY step, so a client renders each
+    /// report against the game as it was when that step finished (`BlockChoiceMessage` reads the
+    /// acting player, which a later `EndPlayerAction` clears). While `Some`, the driver keeps a
+    /// copy of the game, with the report count, after each step that added reports; the server
+    /// sends one model sync per copy. `None` (the default) costs nothing.
+    report_snapshots: Option<(usize, Vec<(Game, usize)>)>,
 }
 
 impl DriverGameState {
@@ -714,6 +721,27 @@ impl DriverGameState {
             reports_evented: 0,
             waiting_for_command: false, events: Vec::new(),
             initial_hash: String::new(),
+            report_snapshots: None,
+        }
+    }
+
+    /// Start recording a game copy after each step that adds reports (see `report_snapshots`).
+    pub fn begin_report_snapshots(&mut self) {
+        self.report_snapshots = Some((self.game.report_list.get_reports().len(), Vec::new()));
+    }
+
+    /// Stop recording and hand over the copies: `(game after the step, reports so far)`.
+    pub fn take_report_snapshots(&mut self) -> Vec<(Game, usize)> {
+        self.report_snapshots.take().map(|(_, v)| v).unwrap_or_default()
+    }
+
+    fn snapshot_reports(&mut self) {
+        if let Some((last, v)) = &mut self.report_snapshots {
+            let n = self.game.report_list.get_reports().len();
+            if n > *last {
+                *last = n;
+                v.push((self.game.clone(), n));
+            }
         }
     }
 
@@ -1345,6 +1373,8 @@ impl DriverGameState {
 
     fn drive(&mut self) {
         loop {
+            // Java `executeStep`: `syncGameModel(fCurrentStep)` once the step has run.
+            self.snapshot_reports();
             // Java: once StepEndGame flips the game to FINISHED the server tears the match down —
             // no further steps run. Rust pushes end_game_sequence ON TOP of whatever turn/kickoff
             // sequence was already queued for the (never-played) next turn, so without this guard the

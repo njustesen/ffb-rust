@@ -59,7 +59,7 @@ impl ReportKickoffScatter {
     pub fn to_json_value(&self) -> serde_json::Value {
         serde_json::json!({
             "reportId": self.get_id().get_name(),
-            "ballCoordinateEnd": { "x": self.ball_coordinate_end.x, "y": self.ball_coordinate_end.y },
+            "ballCoordinateEnd": [self.ball_coordinate_end.x, self.ball_coordinate_end.y],
             "scatterDirection": self.scatter_direction.name(),
             "rollScatterDirection": self.roll_scatter_direction,
             "rollScatterDistance": self.roll_scatter_distance,
@@ -70,8 +70,8 @@ impl ReportKickoffScatter {
         let coord = &json["ballCoordinateEnd"];
         Self {
             ball_coordinate_end: FieldCoordinate::new(
-                coord["x"].as_i64().unwrap_or(0) as i32,
-                coord["y"].as_i64().unwrap_or(0) as i32,
+                coord.get(0).or_else(|| coord.get("x")).and_then(serde_json::Value::as_i64).unwrap_or(0) as i32,
+                coord.get(1).or_else(|| coord.get("y")).and_then(serde_json::Value::as_i64).unwrap_or(0) as i32,
             ),
             scatter_direction: json["scatterDirection"].as_str()
                 .and_then(Direction::from_name)

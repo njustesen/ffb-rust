@@ -43,7 +43,8 @@ impl ReportApothecaryRoll {
         serde_json::json!({
             "reportId": self.get_id().get_name(),
             "playerId": self.player_id,
-            "casualtyRoll": self.casualty_roll,
+            // Java's null int[] (no roll taken) is the empty Vec here; Java writes it as null.
+            "casualtyRoll": (!self.casualty_roll.is_empty()).then_some(&self.casualty_roll),
             "playerState": self.player_state.map(|ps| ps.0),
             "seriousInjury": self.serious_injury,
             "seriousInjuryOld": self.original_injury,

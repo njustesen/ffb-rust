@@ -259,9 +259,18 @@ impl StepApothecary {
                 let defender_id = self.injury_result.as_ref()
                     .and_then(|ir| ir.injury_context.defender_id.clone())
                     .unwrap_or_default();
-                game.report_list.add(ReportApothecaryRoll::new(
-                    Some(defender_id.clone()), vec![], None, None, None, vec![],
-                ));
+                if game.rules == ffb_model::enums::Rules::Bb2016 {
+                    // bb2016.StepApothecary:210 `new ReportApothecaryRoll(defenderId, null, null, null)`
+                    // -- the bb2016 report class (no seriousInjuryOld / casualtyModifiers); BB2016
+                    // runs this shared step, so the report class is edition-gated here.
+                    game.report_list.add(ffb_model::report::bb2016::report_apothecary_roll::ReportApothecaryRoll::new(
+                        defender_id.clone(), vec![], None, None,
+                    ));
+                } else {
+                    game.report_list.add(ReportApothecaryRoll::new(
+                        Some(defender_id.clone()), vec![], None, None, None, vec![],
+                    ));
+                }
                 pending_events.push(GameEvent::ApothecaryRoll {
                     player_id: defender_id,
                     roll: None,
@@ -556,20 +565,44 @@ impl StepApothecary {
 
         let mut events: Vec<GameEvent> = vec![];
         if apothecary_choice {
-            // Java: newInjuryResult = roll new casualty die + interpret
-            // Java: apothecaryChoice = (newState != BADLY_HURT)
-            let roll = rng.die(16);
-            let new_state_base = if roll >= 15 { PS_RESERVE } // RIP re-rolled
-                else if roll >= 9 { PS_SERIOUS_INJURY }
-                else { PS_BADLY_HURT };
+            // Java (bb2016 :281-292, bb2025/shared :475-489): a new InjuryResult whose casualty is
+            // rolled and interpreted by the edition's RollMechanic --
+            //   setCasualtyRoll(rollMechanic.rollCasualty(diceRoller))      [d16,d6] / bb2016 [d6,d8]
+            //   setInjury(rollMechanic.interpretCasualtyRollAndAddModifiers(game, ctx, defender, false))
+            //   setSeriousInjury(rollMechanic.interpretSeriousInjuryRoll(game, ctx))
+            //   apothecaryChoice = (newState.getBase() != BADLY_HURT)
+            let mechanic = crate::mechanic::roll_mechanic_for(game.rules);
+            let mut new_ctx = crate::injury::InjuryContext::new(ffb_model::enums::ApothecaryMode::Defender);
+            new_ctx.defender_id = Some(player_id.clone());
+            let casualty_roll = mechanic.roll_casualty(rng);
+            new_ctx.casualty_roll = Some(casualty_roll);
+            let new_state = game.player(&player_id)
+                .and_then(|d| mechanic.interpret_casualty_roll_and_add_modifiers(game, &mut new_ctx, d, false));
+            new_ctx.injury = new_state;
+            let new_serious_injury = mechanic.interpret_serious_injury_roll(game, &mut new_ctx);
+            new_ctx.serious_injury = new_serious_injury;
+            let new_state_base = new_state.map(|s| s.base()).unwrap_or(PS_BADLY_HURT);
             apothecary_choice = new_state_base != PS_BADLY_HURT;
-            // Java: addReport(new ReportApothecaryRoll(defender, casualtyRoll, newState, newSI, origSI, mods))
-            game.report_list.add(ReportApothecaryRoll::new(
-                Some(player_id.clone()), vec![roll], None, None, None, vec![],
-            ));
+            let si_name = |k| crate::mechanic::state_mechanic::serious_injury_display_name(k, game.rules);
+            if game.rules == ffb_model::enums::Rules::Bb2016 {
+                // bb2016.StepApothecary:291 `new ReportApothecaryRoll(defender, casualtyRoll, state, si)`.
+                game.report_list.add(ffb_model::report::bb2016::report_apothecary_roll::ReportApothecaryRoll::new(
+                    player_id.clone(), casualty_roll.to_vec(), new_state, new_serious_injury.map(si_name),
+                ));
+            } else {
+                // Java: new ReportApothecaryRoll(defender, newCasualtyRoll, newState, newSI,
+                //   newInjuryResult...getOriginalSeriousInjury(), fInjuryResult...casualtyModifiers)
+                let casualty_modifiers = self.injury_result.as_ref()
+                    .map(|ir| ir.injury_context.casualty_modifiers.iter().map(|m| m.name.to_string()).collect())
+                    .unwrap_or_default();
+                game.report_list.add(ReportApothecaryRoll::new(
+                    Some(player_id.clone()), casualty_roll.to_vec(), new_state, new_serious_injury.map(si_name),
+                    new_ctx.original_serious_injury.map(si_name), casualty_modifiers,
+                ));
+            }
             events.push(GameEvent::ApothecaryRoll {
                 player_id: player_id.clone(),
-                roll: Some(roll),
+                roll: Some(casualty_roll[0]),
                 new_state: Some(new_state_base as u16),
                 new_serious_injury: None,
             });
@@ -577,9 +610,6 @@ impl StepApothecary {
                 // Java: UtilServerDialog.showDialog(getGameState(), new DialogApothecaryChoiceParameter(
                 //   defender.getId(), fInjuryResult...getPlayerState(), fInjuryResult...getSeriousInjury(),
                 //   newInjuryResult...getPlayerState(), newInjuryResult...getSeriousInjury()), true)
-                // DEVIATION: this step does not interpret the new casualty's serious injury, so
-                // `serious_injury_new` is left None; `player_state_new` is the step's own reading
-                // of the new casualty roll.
                 let (player_state_old, serious_injury_old) = self.injury_result.as_ref()
                     .map(|ir| (ir.injury_context.injury, ir.injury_context.serious_injury))
                     .unwrap_or((None, None));
@@ -590,8 +620,8 @@ impl StepApothecary {
                             player_id: Some(player_id.clone()),
                             player_state_old,
                             serious_injury_old,
-                            player_state_new: Some(PlayerState::new(new_state_base)),
-                            serious_injury_new: None,
+                            player_state_new: new_state,
+                            serious_injury_new: new_serious_injury,
                         },
                     ),
                     true,

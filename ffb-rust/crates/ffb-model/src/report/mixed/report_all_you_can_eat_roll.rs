@@ -29,7 +29,7 @@ impl ReportAllYouCanEatRoll {
 }
 
 impl IReport for ReportAllYouCanEatRoll {
-    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
+    fn to_json(&self) -> Option<serde_json::Value> { Some(crate::report::report_skill_roll::java_roll_modifiers(self.to_json_value())) }
     fn get_id(&self) -> ReportId { ReportId::ALL_YOU_CAN_EAT }
 }
 

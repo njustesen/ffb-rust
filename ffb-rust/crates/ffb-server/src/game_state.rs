@@ -130,7 +130,11 @@ impl GameState {
     pub fn handle_action(&mut self, side: TeamSide, action: Action) -> Result<Vec<GameEvent>, String> {
         match &mut self.driver {
             Some(driver) if !driver.has_waiting_step() => Err("no step waits for a command".to_string()),
-            Some(driver) => driver.apply(side, action),
+            Some(driver) => {
+                // `server_game_sync::sync_game` sends one sync per step that reported, as Java does.
+                driver.begin_report_snapshots();
+                driver.apply(side, action)
+            }
             None => Err("game not started".to_string()),
         }
     }

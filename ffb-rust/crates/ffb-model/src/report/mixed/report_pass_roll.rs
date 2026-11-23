@@ -66,13 +66,13 @@ impl ReportPassRoll {
 }
 
 impl IReport for ReportPassRoll {
-    fn to_json(&self) -> Option<serde_json::Value> { Some(self.to_json_value()) }
+    fn to_json(&self) -> Option<serde_json::Value> { Some(crate::report::report_skill_roll::java_roll_modifiers(self.to_json_value())) }
     fn get_id(&self) -> ReportId { ReportId::PASS_ROLL }
 }
 
 impl ReportPassRoll {
     pub fn to_json_value(&self) -> serde_json::Value {
-        serde_json::json!({
+        let mut json = serde_json::json!({
             "reportId": self.get_id().get_name(),
             "playerId": self.base.player_id,
             "successful": self.base.successful,
@@ -84,11 +84,14 @@ impl ReportPassRoll {
             "passResult": self.result,
             "hailMaryPass": self.hail_mary_pass,
             "bomb": self.bomb,
-            "statBasedRollModifier": match (&self.stat_based_roll_modifier, self.stat_based_roll_modifier_value) {
-                (Some(name), Some(value)) => serde_json::json!({ "name": name, "value": value }),
-                (name, _) => serde_json::json!(name),
-            },
-        })
+        });
+        // Java: `if (statBasedRollModifier != null)` add `StatBasedRollModifier.toJsonValue()`
+        // ({name, value}); no key otherwise -- the client's initFrom rejects a JSON null here.
+        if let Some(name) = &self.stat_based_roll_modifier {
+            json["statBasedRollModifier"] =
+                serde_json::json!({ "name": name, "value": self.stat_based_roll_modifier_value });
+        }
+        json
     }
 
     pub fn from_json(json: &serde_json::Value) -> Self {

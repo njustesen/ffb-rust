@@ -31,25 +31,29 @@ impl ReportScatterPlayer {
     pub fn get_scatter(&self) -> Option<bool> { self.scatter }
 
     pub fn to_json_value(&self) -> serde_json::Value {
-        serde_json::json!({
+        let mut json = serde_json::json!({
             "reportId": self.get_id().get_name(),
-            "startCoordinate": { "x": self.start_coordinate.x, "y": self.start_coordinate.y },
-            "endCoordinate": { "x": self.end_coordinate.x, "y": self.end_coordinate.y },
+            "startCoordinate": [self.start_coordinate.x, self.start_coordinate.y],
+            "endCoordinate": [self.end_coordinate.x, self.end_coordinate.y],
             "directionArray": self.directions.iter().map(|d| d.name()).collect::<Vec<_>>(),
             "rolls": self.rolls,
-            "isScatter": self.scatter,
-        })
+        });
+        // Java `JsonBooleanOption.addTo`: a null Boolean writes no key.
+        if let Some(scatter) = self.scatter {
+            json["isScatter"] = scatter.into();
+        }
+        json
     }
 
     pub fn from_json(json: &serde_json::Value) -> Self {
         Self {
             start_coordinate: FieldCoordinate::new(
-                json["startCoordinate"]["x"].as_i64().unwrap_or(0) as i32,
-                json["startCoordinate"]["y"].as_i64().unwrap_or(0) as i32,
+                json["startCoordinate"].get(0).or_else(|| json["startCoordinate"].get("x")).and_then(serde_json::Value::as_i64).unwrap_or(0) as i32,
+                json["startCoordinate"].get(1).or_else(|| json["startCoordinate"].get("y")).and_then(serde_json::Value::as_i64).unwrap_or(0) as i32,
             ),
             end_coordinate: FieldCoordinate::new(
-                json["endCoordinate"]["x"].as_i64().unwrap_or(0) as i32,
-                json["endCoordinate"]["y"].as_i64().unwrap_or(0) as i32,
+                json["endCoordinate"].get(0).or_else(|| json["endCoordinate"].get("x")).and_then(serde_json::Value::as_i64).unwrap_or(0) as i32,
+                json["endCoordinate"].get(1).or_else(|| json["endCoordinate"].get("y")).and_then(serde_json::Value::as_i64).unwrap_or(0) as i32,
             ),
             directions: json["directionArray"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().and_then(Direction::from_name)).collect()).unwrap_or_default(),
             rolls: json["rolls"].as_array().map(|a| a.iter().map(|v| v.as_i64().unwrap_or(0) as i32).collect()).unwrap_or_default(),

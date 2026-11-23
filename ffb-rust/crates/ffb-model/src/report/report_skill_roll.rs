@@ -51,6 +51,18 @@ impl ReportSkillRoll {
     }
 }
 
+/// Java `ReportSkillRoll.toJsonValue`: `if (!fRollModifierList.isEmpty())` -- the `rollModifiers`
+/// key exists only when there is a modifier. The Rust writers put the list in unconditionally;
+/// every `to_json` of a `ReportSkillRoll` subclass goes through here so the wire form is Java's.
+pub fn java_roll_modifiers(mut json: serde_json::Value) -> serde_json::Value {
+    if let Some(o) = json.as_object_mut() {
+        if o.get("rollModifiers").and_then(|v| v.as_array()).is_some_and(|a| a.is_empty()) {
+            o.remove("rollModifiers");
+        }
+    }
+    json
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
