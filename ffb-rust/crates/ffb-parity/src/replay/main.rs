@@ -18,12 +18,20 @@
 //!   states <out_dir> <java_dir> <dir|file>...
 //!                                      replay every model sync in Rust, write <id>.states and diff
 //!                                      them with the Java per-sync state hashes (see states.rs)
+//!   actions <out_dir> <java_dir> <dir|file>...
+//!                                      the same replay with the action records (actions.rs), written
+//!                                      in the Java formats and diffed with the Java run (actions_gate.rs)
 
+mod actions;
+mod actions_gate;
 mod add_player;
 mod canonical;
 mod dialog_check;
 mod drop_rules;
 mod ffbr;
+mod game_state_serializer;
+mod java_names;
+mod replay_report;
 mod start_check;
 mod start_of_game;
 mod states;
@@ -39,6 +47,7 @@ fn usage() -> ! {
     eprintln!("       ffb-replay start-check <java_dir> <subtree> <dir|file>...");
     eprintln!("       ffb-replay dialog-check <dialog.tsv> [dialogId...]");
     eprintln!("       ffb-replay states <out_dir> <java_dir> <dir|file>...");
+    eprintln!("       ffb-replay actions <out_dir> <java_dir> <dir|file>...");
     std::process::exit(2);
 }
 
@@ -54,6 +63,11 @@ fn main() {
             &args[3..].iter().map(PathBuf::from).collect::<Vec<_>>(),
         ),
         "states" if args.len() >= 4 => states::states(
+            Path::new(&args[1]),
+            Path::new(&args[2]),
+            &args[3..].iter().map(PathBuf::from).collect::<Vec<_>>(),
+        ),
+        "actions" if args.len() >= 4 => actions_gate::actions(
             Path::new(&args[1]),
             Path::new(&args[2]),
             &args[3..].iter().map(PathBuf::from).collect::<Vec<_>>(),

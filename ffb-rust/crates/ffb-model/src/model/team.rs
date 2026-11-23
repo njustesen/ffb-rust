@@ -163,13 +163,15 @@ impl Team {
         self.dedicated_fans = java_json::get_int(o, "dedicatedFans")?;
         if let Some(rules_array) = java_json::get_string_array(o, "specialRules")? {
             // ArrayTool.isProvided + filter(nonNull) + SpecialRule::valueOf (throws on unknown),
-            // into a Set.
+            // into a Set. The JSON carries the enum CONSTANT names; the engine keeps every special
+            // rule by its `getRuleName()` (the XML/roster form every engine check compares with).
             for name in rules_array.into_iter().flatten() {
-                if SpecialRule::value_of(&name).is_none() {
+                let Some(rule) = SpecialRule::value_of(&name) else {
                     return Err(format!("Team: SpecialRule.valueOf({name:?}) throws"));
-                }
-                if !self.special_rules.contains(&name) {
-                    self.special_rules.push(name);
+                };
+                let rule_name = rule.get_rule_name().to_string();
+                if !self.special_rules.contains(&rule_name) {
+                    self.special_rules.push(rule_name);
                 }
             }
         }
@@ -240,10 +242,17 @@ impl Team {
         o.insert("baseIconPath".into(), s(&self.base_icon_path));
         o.insert("logoUrl".into(), s(&self.logo_url));
         o.insert("dedicatedFans".into(), Value::from(self.dedicated_fans));
-        o.insert(
-            "specialRules".into(),
-            Value::Array(self.special_rules.iter().map(|r| Value::from(r.clone())).collect()),
-        );
+        // Java `specialRules.stream().map(Enum::name)`: the constant name of each rule.
+        let special_rules = self
+            .special_rules
+            .iter()
+            .map(|r| {
+                SpecialRule::from(r)
+                    .map(|rule| Value::from(format!("{rule:?}")))
+                    .ok_or_else(|| format!("Team {}: special rule {r:?} is not a SpecialRule", self.id))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        o.insert("specialRules".into(), Value::Array(special_rules));
         let mut players: Vec<&Player> = self.players.iter().collect();
         players.sort_by_key(|p| p.nr);
         let player_array = players
@@ -696,8 +705,10 @@ mod tests {
         // fPlayerByNr: the second nr-2 player replaced the first.
         assert_eq!(team.players.len(), 2);
         assert_eq!(team.player_by_nr(2).unwrap().name, "second");
-        // Set<SpecialRule>, null filtered.
-        assert_eq!(team.special_rules, vec!["SWARMING".to_string()]);
+        // Set<SpecialRule>, null filtered; kept as the rule NAME the engine compares with
+        // (SppMechanic's Brawlin' Brutes check missed the JSON constant name, BACKLOG §O O3).
+        assert_eq!(team.special_rules, vec!["Swarming".to_string()]);
+        assert_eq!(team.to_json_value(rules).unwrap()["specialRules"], serde_json::json!(["SWARMING"]));
         // Icon indexes: -1 -> findNextIconSetIndex, in nr order (nr 1 gets 0, nr 2 gets 1).
         assert_eq!(team.player_by_nr(1).unwrap().icon_set_index, 0);
         assert_eq!(team.player_by_nr(2).unwrap().icon_set_index, 1);

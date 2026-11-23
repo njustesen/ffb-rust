@@ -10,6 +10,8 @@
 //! JSON>`; `serverAddPlayer` / `serverZapPlayer` / `serverUnzapPlayer` are handled by their client
 //! command handlers (`add_player.rs`, `zap_player.rs`).
 
+use super::actions::Recorder;
+use super::replay_report::decode_report_list;
 use super::{canonical, drop_rules, ffbr};
 use ffb_model::enums::ModelChangeId;
 use ffb_model::inducement::inducement::Inducement;
@@ -32,6 +34,10 @@ pub struct ReplayStates {
     pub unknown: BTreeMap<String, u64>,
     /// The first error (the replay stopped there), if any.
     pub error: Option<String>,
+    /// `CUR.endCheck`: "OK", "MISMATCH: ..." or "not reached" (the replay stopped early).
+    pub end_check: String,
+    /// `LAST_END_SCORE`: the replay's own final score (home, away) -- tags every action line.
+    pub end_score: (i32, i32),
 }
 
 /// `ClientReplayer.reset` via `FumbblReplayParser.resetInducements`: every inducement re-added as
@@ -48,14 +54,58 @@ fn known_model_change(name: &str) -> bool {
 
 /// Replays one `.ffbr`; `keep_texts` also keeps every canonical text (for dumps).
 pub fn replay_states(path: &Path, keep_texts: bool) -> ReplayStates {
-    let mut out = ReplayStates { lines: Vec::new(), texts: Vec::new(), unknown: BTreeMap::new(), error: None };
-    if let Err(e) = replay_into(path, keep_texts, &mut out) {
+    replay_with(path, keep_texts, None)
+}
+
+/// Replays one `.ffbr`, feeding every sync to `recorder` (the action records) when given.
+pub fn replay_with(path: &Path, keep_texts: bool, mut recorder: Option<&mut Recorder>) -> ReplayStates {
+    let mut out = ReplayStates {
+        lines: Vec::new(),
+        texts: Vec::new(),
+        unknown: BTreeMap::new(),
+        error: None,
+        end_check: "not reached".into(),
+        end_score: (0, 0),
+    };
+    if let Err(e) = replay_into(path, keep_texts, &mut out, &mut recorder) {
         out.error = Some(e);
     }
     out
 }
 
-fn replay_into(path: &Path, keep_texts: bool, out: &mut ReplayStates) -> Result<(), String> {
+/// `FumbblReplayParser.dropUnknownReports`: a report whose `reportId` the engine does not know
+/// (`ReportIdFactory.forName` null) is removed and counted as `report=<id>`.
+fn drop_unknown_reports(cmd: &mut Value, unknown: &mut BTreeMap<String, u64>) {
+    let Some(Value::Array(reports)) = cmd.pointer_mut("/reportList/reports") else { return };
+    reports.retain(|r| {
+        let rid = r.get("reportId").and_then(Value::as_str);
+        match rid {
+            Some(rid) if super::replay_report::report_id_constant(rid).is_none() => {
+                *unknown.entry(format!("report={rid}")).or_default() += 1;
+                false
+            }
+            _ => true,
+        }
+    });
+}
+
+/// (home score, away score, half, home turn nr, away turn nr) -- the end check's comparison.
+fn end_tuple(game: &Game) -> [i32; 5] {
+    [
+        game.game_result.home.score,
+        game.game_result.away.score,
+        game.half,
+        game.turn_data_home.turn_nr,
+        game.turn_data_away.turn_nr,
+    ]
+}
+
+fn replay_into(
+    path: &Path,
+    keep_texts: bool,
+    out: &mut ReplayStates,
+    recorder: &mut Option<&mut Recorder>,
+) -> Result<(), String> {
     let mut root = ffbr::read_ffbr(path)?;
     let commands = root.get_mut("commandArray").and_then(Value::as_array_mut).ok_or("no commandArray")?;
     let start_idx = commands
@@ -69,9 +119,14 @@ fn replay_into(path: &Path, keep_texts: bool, out: &mut ReplayStates) -> Result<
     let mut options = ffb_model::model::game_options::GameOptions::new();
     options.init_from(game_json.get("gameOptions").ok_or("gameOptions missing in serverGameState")?)?;
     if let Ok(rules) = options.rules_version() {
-        drop_rules::drop_unknown_inducements(rules, &options, &mut game_json)?;
+        for key in drop_rules::drop_unknown_inducements(rules, &options, &mut game_json)? {
+            *out.unknown.entry(key).or_default() += 1;
+        }
     }
-    let mut game: Game = super::start_of_game::start_of_game(Game::from_java_json(&game_json)?)?;
+    let end_game = Game::from_java_json(&game_json)?;
+    let want = end_tuple(&end_game);
+    out.end_score = (want[0], want[1]);
+    let mut game: Game = super::start_of_game::start_of_game(end_game)?;
     let processor = ModelChangeProcessor::new();
 
     for (i, cmd) in commands.iter_mut().enumerate().skip(start_idx + 1) {
@@ -112,11 +167,16 @@ fn replay_into(path: &Path, keep_texts: bool, out: &mut ReplayStates) -> Result<
                 }
             }
         }
+        drop_unknown_reports(cmd, &mut out.unknown);
         // ServerCommandModelSync decode: ModelChangeList.initFrom decodes every value first.
         let mut decoded = Vec::with_capacity(kept.len());
         for mc in &kept {
             let change = ModelChange::init_from(mc).map_err(|e| format!("command {i}: {e}"))?;
             decoded.push(DecodedModelChange::decode(&game, &change).map_err(|e| format!("command {i}: {e}"))?);
+        }
+        if let Some(rec) = recorder.as_deref_mut() {
+            let reports = decode_report_list(game.rules, cmd.get("reportList")).map_err(|e| format!("command {i}: reports {e}"))?;
+            rec.pre_sync(&game, &reports);
         }
         // ModelChangeList.applyTo(game, IGNORE_PLAYER_MARKER).
         for change in &decoded {
@@ -139,7 +199,19 @@ fn replay_into(path: &Path, keep_texts: bool, out: &mut ReplayStates) -> Result<
         if keep_texts {
             out.texts.push(text);
         }
+        if let Some(rec) = recorder.as_deref_mut() {
+            rec.post_sync(&game);
+        }
     }
+    if let Some(rec) = recorder.as_deref_mut() {
+        rec.finish(&game);
+    }
+    let got = end_tuple(&game);
+    let text = format!(
+        "replayed score {}-{} half {} turns {}/{}, replay end {}-{} half {} turns {}/{}",
+        got[0], got[1], got[2], got[3], got[4], want[0], want[1], want[2], want[3], want[4]
+    );
+    out.end_check = if got == want { "OK".into() } else { format!("MISMATCH: {text}") };
     Ok(())
 }
 
