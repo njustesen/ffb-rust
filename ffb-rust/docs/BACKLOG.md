@@ -11752,7 +11752,7 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
   reordered, nothing else changed), `double-check` 1,024,826 numbers / 3,775 distinct / 0 different.
   `cargo test --workspace` green (15,152 passed).
 - **Frozen Rust tool: `D:/ffb_replay_parity/bin/ffb-replay-o3b.exe`** (sha256 `b49763071e78...`, built from
-  this iteration's commit), re-verified 10/10 on fumbbl/ as the frozen copy.
+  the tree of commit `0d6966c27`), re-verified 10/10 on fumbbl/ as the frozen copy.
 
 ### RESUME HERE
 **This iteration (2026-11-23, loop iteration 17):** O3(b) COMPLETE -- canonical move_target order (harness),
