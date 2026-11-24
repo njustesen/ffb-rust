@@ -12035,6 +12035,26 @@ parity, which §I-§M closed.
 - **P5 done-check** `scripts/gui_check.py` (written before P4 closes) + docs + push.
 
 ### RESUME HERE
+**2026-11-24 (7): the P2 worklist of (6), engine side, done for the suites run so far.**
+
+Done (7), three pushed commits, every gate steps + reports identical (cert9 jar, fresh JVM):
+InjuryResult.applyTo stats/send-to-box/blood spot (updateStats=false in the multi-block
+apothecaries), bomb/wizard blood spots, changeActingPlayer's marker clear (track numbers, dice
+decorations, pushback + move squares), Horns + Really Stupid on the ACTING player, Getting Even
+`Game.addHatred`, `Game::set_turn_mode` (lastTurnMode; every engine/server write swept), client
+enhancement maps written by the Player's own add/remove (+ `begin_enhancement` = addEnhancement's
+three keys; prayer sources = Java display names, an active prayer is a no-op), StepEndPassing
+completion/yards/catch rule, secret-weapon ban into the box, raised player's sendToBoxTurn,
+bb2025 StepEndFeeding passCoordinate. `client_view_check.py`: SETUP paths (harness team/option
+data) may differ only while constant all game on both sides; clocks ignored.
+View check now: bb2025 human/chaos 577/577; chaos_dwarf_sk/vampire_sk/undead_sk x4 all but a
+handful of steps. Open, in order: (1) human two-window test (user); (2) run the view check across
+the mirror/cross/skill suites (gatev.cmd per suite; night window for the sweep) and port each new
+path -- expect more negatraits marked on the player instead of the acting player (Bone Head, Wild
+Animal, Animal Savagery, Unchannelled Fury, Bloodlust, Take Root: Java actingPlayer.markSkillUsed
++ UtilCards.hasUnusedSkill(actingPlayer, ..) -> util_server_steps::mark_skill_used and
+acting_player.used_skills, mark and read together, gate each).
+
 **2026-11-24 (6): open items (2) and (3) of (5) done -- the AiMain NPE and the last inline decisions.**
 
 Done (6):
