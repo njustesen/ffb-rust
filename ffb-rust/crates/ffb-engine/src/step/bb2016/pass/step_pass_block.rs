@@ -220,7 +220,7 @@ mod tests {
     fn bomb_turn_skips_pass_block_and_report() {
         use ffb_model::report::report_id::ReportId;
         let mut game = make_thrower_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         let mut step = StepPassBlock::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(matches!(out.action, StepAction::NextStep));

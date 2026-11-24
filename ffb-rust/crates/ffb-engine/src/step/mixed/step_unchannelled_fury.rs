@@ -434,7 +434,7 @@ mod tests {
     #[test]
     fn skip_when_turn_mode_does_not_check_negatraits() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::KickoffReturn; // check_negatraits() = false
+        game.set_turn_mode(TurnMode::KickoffReturn); // check_negatraits() = false
         let mut step = StepUnchannelledFury::new("fail");
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);

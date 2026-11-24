@@ -103,7 +103,7 @@ impl StepHitAndRun {
                 if game.turn_mode != TurnMode::HitAndRun {
                     self.saved_turn_mode = game.last_turn_mode;
                     game.last_turn_mode = Some(game.turn_mode);
-                    game.turn_mode = TurnMode::HitAndRun;
+                    game.set_turn_mode(TurnMode::HitAndRun);
                 }
                 game.field_model.clear_move_squares();
                 for coord in self.find_squares(game) {
@@ -179,7 +179,7 @@ impl StepHitAndRun {
     /// Java: StepHitAndRun.resetState — restores TurnMode, updates move squares.
     fn reset_state(&mut self, game: &mut Game) {
         if game.turn_mode == TurnMode::HitAndRun {
-            game.turn_mode = game.last_turn_mode.unwrap_or(TurnMode::Regular);
+            game.set_turn_mode(game.last_turn_mode.unwrap_or(TurnMode::Regular));
             if let Some(saved) = self.saved_turn_mode.take() {
                 game.last_turn_mode = Some(saved);
             }

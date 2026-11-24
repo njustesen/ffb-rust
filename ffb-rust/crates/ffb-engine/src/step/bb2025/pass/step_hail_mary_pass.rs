@@ -659,7 +659,7 @@ mod tests {
         if let Some(p) = game.team_home.players.iter_mut().find(|p| p.id == "thrower") {
             p.starting_skills = vec![SkillWithValue::new(SkillId::Pass)];
         }
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
         game.acting_player.player_id = Some("thrower".into());
         game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::HailMaryPass);
         let mut step = StepHailMaryPass::new("fail".into());
@@ -930,7 +930,7 @@ mod tests {
         p.extra_skills.push(ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::Pass, value: None });
         // find_skill_reroll_source reads the ACTING player in a regular turn.
         game.acting_player.player_id = Some(tid.clone());
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
 
         let mut step = StepHailMaryPass::new("fail".into());
         step.roll = 1;

@@ -181,7 +181,7 @@ impl StepSelectGazeTarget {
         // Headless: clearStepStack() is skipped — the EndPlayerAction sequence is pushed on top and
         // runs first (LIFO), then the driver continues from whatever remains on the stack.
         if self.end_player_action || self.end_turn {
-            game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
+            game.set_turn_mode(game.last_turn_mode.unwrap_or(game.turn_mode));
             let params = EndPlayerActionParams {
                 feeding_allowed: false,
                 end_player_action: true,
@@ -199,7 +199,7 @@ impl StepSelectGazeTarget {
             // "restored" SELECT_GAZE_TARGET and the turn ran on in the wrong mode (§K bb2020 gaze).
             if game.turn_mode != TurnMode::SelectGazeTarget {
                 game.last_turn_mode = Some(game.turn_mode);
-                game.turn_mode = TurnMode::SelectGazeTarget;
+                game.set_turn_mode(TurnMode::SelectGazeTarget);
             }
             // Java: showDialog(DialogSelectGazeTargetParameter) -- the agent's question. A bare
             // cont() here parked the step with nothing asked (BACKLOG §K bb2020 gaze).
@@ -230,7 +230,7 @@ impl StepSelectGazeTarget {
                 return StepOutcome::cont();
             } else {
                 // Java: game.setTurnMode(lastTurnMode); setTargetSelectionState(cancel()); GOTO_LABEL
-                game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
+                game.set_turn_mode(game.last_turn_mode.unwrap_or(game.turn_mode));
                 game.field_model.target_selection_state =
                     Some({ let mut s = TargetSelectionState::default(); s.cancel(); s });
                 if self.goto_label_on_end.is_empty() {
@@ -244,7 +244,7 @@ impl StepSelectGazeTarget {
         // Java: !game.getActingTeam().hasPlayer(game.getPlayerById(selectedPlayerId))
         let is_on_active_team = game.active_team().player(&selected_id).is_some();
         if !is_on_active_team {
-            game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
+            game.set_turn_mode(game.last_turn_mode.unwrap_or(game.turn_mode));
 
             // Java: PlayerState newState = getPlayerState(targetPlayer).changeSelectedGazeTarget(true);
             //       setPlayerState(targetPlayer, newState);
@@ -293,7 +293,7 @@ impl StepSelectGazeTarget {
 
         // Case 5: selected player is on the acting team (own teammate, not self)
         // Java: game.setTurnMode(lastTurnMode); NEXT_STEP
-        game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
+        game.set_turn_mode(game.last_turn_mode.unwrap_or(game.turn_mode));
         StepOutcome::next()
     }
 }
@@ -326,7 +326,7 @@ mod tests {
     #[test]
     fn waiting_asks_the_agent_and_cancel_restores_the_turn_mode() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.acting_player.player_id = Some("gazer".into());
         let mut step = StepSelectGazeTarget::new();
         step.goto_label_on_end = "END_SELECTING".into();
@@ -626,7 +626,7 @@ mod tests {
     fn end_player_action_restores_last_turn_mode() {
         use ffb_model::enums::TurnMode;
         let mut game = make_game();
-        game.turn_mode = TurnMode::SelectGazeTarget;
+        game.set_turn_mode(TurnMode::SelectGazeTarget);
         game.last_turn_mode = Some(TurnMode::Regular);
         let mut step = StepSelectGazeTarget::new();
         step.end_turn = true;

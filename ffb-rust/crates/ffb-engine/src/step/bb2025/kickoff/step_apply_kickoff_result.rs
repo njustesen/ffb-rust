@@ -147,7 +147,7 @@ impl Step for StepApplyKickoffResult {
                 }
                 if game.turn_mode == TurnMode::QuickSnap {
                     game.home_playing = !game.home_playing;
-                    game.turn_mode = TurnMode::Kickoff;
+                    game.set_turn_mode(TurnMode::Kickoff);
                 } else if game.turn_mode == TurnMode::SolidDefence {
                     // client-only: no-op — SolidDefence playerCoordinate updates are sent only by clients
                 }
@@ -161,7 +161,7 @@ impl Step for StepApplyKickoffResult {
                 self.selected_players.extend(player_ids.iter().filter(|id| self.eligible_players.contains(id)).cloned());
                 self.choice_made = true;
                 if mode == "SOLID_DEFENCE" {
-                    game.turn_mode = TurnMode::SolidDefence;
+                    game.set_turn_mode(TurnMode::SolidDefence);
                 }
             }
             Action::SelectPlayer { player_id } if !self.choice_made && !self.eligible_players.is_empty()
@@ -171,7 +171,7 @@ impl Step for StepApplyKickoffResult {
                 }
                 self.choice_made = true;
                 if self.kickoff_result == Some(KickoffResult::SolidDefence) {
-                    game.turn_mode = TurnMode::SolidDefence;
+                    game.set_turn_mode(TurnMode::SolidDefence);
                 }
             }
             _ => {}
@@ -624,7 +624,7 @@ impl StepApplyKickoffResult {
 
             if self.eligible_players.is_empty() {
                 // No players to select; go straight to end.
-                game.turn_mode = TurnMode::Kickoff;
+                game.set_turn_mode(TurnMode::Kickoff);
                 return StepOutcome::next();
             }
 
@@ -638,7 +638,7 @@ impl StepApplyKickoffResult {
 
         if self.selected_players.is_empty() {
             // No players chosen → end without blitz.
-            game.turn_mode = TurnMode::Kickoff;
+            game.set_turn_mode(TurnMode::Kickoff);
             return StepOutcome::next();
         }
 
@@ -769,7 +769,7 @@ impl StepApplyKickoffResult {
     fn leave_solid_defence(game: &mut Game) -> StepOutcome {
         use ffb_model::enums::PS_PRONE;
         game.kicking_swarmers = 0;
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         let acting_ids: Vec<String> = game.active_team().players.iter().map(|p| p.id.clone()).collect();
         for id in acting_ids {
             if let Some(state) = game.field_model.player_state(&id) {
@@ -824,7 +824,7 @@ impl StepApplyKickoffResult {
                 if moved_players <= self.nr_of_players_allowed && valid {
                     // Java: leaveSolidDefence → setKickingSwarmers(0)
                     game.kicking_swarmers = 0;
-                    game.turn_mode = TurnMode::Kickoff;
+                    game.set_turn_mode(TurnMode::Kickoff);
                     StepOutcome::next()
                 } else {
                     self.end_kickoff = false;
@@ -878,7 +878,7 @@ impl StepApplyKickoffResult {
                     .count() as i32;
                 self.nr_of_players_allowed = self.nr_of_players_allowed.min(eligible);
             }
-            game.turn_mode = TurnMode::SolidDefence;
+            game.set_turn_mode(TurnMode::SolidDefence);
             game.report_list.add(ReportSolidDefenceRoll::new(
                 Some(acting_team_id.clone()),
                 roll,
@@ -902,7 +902,7 @@ impl StepApplyKickoffResult {
         if game.turn_mode == TurnMode::HighKick {
             if self.end_kickoff {
                 game.home_playing = !game.home_playing;
-                game.turn_mode = TurnMode::Kickoff;
+                game.set_turn_mode(TurnMode::Kickoff);
                 StepOutcome::next()
             } else {
                 StepOutcome::cont()
@@ -916,7 +916,7 @@ impl StepApplyKickoffResult {
                 StepOutcome::next()
             } else {
                 game.home_playing = !game.home_playing;
-                game.turn_mode = TurnMode::HighKick;
+                game.set_turn_mode(TurnMode::HighKick);
                 let pin_team_id = if game.home_playing {
                     game.team_home.id.clone()
                 } else {
@@ -932,7 +932,7 @@ impl StepApplyKickoffResult {
                         .unwrap_or(false));
                 if !any_active {
                     game.home_playing = !game.home_playing;
-                    game.turn_mode = TurnMode::Kickoff;
+                    game.set_turn_mode(TurnMode::Kickoff);
                     StepOutcome::next()
                 } else {
                     StepOutcome::cont()
@@ -1034,14 +1034,14 @@ impl StepApplyKickoffResult {
                 // `limit_reached=false` when the team ran out of active players instead.
                 let limit_reached = self.nr_of_moved_players == self.nr_of_players_allowed;
                 game.home_playing = !game.home_playing;
-                game.turn_mode = TurnMode::Kickoff;
+                game.set_turn_mode(TurnMode::Kickoff);
                 StepOutcome::next().with_event(GameEvent::KickoffSequenceActivationsExhausted { limit_reached })
             } else {
                 StepOutcome::cont()
             }
         } else {
             game.home_playing = !game.home_playing;
-            game.turn_mode = TurnMode::QuickSnap;
+            game.set_turn_mode(TurnMode::QuickSnap);
             let roll = rng.d3();
             self.nr_of_players_allowed = roll + 3;
             let active_team_id = game.active_team().id.clone();
@@ -1077,7 +1077,7 @@ impl StepApplyKickoffResult {
             if !any_active {
                 self.end_kickoff = true;
                 game.home_playing = !game.home_playing;
-                game.turn_mode = TurnMode::Kickoff;
+                game.set_turn_mode(TurnMode::Kickoff);
                 StepOutcome::next()
                     .with_event(snap_event)
                     .with_event(GameEvent::KickoffSequenceActivationsExhausted { limit_reached: false })

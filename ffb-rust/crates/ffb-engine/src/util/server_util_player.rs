@@ -264,7 +264,7 @@ mod tests {
         use ffb_model::skill_touch;
         let mut game = make_game();
         game.home_playing = true;
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.team_home.players.push(make_player("atk", 1));
         let mut guard = make_player("guard", 2);
         guard.extra_skills.push(SkillWithValue::new(SkillId::Guard));
@@ -282,7 +282,7 @@ mod tests {
         let s = ServerUtilPlayer::find_block_strength(
             &game, FieldCoordinate::new(12, 8), 3, FieldCoordinate::new(13, 7));
         let regular = skill_touch::take();
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         let s_blitz = ServerUtilPlayer::find_block_strength(
             &game, FieldCoordinate::new(12, 8), 3, FieldCoordinate::new(13, 7));
         let blitz = skill_touch::take();

@@ -530,7 +530,7 @@ mod tests {
     #[test]
     fn failure_without_reroll_goes_to_label() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 0; // no TRR
         add_player(&mut game, "p1");
@@ -546,7 +546,7 @@ mod tests {
     #[test]
     fn failure_with_trr_offers_reroll_prompt() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1; // TRR available
         add_player(&mut game, "p1");
@@ -564,7 +564,7 @@ mod tests {
     #[test]
     fn accept_reroll_then_success_returns_next_step() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "p1");
@@ -583,7 +583,7 @@ mod tests {
     #[test]
     fn decline_reroll_goes_to_failure_label() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "p1");
@@ -756,7 +756,7 @@ mod tests {
     fn swift_as_the_breeze_passes_a_rush_failed_on_modifiers() {
         use ffb_model::enums::Weather;
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         game.field_model.weather = Weather::Blizzard;

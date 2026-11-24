@@ -189,7 +189,7 @@ mod tests {
         let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
         // Java hasPrerequisite → isProReRollAvailable → eligibleForPro requires the Pro user
         // to BE the acting player, in a Pro-allowing turn mode.
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
         game.acting_player.player_id = Some("att".into());
         game
     }

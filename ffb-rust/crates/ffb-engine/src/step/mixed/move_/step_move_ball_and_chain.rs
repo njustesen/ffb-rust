@@ -483,7 +483,7 @@ mod tests {
         game.field_model.set_player_state("mover", ffb_model::enums::PlayerState::new(PS_STANDING));
         game.acting_player.set_player("mover".into(), ffb_model::enums::PlayerAction::Move);
         game.home_playing = true;
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
     }
 
     fn add_ball_and_chain_acting_player(game: &mut Game) {
@@ -752,7 +752,7 @@ mod tests {
         game.field_model.set_player_state("mover", ffb_model::enums::PlayerState::new(PS_STANDING));
         game.acting_player.set_player("mover".into(), ffb_model::enums::PlayerAction::Move);
         game.home_playing = true;
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
         // ALLOW_BALL_AND_CHAIN_RE_ROLL left unset/false — must not matter for a skill reroll.
 
         let mut rng = GameRng::new(2);

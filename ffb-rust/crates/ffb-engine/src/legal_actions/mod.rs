@@ -2211,7 +2211,7 @@ mod tests {
     fn throw_keg_offered_under_the_client_rule() {
         let mut game = make_game(Rules::Bb2025);
         // Game::new defaults to TurnMode::StartGame; isThrowKegAvailable requires REGULAR.
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
         add_player(&mut game, true, "thorsson", c(5, 5), PS_STANDING, vec![SkillId::BeerBarrelBash]);
         assert!(is_throw_keg_available(&game, "thorsson"),
             "no adjacent opponent is required by the client rule");
@@ -2229,13 +2229,13 @@ mod tests {
     fn throw_keg_requires_standing_and_regular_turn_mode() {
         let mut game = make_game(Rules::Bb2025);
         // Game::new defaults to TurnMode::StartGame; isThrowKegAvailable requires REGULAR.
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
         add_player(&mut game, true, "thorsson", c(5, 5), PS_STANDING, vec![SkillId::BeerBarrelBash]);
         assert!(is_throw_keg_available(&game, "thorsson"));
         game.field_model.set_player_state("thorsson", ffb_model::enums::PlayerState::new(PS_PRONE));
         assert!(!is_throw_keg_available(&game, "thorsson"));
         game.field_model.set_player_state("thorsson", ffb_model::enums::PlayerState::new(PS_STANDING));
-        game.turn_mode = ffb_model::enums::TurnMode::Blitz;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Blitz);
         assert!(!is_throw_keg_available(&game, "thorsson"));
     }
 
@@ -2245,7 +2245,7 @@ mod tests {
     fn throw_keg_targets_are_opposing_standing_and_within_three() {
         let mut game = make_game(Rules::Bb2025);
         // Game::new defaults to TurnMode::StartGame; isThrowKegAvailable requires REGULAR.
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
         add_player(&mut game, true, "thorsson", c(5, 5), PS_STANDING, vec![SkillId::BeerBarrelBash]);
         add_player(&mut game, true, "mate", c(6, 5), PS_STANDING, vec![]);          // own team
         add_player(&mut game, false, "far", c(9, 5), PS_STANDING, vec![]);          // 4 steps
@@ -2355,7 +2355,7 @@ mod tests {
     #[test]
     fn all_you_can_eat_offered_only_with_bombardier_and_unused_skill() {
         let mut game = make_game(Rules::Bb2025);
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
         add_player(&mut game, true, "cindy", c(5, 5), PS_STANDING,
             vec![SkillId::Bombardier, SkillId::AllYouCanEat]);
         add_player(&mut game, false, "opp", c(15, 5), PS_STANDING, vec![]);

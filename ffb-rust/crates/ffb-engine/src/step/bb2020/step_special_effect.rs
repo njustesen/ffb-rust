@@ -448,7 +448,7 @@ mod tests {
         step.original_bombardier = Some(pid.into());
 
         let mut game = make_game_with_player(pid, true); // home player, home playing
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         // BOMBER_PLACED_PRONE_IGNORES_TURNOVER defaults to false → !false = true → suppressEndTurn=false
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))),
@@ -474,7 +474,7 @@ mod tests {
 
         let mut game = make_game_with_player(pid, true);
         game.acting_player.player_id = Some(pid.into()); // hit player is the current actor
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
 
         step.start(&mut game, &mut GameRng::new(0));
 

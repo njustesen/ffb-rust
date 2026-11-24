@@ -466,7 +466,7 @@ mod tests {
     #[test]
     fn failed_roll_no_reroll_goes_to_label() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 0;
         add_player(&mut game, "atk", vec![]);
@@ -489,7 +489,7 @@ mod tests {
     #[test]
     fn failed_roll_with_trr_offers_reroll() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "atk", vec![]);
@@ -542,7 +542,7 @@ mod tests {
         use ffb_model::enums::{PlayerAction, Rules};
         let run = |rules: Rules, action: PlayerAction| {
             let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
-            game.turn_mode = TurnMode::Regular;
+            game.set_turn_mode(TurnMode::Regular);
             game.home_playing = true;
             game.turn_data_home.rerolls = 0;
             add_player(&mut game, "atk", vec![]);
@@ -567,7 +567,7 @@ mod tests {
     fn in_select_copy_rolls_only_once_per_activation() {
         use ffb_model::enums::{PlayerAction, Rules};
         let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 0;
         add_player(&mut game, "atk", vec![]);
@@ -600,7 +600,7 @@ mod tests {
     fn failed_with_standing_up_blitz_move_sets_player_prone() {
         use ffb_model::enums::{PlayerAction, PS_PRONE, PS_STANDING};
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 0;
         add_player(&mut game, "atk", vec![]);
@@ -629,7 +629,7 @@ mod tests {
         use ffb_model::enums::{PlayerAction, PS_PRONE, PS_STANDING, Rules};
         let run = |rules: Rules| {
             let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
-            game.turn_mode = TurnMode::Regular;
+            game.set_turn_mode(TurnMode::Regular);
             game.home_playing = true;
             game.turn_data_home.rerolls = 0;
             add_player(&mut game, "atk", vec![]);
@@ -658,7 +658,7 @@ mod tests {
     fn bb2020_blitzer_that_has_already_blocked_is_not_reverted_to_prone() {
         use ffb_model::enums::{PlayerAction, PS_STANDING, Rules};
         let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 0;
         add_player(&mut game, "atk", vec![]);
@@ -680,7 +680,7 @@ mod tests {
         use ffb_model::enums::PlayerAction;
         use ffb_model::model::target_selection_state::{TargetSelectionState, TargetSelectionStatus};
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 0;
         add_player(&mut game, "atk", vec![]);
@@ -707,7 +707,7 @@ mod tests {
         // END_PLAYER_ACTION condition (bb2020 does not) — this crate targets bb2025.
         use ffb_model::enums::PlayerAction;
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 0;
         add_player(&mut game, "atk", vec![]);
@@ -729,7 +729,7 @@ mod tests {
     fn failed_with_block_action_publishes_end_player_action() {
         use ffb_model::enums::PlayerAction;
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 0;
         add_player(&mut game, "atk", vec![]);

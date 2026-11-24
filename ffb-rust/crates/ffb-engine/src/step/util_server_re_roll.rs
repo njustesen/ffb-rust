@@ -897,7 +897,7 @@ mod tests {
             game.turn_data_mut().rerolls = 0;
             // bb2020/bb2025 `eligibleForPro` additionally require the Pro carrier to BE the
             // acting player, upright, in a Regular/Blitz turn; bb2016's is unconditionally true.
-            game.turn_mode = ffb_model::enums::TurnMode::Regular;
+            game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
             game.acting_player.player_id = Some("pro1".into());
             game.acting_player.has_moved = true;
 
@@ -940,7 +940,7 @@ mod tests {
                 ..Default::default()
             });
             game.turn_data_mut().rerolls = 0;
-            game.turn_mode = ffb_model::enums::TurnMode::Regular;
+            game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
             game.acting_player.player_id = Some("pro1".into());
             game.acting_player.has_moved = true;
             game
@@ -1235,7 +1235,7 @@ mod tests {
     fn the_player_overload_does_not_read_the_acting_players_skill_reroll() {
         let mut game = make_game();
         game.home_playing = true;
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
         game.turn_data_home.rerolls = 0; // empty bank: only a skill source could open a dialog
         add_player_with_skill(&mut game, "thrower", SkillId::Catch);
         add_player_with_skill(&mut game, "catcher", SkillId::Block); // no Catch
@@ -1266,7 +1266,7 @@ mod tests {
         let mut game = make_game();
         game.rules = ffb_model::enums::Rules::Bb2020;
         game.home_playing = true;
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
         game.turn_data_home.rerolls = 0;
         add_player_with_skill(&mut game, "eldril", SkillId::MesmerizingDance);
         game.acting_player.player_id = Some("eldril".into());
@@ -1293,7 +1293,7 @@ mod tests {
     #[test]
     fn trr_available_returns_prompt() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         let result = ask_for_reroll_if_available(&mut game, "DODGE", 3, false);
@@ -1308,11 +1308,11 @@ mod tests {
         let mut game = make_game();
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         assert!(ask_for_reroll_if_available(&mut game, "CATCH", 3, false).is_none(),
             "no team re-roll may be offered during KICKOFF");
         // Sanity: the same TRR IS offered on a regular turn.
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         assert!(ask_for_reroll_if_available(&mut game, "CATCH", 3, false).is_some(),
             "a team re-roll IS available on a regular turn");
     }

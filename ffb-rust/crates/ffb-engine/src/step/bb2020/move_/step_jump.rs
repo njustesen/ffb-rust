@@ -306,7 +306,7 @@ mod tests {
     #[test]
     fn failure_with_trr_offers_reroll_prompt() {
         let mut game = make_game_with_leaper();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         let mut step = StepJump::new("fail".into());

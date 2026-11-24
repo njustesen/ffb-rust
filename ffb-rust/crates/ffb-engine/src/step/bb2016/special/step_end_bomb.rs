@@ -52,11 +52,12 @@ impl StepEndBomb {
             // Restore home_playing from the bomb turn mode
             game.home_playing = matches!(game.turn_mode, TurnMode::BombHome | TurnMode::BombHomeBlitz);
             // Restore turn_mode
-            game.turn_mode = if matches!(game.turn_mode, TurnMode::BombHomeBlitz | TurnMode::BombAwayBlitz) {
+            let mode = if matches!(game.turn_mode, TurnMode::BombHomeBlitz | TurnMode::BombAwayBlitz) {
                 TurnMode::Blitz
             } else {
                 TurnMode::Regular
             };
+            game.set_turn_mode(mode);
 
             let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
                 feeding_allowed: false,
@@ -149,7 +150,7 @@ mod tests {
     #[test]
     fn no_catcher_pushes_end_player_action() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         let mut step = StepEndBomb::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
@@ -160,7 +161,7 @@ mod tests {
     #[test]
     fn end_turn_pushes_end_player_action() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         let mut step = StepEndBomb::new();
         step.end_turn = true;
         step.catcher_id = Some("foo".into());
@@ -172,7 +173,7 @@ mod tests {
     #[test]
     fn bomb_exploded_pushes_end_player_action() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         let mut step = StepEndBomb::new();
         step.bomb_exploded = true;
         step.catcher_id = Some("foo".into());
@@ -184,7 +185,7 @@ mod tests {
     #[test]
     fn bomb_home_sets_home_playing_true() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         game.home_playing = false;
         let mut step = StepEndBomb::new();
         step.start(&mut game, &mut GameRng::new(0));
@@ -194,7 +195,7 @@ mod tests {
     #[test]
     fn bomb_away_sets_home_playing_false() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombAway;
+        game.set_turn_mode(TurnMode::BombAway);
         game.home_playing = true;
         let mut step = StepEndBomb::new();
         step.start(&mut game, &mut GameRng::new(0));
@@ -204,7 +205,7 @@ mod tests {
     #[test]
     fn bomb_home_blitz_restores_blitz_mode() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHomeBlitz;
+        game.set_turn_mode(TurnMode::BombHomeBlitz);
         let mut step = StepEndBomb::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::Blitz);
@@ -213,7 +214,7 @@ mod tests {
     #[test]
     fn bomb_away_blitz_restores_blitz_mode() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombAwayBlitz;
+        game.set_turn_mode(TurnMode::BombAwayBlitz);
         let mut step = StepEndBomb::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::Blitz);
@@ -222,7 +223,7 @@ mod tests {
     #[test]
     fn bomb_home_non_blitz_restores_regular_mode() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         let mut step = StepEndBomb::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::Regular);
@@ -231,7 +232,7 @@ mod tests {
     #[test]
     fn catcher_present_pushes_pass_sequence() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         add_player(&mut game, "away", "catcher1");
         let mut step = StepEndBomb::new();
         step.catcher_id = Some("catcher1".into());
@@ -243,7 +244,7 @@ mod tests {
     #[test]
     fn away_catcher_sets_home_playing_false() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         add_player(&mut game, "away", "awaycatcher");
         game.home_playing = true;
         let mut step = StepEndBomb::new();
@@ -255,7 +256,7 @@ mod tests {
     #[test]
     fn home_catcher_sets_home_playing_true() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombAway;
+        game.set_turn_mode(TurnMode::BombAway);
         add_player(&mut game, "home", "homecatcher");
         game.home_playing = false;
         let mut step = StepEndBomb::new();
@@ -267,7 +268,7 @@ mod tests {
     #[test]
     fn clears_pass_coordinate() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         game.pass_coordinate = Some(FieldCoordinate::new(5, 5));
         let mut step = StepEndBomb::new();
         step.start(&mut game, &mut GameRng::new(0));
@@ -277,7 +278,7 @@ mod tests {
     #[test]
     fn clears_thrower_id_and_action() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         game.thrower_id = Some("thrower".into());
         game.thrower_action = Some(PlayerAction::ThrowBomb);
         let mut step = StepEndBomb::new();

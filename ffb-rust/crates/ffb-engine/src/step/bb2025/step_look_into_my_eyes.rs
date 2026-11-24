@@ -249,15 +249,15 @@ impl StepLookIntoMyEyes {
         match game.acting_player.player_action {
             Some(PlayerAction::Blitz) | Some(PlayerAction::BlitzMove) | Some(PlayerAction::KickEmBlitz) => {
                 game.turn_data_mut().blitz_used = true;
-                game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
+                game.set_turn_mode(game.last_turn_mode.unwrap_or(game.turn_mode));
                 true
             }
             Some(PlayerAction::Gaze) | Some(PlayerAction::GazeMove) => {
-                game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
+                game.set_turn_mode(game.last_turn_mode.unwrap_or(game.turn_mode));
                 true
             }
             Some(PlayerAction::ThrowKeg) => {
-                game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
+                game.set_turn_mode(game.last_turn_mode.unwrap_or(game.turn_mode));
                 true
             }
             Some(PlayerAction::KickTeamMate) | Some(PlayerAction::KickTeamMateMove) => {
@@ -500,7 +500,7 @@ mod tests {
     fn end_player_action_cancel_sets_blitz_used_and_clears_stack() {
         let (mut game, _) = make_game_lime();
         game.acting_player.player_action = Some(PlayerAction::Blitz);
-        game.turn_mode = ffb_model::enums::TurnMode::Blitz;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Blitz);
         game.last_turn_mode = Some(ffb_model::enums::TurnMode::Regular);
         let mut step = StepLookIntoMyEyes::new();
         step.end_turn = true;

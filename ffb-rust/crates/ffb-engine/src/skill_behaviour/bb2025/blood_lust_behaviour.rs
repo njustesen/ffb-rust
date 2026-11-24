@@ -255,7 +255,7 @@ mod tests {
         use ffb_model::enums::TurnMode;
         let m = BloodLustStepModifier;
         let mut game = test_game();
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         let mut hook = StepBloodLustHookState {
             goto_label_on_failure: None,
             re_rolled_action: None,

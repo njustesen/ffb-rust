@@ -68,7 +68,7 @@ impl StepBlitzTurn {
         }
         if game.turn_mode == TurnMode::Blitz {
             // Second entry: blitz turn is over, return to kickoff.
-            game.turn_mode = TurnMode::Kickoff;
+            game.set_turn_mode(TurnMode::Kickoff);
         } else {
             // First entry: set up the blitz turn for the kicking team.
             let blitzing_team_id = if game.home_playing {
@@ -88,7 +88,7 @@ impl StepBlitzTurn {
             if game.rules == ffb_model::enums::Rules::Bb2016 {
                 UtilServerGame::update_player_state_dependent_properties(game);
             }
-            game.turn_mode = TurnMode::Blitz;
+            game.set_turn_mode(TurnMode::Blitz);
             // Java: pushCurrentStepOnStack(); Select.pushSequence(gameState, true)
             let self_seq = vec![SequenceStep::new(StepId::BlitzTurn)];
             let select_seq = Select::build_sequence(&SelectParams {
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn first_entry_sets_blitz_mode() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         let mut step = StepBlitzTurn::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::Blitz);
@@ -168,7 +168,7 @@ mod tests {
     #[test]
     fn second_entry_restores_kickoff_mode() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         let mut step = StepBlitzTurn::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::Kickoff);
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn first_entry_pushes_self_seq_and_select_seq() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         let mut step = StepBlitzTurn::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         // Java: pushCurrentStepOnStack() + Select.pushSequence → two pushed sequences

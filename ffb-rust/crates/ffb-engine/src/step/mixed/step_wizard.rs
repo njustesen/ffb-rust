@@ -66,7 +66,7 @@ impl StepWizard {
         if self.end_inducement {
             // Java: cancel spellcasting — restore old turn mode
             if let Some(old) = self.old_turn_mode {
-                game.turn_mode = old;
+                game.set_turn_mode(old);
             }
             return StepOutcome::next();
         }
@@ -136,7 +136,7 @@ impl StepWizard {
 
                 // Restore old turn mode
                 if let Some(old) = self.old_turn_mode {
-                    game.turn_mode = old;
+                    game.set_turn_mode(old);
                 }
                 // Java: fieldModel.add(new BloodSpot(fTargetCoordinate, FIREBALL ? HIT_BY_FIREBALL : HIT_BY_LIGHTNING))
                 let blood = if spell == SpecialEffect::FIREBALL {
@@ -161,7 +161,7 @@ impl StepWizard {
         if game.turn_mode != TurnMode::Wizard {
             self.old_turn_mode = Some(game.turn_mode);
         }
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         // Java: showDialog(new DialogWizardSpellParameter((fHomeTeam ? teamHome : teamAway).getId()), false)
         let team_id = if self.home_team { game.team_home.id.clone() } else { game.team_away.id.clone() };
         crate::util::util_server_dialog::UtilServerDialog::show_dialog(
@@ -254,7 +254,7 @@ mod tests {
     fn start_sets_wizard_turn_mode_and_continues() {
         let mut step = StepWizard::new();
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::Continue);
         assert_eq!(game.turn_mode, TurnMode::Wizard);
@@ -264,7 +264,7 @@ mod tests {
     fn start_saves_old_turn_mode() {
         let mut step = StepWizard::new();
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(step.old_turn_mode, Some(TurnMode::Regular));
     }
@@ -275,7 +275,7 @@ mod tests {
         step.old_turn_mode = Some(TurnMode::Regular);
         step.end_inducement = true;
         let mut game = make_game();
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(game.turn_mode, TurnMode::Regular);
@@ -295,7 +295,7 @@ mod tests {
         step.target_coordinate = Some(FieldCoordinate::new(5, 5));
         step.old_turn_mode = Some(TurnMode::Regular);
         let mut game = make_game();
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(game.turn_mode, TurnMode::Regular);
@@ -311,13 +311,13 @@ mod tests {
         step.target_coordinate = Some(coord);
 
         let mut game = make_game();
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
 
         // Add a standing player at the target coordinate
         let mut team = test_team("home", 0);
         team.players.push(Player { id: "p1".into(), name: "P1".into(), nr: 1, ..Default::default() });
         game = Game::new(team, test_team("away", 0), Rules::Bb2025);
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         game.field_model.set_player_coordinate("p1", coord);
         game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
 
@@ -338,7 +338,7 @@ mod tests {
         let mut team = test_team("home", 0);
         team.players.push(Player { id: "p1".into(), name: "P1".into(), nr: 1, ..Default::default() });
         let mut game = Game::new(team, test_team("away", 0), Rules::Bb2025);
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         game.field_model.set_player_coordinate("p1", coord);
         game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE));
 
@@ -359,7 +359,7 @@ mod tests {
         let mut team = test_team("home", 0);
         team.players.push(Player { id: "p1".into(), name: "P1".into(), nr: 1, ..Default::default() });
         let mut game = Game::new(team, test_team("away", 0), Rules::Bb2020);
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         game.field_model.set_player_coordinate("p1", coord);
         game.field_model.set_player_state("p1", PlayerState::new(PS_STANDING));
 
@@ -389,7 +389,7 @@ mod tests {
         let mut team = test_team("home", 0);
         team.players.push(Player { id: "p1".into(), name: "P1".into(), nr: 1, ..Default::default() });
         let mut game = Game::new(team, test_team("away", 0), Rules::Bb2025);
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         game.field_model.set_player_coordinate("p1", coord);
         game.field_model.set_player_state("p1", PlayerState::new(PS_PRONE));
 
@@ -403,7 +403,7 @@ mod tests {
         let mut step = StepWizard::new();
         step.home_team = true;
         let mut game = make_game();
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         let coord = FieldCoordinate::new(5, 5);
         step.handle_command(
             &Action::WizardSpell { spell: WizardSpellChoice::Zap, coord },
@@ -425,7 +425,7 @@ mod tests {
         let mut team = test_team("home", 0);
         team.players.push(Player { id: "p1".into(), name: "P1".into(), nr: 1, ..Default::default() });
         let mut game = Game::new(team, test_team("away", 0), Rules::Bb2025);
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         game.field_model.set_player_coordinate("p1", coord);
         game.field_model.set_player_state("p1", PlayerState::new(PS_STUNNED));
 
@@ -444,7 +444,7 @@ mod tests {
         step.target_coordinate = Some(coord);
 
         let mut game = make_game();
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
 
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::WIZARD_USE),
@@ -459,7 +459,7 @@ mod tests {
         step.end_inducement = true;
 
         let mut game = make_game();
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
 
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.report_list.has_report(ReportId::WIZARD_USE),

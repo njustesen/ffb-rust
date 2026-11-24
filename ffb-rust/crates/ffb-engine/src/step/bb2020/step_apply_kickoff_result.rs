@@ -113,7 +113,7 @@ impl Step for StepApplyKickoffResult {
                 if game.turn_mode == TurnMode::QuickSnap {
                     // Java: endQuickSnap — flip playing side, restore KICKOFF mode
                     game.home_playing = !game.home_playing;
-                    game.turn_mode = TurnMode::Kickoff;
+                    game.set_turn_mode(TurnMode::Kickoff);
                 } else if game.turn_mode == TurnMode::SolidDefence {
                     // Java: setPlayerCoordinates from command
                     // client-only: no-op — playerCoordinates from ClientCommandEndTurn sent only by clients
@@ -235,7 +235,7 @@ impl StepApplyKickoffResult {
                     }
                     // Java: setKickingSwarmers(0)
                     game.kicking_swarmers = 0;
-                    game.turn_mode = TurnMode::Kickoff;
+                    game.set_turn_mode(TurnMode::Kickoff);
                     StepOutcome::next()
                 } else {
                     // Invalid: too many players moved; reset end_kickoff, show dialog again
@@ -286,7 +286,7 @@ impl StepApplyKickoffResult {
                 }
             }
 
-            game.turn_mode = TurnMode::SolidDefence;
+            game.set_turn_mode(TurnMode::SolidDefence);
             game.report_list.add(ReportSolidDefenceRoll::new(
                 Some(acting_team_id.clone()),
                 roll,
@@ -307,7 +307,7 @@ impl StepApplyKickoffResult {
         if game.turn_mode == TurnMode::HighKick {
             if self.end_kickoff {
                 game.home_playing = !game.home_playing;
-                game.turn_mode = TurnMode::Kickoff;
+                game.set_turn_mode(TurnMode::Kickoff);
                 StepOutcome::next()
             } else {
                 StepOutcome::cont()
@@ -322,7 +322,7 @@ impl StepApplyKickoffResult {
                 StepOutcome::next()
             } else {
                 game.home_playing = !game.home_playing;
-                game.turn_mode = TurnMode::HighKick;
+                game.set_turn_mode(TurnMode::HighKick);
                 let pin_team_id = if game.home_playing {
                     game.team_home.id.clone()
                 } else {
@@ -571,7 +571,7 @@ impl StepApplyKickoffResult {
                     // even though that sub-sequence runs before this step is popped again.
                     if self.end_kickoff {
                         game.home_playing = !game.home_playing;
-                        game.turn_mode = TurnMode::Kickoff;
+                        game.set_turn_mode(TurnMode::Kickoff);
                     }
                     return out;
                 }
@@ -581,7 +581,7 @@ impl StepApplyKickoffResult {
 
             if self.end_kickoff {
                 game.home_playing = !game.home_playing;
-                game.turn_mode = TurnMode::Kickoff;
+                game.set_turn_mode(TurnMode::Kickoff);
                 StepOutcome::next().with_event(GameEvent::KickoffSequenceActivationsExhausted { limit_reached: true })
             } else {
                 StepOutcome::cont()
@@ -589,7 +589,7 @@ impl StepApplyKickoffResult {
         } else {
             // First entry: flip side, set QUICK_SNAP mode, roll D3+3
             game.home_playing = !game.home_playing;
-            game.turn_mode = TurnMode::QuickSnap;
+            game.set_turn_mode(TurnMode::QuickSnap);
             let roll = rng.d3();
             self.nr_of_players_allowed = roll + 3;
             let active_team_id = game.active_team().id.clone();
@@ -619,7 +619,7 @@ impl StepApplyKickoffResult {
             if !any_active {
                 self.end_kickoff = true;
                 game.home_playing = !game.home_playing;
-                game.turn_mode = TurnMode::Kickoff;
+                game.set_turn_mode(TurnMode::Kickoff);
                 StepOutcome::next()
                     .with_event(snap_event)
                     .with_event(GameEvent::KickoffSequenceActivationsExhausted { limit_reached: false })
@@ -1148,7 +1148,7 @@ mod tests {
         let mut step = make_step();
         let mut game = make_game();
         game.home_playing = true;
-        game.turn_mode = TurnMode::QuickSnap;
+        game.set_turn_mode(TurnMode::QuickSnap);
         add_active_player(&mut game, true, "home1", FieldCoordinate::new(3, 3));
 
         step.nr_of_players_allowed = 5;
@@ -1175,7 +1175,7 @@ mod tests {
         let mut step = make_step();
         let mut game = make_game();
         game.home_playing = true;
-        game.turn_mode = TurnMode::QuickSnap;
+        game.set_turn_mode(TurnMode::QuickSnap);
         add_active_player(&mut game, true, "home1", FieldCoordinate::new(3, 3));
 
         // Only one active player and moving it off the FIELD bounds (into the dugout region)
@@ -1198,7 +1198,7 @@ mod tests {
         let mut step = make_step();
         let mut game = make_game();
         game.home_playing = true;
-        game.turn_mode = TurnMode::QuickSnap;
+        game.set_turn_mode(TurnMode::QuickSnap);
         let coord = FieldCoordinate::new(3, 3);
         add_active_player(&mut game, true, "home1", coord);
 

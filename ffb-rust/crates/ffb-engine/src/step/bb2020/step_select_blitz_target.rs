@@ -103,7 +103,7 @@ impl StepSelectBlitzTarget {
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         // Case 1: End player action or end turn triggered
         if self.end_player_action || self.end_turn {
-            game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
+            game.set_turn_mode(game.last_turn_mode.unwrap_or(game.turn_mode));
             let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
                 feeding_allowed: false,
                 end_player_action: true,
@@ -117,7 +117,7 @@ impl StepSelectBlitzTarget {
         // Case 2: No player selected yet
         if self.selected_player_id.is_none() {
             if self.has_standing_opponents(game) {
-                game.turn_mode = TurnMode::SelectBlitzTarget;
+                game.set_turn_mode(TurnMode::SelectBlitzTarget);
                 // client-only: DialogSelectBlitzTarget shown to coach — headless waits for action
                 return StepOutcome::cont();
             } else {
@@ -142,7 +142,7 @@ impl StepSelectBlitzTarget {
                 return StepOutcome::cont();
             } else {
                 // Cancel blitz target: restore last turn mode and goto end label
-                game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
+                game.set_turn_mode(game.last_turn_mode.unwrap_or(game.turn_mode));
                 // Java: setTargetSelectionState(new TargetSelectionState(actingPlayerId).cancel())
                 let mut ts = TargetSelectionState::default();
                 ts.cancel();
@@ -162,7 +162,7 @@ impl StepSelectBlitzTarget {
 
         if is_on_inactive_team {
             // Selected an opponent → valid blitz target
-            game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
+            game.set_turn_mode(game.last_turn_mode.unwrap_or(game.turn_mode));
             // Java: getFieldModel().getPlayerState(targetPlayer).addSelectedBlitzTarget()
             if let Some(state) = game.field_model.player_state(&selected_id) {
                 game.field_model.set_player_state(&selected_id, state.add_selected_blitz_target());
@@ -187,7 +187,7 @@ impl StepSelectBlitzTarget {
             })
         } else {
             // Selected own teammate (not acting player): restore last turn mode
-            game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
+            game.set_turn_mode(game.last_turn_mode.unwrap_or(game.turn_mode));
             StepOutcome::next()
         }
     }

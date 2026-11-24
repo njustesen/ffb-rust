@@ -168,7 +168,7 @@ impl StepKickoffReturn {
                 // Java: game.setHomePlaying(!game.isHomePlaying())
                 game.home_playing = !game.home_playing;
                 // Java: game.setTurnMode(TurnMode.KICKOFF)
-                game.turn_mode = TurnMode::Kickoff;
+                game.set_turn_mode(TurnMode::Kickoff);
                 self.window_open = false;
                 // Java: UtilPlayer.refreshPlayersForTurnStart(game)
                 let mechanic = crate::mechanic::game_mechanic_for(game.rules);
@@ -236,7 +236,7 @@ impl StepKickoffReturn {
                 // Java: game.setHomePlaying(!game.isHomePlaying())
                 game.home_playing = !game.home_playing;
                 // Java: game.setTurnMode(TurnMode.KICKOFF_RETURN)
-                game.turn_mode = TurnMode::KickoffReturn;
+                game.set_turn_mode(TurnMode::KickoffReturn);
                 self.window_open = true;
                 // Java: UtilServerDialog.showDialog(…, new DialogKickoffReturnParameter(), false)
                 crate::util::util_server_dialog::UtilServerDialog::show_dialog(
@@ -312,7 +312,7 @@ mod tests {
     #[test]
     fn kickoff_return_mode_end_turn_flips_home_playing_and_sets_kickoff_mode() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         game.home_playing = true;
         let mut step = StepKickoffReturn::new();
         step.end_turn = true;
@@ -325,7 +325,7 @@ mod tests {
     #[test]
     fn kickoff_return_mode_end_player_action_and_end_turn_flips_and_sets_kickoff() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         game.home_playing = false;
         let mut step = StepKickoffReturn::new();
         step.end_player_action = true;

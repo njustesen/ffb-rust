@@ -334,7 +334,7 @@ mod tests {
     #[test]
     fn failure_with_trr_offers_reroll_prompt() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "p1");
@@ -351,7 +351,7 @@ mod tests {
     #[test]
     fn decline_reroll_goes_to_failure_label() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "p1");

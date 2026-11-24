@@ -92,7 +92,7 @@ impl StepSetup {
         // Java: checkNoPlayersInBoxOrField()
         let (no_players, no_players_events) = self.check_no_players_in_box_or_field(game);
         if no_players {
-            game.turn_mode = TurnMode::NoPlayersToField;
+            game.set_turn_mode(TurnMode::NoPlayersToField);
             let mut out = StepOutcome::goto(&goto_label);
             for ev in no_players_events { out = out.with_event(ev); }
             return out;
@@ -111,7 +111,7 @@ impl StepSetup {
 
                 if game.setup_offense {
                     // Java: game.setTurnMode(TurnMode.KICKOFF)
-                    game.turn_mode = TurnMode::Kickoff;
+                    game.set_turn_mode(TurnMode::Kickoff);
                 } else {
                     // Java: game.setSetupOffense(true)
                     game.setup_offense = true;

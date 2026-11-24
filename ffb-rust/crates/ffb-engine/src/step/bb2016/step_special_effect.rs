@@ -381,7 +381,7 @@ mod tests {
         add_home_player(&mut game, "home_p");
         // BombHome mode: home team is acting regardless of home_playing
         game.home_playing = false;
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         let mut step = StepSpecialEffect::new("fail".into(), "home_p".into(), Some(SpecialEffect::Bomb));
         step.roll_for_effect = false;
         let out = step.start(&mut game, &mut GameRng::new(0));

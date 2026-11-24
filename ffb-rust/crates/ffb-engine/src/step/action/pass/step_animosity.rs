@@ -378,7 +378,7 @@ mod tests {
     #[test]
     fn bomb_turn_skips_animosity_check() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         let out = StepAnimosity::new("fail").start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
     }
@@ -432,7 +432,7 @@ mod tests {
     #[test]
     fn regular_turn_no_animosity_returns_next() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         let mut step = StepAnimosity::new("fail");
         step.catcher_id = Some("c2".into());
         let out = step.start(&mut game, &mut GameRng::new(0));

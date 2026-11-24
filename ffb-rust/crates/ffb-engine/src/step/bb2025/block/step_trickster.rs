@@ -185,7 +185,7 @@ impl StepTrickster {
             if self.to_coordinate.is_none() {
                 // Show eligible squares to defender's coach
                 self.last_turn_mode = Some(game.turn_mode);
-                game.turn_mode = TurnMode::Trickster;
+                game.set_turn_mode(TurnMode::Trickster);
                 // Java: game.setHomePlaying(!game.isHomePlaying()) — switch acting team
                 game.home_playing = !game.home_playing;
                 game.field_model.clear_move_squares();
@@ -269,7 +269,7 @@ impl StepTrickster {
         // Java: game.setHomePlaying(!game.isHomePlaying()) — switch back
         game.home_playing = !game.home_playing;
         if let Some(mode) = self.last_turn_mode {
-            game.turn_mode = mode;
+            game.set_turn_mode(mode);
         }
         StepOutcome::next()
     }
@@ -279,7 +279,7 @@ impl StepTrickster {
         // Java: game.setHomePlaying(!game.isHomePlaying()) — switch back
         game.home_playing = !game.home_playing;
         if let Some(mode) = self.last_turn_mode {
-            game.turn_mode = mode;
+            game.set_turn_mode(mode);
         }
         base
     }
@@ -333,7 +333,7 @@ mod tests {
         step.using_trickster = Some(true);
         step.last_turn_mode = Some(TurnMode::Regular);
         let mut game = make_game();
-        game.turn_mode = TurnMode::Trickster;
+        game.set_turn_mode(TurnMode::Trickster);
         let out = step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));
         // leave() restores TurnMode and returns NEXT_STEP
         assert_eq!(out.action, StepAction::NextStep);
@@ -530,7 +530,7 @@ mod tests {
         step.using_trickster = Some(true);
         step.last_turn_mode = Some(TurnMode::Regular);
         let mut game = make_game();
-        game.turn_mode = TurnMode::Trickster;
+        game.set_turn_mode(TurnMode::Trickster);
         // Populate a stale move square
         game.field_model.add_move_square(MoveSquare::new(FieldCoordinate::new(3, 3), 0, 0));
         step.handle_command(&Action::EndTurn, &mut game, &mut GameRng::new(0));

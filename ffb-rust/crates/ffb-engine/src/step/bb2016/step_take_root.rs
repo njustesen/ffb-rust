@@ -200,7 +200,7 @@ mod tests {
         game.acting_player.player_id = Some("p1".into());
         game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
         game.field_model.set_player_state("p1", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING));
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game
     }
 
@@ -234,7 +234,7 @@ mod tests {
     #[test]
     fn negatraits_disabled_skips_roll() {
         let mut game = make_game(vec![SkillId::TakeRoot]);
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         let out = StepTakeRoot::new().start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
     }

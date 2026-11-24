@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn default_pushes_select_sequence() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         let mut step = StepEndFeeding::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
@@ -172,7 +172,7 @@ mod tests {
     #[test]
     fn end_turn_regular_pushes_inducement_and_pick_me_up() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         let mut step = StepEndFeeding::new();
         step.end_turn = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn end_turn_regular_forwards_check_forgo_to_opponent_inducement_sequence() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         let mut step = StepEndFeeding::new();
         step.end_turn = true;
         step.check_forgo = true;
@@ -210,7 +210,7 @@ mod tests {
     #[test]
     fn end_turn_pass_block_pushes_end_turn_sequence() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::PassBlock;
+        game.set_turn_mode(TurnMode::PassBlock);
         let mut step = StepEndFeeding::new();
         step.end_turn = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
@@ -221,7 +221,7 @@ mod tests {
     #[test]
     fn kickoff_return_with_end_player_action_publishes_end_player_action() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         let mut step = StepEndFeeding::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))));

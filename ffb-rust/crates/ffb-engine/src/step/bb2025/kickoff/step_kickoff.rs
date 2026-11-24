@@ -87,7 +87,7 @@ impl StepKickoff {
             None => {
                 // Waiting for CLIENT_KICKOFF command: set TurnMode to Kickoff so the
                 // client knows it should offer a placement UI.
-                game.turn_mode = TurnMode::Kickoff;
+                game.set_turn_mode(TurnMode::Kickoff);
                 StepOutcome::cont().with_prompt(AgentPrompt::KickBall)
             }
         }

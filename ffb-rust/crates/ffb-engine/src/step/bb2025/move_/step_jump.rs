@@ -671,7 +671,7 @@ mod tests {
     #[test]
     fn failure_with_trr_offers_reroll_prompt() {
         let mut game = make_game_with_leaper();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         let mut step = StepJump::new("fail".into());
@@ -684,7 +684,7 @@ mod tests {
     #[test]
     fn decline_reroll_goes_to_failure_label() {
         let mut game = make_game_with_leaper();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         let mut step = StepJump::new("fail".into());
@@ -697,7 +697,7 @@ mod tests {
     #[test]
     fn accept_reroll_with_success_returns_next_step() {
         let mut game = make_game_with_leaper();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         let mut step = StepJump::new("fail".into());
@@ -833,7 +833,7 @@ mod tests {
         game.team_away.players.push(opp);
         game.field_model.set_player_coordinate("opp", FieldCoordinate::new(5, 6));
         game.field_model.set_player_state("opp", ffb_model::enums::PlayerState::new(PS_STANDING));
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game
     }
@@ -917,7 +917,7 @@ mod tests {
         for roll in 2..=6 {
             let mut game = make_game_with_leaper();
             game.home_playing = true;
-            game.turn_mode = TurnMode::Regular;
+            game.set_turn_mode(TurnMode::Regular);
             game.turn_data_home.rerolls = 0;
             // The leaper started next to an away Diving Tackler and landed two squares away.
             let mut tackler = Player::default();

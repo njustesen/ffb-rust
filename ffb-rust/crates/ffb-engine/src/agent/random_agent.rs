@@ -2378,7 +2378,7 @@ mod tests {
             // EndTurn`, added for pass-block windows) must not fire here.
             gs.game.turn_data_home.turn_nr = 1;
             gs.game.turn_data_away.turn_nr = 1;
-            gs.game.turn_mode = ffb_model::enums::TurnMode::Regular;
+            gs.game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
             gs.game.team_home.players.push(mk("fouler"));
             gs.game.team_home.players.push(mk("mover"));
             gs.game.team_away.players.push(mk("victim"));

@@ -151,7 +151,7 @@ mod tests {
     fn pass_block_does_not_publish_end_turn_even_for_turnover_injury() {
         let mut game = make_game();
         add_acting_player(&mut game, "p1");
-        game.turn_mode = TurnMode::PassBlock;
+        game.set_turn_mode(TurnMode::PassBlock);
         let mut step = StepFallDown::new();
         step.injury_type_name = Some("InjuryTypeDropGFI".into());
         let out = step.start(&mut game, &mut GameRng::new(0));

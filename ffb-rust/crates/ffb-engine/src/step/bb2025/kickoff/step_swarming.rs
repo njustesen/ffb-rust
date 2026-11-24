@@ -220,7 +220,7 @@ impl StepSwarming {
             game.home_playing = !game.home_playing;
         }
 
-        game.turn_mode = TurnMode::Swarming;
+        game.set_turn_mode(TurnMode::Swarming);
 
         // Java `DiceRoller.rollSwarmingPlayers()` is `rollDice(3)` -- a d3 in EVERY edition. This
         // read d6, so even where the step did fire it consumed the wrong die.
@@ -295,7 +295,7 @@ impl StepSwarming {
             game.kicking_swarmers = placed_swarming_players;
         }
 
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         // Java: UtilServerDialog.hideDialog(getGameState())
         crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
     }

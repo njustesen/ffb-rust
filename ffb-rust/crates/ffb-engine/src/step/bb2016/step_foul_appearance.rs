@@ -223,7 +223,7 @@ mod tests {
     fn defender_with_fa_failed_roll_no_reroll_goes_to_label() {
         // roll = 1 → failure, no TRR → goto fail label; hasBlocked=true, turnStarted=true
         let mut game = make_game();
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 0;
         add_player(&mut game, "atk", vec![]);
@@ -242,7 +242,7 @@ mod tests {
     #[test]
     fn defender_with_fa_failed_roll_with_trr_offers_reroll() {
         let mut game = make_game();
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "atk", vec![]);

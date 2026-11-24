@@ -994,7 +994,7 @@ mod tests {
         game.field_model.set_player_coordinate("tackler", FieldCoordinate::new(4, 4));
         game.field_model.set_player_state("tackler", PSt::new(PS_STANDING));
         game.home_playing = true;
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.turn_data_home.rerolls = 2;
         game.turn_data_away.rerolls = 2;
         game.acting_player.set_player("dodger".into(), PlayerAction::Move);
@@ -1247,7 +1247,7 @@ mod tests {
         game.field_model.set_player_coordinate("tackler", FieldCoordinate::new(5, 6));
         game.field_model.set_player_state("tackler", PSt::new(PS_STANDING));
         game.home_playing = true;
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         // Java `isTeamReRollAvailable`: an empty bank offers nothing.
         game.turn_data_home.rerolls = 0;
         game.acting_player.set_player("dodger".into(), PlayerAction::Move);
@@ -1399,7 +1399,7 @@ mod tests {
         let dodger_with_tackle_neighbour = |tackle: bool| -> u64 {
             let mut game = make_game();
             game.home_playing = true;
-            game.turn_mode = ffb_model::enums::TurnMode::Regular; // skill re-roll requires Regular
+            game.set_turn_mode(ffb_model::enums::TurnMode::Regular); // skill re-roll requires Regular
             game.turn_data_home.rerolls = 0; // no TRR — isolate the skill re-roll
             // Home dodger with the Dodge skill at (5,5).
             game.team_home.players.push(Player {
@@ -1454,7 +1454,7 @@ mod tests {
         use ffb_model::model::skill_def::SkillWithValue;
         let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
         game.home_playing = true;
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
         game.turn_data_home.rerolls = 0;
         game.team_home.players.push(Player {
             id: "g".into(), name: "g".into(), nr: 1, position_id: "star".into(),
@@ -1565,7 +1565,7 @@ mod tests {
     #[test]
     fn failure_with_trr_offers_reroll_prompt() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "p1");
@@ -1579,7 +1579,7 @@ mod tests {
     #[test]
     fn accept_reroll_then_success_returns_next_step() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "p1");
@@ -1594,7 +1594,7 @@ mod tests {
     #[test]
     fn decline_reroll_goes_to_failure_label() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "p1");

@@ -72,7 +72,7 @@ impl StepTouchback {
                 // Java: game.getFieldModel().setBallCoordinate(null)
                 game.field_model.ball_coordinate = None;
                 // Java: game.setTurnMode(TurnMode.TOUCHBACK)
-                game.turn_mode = TurnMode::Touchback;
+                game.set_turn_mode(TurnMode::Touchback);
                 // Java: game.setDialogParameter(new DialogTouchbackParameter())
                 // → in Rust: build eligible-players list and return cont() with prompt
                 // (show_dialog with stop_turn_timer=false is exactly game.setDialogParameter)
@@ -139,7 +139,7 @@ impl StepTouchback {
                     }
                 }
                 // Java: game.setTurnMode(TurnMode.KICKOFF)
-                game.turn_mode = TurnMode::Kickoff;
+                game.set_turn_mode(TurnMode::Kickoff);
                 if publish_catch_scatter {
                     return StepOutcome::next().publish(StepParameter::CatchScatterThrowInMode(
                         CatchScatterThrowInMode::CatchKickoff,

@@ -62,7 +62,7 @@ mod tests {
     #[test]
     fn team_reroll_unavailable_on_kickoff_mode() {
         let mut game = make_game(Rules::Bb2025);
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         game.turn_data_home.rerolls = 2;
         let player = Player::default();
         // BB2025 blocks re-rolls during kickoff
@@ -79,7 +79,7 @@ mod tests {
     #[test]
     fn bb2020_blocks_blitz_team_reroll() {
         let mut game = make_game(Rules::Bb2020);
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         game.home_playing = true;
         game.turn_data_home.rerolls = 2;
         let player = Player::default();

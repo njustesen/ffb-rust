@@ -86,7 +86,7 @@ impl StepEndInducement {
 
         match phase {
             InducementPhase::EndOfOwnTurn | InducementPhase::EndOfOpponentTurn => {
-                game.turn_mode = TurnMode::Regular;
+                game.set_turn_mode(TurnMode::Regular);
             }
             _ => {}
         }
@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn end_of_own_turn_sets_regular_mode() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BetweenTurns;
+        game.set_turn_mode(TurnMode::BetweenTurns);
         let mut step = StepEndInducement::new(false);
         step.inducement_phase = Some(InducementPhase::EndOfOwnTurn);
         step.start(&mut game, &mut GameRng::new(0));
@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn end_of_opponent_turn_sets_regular_mode() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BetweenTurns;
+        game.set_turn_mode(TurnMode::BetweenTurns);
         let mut step = StepEndInducement::new(false);
         step.inducement_phase = Some(InducementPhase::EndOfOpponentTurn);
         step.start(&mut game, &mut GameRng::new(0));

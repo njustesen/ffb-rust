@@ -219,7 +219,7 @@ impl Step for StepPlayCard {
                     self.end_card_playing = true;
                     self.setup_player_id = None;
                     self.illegal_substitution = false;
-                    game.turn_mode = ffb_model::enums::TurnMode::Regular;
+                    game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
                 }
             }
             _ => {}
@@ -349,7 +349,7 @@ mod tests {
         let mut step = StepPlayCard::new();
         step.illegal_substitution = true;
         let mut game = make_game();
-        game.turn_mode = ffb_model::enums::TurnMode::IllegalSubstitution;
+        game.set_turn_mode(ffb_model::enums::TurnMode::IllegalSubstitution);
         let mut rng = GameRng::new(0);
         step.handle_command(&Action::EndTurn, &mut game, &mut rng);
         assert_eq!(game.turn_mode, ffb_model::enums::TurnMode::Regular);
@@ -361,7 +361,7 @@ mod tests {
         let mut step = StepPlayCard::new();
         step.illegal_substitution = false;
         let mut game = make_game();
-        game.turn_mode = ffb_model::enums::TurnMode::Setup;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Setup);
         let mut rng = GameRng::new(0);
         step.handle_command(&Action::EndTurn, &mut game, &mut rng);
         assert_eq!(game.turn_mode, ffb_model::enums::TurnMode::Setup);

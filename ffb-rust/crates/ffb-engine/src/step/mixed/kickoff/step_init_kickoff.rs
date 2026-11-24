@@ -53,7 +53,7 @@ impl StepInitKickoff {
             events.extend(half_events);
             // Java: getResult().addReport(new ReportStartHalf(game.getHalf()))
             events.push(GameEvent::StartHalf { half: game.half });
-            game.turn_mode = TurnMode::Setup;
+            game.set_turn_mode(TurnMode::Setup);
             game.start_turn();
             UtilServerGame::update_player_state_dependent_properties(game);
             UtilServerGame::prepare_for_setup(game);
@@ -95,7 +95,7 @@ mod tests {
         let mut game = make_game();
         game.team_home.rerolls = 3;
         game.team_away.rerolls = 2;
-        game.turn_mode = TurnMode::StartGame;
+        game.set_turn_mode(TurnMode::StartGame);
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::Setup);
         assert_eq!(game.half, 1);
@@ -108,7 +108,7 @@ mod tests {
     fn non_start_game_mode_unchanged() {
         let mut step = StepInitKickoff::new();
         let mut game = make_game();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::Kickoff);
     }

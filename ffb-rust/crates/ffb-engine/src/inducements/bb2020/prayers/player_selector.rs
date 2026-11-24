@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn selects_reserve_player_at_start_game() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::StartGame;
+        game.set_turn_mode(TurnMode::StartGame);
         add_player(&mut game, "home", "h1", PlayerState::new(PS_RESERVE));
         let sel = PlayerSelector::new();
         let result = sel.select_players(&game, "home", 1, &mut JavaRandom::new(0), &[]);
@@ -131,7 +131,7 @@ mod tests {
     #[test]
     fn excludes_standing_player_at_start_game() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::StartGame;
+        game.set_turn_mode(TurnMode::StartGame);
         add_player(&mut game, "home", "h1", PlayerState::new(PS_STANDING));
         let sel = PlayerSelector::new();
         let result = sel.select_players(&game, "home", 1, &mut JavaRandom::new(0), &[]);
@@ -141,7 +141,7 @@ mod tests {
     #[test]
     fn selects_on_pitch_player_during_regular_play() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         add_player(&mut game, "home", "h1", PlayerState::new(PS_STANDING));
         game.field_model.set_player_coordinate("h1", FieldCoordinate::new(13, 7));
         let sel = PlayerSelector::new();
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn excludes_off_pitch_player_during_regular_play() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         add_player(&mut game, "home", "h1", PlayerState::new(PS_RESERVE));
         // No coordinate set → not on field
         let sel = PlayerSelector::new();
@@ -163,7 +163,7 @@ mod tests {
     #[test]
     fn respects_count_limit() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::StartGame;
+        game.set_turn_mode(TurnMode::StartGame);
         for i in 0..5 {
             let id = format!("h{i}");
             add_player(&mut game, "home", &id, PlayerState::new(PS_RESERVE));
@@ -178,7 +178,7 @@ mod tests {
         use ffb_model::model::skill_def::SkillWithValue;
         use ffb_model::model::skill_def::SkillId;
         let mut game = make_game();
-        game.turn_mode = TurnMode::StartGame;
+        game.set_turn_mode(TurnMode::StartGame);
         add_player(&mut game, "home", "h1", PlayerState::new(PS_RESERVE));
         // Give h1 the Loner skill (hasToRollToUseTeamReroll property)
         game.team_home.players[0].extra_skills.push(SkillWithValue { skill_id: SkillId::Loner, value: None });

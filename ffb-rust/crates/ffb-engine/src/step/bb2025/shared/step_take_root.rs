@@ -341,7 +341,7 @@ mod tests {
     fn make_game_with_rules(rules: Rules) -> Game {
         let mut game = Game::new(test_team("home", 0), test_team("away", 0), rules);
         game.home_playing = true;
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
         add_player_with_take_root(&mut game, "p1");
         game.field_model.set_player_coordinate("p1", ffb_model::types::FieldCoordinate::new(5, 5));
         game.acting_player.player_id = Some("p1".into());
@@ -440,7 +440,7 @@ mod tests {
     #[test]
     fn kickoff_return_skips_roll() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         let mut step = StepTakeRoot::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);

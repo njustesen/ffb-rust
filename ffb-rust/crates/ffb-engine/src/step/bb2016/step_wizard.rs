@@ -117,7 +117,7 @@ impl StepWizard {
         if self.end_inducement {
             // Java: cancel spellcasting — restore old turn mode if set
             if let Some(old_mode) = self.old_turn_mode {
-                game.turn_mode = old_mode;
+                game.set_turn_mode(old_mode);
             }
             return StepOutcome::next();
         }
@@ -126,7 +126,7 @@ impl StepWizard {
             if game.turn_mode == TurnMode::Wizard {
                 // Restore old turn mode
                 if let Some(old_mode) = self.old_turn_mode {
-                    game.turn_mode = old_mode;
+                    game.set_turn_mode(old_mode);
                 }
                 // Java: UtilServerInducementUse.useInducement — mark wizard inducement as used
                 let inducement_id = if self.home_team {
@@ -191,7 +191,7 @@ impl StepWizard {
         if game.turn_mode != TurnMode::Wizard {
             self.old_turn_mode = Some(game.turn_mode);
         }
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         // client-only: DialogWizardSpellParameter — headless skips spell selection dialog
         StepOutcome::cont()
     }
@@ -231,7 +231,7 @@ mod tests {
     fn start_sets_wizard_turn_mode_and_returns_cont() {
         let mut step = StepWizard::new();
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::Continue);
         assert_eq!(game.turn_mode, TurnMode::Wizard);
@@ -241,7 +241,7 @@ mod tests {
     fn start_saves_old_turn_mode() {
         let mut step = StepWizard::new();
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(step.old_turn_mode, Some(TurnMode::Regular));
     }
@@ -250,7 +250,7 @@ mod tests {
     fn acknowledge_cancels_and_restores_turn_mode() {
         let mut step = StepWizard::new();
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         // First call: sets Wizard mode
         step.start(&mut game, &mut GameRng::new(0));
         // Acknowledge: cancel
@@ -264,7 +264,7 @@ mod tests {
     fn wizard_spell_command_records_spell_and_coord() {
         let mut step = StepWizard::new();
         let mut game = make_game();
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         game.home_playing = true;
         let coord = FieldCoordinate::new(12, 7);
         step.handle_command(
@@ -280,7 +280,7 @@ mod tests {
     fn fireball_spell_sets_fireball_effect() {
         let mut step = StepWizard::new();
         let mut game = make_game();
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         game.home_playing = true;
         let coord = FieldCoordinate::new(5, 5);
         step.handle_command(
@@ -297,7 +297,7 @@ mod tests {
         // Verify ReportWizardUse is added when a spell is cast in WIZARD turn mode.
         let mut step = StepWizard::new();
         let mut game = make_game();
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         game.home_playing = true;
         let coord = FieldCoordinate::new(8, 4);
         step.handle_command(
@@ -314,7 +314,7 @@ mod tests {
         // Verify ReportWizardUse is added for fireball spells as well.
         let mut step = StepWizard::new();
         let mut game = make_game();
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         game.home_playing = true;
         let coord = FieldCoordinate::new(3, 6);
         step.handle_command(
@@ -333,7 +333,7 @@ mod tests {
         team.players.push(Player { id: "p1".into(), name: "P1".into(), nr: 1, ..Default::default() });
         let away = test_team("away", 0);
         let mut game = Game::new(team, away, Rules::Bb2016);
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         game.home_playing = true;
         let coord = FieldCoordinate::new(5, 5);
         game.field_model.set_player_coordinate("p1", coord);
@@ -355,7 +355,7 @@ mod tests {
         team.players.push(Player { id: "p1".into(), name: "P1".into(), nr: 1, ..Default::default() });
         let away = test_team("away", 0);
         let mut game = Game::new(team, away, Rules::Bb2016);
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         game.home_playing = true;
         let coord = FieldCoordinate::new(5, 5);
         game.field_model.set_player_coordinate("p1", coord);
@@ -377,7 +377,7 @@ mod tests {
         team.players.push(Player { id: "p1".into(), name: "P1".into(), nr: 1, ..Default::default() });
         let away = test_team("away", 0);
         let mut game = Game::new(team, away, Rules::Bb2016);
-        game.turn_mode = TurnMode::Wizard;
+        game.set_turn_mode(TurnMode::Wizard);
         game.home_playing = true;
         let coord = FieldCoordinate::new(5, 5);
         game.field_model.set_player_coordinate("p1", coord);

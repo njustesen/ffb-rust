@@ -89,7 +89,7 @@ impl StepInitInducement {
         if matches!(phase, InducementPhase::EndOfOwnTurn | InducementPhase::EndOfOpponentTurn)
             && !self.touchdown_or_end_of_half
         {
-            game.turn_mode = ffb_model::enums::TurnMode::BetweenTurns;
+            game.set_turn_mode(ffb_model::enums::TurnMode::BetweenTurns);
             if phase == InducementPhase::EndOfOpponentTurn && self.home_team != game.home_playing {
                 game.home_playing = !game.home_playing;
             }

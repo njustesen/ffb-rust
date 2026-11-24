@@ -114,7 +114,7 @@ impl StepSelectBlitzTarget {
         // overrides it.
         if self.end_player_action || self.end_turn {
             // Java: turnMode = lastTurnMode; stepStack.clear(); push EndPlayerAction sequence.
-            if let Some(ltm) = game.last_turn_mode { game.turn_mode = ltm; }
+            if let Some(ltm) = game.last_turn_mode { game.set_turn_mode(ltm); }
             let seq = EndPlayerAction::build_sequence(&EndPlayerActionParams {
                 feeding_allowed: false,
                 end_player_action: true,
@@ -158,7 +158,7 @@ impl StepSelectBlitzTarget {
                 // confused check), coordinate-sorted, answered with ONE actionRng pick.
                 if game.turn_mode != TurnMode::SelectBlitzTarget {
                     game.last_turn_mode = Some(game.turn_mode);
-                    game.turn_mode = TurnMode::SelectBlitzTarget;
+                    game.set_turn_mode(TurnMode::SelectBlitzTarget);
                 }
                 // Java: UtilServerDialog.showDialog(getGameState(), new DialogSelectBlitzTargetParameter(), false)
                 crate::util::util_server_dialog::UtilServerDialog::show_dialog(
@@ -179,7 +179,7 @@ impl StepSelectBlitzTarget {
             }
             Some(selected) if selected == acting_id => {
                 // Java: selecting the acting player himself cancels the selection.
-                if let Some(ltm) = game.last_turn_mode { game.turn_mode = ltm; }
+                if let Some(ltm) = game.last_turn_mode { game.set_turn_mode(ltm); }
                 let mut ts = TargetSelectionState::default();
                 ts.cancel();
                 game.field_model.target_selection_state = Some(ts);
@@ -190,7 +190,7 @@ impl StepSelectBlitzTarget {
                 if game.inactive_team().player(&selected).is_none() {
                     return StepOutcome::cont();
                 }
-                if let Some(ltm) = game.last_turn_mode { game.turn_mode = ltm; }
+                if let Some(ltm) = game.last_turn_mode { game.set_turn_mode(ltm); }
                 // Java: playerState.addSelectedBlitzTarget()
                 if let Some(st) = game.field_model.player_state(&selected) {
                     game.field_model.set_player_state(&selected, st.add_selected_blitz_target());

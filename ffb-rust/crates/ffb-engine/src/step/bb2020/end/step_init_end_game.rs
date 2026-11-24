@@ -74,7 +74,7 @@ impl StepInitEndGame {
             game.game_result.away.score = 0;
         }
 
-        game.turn_mode = TurnMode::EndGame;
+        game.set_turn_mode(TurnMode::EndGame);
         game.concession_possible = false;
         game.admin_mode = self.admin_mode;
 

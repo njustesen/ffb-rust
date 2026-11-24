@@ -29,7 +29,7 @@ impl GameStateService {
 
         game.acting_player.clear();
 
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.last_turn_mode = None;
         game.timeout_enforced = false;
         game.blitz_turn_state = None;

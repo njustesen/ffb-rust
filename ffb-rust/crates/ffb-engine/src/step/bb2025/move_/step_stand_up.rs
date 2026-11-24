@@ -380,7 +380,7 @@ mod tests {
         fn setup() -> (Game, StepStandUp) {
             let mut game = make_game();
             game.home_playing = true;
-            game.turn_mode = ffb_model::enums::TurnMode::Regular;
+            game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
             game.team_home.players.push(ffb_model::model::player::Player {
                 id: "tree".into(), name: "tree".into(), nr: 1, position_id: "treeman".into(),
                 movement: 2, strength: 6, agility: 1, passing: 5, armour: 10, // MA < 3 → roll required
@@ -526,7 +526,7 @@ mod tests {
     #[test]
     fn failure_with_trr_offers_reroll_prompt() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         game.acting_player.standing_up = true;
@@ -540,7 +540,7 @@ mod tests {
     #[test]
     fn accept_reroll_then_success_returns_next_step() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         game.acting_player.standing_up = true;
@@ -555,7 +555,7 @@ mod tests {
     #[test]
     fn decline_reroll_goes_to_failure_label() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         game.acting_player.standing_up = true;
@@ -672,7 +672,7 @@ mod tests {
         // circuit straight to the failure label.
         use ffb_model::enums::PlayerState;
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         game.acting_player.standing_up = true;

@@ -223,7 +223,7 @@ impl StepRaidingParty {
     /// Java: resetState(Game) — restore turn modes and refresh client decorations.
     fn reset_state(&mut self, game: &mut Game) {
         if game.turn_mode == ffb_model::enums::TurnMode::RaidingParty {
-            game.turn_mode = game.last_turn_mode.unwrap_or(game.turn_mode);
+            game.set_turn_mode(game.last_turn_mode.unwrap_or(game.turn_mode));
             if let Some(saved) = self.saved_turn_mode.take() {
                 game.last_turn_mode = Some(saved);
             }
@@ -248,7 +248,7 @@ impl StepRaidingParty {
         if game.turn_mode != ffb_model::enums::TurnMode::RaidingParty {
             self.saved_turn_mode = game.last_turn_mode;
             game.last_turn_mode = Some(game.turn_mode);
-            game.turn_mode = ffb_model::enums::TurnMode::RaidingParty;
+            game.set_turn_mode(ffb_model::enums::TurnMode::RaidingParty);
         }
     }
 

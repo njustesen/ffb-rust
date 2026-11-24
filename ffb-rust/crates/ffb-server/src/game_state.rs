@@ -20,7 +20,7 @@ use ffb_engine::game_log::GameLog;
 fn new_server_game() -> Game {
     let mut game = Game::new(Team::default(), Team::default(), Rules::Bb2025);
     game.home_playing = true;
-    game.turn_mode = ffb_model::enums::TurnMode::StartGame;
+    game.set_turn_mode(ffb_model::enums::TurnMode::StartGame);
     game.dialog_parameter = Some(ffb_model::dialog::dialog_parameter_factory::DialogParameter::StartGame(
         Default::default(),
     ));

@@ -203,7 +203,7 @@ impl StepApplyKickoffResult {
                 // client-only: show setup error dialog when !valid
                 // Java: setKickingSwarmers(0)
                 game.kicking_swarmers = 0;
-                game.turn_mode = TurnMode::Kickoff;
+                game.set_turn_mode(TurnMode::Kickoff);
                 StepOutcome::next()
             } else {
                 // Waiting for CLIENT_END_TURN
@@ -211,7 +211,7 @@ impl StepApplyKickoffResult {
             }
         } else {
             // Java: setAnimation(KICKOFF_PERFECT_DEFENSE); setTurnMode(PERFECT_DEFENCE)
-            game.turn_mode = TurnMode::PerfectDefence;
+            game.set_turn_mode(TurnMode::PerfectDefence);
             // Animation is client-side only; no server state change.
             StepOutcome::cont()
         }
@@ -221,7 +221,7 @@ impl StepApplyKickoffResult {
         if game.turn_mode == TurnMode::HighKick {
             if self.end_kickoff {
                 game.home_playing = !game.home_playing;
-                game.turn_mode = TurnMode::Kickoff;
+                game.set_turn_mode(TurnMode::Kickoff);
                 StepOutcome::next()
             } else {
                 StepOutcome::cont()
@@ -234,7 +234,7 @@ impl StepApplyKickoffResult {
                 StepOutcome::next()
             } else {
                 game.home_playing = !game.home_playing;
-                game.turn_mode = TurnMode::HighKick;
+                game.set_turn_mode(TurnMode::HighKick);
                 let pin_team_id = if game.home_playing {
                     game.team_home.id.clone()
                 } else {
@@ -370,14 +370,14 @@ impl StepApplyKickoffResult {
         if game.turn_mode == TurnMode::QuickSnap {
             if self.end_kickoff {
                 game.home_playing = !game.home_playing;
-                game.turn_mode = TurnMode::Kickoff;
+                game.set_turn_mode(TurnMode::Kickoff);
                 StepOutcome::next()
             } else {
                 StepOutcome::cont()
             }
         } else {
             game.home_playing = !game.home_playing;
-            game.turn_mode = TurnMode::QuickSnap;
+            game.set_turn_mode(TurnMode::QuickSnap);
             // Animation is client-side only; no server state change.
             StepOutcome::cont()
         }
@@ -798,7 +798,7 @@ mod tests {
     #[test]
     fn quick_snap_second_entry_end_kickoff_restores_mode() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::QuickSnap;
+        game.set_turn_mode(TurnMode::QuickSnap);
         let mut step = StepApplyKickoffResult::new("end".into(), "blitz".into());
         step.kickoff_result = Some(KickoffResult::QuickSnap);
         step.end_kickoff = true;

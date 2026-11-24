@@ -78,14 +78,14 @@ impl StepIntercept {
         } else {
             self.old_turn_mode = old;
         }
-        game.turn_mode = ffb_model::enums::TurnMode::Interception;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Interception);
     }
 
     /// Java (doNextStep tail): `if (oldTurnMode != null) game.setTurnMode(oldTurnMode)`.
     fn restore_turn_mode(&self, game: &mut Game) {
         let old = if Self::uses_pass_state(game) { game.pass_old_turn_mode } else { self.old_turn_mode };
         if let Some(m) = old {
-            game.turn_mode = m;
+            game.set_turn_mode(m);
         }
     }
 
@@ -1413,7 +1413,7 @@ mod tests {
     #[test]
     fn interception_dialog_switches_to_interception_mode() {
         let mut game = make_game();
-        game.turn_mode = ffb_model::enums::TurnMode::DumpOff;
+        game.set_turn_mode(ffb_model::enums::TurnMode::DumpOff);
         let mut step = StepIntercept::new("fail".into());
         step.enter_interception_mode(&mut game);
         assert_eq!(game.turn_mode, ffb_model::enums::TurnMode::Interception);

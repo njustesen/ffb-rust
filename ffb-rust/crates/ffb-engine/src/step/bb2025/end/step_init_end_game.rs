@@ -62,7 +62,7 @@ impl StepInitEndGame {
             game.game_result.home.score = home_score.max(2);
             game.game_result.away.score = 0; // always 0 — Java: concedingResult.setScore(0)
         }
-        game.turn_mode = TurnMode::EndGame;
+        game.set_turn_mode(TurnMode::EndGame);
         game.concession_possible = false;
         game.admin_mode = self.admin_mode;
         StepOutcome::next()

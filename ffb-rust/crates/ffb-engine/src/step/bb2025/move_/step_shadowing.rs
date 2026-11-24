@@ -399,7 +399,7 @@ mod tests {
     #[test]
     fn kickoff_return_disables_shadowing() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         let mut step = StepShadowing::new();
         step.coordinate_from = Some(FieldCoordinate::new(5, 5));
         let out = step.start(&mut game, &mut GameRng::new(0));

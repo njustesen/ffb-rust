@@ -154,7 +154,7 @@ mod tests {
     fn init_effect_marks_prayer_on_selected_players() {
         let mut state = PrayerState::new();
         let mut game = make_game();
-        game.turn_mode = ffb_model::enums::TurnMode::StartGame;
+        game.set_turn_mode(ffb_model::enums::TurnMode::StartGame);
         add_player_reserve(&mut game, "home", "h1");
         let selector = BB2020Selector::new();
         init_effect_random_selection(&mut state, &mut game, &mut GameRng::new(0), "home", "STILETTO", 1, &selector, &[]);
@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn remove_effect_clears_prayer_tracking() {
         let mut game = make_game();
-        game.turn_mode = ffb_model::enums::TurnMode::StartGame;
+        game.set_turn_mode(ffb_model::enums::TurnMode::StartGame);
         add_player_reserve(&mut game, "home", "h1");
         game.field_model.add_prayer_enhancement("h1", "STILETTO");
         let selector = BB2020Selector::new();
@@ -195,7 +195,7 @@ mod tests {
     fn init_effect_prayer_name_is_used_as_enhancement_key() {
         let mut state = PrayerState::new();
         let mut game = make_game();
-        game.turn_mode = ffb_model::enums::TurnMode::StartGame;
+        game.set_turn_mode(ffb_model::enums::TurnMode::StartGame);
         add_player_reserve(&mut game, "home", "h3");
         let selector = BB2020Selector::new();
         init_effect_random_selection(&mut state, &mut game, &mut GameRng::new(0), "home", "KNUCKLE_DUSTERS", 1, &selector, &[]);

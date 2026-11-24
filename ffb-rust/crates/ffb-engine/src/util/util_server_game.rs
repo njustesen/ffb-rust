@@ -543,7 +543,7 @@ mod tests {
     #[test]
     fn mark_played_noop_for_non_regular_kickoff_turnmode() {
         let mut game = game_with_standing_player("p1", true);
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         game.home_playing = true;
         UtilServerGame::mark_played_and_secret_weapons(&mut game);
         assert_eq!(game.game_result.home.player_result("p1").map(|p| p.turns_played), None);
@@ -553,7 +553,7 @@ mod tests {
     fn mark_played_increments_turns_played_for_active_team_in_regular_mode() {
         use ffb_model::enums::PS_STANDING;
         let mut game = game_with_standing_player("p1", true);
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         UtilServerGame::mark_played_and_secret_weapons(&mut game);
         assert_eq!(game.game_result.home.player_result("p1").unwrap().turns_played, 1);
@@ -563,7 +563,7 @@ mod tests {
     fn mark_played_does_not_increment_turns_played_for_inactive_team_in_regular_mode() {
         use ffb_model::enums::PS_STANDING;
         let mut game = game_with_standing_player("p1", false); // away player
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true; // home is active
         UtilServerGame::mark_played_and_secret_weapons(&mut game);
         assert_eq!(game.game_result.away.player_result("p1").map(|p| p.turns_played).unwrap_or(0), 0);
@@ -572,7 +572,7 @@ mod tests {
     #[test]
     fn mark_played_does_not_increment_turns_played_in_kickoff_mode() {
         let mut game = game_with_standing_player("p1", true);
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         game.home_playing = true;
         UtilServerGame::mark_played_and_secret_weapons(&mut game);
         assert_eq!(game.game_result.home.player_result("p1").map(|p| p.turns_played).unwrap_or(0), 0);
@@ -583,7 +583,7 @@ mod tests {
         let mut game = game_with_standing_player("p1", true);
         // Override state to RESERVE
         game.field_model.set_player_state("p1", PlayerState(PS_RESERVE));
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         UtilServerGame::mark_played_and_secret_weapons(&mut game);
         assert_eq!(game.game_result.home.player_result("p1").map(|p| p.turns_played).unwrap_or(0), 0);
@@ -600,7 +600,7 @@ mod tests {
         let mut game = Game::new(home, away, Rules::Bb2025);
         use ffb_model::enums::PS_STANDING;
         game.field_model.set_player_state("sw", PlayerState(PS_STANDING));
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         UtilServerGame::mark_played_and_secret_weapons(&mut game);
         assert!(game.game_result.home.player_result("sw").unwrap().has_used_secret_weapon);
@@ -609,7 +609,7 @@ mod tests {
     #[test]
     fn mark_played_does_not_set_secret_weapon_for_regular_player() {
         let mut game = game_with_standing_player("p1", true);
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         UtilServerGame::mark_played_and_secret_weapons(&mut game);
         assert!(!game.game_result.home.player_result("p1").map(|p| p.has_used_secret_weapon).unwrap_or(false));

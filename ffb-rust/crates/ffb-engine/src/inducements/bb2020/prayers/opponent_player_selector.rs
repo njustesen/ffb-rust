@@ -127,7 +127,7 @@ mod tests {
     #[test]
     fn selects_from_opposing_team() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::StartGame;
+        game.set_turn_mode(TurnMode::StartGame);
         add_player(&mut game, "away", "a1", PlayerState::new(PS_RESERVE));
         add_player(&mut game, "home", "h1", PlayerState::new(PS_RESERVE));
         // Passing "home" as the praying team → should select from "away"
@@ -139,7 +139,7 @@ mod tests {
     #[test]
     fn opponent_selector_on_pitch_regular() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         add_player(&mut game, "away", "a1", PlayerState::new(PS_STANDING));
         game.field_model.set_player_coordinate("a1", FieldCoordinate::new(13, 7));
         let sel = OpponentPlayerSelector::new();
@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn opponent_selector_respects_count() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::StartGame;
+        game.set_turn_mode(TurnMode::StartGame);
         for i in 0..4 {
             let id = format!("a{i}");
             add_player(&mut game, "away", &id, PlayerState::new(PS_RESERVE));
@@ -163,7 +163,7 @@ mod tests {
     #[test]
     fn opponent_selector_selects_from_home_when_away_prays() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::StartGame;
+        game.set_turn_mode(TurnMode::StartGame);
         add_player(&mut game, "home", "h1", PlayerState::new(PS_RESERVE));
         // "away" is praying → opponent is "home"
         let sel = OpponentPlayerSelector::new();
@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn opponent_selector_returns_empty_when_no_opponent_players() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::StartGame;
+        game.set_turn_mode(TurnMode::StartGame);
         // Only home players added; "away" has no players
         add_player(&mut game, "home", "h2", PlayerState::new(PS_RESERVE));
         // Praying team is "home" → opponent is "away" → empty
@@ -188,7 +188,7 @@ mod tests {
         use ffb_model::model::skill_def::SkillWithValue;
         use ffb_model::enums::SkillId;
         let mut game = make_game();
-        game.turn_mode = TurnMode::StartGame;
+        game.set_turn_mode(TurnMode::StartGame);
         add_player(&mut game, "away", "a1", PlayerState::new(PS_RESERVE));
         // Give the opposing player the Loner skill (hasToRollToUseTeamReroll property),
         // matching Java's PlayerSelector.eligiblePlayers() filter which OpponentPlayerSelector inherits.

@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn kickoff_return_skips_roll() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         let mut step = StepTakeRoot::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);

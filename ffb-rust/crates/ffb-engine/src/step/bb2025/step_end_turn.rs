@@ -1101,7 +1101,7 @@ impl StepEndTurn {
                         }
                     }
                 }
-                game.turn_mode = TurnMode::Setup;
+                game.set_turn_mode(TurnMode::Setup);
                 game.setup_offense = false;
                 // Stub: kickoffGenerator / endGenerator pushes → skip
                 // Stub: ball clear, sound → skip (the setup/kickoff path already re-places the
@@ -1123,11 +1123,11 @@ impl StepEndTurn {
                         game.turn_data_mut().turn_nr += 1;
                         game.turn_data_mut().turn_started = false;
                         game.turn_data_mut().first_turn_after_kickoff = true;
-                        game.turn_mode = TurnMode::Regular;
+                        game.set_turn_mode(TurnMode::Regular);
                     }
                     TurnMode::Regular => {
                         if self.new_half {
-                            game.turn_mode = TurnMode::Setup;
+                            game.set_turn_mode(TurnMode::Setup);
                             game.setup_offense = false;
                         } else {
                             game.home_playing = !game.home_playing;
@@ -1535,7 +1535,7 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         let mut game = Game::new(home, away, Rules::Bb2025);
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.turn_nr = 1;
         game.turn_data_away.turn_nr = 1;
@@ -1859,7 +1859,7 @@ mod tests {
     #[test]
     fn blitz_mode_publishes_end_turn_and_returns_next_step() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         let mut step = StepEndTurn::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
@@ -1983,7 +1983,7 @@ mod tests {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
         let mut game = Game::new(home, away, Rules::Bb2016);
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.field_model.weather = Weather::SwelteringHeat;
         for i in 0..6 {
@@ -2089,7 +2089,7 @@ mod tests {
         // deselecting ThrowTeamMate leaves turn_started=false yet must still clear at its end.)
         let mut game = make_game();
         game.home_playing = false; // away = the "acting"/kicking team at the transition
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.turn_data_away.turn_nr = 0; // away has not taken a turn yet
         game.away_additional_assists = 1;
         let mut step = StepEndTurn::new();
@@ -2104,7 +2104,7 @@ mod tests {
         // (underworld seed 26 regression: else a stale +1 inflated a later block's dice count).
         let mut game = make_game();
         game.home_playing = true;
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.turn_data_home.turn_nr = 1;
         game.turn_data_home.turn_started = false; // deselecting-TTM turn: never set true
         game.home_additional_assists = 1;
@@ -2117,7 +2117,7 @@ mod tests {
     fn additional_assist_cleared_at_real_turn_end() {
         let mut game = make_game();
         game.home_playing = false;
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.turn_data_away.turn_started = true; // away actually played this turn
         game.away_additional_assists = 1;
         let mut step = StepEndTurn::new();
@@ -2128,7 +2128,7 @@ mod tests {
     #[test]
     fn kickoff_mode_transitions_to_regular_and_flips_team() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         game.turn_data_away.turn_nr = 2;
         let mut step = StepEndTurn::new();
         let out = step.start(&mut game, &mut GameRng::new(0));

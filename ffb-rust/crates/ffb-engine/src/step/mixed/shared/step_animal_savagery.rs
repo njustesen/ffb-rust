@@ -1022,7 +1022,7 @@ mod tests {
     fn negatrait_gate_skips_when_turn_mode_disallows() {
         use ffb_model::enums::TurnMode;
         let mut game = make_game();
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         game.acting_player.player_id = Some("p1".into());
         add_player(&mut game, true, "p1", vec![SkillId::AnimalSavagery]);
         let out = StepAnimalSavagery::new("fail").start(&mut game, &mut GameRng::new(0));

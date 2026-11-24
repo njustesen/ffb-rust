@@ -1546,7 +1546,7 @@ mod tests {
         use ffb_model::enums::TurnMode;
         let mut step = StepBlockRoll::new();
         let mut game = game_with_team_reroll();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         let out = step.start(&mut game, &mut GameRng::new(1));
         assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::BlockChoice { .. })));
     }

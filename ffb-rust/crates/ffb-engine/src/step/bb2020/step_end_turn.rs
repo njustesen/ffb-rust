@@ -188,7 +188,7 @@ impl StepEndTurn {
                         }
                     }
                 }
-                game.turn_mode = TurnMode::Setup;
+                game.set_turn_mode(TurnMode::Setup);
                 game.setup_offense = false;
             } else {
                 match game.turn_mode {
@@ -197,11 +197,11 @@ impl StepEndTurn {
                         game.turn_data_mut().turn_nr += 1;
                         game.turn_data_mut().turn_started = false;
                         game.turn_data_mut().first_turn_after_kickoff = true;
-                        game.turn_mode = TurnMode::Regular;
+                        game.set_turn_mode(TurnMode::Regular);
                     }
                     TurnMode::Regular => {
                         if self.new_half {
-                            game.turn_mode = TurnMode::Setup;
+                            game.set_turn_mode(TurnMode::Setup);
                             game.setup_offense = false;
                         } else {
                             game.home_playing = !game.home_playing;
@@ -412,7 +412,7 @@ mod tests {
 
     fn make_game() -> Game {
         let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2020);
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.turn_nr = 1;
         game.turn_data_away.turn_nr = 1;
@@ -422,7 +422,7 @@ mod tests {
     #[test]
     fn blitz_mode_publishes_end_turn_and_returns_next() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         let mut step = StepEndTurn::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
@@ -432,7 +432,7 @@ mod tests {
     #[test]
     fn swarming_mode_publishes_end_turn() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Swarming;
+        game.set_turn_mode(TurnMode::Swarming);
         let mut step = StepEndTurn::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
@@ -441,7 +441,7 @@ mod tests {
     #[test]
     fn pass_block_mode_publishes_end_turn() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::PassBlock;
+        game.set_turn_mode(TurnMode::PassBlock);
         let mut step = StepEndTurn::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
@@ -510,7 +510,7 @@ mod tests {
     #[test]
     fn kickoff_mode_transitions_to_regular_and_flips_team() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         game.turn_data_away.turn_nr = 2;
         let mut step = StepEndTurn::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
@@ -575,7 +575,7 @@ mod tests {
     fn turn_nr_initialized_on_first_run() {
         let mut game = make_game();
         game.turn_data_home.turn_nr = 5;
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         let mut step = StepEndTurn::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(step.turn_nr, 5);

@@ -136,7 +136,7 @@ mod tests {
         });
         let away = test_team("away", 0);
         let mut game = Game::new(home, away, Rules::Bb2025);
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.acting_player.player_id = Some(player_id.clone());
         game.acting_player.player_action = Some(PlayerAction::Move);
@@ -156,7 +156,7 @@ mod tests {
     #[test]
     fn negatraits_disabled_skips_roll() {
         let (mut game, _) = make_game_with_bone_head_player();
-        game.turn_mode = TurnMode::KickoffReturn; // check_negatraits() = false
+        game.set_turn_mode(TurnMode::KickoffReturn); // check_negatraits() = false
         let mut step = StepBoneHead::new();
         let mut rng = GameRng::new(0);
         let outcome = step.start(&mut game, &mut rng);

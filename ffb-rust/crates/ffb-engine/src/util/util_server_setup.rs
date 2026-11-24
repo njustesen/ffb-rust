@@ -243,7 +243,7 @@ mod tests {
     #[test]
     fn setup_player_quick_snap_changed_coord_active_false() {
         let mut game = game_with_home_player("p1");
-        game.turn_mode = TurnMode::QuickSnap;
+        game.set_turn_mode(TurnMode::QuickSnap);
         let old_coord = FieldCoordinate::new(5, 5);
         let new_coord = FieldCoordinate::new(6, 5);
         game.field_model.set_player_coordinate("p1", old_coord);

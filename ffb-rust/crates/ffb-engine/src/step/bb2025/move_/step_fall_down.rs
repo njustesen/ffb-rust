@@ -286,7 +286,7 @@ mod tests {
     #[test]
     fn no_end_turn_when_pass_block() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::PassBlock;
+        game.set_turn_mode(TurnMode::PassBlock);
         add_acting_player(&mut game, "p1");
         let mut step = StepFallDown::new();
         step.injury_type_name = Some("InjuryTypeDropGFI".into());

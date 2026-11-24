@@ -56,7 +56,7 @@ impl StepBlitzTurn {
             // Java: getGameState().setBlitzTurnState(null)
             // Java: game.setTurnMode(TurnMode.KICKOFF)
             game.blitz_turn_state = None;
-            game.turn_mode = TurnMode::Kickoff;
+            game.set_turn_mode(TurnMode::Kickoff);
         } else {
             // Java: Team blitzingTeam = game.isHomePlaying() ? game.getTeamHome() : game.getTeamAway()
             // Java: SetupMechanic mechanic = ...; mechanic.pinPlayersInTacklezones(getGameState(), blitzingTeam, true)
@@ -82,7 +82,7 @@ impl StepBlitzTurn {
                 let limit = roll + 3;
 
                 // Java: game.setTurnMode(TurnMode.BLITZ)
-                game.turn_mode = TurnMode::Blitz;
+                game.set_turn_mode(TurnMode::Blitz);
                 // Java: getGameState().setBlitzTurnState(new BlitzTurnState(limit, availablePlayers))
                 game.blitz_turn_state = Some(BlitzTurnState::new(limit, available_players));
 
@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn cleanup_phase_clears_state_and_resets_to_kickoff() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         game.blitz_turn_state = Some(BlitzTurnState::new(4, 2));
 
         let mut step = StepBlitzTurn::new();
@@ -177,7 +177,7 @@ mod tests {
     #[test]
     fn no_active_players_returns_next_step() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         game.home_playing = true;
         // No players added to home team → availablePlayers = 0
 
@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn active_players_sets_blitz_turn_state() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         game.home_playing = true;
 
         // Add an active player to home team
@@ -227,7 +227,7 @@ mod tests {
     fn blitz_limit_is_d3_plus_3() {
         for seed in 0u64..50 {
             let mut game = make_game();
-            game.turn_mode = TurnMode::Kickoff;
+            game.set_turn_mode(TurnMode::Kickoff);
             game.home_playing = true;
 
             let player = make_player("home1");
@@ -253,7 +253,7 @@ mod tests {
     #[test]
     fn handle_command_delegates_to_execute_step() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         game.blitz_turn_state = Some(BlitzTurnState::new(5, 1));
 
         let mut step = StepBlitzTurn::new();
@@ -294,7 +294,7 @@ mod tests {
     fn no_active_players_adds_activations_exhausted_report() {
         use ffb_model::report::report_id::ReportId;
         let mut game = make_game();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         game.home_playing = true;
         let mut step = StepBlitzTurn::new();
         step.start(&mut game, &mut GameRng::new(0));
@@ -306,7 +306,7 @@ mod tests {
     fn active_players_adds_blitz_roll_report() {
         use ffb_model::report::report_id::ReportId;
         let mut game = make_game();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         game.home_playing = true;
         let player = make_player("home1");
         game.team_home.players.push(player);

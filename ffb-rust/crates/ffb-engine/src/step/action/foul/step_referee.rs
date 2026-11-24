@@ -246,7 +246,7 @@ mod tests {
 });
         let away = test_team("away", 0);
         let mut game = Game::new(home, away, Rules::Bb2025);
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.acting_player.player_id = Some(pid.clone());
         game.field_model.set_player_state(&pid, PlayerState::new(PS_STANDING).change_active(true));

@@ -288,7 +288,7 @@ mod tests {
         use ffb_model::util::rng::GameRng;
         let m = WildAnimalStepModifier;
         let mut game = test_game();
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         let mut hook = StepWildAnimalHookState {
             goto_label_on_failure: "FAIL".into(),
             re_rolled_action: None,
@@ -344,7 +344,7 @@ mod tests {
         game.field_model.set_player_coordinate("yhetee", FieldCoordinate::new(5, 5));
         game.field_model.set_player_state("yhetee", PlayerState::new(PS_STANDING));
         game.home_playing = true;
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.acting_player.player_id = Some("yhetee".into());
         game.acting_player.player_action = Some(PlayerAction::Move);
         // Simulate Wild Animal already rolled earlier THIS activation.

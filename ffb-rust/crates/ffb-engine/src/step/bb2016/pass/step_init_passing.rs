@@ -410,7 +410,7 @@ mod tests {
         for mode in [TurnMode::Regular, TurnMode::BombHome] {
             let mut game = make_game();
             add_player(&mut game, "p1", FieldCoordinate::new(12, 7));
-            game.turn_mode = mode;
+            game.set_turn_mode(mode);
             game.home_playing = true;
             game.acting_player.player_id = Some("p1".into());
             game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::HandOver);
@@ -560,7 +560,7 @@ mod tests {
     #[test]
     fn dump_off_defender_becomes_thrower() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::DumpOff;
+        game.set_turn_mode(TurnMode::DumpOff);
         game.defender_id = Some("d1".into());
         game.defender_action = Some(ffb_model::enums::PlayerAction::DumpOff);
         let mut step = StepInitPassing::new();

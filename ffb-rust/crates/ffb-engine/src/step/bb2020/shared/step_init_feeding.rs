@@ -441,7 +441,7 @@ mod tests {
         let mut game = make_game();
         // BlitzTurnState with limit=1, available=0 → limit reached after 1 activation
         game.blitz_turn_state = Some(BlitzTurnState::new(1, 1));
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         game.acting_player.player_id = Some("vamp".into());
         game.acting_player.suffering_blood_lust = true;
         game.acting_player.has_acted = true;
@@ -476,7 +476,7 @@ mod tests {
         step.end_player_action = true;
         let mut game = make_game();
         game.blitz_turn_state = Some(BlitzTurnState::new(2, 2));
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         game.acting_player.player_id = Some("vamp".into());
         game.acting_player.suffering_blood_lust = true;
         game.acting_player.has_acted = true;

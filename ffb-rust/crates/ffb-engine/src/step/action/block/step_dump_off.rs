@@ -71,7 +71,7 @@ impl StepDumpOff {
         // Java: if (turnMode == DUMP_OFF) → restore old turn mode and clear thrower.
         if game.turn_mode == TurnMode::DumpOff {
             if let Some(old) = self.old_turn_mode {
-                game.turn_mode = old;
+                game.set_turn_mode(old);
             }
             game.thrower_id = None;
             return StepOutcome::next();
@@ -136,7 +136,7 @@ impl StepDumpOff {
             // Java: save old turn mode, switch to DumpOff, set thrower, show the
             // DEFENDER_ACTION dialog, pushCurrentStepOnStack(), push the edition's Pass sequence.
             self.old_turn_mode = Some(game.turn_mode);
-            game.turn_mode = TurnMode::DumpOff;
+            game.set_turn_mode(TurnMode::DumpOff);
             game.thrower_id = defender_id.clone();
             // Java: game.setThrowerAction(PlayerAction.DUMP_OFF) — NOT actingPlayer's action.
             // StepDispatchPassing routes on game.thrower_action, so leaving this unset would
@@ -377,7 +377,7 @@ mod tests {
     #[test]
     fn dump_off_turn_mode_restores_old_mode() {
         let mut game = make_game(vec![]);
-        game.turn_mode = TurnMode::DumpOff;
+        game.set_turn_mode(TurnMode::DumpOff);
         let mut step = StepDumpOff::new();
         step.old_turn_mode = Some(TurnMode::Regular);
         let outcome = step.start(&mut game, &mut GameRng::new(0));

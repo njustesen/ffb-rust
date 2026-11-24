@@ -58,7 +58,7 @@ impl StepInitKickoff {
             events.extend(half_events);
             // Java: ReportStartHalf is added inside stateMechanic.startHalf (see start_half).
             events.push(GameEvent::StartHalf { half: game.half });
-            game.turn_mode = TurnMode::Setup;
+            game.set_turn_mode(TurnMode::Setup);
             game.start_turn();
             // Java: com.fumbbl.ffb.server.step.bb2025.kickoff.StepInitKickoff.executeStep does NOT call
             // UtilServerGame.updatePlayerStateDependentProperties (unlike the mixed BB2016/BB2020
@@ -105,7 +105,7 @@ mod tests {
         let mut game = make_game();
         game.team_home.rerolls = 2;
         game.team_away.rerolls = 1;
-        game.turn_mode = TurnMode::StartGame;
+        game.set_turn_mode(TurnMode::StartGame);
         let mut step = StepInitKickoff::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::Setup);
@@ -120,7 +120,7 @@ mod tests {
     #[test]
     fn non_start_game_mode_unchanged() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         let mut step = StepInitKickoff::new();
         step.start(&mut game, &mut GameRng::new(0));
         // TurnMode should remain Kickoff (not transitioned to Setup)
@@ -147,7 +147,7 @@ mod tests {
         let mut game = make_game();
         game.team_home.rerolls = 1;
         game.team_away.rerolls = 1;
-        game.turn_mode = TurnMode::StartGame;
+        game.set_turn_mode(TurnMode::StartGame);
         let mut step = StepInitKickoff::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::START_HALF),
@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn start_game_mode_does_not_recompute_single_use_rerolls() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::StartGame;
+        game.set_turn_mode(TurnMode::StartGame);
         game.turn_data_home.single_use_rerolls = 99;
         game.turn_data_away.single_use_rerolls = 99;
         let mut step = StepInitKickoff::new();
@@ -174,7 +174,7 @@ mod tests {
     fn non_start_game_mode_does_not_add_start_half_report() {
         use ffb_model::report::report_id::ReportId;
         let mut game = make_game();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         let mut step = StepInitKickoff::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert!(!game.report_list.has_report(ReportId::START_HALF),

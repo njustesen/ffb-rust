@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn kickoff_return_disables_shadowing() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         let mut step = StepShadowing::new();
         step.coordinate_from = Some(FieldCoordinate::new(5, 5));
         let out = step.start(&mut game, &mut GameRng::new(0));
@@ -304,7 +304,7 @@ mod tests {
     fn pass_block_mode_allows_shadowing_in_bb2020() {
         // BB2020: PassBlock does NOT disable shadowing (unlike BB2016)
         let mut game = make_game();
-        game.turn_mode = TurnMode::PassBlock;
+        game.set_turn_mode(TurnMode::PassBlock);
         let mut step = StepShadowing::new();
         step.coordinate_from = Some(FieldCoordinate::new(5, 5));
         // No shadowers on pitch → usingShadowing=false → NEXT_STEP

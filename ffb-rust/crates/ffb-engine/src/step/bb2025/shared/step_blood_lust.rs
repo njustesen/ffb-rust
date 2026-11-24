@@ -423,7 +423,7 @@ mod tests {
         game.home_playing = true;
         game.acting_player.player_id = Some("vamp".into());
         game.acting_player.player_action = action;
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game
     }
 
@@ -451,7 +451,7 @@ mod tests {
     #[test]
     fn negatraits_disabled_skips_roll() {
         let mut game = make_game(vec![SkillId::BloodLust], Some(PlayerAction::Block));
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         let out = StepBloodLust::new("fail").start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
     }

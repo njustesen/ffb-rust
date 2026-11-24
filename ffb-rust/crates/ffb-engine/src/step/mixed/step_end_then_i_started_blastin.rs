@@ -45,8 +45,8 @@ impl StepEndThenIStartedBlastin {
             // REGULAR and BLITZ, so this must check is_basic_mode(), not `!= Regular`.
             if !game.turn_mode.is_basic_mode() {
                 match game.last_turn_mode {
-                    Some(ltm) => game.turn_mode = ltm,
-                    None => game.turn_mode = TurnMode::Regular,
+                    Some(ltm) => game.set_turn_mode(ltm),
+                    None => game.set_turn_mode(TurnMode::Regular),
                 }
             }
             // Java: getGameState().getStepStack().clear() + push EndPlayerAction sequence.
@@ -176,7 +176,7 @@ mod tests {
         step.end_turn = true;
         let mut game = make_game();
         add_player(&mut game, "att", PS_STANDING);
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         game.last_turn_mode = None;
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);

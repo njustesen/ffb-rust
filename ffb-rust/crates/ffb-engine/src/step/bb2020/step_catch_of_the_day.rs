@@ -319,7 +319,7 @@ mod tests {
         let (mut game, _) = make_game_cotd();
         game.field_model.ball_coordinate = Some(FieldCoordinate::new(11, 7));
         game.field_model.ball_moving = true;
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
         game.turn_data_mut().rerolls = 1;
 
         let mut step = StepCatchOfTheDay::new();

@@ -21,7 +21,7 @@ impl CardHandler for IllegalSubstitutionHandler {
 
     /// Java: game.setTurnMode(TurnMode.ILLEGAL_SUBSTITUTION); return false (step continues dialog).
     fn activate_on_game(&self, game: &mut Game, _card: &Card, _player_id: &str, _rng: &mut ffb_model::util::rng::GameRng) -> bool {
-        game.turn_mode = TurnMode::IllegalSubstitution;
+        game.set_turn_mode(TurnMode::IllegalSubstitution);
         false
     }
 

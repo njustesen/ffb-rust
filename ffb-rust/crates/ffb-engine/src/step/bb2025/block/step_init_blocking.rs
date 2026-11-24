@@ -111,7 +111,7 @@ impl StepInitBlocking {
         if game.turn_mode == TurnMode::SelectBlockKind {
             let restored = game.last_turn_mode.unwrap_or(TurnMode::Regular);
             if restored != TurnMode::SelectBlockKind {
-                game.turn_mode = restored;
+                game.set_turn_mode(restored);
                 game.last_turn_mode = Some(TurnMode::SelectBlockKind);
             }
         }
@@ -205,7 +205,7 @@ impl StepInitBlocking {
             if game.turn_mode != TurnMode::SelectBlockKind {
                 game.last_turn_mode = Some(game.turn_mode);
             }
-            game.turn_mode = TurnMode::SelectBlockKind;
+            game.set_turn_mode(TurnMode::SelectBlockKind);
             self.ask_for_block_kind = false;
             return StepOutcome::cont();
         }
@@ -531,7 +531,7 @@ mod tests {
         let mut step = StepInitBlocking::new("end".into());
         step.block_defender_id = Some("def7".into());
         let mut game = make_game();
-        game.turn_mode = ffb_model::enums::TurnMode::SelectBlockKind;
+        game.set_turn_mode(ffb_model::enums::TurnMode::SelectBlockKind);
         game.last_turn_mode = Some(ffb_model::enums::TurnMode::Regular);
         game.field_model.set_player_state("def7", ffb_model::enums::PlayerState::new(PS_STANDING));
         step.start(&mut game, &mut GameRng::new(0));

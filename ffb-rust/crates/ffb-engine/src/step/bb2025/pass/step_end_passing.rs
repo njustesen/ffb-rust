@@ -621,7 +621,7 @@ mod tests {
     #[test]
     fn bomb_turn_pushes_bomb_sequence() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         let mut step = StepEndPassing::new();
         step.catcher_id = Some("c1".into());
         let out = step.start(&mut game, &mut GameRng::new(0));
@@ -634,7 +634,7 @@ mod tests {
     #[test]
     fn bomb_turn_uses_interceptor_id_when_set() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         let mut step = StepEndPassing::new();
         step.interceptor_id = Some("i1".into());
         // Java hands the Bomb sequence the interceptor only when the interception was an
@@ -654,7 +654,7 @@ mod tests {
     #[test]
     fn bomb_turn_publishes_bomb_out_of_bounds_when_set() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         let mut step = StepEndPassing::new();
         step.bomb_out_of_bounds = true;
         let out = step.start(&mut game, &mut GameRng::new(0));

@@ -180,7 +180,7 @@ impl StepThenIStartedBlastin {
         // Java: if (game.getTurnMode() != TurnMode.THEN_I_STARTED_BLASTIN) → enter mode
         if game.turn_mode != TurnMode::ThenIStartedBlastin {
             self.old_turn_mode = game.last_turn_mode;
-            game.turn_mode = TurnMode::ThenIStartedBlastin;
+            game.set_turn_mode(TurnMode::ThenIStartedBlastin);
             {
                 use ffb_model::report::mixed::report_then_i_started_blastin::ReportThenIStartedBlastin;
                 game.report_list.add(ReportThenIStartedBlastin::new(
@@ -319,7 +319,7 @@ impl StepThenIStartedBlastin {
 
     /// Java: `restoreTurnModes(Game game)`.
     fn restore_turn_modes(&mut self, game: &mut Game) {
-        game.turn_mode = game.last_turn_mode.unwrap_or(TurnMode::Regular);
+        game.set_turn_mode(game.last_turn_mode.unwrap_or(TurnMode::Regular));
         game.last_turn_mode = self.old_turn_mode;
     }
 
@@ -417,7 +417,7 @@ mod tests {
     #[test]
     fn end_turn_restores_turn_mode_and_returns_next() {
         let (mut game, _) = make_game();
-        game.turn_mode = TurnMode::ThenIStartedBlastin;
+        game.set_turn_mode(TurnMode::ThenIStartedBlastin);
         game.last_turn_mode = Some(TurnMode::Regular);
         let mut step = StepThenIStartedBlastin::new();
         step.old_turn_mode = Some(TurnMode::Regular);
@@ -438,7 +438,7 @@ mod tests {
         game.field_model.set_player_state(&def_id, PlayerState::new(PS_STANDING).change_active(true));
         game.field_model.set_player_coordinate(&def_id, FieldCoordinate::new(15, 7));
 
-        game.turn_mode = TurnMode::ThenIStartedBlastin;
+        game.set_turn_mode(TurnMode::ThenIStartedBlastin);
         game.last_turn_mode = Some(TurnMode::Regular);
         game.home_playing = false; // flipped by a prior failed roll; actor (home) no longer "playing"
 
@@ -468,7 +468,7 @@ mod tests {
         game.field_model.set_player_state(&def_id, PlayerState::new(PS_STANDING).change_active(true));
         game.field_model.set_player_coordinate(&def_id, FieldCoordinate::new(15, 7));
 
-        game.turn_mode = TurnMode::ThenIStartedBlastin;
+        game.set_turn_mode(TurnMode::ThenIStartedBlastin);
         game.last_turn_mode = Some(TurnMode::Regular);
         // home_playing stays true (default from make_game): acting player's own team IS playing.
 
@@ -499,7 +499,7 @@ mod tests {
     #[test]
     fn restore_turn_modes_works_correctly() {
         let (mut game, _) = make_game();
-        game.turn_mode = TurnMode::ThenIStartedBlastin;
+        game.set_turn_mode(TurnMode::ThenIStartedBlastin);
         game.last_turn_mode = Some(TurnMode::Regular);
         let mut step = StepThenIStartedBlastin::new();
         step.old_turn_mode = Some(TurnMode::Kickoff);
@@ -543,7 +543,7 @@ mod tests {
         game.field_model.set_player_coordinate(&def_id, FieldCoordinate::new(12, 7));
         game.defender_id = Some(def_id.clone());
         // Pre-position into TISB mode (skip the enter-mode branch)
-        game.turn_mode = TurnMode::ThenIStartedBlastin;
+        game.set_turn_mode(TurnMode::ThenIStartedBlastin);
         game.last_turn_mode = Some(TurnMode::Regular);
         let mut step = StepThenIStartedBlastin::new();
         step.old_turn_mode = Some(TurnMode::Regular);

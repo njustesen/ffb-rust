@@ -36,7 +36,7 @@ impl TalkHandlerTurnMode {
         }
 
         if let Some(turn_mode) = commands.get(1).and_then(|s| TurnMode::from_name(s)) {
-            game.turn_mode = turn_mode;
+            game.set_turn_mode(turn_mode);
         }
 
         if commands.len() > 3 {

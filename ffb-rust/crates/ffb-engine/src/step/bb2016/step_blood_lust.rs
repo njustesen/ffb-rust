@@ -225,7 +225,7 @@ mod tests {
         let mut game = Game::new(home, away, Rules::Bb2016);
         game.home_playing = true;
         game.acting_player.player_id = Some("vamp".into());
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game
     }
 
@@ -242,7 +242,7 @@ mod tests {
     fn negatraits_disabled_skips_roll() {
         let mut game = make_game(vec![SkillId::BloodLust]);
         // KickoffReturn is one of the turn modes where check_negatraits() returns false
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         let mut step = StepBloodLust::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);

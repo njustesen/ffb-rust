@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn eligible_players_lists_every_on_pitch_player_without_randomness() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         add_player(&mut game, "h1", 1, true);
         add_player(&mut game, "h2", 2, true);
         add_player(&mut game, "h3", 3, false); // reserve → not eligible outside START_GAME
@@ -136,7 +136,7 @@ mod tests {
     #[test]
     fn eligible_players_is_empty_when_nobody_qualifies() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         add_player(&mut game, "h1", 1, false);
         assert!(eligible_players_for_dialog(&game, "home", &[], &BB2020Selector::new()).is_empty());
     }

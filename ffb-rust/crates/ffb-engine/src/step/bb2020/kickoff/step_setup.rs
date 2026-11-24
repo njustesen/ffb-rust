@@ -91,7 +91,7 @@ impl StepSetup {
             UtilBox::refresh_boxes(game);
 
             if game.setup_offense {
-                game.turn_mode = TurnMode::Kickoff;
+                game.set_turn_mode(TurnMode::Kickoff);
                 self.end_setup = false;
                 StepOutcome::next()
             } else {

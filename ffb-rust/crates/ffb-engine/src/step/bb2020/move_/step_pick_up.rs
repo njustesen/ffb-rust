@@ -291,7 +291,7 @@ mod tests {
     #[test]
     fn failure_without_reroll_goes_to_label() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 0;
         add_player_at_ball(&mut game, "p1");
@@ -329,7 +329,7 @@ mod tests {
     #[test]
     fn failure_with_trr_offers_reroll_prompt() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player_at_ball(&mut game, "p1");
@@ -343,7 +343,7 @@ mod tests {
     #[test]
     fn decline_reroll_goes_to_failure_label() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player_at_ball(&mut game, "p1");
@@ -362,7 +362,7 @@ mod tests {
         // pins that behavior (previously this file had been overwritten with BB2025's
         // Trickster/Secure-The-Ball logic, which doesn't apply to BB2020 at all).
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player_at_ball(&mut game, "p1");

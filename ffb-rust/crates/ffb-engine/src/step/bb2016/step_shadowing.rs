@@ -263,7 +263,7 @@ mod tests {
     #[test]
     fn kickoff_return_mode_disables_shadowing() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         let mut step = StepShadowing::new();
         step.coordinate_from = Some(FieldCoordinate::new(5, 5));
         let out = step.start(&mut game, &mut GameRng::new(0));
@@ -273,7 +273,7 @@ mod tests {
     #[test]
     fn pass_block_mode_disables_shadowing() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::PassBlock;
+        game.set_turn_mode(TurnMode::PassBlock);
         let mut step = StepShadowing::new();
         step.coordinate_from = Some(FieldCoordinate::new(5, 5));
         let out = step.start(&mut game, &mut GameRng::new(0));

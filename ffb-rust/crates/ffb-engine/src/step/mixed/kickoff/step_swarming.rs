@@ -185,7 +185,7 @@ impl StepSwarming {
             game.home_playing = !game.home_playing;
         }
 
-        game.turn_mode = TurnMode::Swarming;
+        game.set_turn_mode(TurnMode::Swarming);
 
         // Java: pushCurrentStepOnStack() → Rust StepAction::Repeat (driver re-enters start()).
         // Roll how many swarmers may be placed: d3 (Java: DiceRoller.rollSwarmingPlayers() = d3).
@@ -242,7 +242,7 @@ impl StepSwarming {
             }
         }
 
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         let mechanic = crate::mechanic::game_mechanic_for(game.rules);
         UtilPlayer::refresh_players_for_turn_start(game, &mechanic.enhancements_to_remove_at_end_of_turn(), &mechanic.enhancements_to_remove_at_end_of_turn_when_not_setting_active());
         game.field_model.clear_track_numbers();
@@ -371,7 +371,7 @@ mod tests {
     fn end_turn_with_valid_placement_leaves() {
         let mut game = make_game();
         game.home_playing = true;
-        game.turn_mode = TurnMode::Swarming;
+        game.set_turn_mode(TurnMode::Swarming);
 
         let mut step = StepSwarming::new();
         step.team_id = Some("home".into());
@@ -386,7 +386,7 @@ mod tests {
     fn end_turn_with_too_many_placed_stays() {
         let mut game = make_game();
         game.home_playing = true;
-        game.turn_mode = TurnMode::Swarming;
+        game.set_turn_mode(TurnMode::Swarming);
 
         let p1 = make_player("h1", 1);
         game.team_home.players.push(p1);
@@ -421,7 +421,7 @@ mod tests {
     fn place_player_updates_coordinate_and_continues() {
         let mut step = StepSwarming::new();
         let mut game = make_game();
-        game.turn_mode = TurnMode::Swarming;
+        game.set_turn_mode(TurnMode::Swarming);
         // Player must belong to the active team for UtilServerSetup::setup_player to accept it.
         game.team_home.players.push(make_player("p1", 1));
         game.field_model.set_player_state("p1", ffb_model::enums::PlayerState::new(PS_RESERVE));
@@ -480,7 +480,7 @@ mod tests {
     #[test]
     fn leave_restores_prone_to_reserve() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Swarming;
+        game.set_turn_mode(TurnMode::Swarming);
         // Player was set PRONE during setup
         let p = make_player("h1", 1);
         game.team_home.players.push(p);
@@ -499,7 +499,7 @@ mod tests {
     fn receiving_team_flips_home_playing() {
         let mut game = make_game();
         game.home_playing = true;
-        game.turn_mode = TurnMode::Swarming;
+        game.set_turn_mode(TurnMode::Swarming);
 
         let mut step = StepSwarming::new();
         step.team_id = Some("away".into());

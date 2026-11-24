@@ -15,7 +15,7 @@ fn set_turn_mode(game: &mut Game, turn_mode: ffb_model::enums::TurnMode) {
         return;
     }
     let last = game.turn_mode;
-    game.turn_mode = turn_mode;
+    game.set_turn_mode(turn_mode);
     game.last_turn_mode = Some(last);
 }
 
@@ -344,7 +344,7 @@ mod tests {
         let mut game = make_game();
         game.home_playing = true;
         // SELECT records the mode it replaces (Java `setTurnMode`), PLACE restores exactly that.
-        game.turn_mode = ffb_model::enums::TurnMode::Regular;
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
         game.team_home.players.push(ffb_model::model::player::Player {
             id: "carrier".into(), name: "carrier".into(), nr: 1, position_id: "p".into(),
             movement: 6, strength: 3, agility: 3, passing: 3, armour: 8,
@@ -385,7 +385,7 @@ mod tests {
     fn safe_pair_of_hands_restores_the_mode_it_replaced_even_with_no_last_mode() {
         use ffb_model::enums::TurnMode;
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.last_turn_mode = None;
         set_turn_mode(&mut game, TurnMode::SafePairOfHands);
         assert_eq!(game.last_turn_mode, Some(TurnMode::Regular));

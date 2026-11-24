@@ -373,7 +373,7 @@ mod tests {
         let mut game = make_game();
         add_player_ag3(&mut game, "p1");
         game.acting_player.jumping = true;
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         let mut step = StepJump::new("fail".into());
@@ -388,7 +388,7 @@ mod tests {
         let mut game = make_game();
         add_player_ag3(&mut game, "p1");
         game.acting_player.jumping = true;
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         let mut step = StepJump::new("fail".into());
@@ -407,7 +407,7 @@ mod tests {
         let mut game = make_game();
         add_player_ag3(&mut game, "p1");
         game.acting_player.jumping = true;
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         let mut step = StepJump::new("fail".into());
@@ -423,7 +423,7 @@ mod tests {
         let mut game = make_game();
         add_player_ag3(&mut game, "p1");
         game.acting_player.jumping = true;
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         let mut step = StepJump::new("fail".into());
@@ -452,7 +452,7 @@ mod tests {
         let mut game = make_game();
         add_player_ag3(&mut game, "p1");
         game.acting_player.jumping = true;
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         let mut step = StepJump::new("fail".into());

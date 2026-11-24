@@ -308,7 +308,7 @@ mod tests {
     #[test]
     fn bomb_turn_pushes_bomb_sequence() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         let mut step = StepEndPassing::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
@@ -502,7 +502,7 @@ mod tests {
     #[test]
     fn bomb_turn_prefers_interceptor_id_over_catcher_id() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         let mut step = StepEndPassing::new();
         step.catcher_id = Some("catcher1".into());
         step.interceptor_id = Some("interceptor1".into());
@@ -522,7 +522,7 @@ mod tests {
     #[test]
     fn bomb_turn_dont_drop_fumble_is_always_false() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         let mut step = StepEndPassing::new();
         step.dont_drop_fumble = true;
         let out = step.start(&mut game, &mut GameRng::new(0));

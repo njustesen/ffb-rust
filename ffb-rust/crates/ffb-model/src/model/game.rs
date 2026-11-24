@@ -311,6 +311,21 @@ impl Game {
         self.active_shadowers.push(player_id.to_owned());
     }
 
+    /// Java `Game.setTurnMode(turnMode)`: a no-op for the current mode; otherwise the old
+    /// (non-null) mode moves into `lastTurnMode`, which the client shows and several steps
+    /// restore from (`setTurnMode(getLastTurnMode())`).
+    pub fn set_turn_mode(&mut self, turn_mode: TurnMode) {
+        let old = if self.turn_mode_null { None } else { Some(self.turn_mode) };
+        if old == Some(turn_mode) {
+            return;
+        }
+        self.turn_mode = turn_mode;
+        self.turn_mode_null = false;
+        if let Some(old) = old {
+            self.last_turn_mode = Some(old);
+        }
+    }
+
     /// Mark a skill as used for the given player (Java: actingPlayer.markSkillUsed / player.addUsedSkill).
     pub fn mark_skill_used(&mut self, player_id: &str, skill_id: crate::enums::SkillId) {
         if let Some(player) = self.player_mut(player_id) {
@@ -851,6 +866,22 @@ mod tests {
         let mut g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2020);
         // Should not panic
         g.mark_skill_used("nonexistent", crate::enums::SkillId::BlastIt);
+    }
+
+    /// Java `Game.setTurnMode`: the old mode moves into lastTurnMode; re-setting the current
+    /// mode changes nothing; a null (unset) old mode leaves lastTurnMode alone.
+    #[test]
+    fn set_turn_mode_records_the_last_turn_mode() {
+        let mut g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2025);
+        g.turn_mode = TurnMode::Regular;
+        g.last_turn_mode = None;
+        g.set_turn_mode(TurnMode::Blitz);
+        assert_eq!((g.turn_mode, g.last_turn_mode), (TurnMode::Blitz, Some(TurnMode::Regular)));
+        g.set_turn_mode(TurnMode::Blitz);
+        assert_eq!(g.last_turn_mode, Some(TurnMode::Regular));
+        g.turn_mode_null = true;
+        g.set_turn_mode(TurnMode::Kickoff);
+        assert_eq!((g.turn_mode, g.last_turn_mode, g.turn_mode_null), (TurnMode::Kickoff, Some(TurnMode::Regular), false));
     }
 
     #[test]

@@ -65,11 +65,12 @@ impl StepBombardier {
                         game.turn_mode, is_home, game.acting_player.player_id
                     );
                 }
-                game.turn_mode = if is_home {
+                let mode = if is_home {
                     if game.turn_mode == TurnMode::Blitz { TurnMode::BombHomeBlitz } else { TurnMode::BombHome }
                 } else {
                     if game.turn_mode == TurnMode::Blitz { TurnMode::BombAwayBlitz } else { TurnMode::BombAway }
                 };
+                game.set_turn_mode(mode);
             }
         }
 
@@ -117,7 +118,7 @@ mod tests {
     #[test]
     fn blitz_turn_mode_becomes_bomb_home_blitz() {
         let (mut game, _) = make_game_with_bombardier();
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         StepBombardier::new().start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::BombHomeBlitz);
     }
@@ -125,7 +126,7 @@ mod tests {
     #[test]
     fn bomb_turn_mode_is_not_changed() {
         let (mut game, _) = make_game_with_bombardier();
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         StepBombardier::new().start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::BombHome);
     }
@@ -134,7 +135,7 @@ mod tests {
     fn non_bomb_action_does_not_change_turn_mode() {
         let (mut game, _) = make_game_with_bombardier();
         game.acting_player.player_action = Some(PlayerAction::Pass);
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         StepBombardier::new().start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::Regular);
     }

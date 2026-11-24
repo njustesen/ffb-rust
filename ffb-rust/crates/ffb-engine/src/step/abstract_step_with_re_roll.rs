@@ -182,7 +182,7 @@ mod tests {
     #[test]
     fn find_skill_reroll_source_returns_none_non_regular_mode() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         add_player_with_skill(&mut game, "p1", SkillId::Dodge);
         game.acting_player.player_id = Some("p1".into());
         assert!(find_skill_reroll_source(&game, "DODGE").is_none());
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn find_skill_reroll_source_returns_none_when_no_matching_skill() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         add_player_with_skill(&mut game, "p1", SkillId::Block);
         game.acting_player.player_id = Some("p1".into());
         assert!(find_skill_reroll_source(&game, "DODGE").is_none());
@@ -200,7 +200,7 @@ mod tests {
     #[test]
     fn find_skill_reroll_source_returns_some_when_dodge_skill_present() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         add_player_with_skill(&mut game, "p1", SkillId::Dodge);
         game.acting_player.player_id = Some("p1".into());
         // Only returns Some if Dodge's properties include "canRerollDodge"
@@ -213,7 +213,7 @@ mod tests {
     #[test]
     fn find_skill_reroll_source_returns_none_when_skill_used() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         add_player_with_skill(&mut game, "p1", SkillId::Dodge);
         game.acting_player.player_id = Some("p1".into());
         // Mark skill as used
@@ -232,7 +232,7 @@ mod tests {
     fn pro_offers_single_die_per_activation_reroll() {
         // Java: bb2025/Pro.postConstruct registers SINGLE_DIE_PER_ACTIVATION → ReRollSources.PRO.
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         add_player_with_skill(&mut game, "p1", SkillId::Pro);
         game.acting_player.player_id = Some("p1".into());
         let source = find_skill_reroll_source(&game, "SINGLE_DIE_PER_ACTIVATION")
@@ -245,7 +245,7 @@ mod tests {
     fn brawler_offers_single_both_down_reroll() {
         // Java: bb2025/Brawler.postConstruct registers SINGLE_BOTH_DOWN → ReRollSources.BRAWLER.
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         add_player_with_skill(&mut game, "p1", SkillId::Brawler);
         game.acting_player.player_id = Some("p1".into());
         let source = find_skill_reroll_source(&game, "SINGLE_BOTH_DOWN")
@@ -260,7 +260,7 @@ mod tests {
         // broken deterministically by SkillId declaration order, and Catch is
         // declared before MonstrousMouth.
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         add_player_with_skills(&mut game, "p1", &[SkillId::MonstrousMouth, SkillId::Catch]);
         game.acting_player.player_id = Some("p1".into());
         let source = find_skill_reroll_source(&game, "CATCH")
@@ -274,7 +274,7 @@ mod tests {
         // Pass registers PASS at priority 1; TheBallista at priority 2 (the only
         // priority-2 source in Java ReRollSources) — the lower priority wins.
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         add_player_with_skills(&mut game, "p1", &[SkillId::TheBallista, SkillId::Pass]);
         game.acting_player.player_id = Some("p1".into());
         let source = find_skill_reroll_source(&game, "PASS")
@@ -287,7 +287,7 @@ mod tests {
     fn whirling_dervish_offers_direction_reroll() {
         // Java: bb2020+bb2025 special/WhirlingDervish register DIRECTION → WHIRLING_DERVISH.
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         add_player_with_skill(&mut game, "p1", SkillId::WhirlingDervish);
         game.acting_player.player_id = Some("p1".into());
         let source = find_skill_reroll_source(&game, "DIRECTION")
@@ -300,7 +300,7 @@ mod tests {
     fn used_skill_is_excluded_and_other_candidate_returned() {
         // With Catch already used, the CATCH lookup must fall through to MonstrousMouth.
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         add_player_with_skills(&mut game, "p1", &[SkillId::Catch, SkillId::MonstrousMouth]);
         game.acting_player.player_id = Some("p1".into());
         if let Some(p) = game.team_home.player_mut("p1") {

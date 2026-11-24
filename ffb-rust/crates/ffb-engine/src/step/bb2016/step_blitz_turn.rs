@@ -63,7 +63,7 @@ impl StepBlitzTurn {
         if game.turn_mode == TurnMode::Blitz {
             // Second entry: blitz turn is over.
             if self.end_turn {
-                game.turn_mode = TurnMode::Kickoff;
+                game.set_turn_mode(TurnMode::Kickoff);
             }
             StepOutcome::next()
         } else {
@@ -74,7 +74,7 @@ impl StepBlitzTurn {
                 game.team_away.id.clone()
             };
             SetupMechanic::new().pin_players_in_tacklezones_chain(game, &blitzing_team_id, true);
-            game.turn_mode = TurnMode::Blitz;
+            game.set_turn_mode(TurnMode::Blitz);
             // no-op: headless engine has no turn timer; stopTurnTimer/startTurnTimer are server-only
             game.start_turn();
 
@@ -105,7 +105,7 @@ mod tests {
     #[test]
     fn first_entry_sets_blitz_mode() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         let mut step = StepBlitzTurn::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::Blitz);
@@ -114,7 +114,7 @@ mod tests {
     #[test]
     fn first_entry_pushes_self_and_select_sequence() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Kickoff;
+        game.set_turn_mode(TurnMode::Kickoff);
         let mut step = StepBlitzTurn::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.pushes.len(), 2);
@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn second_entry_end_turn_sets_kickoff_mode() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         let mut step = StepBlitzTurn::new();
         step.end_turn = true;
         step.start(&mut game, &mut GameRng::new(0));
@@ -135,7 +135,7 @@ mod tests {
     #[test]
     fn second_entry_no_end_turn_stays_in_blitz() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         let mut step = StepBlitzTurn::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(game.turn_mode, TurnMode::Blitz);

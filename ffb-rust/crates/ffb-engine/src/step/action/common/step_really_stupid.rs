@@ -167,7 +167,7 @@ mod tests {
         add_player(&mut home, &pid, 1, vec![SkillId::ReallyStupid]);
         let away = test_team("away", 0);
         let mut game = Game::new(home, away, Rules::Bb2025);
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.acting_player.player_id = Some(pid.clone());
         game.acting_player.player_action = Some(PlayerAction::Move);
@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn negatraits_disabled_skips_roll() {
         let (mut game, _) = make_game_with_really_stupid();
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         let outcome = StepReallyStupid::new().start(&mut game, &mut GameRng::new(0));
         assert_eq!(outcome.action, StepAction::NextStep);
         assert!(outcome.events.is_empty());

@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn end_turn_pass_block_pushes_end_turn_sequence() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::PassBlock;
+        game.set_turn_mode(TurnMode::PassBlock);
         let mut step = StepEndFeeding::new();
         step.end_turn = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn end_turn_regular_pushes_three_sequences() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         let mut step = StepEndFeeding::new();
         step.end_turn = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn default_pushes_select_sequence() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         let mut step = StepEndFeeding::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(!out.pushes.is_empty());
@@ -196,7 +196,7 @@ mod tests {
     fn clears_defender_id_on_execute() {
         let mut game = make_game();
         game.defender_id = Some("p1".into());
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         let mut step = StepEndFeeding::new();
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.defender_id.is_none());

@@ -497,7 +497,7 @@ mod tests {
         // is_active/suppress_end_turn) was entirely missing from the published context.
         let mut game = make_game();
         game.home_playing = true;
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         add_home_player(&mut game, "p1");
         let mut step = StepSpecialEffect::new("fail".into());
         step.player_id = Some("p1".into());
@@ -637,7 +637,7 @@ mod tests {
         // Bomb with no originalBombardier → uses InjuryTypeBombWithModifier → publishes SteadyFootingContext
         let mut game = make_game();
         game.home_playing = true;
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         add_home_player(&mut game, "p1");
         let mut step = StepSpecialEffect::new("fail".into());
         step.player_id = Some("p1".into());
@@ -653,7 +653,7 @@ mod tests {
         // suppressEndTurn should become false → EndTurn should be published for a standing acting-team player
         let mut game = make_game();
         game.home_playing = true;
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         add_home_player(&mut game, "bomb1");
         let mut step = StepSpecialEffect::new("fail".into());
         step.player_id = Some("bomb1".into());

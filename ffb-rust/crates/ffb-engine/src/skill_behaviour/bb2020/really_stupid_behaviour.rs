@@ -391,7 +391,7 @@ mod tests {
         use ffb_model::enums::TurnMode;
         let m = ReallyStupidStepModifier;
         let mut game = test_game();
-        game.turn_mode = TurnMode::KickoffReturn;
+        game.set_turn_mode(TurnMode::KickoffReturn);
         let mut hook = StepReallyStupidHookState {
             goto_label_on_failure: "FAIL".into(),
             re_rolled_action: None,

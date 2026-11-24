@@ -503,7 +503,7 @@ mod tests {
         // it back. Java still rolls fresh on the re-entry (`doRoll = reRolledAction`), so the
         // re-entry must not re-use the delivered die.
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "p1");
@@ -531,7 +531,7 @@ mod tests {
         let dodger_with_tackle_neighbour = |tackle: bool| -> u64 {
             let mut game = make_game();
             game.home_playing = true;
-            game.turn_mode = TurnMode::Regular;
+            game.set_turn_mode(TurnMode::Regular);
             game.turn_data_home.rerolls = 0; // no TRR -- isolate the skill re-roll
             game.team_home.players.push(Player {
                 id: "p1".into(), name: "p1".into(), nr: 1, position_id: "catcher".into(),
@@ -612,7 +612,7 @@ mod tests {
     #[test]
     fn failure_with_trr_offers_reroll_prompt() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "p1");
@@ -628,7 +628,7 @@ mod tests {
     #[test]
     fn failure_after_a_spent_reroll_offers_nothing() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "p1");
@@ -643,7 +643,7 @@ mod tests {
     #[test]
     fn accept_reroll_with_success_returns_next_step() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "p1");
@@ -658,7 +658,7 @@ mod tests {
     #[test]
     fn decline_reroll_goes_to_failure_label() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.home_playing = true;
         game.turn_data_home.rerolls = 1;
         add_player(&mut game, "p1");

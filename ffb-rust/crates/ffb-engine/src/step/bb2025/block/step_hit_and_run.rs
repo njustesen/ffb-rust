@@ -99,7 +99,7 @@ impl StepHitAndRun {
                 if game.turn_mode != TurnMode::HitAndRun {
                     self.saved_turn_mode = game.last_turn_mode;
                     game.last_turn_mode = Some(game.turn_mode);
-                    game.turn_mode = TurnMode::HitAndRun;
+                    game.set_turn_mode(TurnMode::HitAndRun);
                 }
                 // Java: getResult().addReport(new ReportSkillUse(actingPlayer.getPlayerId(), skill, true, SkillUse.MOVE_SQUARE))
                 if let Some(ref attacker_id) = acting_player_id {
@@ -194,7 +194,7 @@ impl StepHitAndRun {
     /// Java: StepHitAndRun.resetState — restores TurnMode, updates move squares.
     fn reset_state(&mut self, game: &mut Game) {
         if game.turn_mode == TurnMode::HitAndRun {
-            game.turn_mode = game.last_turn_mode.unwrap_or(TurnMode::Regular);
+            game.set_turn_mode(game.last_turn_mode.unwrap_or(TurnMode::Regular));
             if let Some(saved) = self.saved_turn_mode.take() {
                 game.last_turn_mode = Some(saved);
             }
@@ -352,7 +352,7 @@ mod tests {
         game.field_model.set_player_coordinate("attacker", FieldCoordinate::new(5, 5));
         game.field_model.set_player_state("attacker", PlayerState::new(PS_STANDING));
         game.acting_player.set_player("attacker".into(), PlayerAction::Block);
-        game.turn_mode = TurnMode::HitAndRun;
+        game.set_turn_mode(TurnMode::HitAndRun);
 
         let dest = FieldCoordinate::new(6, 5);
         let mut step = StepHitAndRun::new();
@@ -480,7 +480,7 @@ mod tests {
         game.field_model.set_player_state("attacker", PlayerState::new(PS_STANDING));
         game.acting_player.set_player("attacker".into(), PlayerAction::Block);
 
-        game.turn_mode = TurnMode::HitAndRun;
+        game.set_turn_mode(TurnMode::HitAndRun);
 
         let dest = FieldCoordinate::new(6, 5);
         let mut step = StepHitAndRun::new();

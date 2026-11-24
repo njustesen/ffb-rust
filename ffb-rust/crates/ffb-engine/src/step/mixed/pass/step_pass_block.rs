@@ -242,7 +242,7 @@ impl StepPassBlock {
                     game.acting_player.goes_for_it = resume.going_for_it;
                 }
 
-                game.turn_mode = resume.old_turn_mode;
+                game.set_turn_mode(resume.old_turn_mode);
                 if resume.old_turn_mode != TurnMode::DumpOff {
                     game.home_playing = !game.home_playing;
                 }
@@ -287,7 +287,7 @@ impl StepPassBlock {
             eligible_ids.sort();
             let home_defending = opposing_team.id == game.team_home.id;
 
-            game.turn_mode = TurnMode::PassBlock;
+            game.set_turn_mode(TurnMode::PassBlock);
             game.home_playing = !game.home_playing;
             // Java: game.getActingPlayer().setPlayerId(null) — raw id clear, NOT changeActingPlayer.
             game.acting_player.player_id = None;
@@ -484,7 +484,7 @@ mod tests {
         let mut game = make_game();
         game.thrower_id = Some("p1".into());
         game.thrower_action = Some(PlayerAction::ThrowBomb);
-        game.turn_mode = TurnMode::BombHome;
+        game.set_turn_mode(TurnMode::BombHome);
         let mut rng = GameRng::new(0);
         let out = step.start(&mut game, &mut rng);
         assert_eq!(out.action, StepAction::NextStep);
@@ -526,7 +526,7 @@ mod tests {
         use ffb_model::model::skill_def::SkillWithValue;
         use ffb_model::types::FieldCoordinate;
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         add_player(&mut game, true, "p1", vec![]);
         game.thrower_id = Some("p1".into());
         game.thrower_action = Some(PlayerAction::Pass);

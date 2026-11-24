@@ -141,7 +141,7 @@ mod tests {
     #[test]
     fn not_regular_turn_mode_skips() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Blitz;
+        game.set_turn_mode(TurnMode::Blitz);
         game.options.set("enableStallingCheck", "true");
         let mut step = StepForgoneStalling::new();
         step.check_forgo = true;
@@ -154,7 +154,7 @@ mod tests {
     #[test]
     fn check_forgo_false_skips() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.options.set("enableStallingCheck", "true");
         let mut step = StepForgoneStalling::new();
         step.check_forgo = false;
@@ -165,7 +165,7 @@ mod tests {
     #[test]
     fn option_disabled_skips() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         // enableStallingCheck not set => disabled
         let mut step = StepForgoneStalling::new();
         step.check_forgo = true;
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn no_ball_carrier_skips_without_panic() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.options.set("enableStallingCheck", "true");
         let mut step = StepForgoneStalling::new();
         step.check_forgo = true;
@@ -195,7 +195,7 @@ mod tests {
     #[test]
     fn no_player_event_report_when_option_disabled() {
         let mut game = make_game();
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         let mut step = StepForgoneStalling::new();
         step.check_forgo = true;
         // enableStallingCheck not set -> skips without report

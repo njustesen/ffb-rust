@@ -1301,7 +1301,7 @@ mod tests {
         game.team_home.player_mut("t1").unwrap()
             .starting_skills.push(SkillWithValue { skill_id: SkillId::Pass, value: None });
         game.acting_player.player_id = Some("t1".into());
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
 
         let mut step = make_step();
         step.roll = 1; // force the first pass roll to a natural 1 -> FUMBLE
@@ -1339,7 +1339,7 @@ mod tests {
             t.starting_skills.push(SkillWithValue { skill_id: SkillId::StrongPassingGame, value: None });
         }
         game.acting_player.player_id = Some("t1".into());
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         game.turn_data_mut().rerolls = 0;
 
         let mut step = make_step();
@@ -1374,7 +1374,7 @@ mod tests {
             game.team_home.player_mut("t1").unwrap()
                 .starting_skills.push(SkillWithValue { skill_id: SkillId::Pass, value: None });
             game.acting_player.player_id = Some("t1".into());
-            game.turn_mode = TurnMode::Regular;
+            game.set_turn_mode(TurnMode::Regular);
             let mut step = make_step();
             step.roll = 1;
             step.start(&mut game, &mut GameRng::new(0));
@@ -1403,7 +1403,7 @@ mod tests {
         game.team_home.player_mut("t1").unwrap()
             .starting_skills.push(SkillWithValue { skill_id: SkillId::Pass, value: None });
         game.acting_player.player_id = Some("t1".into());
-        game.turn_mode = TurnMode::Regular;
+        game.set_turn_mode(TurnMode::Regular);
         let mut step = make_step();
         step.roll = 1;
         step.pass_skill_used = true;
