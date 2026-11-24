@@ -55,50 +55,57 @@ use crate::step::framework::{StepAction, StepId, StepParameter};
 ///
 /// If BH or KO: auto-cures (emits `ReportApothecaryChoice`).
 /// If CAS: rolls new casualty, headless auto-picks the better outcome, emits both reports.
-fn roll_apothecary_for_injury(result: &mut Box<InjuryResult>, rng: &mut GameRng, game: &mut Game) {
+fn roll_apothecary_for_injury(result: &mut Box<InjuryResult>, rng: &mut GameRng, game: &mut Game) -> Option<ffb_model::prompts::AgentPrompt> {
     let ctx = result.injury_context();
     let defender_id = ctx.defender_id.clone().unwrap_or_default();
     let base = ctx.injury.map(|ps| ps.base()).unwrap_or(0);
-    let apothecary_choice = base != PS_BADLY_HURT && base != PS_KNOCKED_OUT;
+    let mut apothecary_choice = base != PS_BADLY_HURT && base != PS_KNOCKED_OUT;
 
     if apothecary_choice {
-        let d16 = rng.die(16);
-        let d6 = rng.d6();
-        let new_base = if d16 >= 15 { PS_RIP } else if d16 >= 9 { PS_SERIOUS_INJURY } else { PS_BADLY_HURT };
-        let new_state = PlayerState::new(new_base);
-
+        // Java: a new InjuryResult rolled and interpreted by the edition's RollMechanic.
+        let mechanic = crate::mechanic::roll_mechanic_for(game.rules);
+        let mut new_ctx = crate::injury::InjuryContext::new(ApothecaryMode::Defender);
+        new_ctx.defender_id = Some(defender_id.clone());
+        let casualty_roll = mechanic.roll_casualty(rng);
+        new_ctx.casualty_roll = Some(casualty_roll);
+        let new_state = game.player(&defender_id)
+            .and_then(|d| mechanic.interpret_casualty_roll_and_add_modifiers(game, &mut new_ctx, d, false));
+        let new_si = mechanic.interpret_serious_injury_roll(game, &mut new_ctx);
+        apothecary_choice = new_state.map(|s| s.base()) != Some(PS_BADLY_HURT);
+        let si_name = |k| crate::mechanic::state_mechanic::serious_injury_display_name(k, game.rules);
+        let casualty_modifiers: Vec<String> = result.injury_context().casualty_modifiers.iter().map(|m| m.name.to_string()).collect();
         game.report_list.add(ReportApothecaryRoll::new(
-            Some(defender_id.clone()),
-            vec![d16, d6],
-            Some(new_state),
-            None, None, vec![],
+            Some(defender_id.clone()), casualty_roll.to_vec(), new_state, new_si.map(si_name),
+            new_ctx.original_serious_injury.map(si_name), casualty_modifiers,
         ));
-
-        let orig_state = ctx.injury.unwrap_or(new_state);
-        let chosen_state = if new_base < orig_state.base() { new_state } else { orig_state };
-        let final_state = if chosen_state.base() == PS_BADLY_HURT {
-            PlayerState::new(PS_RESERVE)
-        } else {
-            chosen_state
-        };
-
-        let ctx_mut = result.injury_context_mut();
-        ctx_mut.injury = Some(final_state);
-        ctx_mut.apothecary_status = ApothecaryStatus::DoNotUseApothecary;
-
-        game.report_list.add(ReportApothecaryChoice::new(defender_id, PlayerStateModel::new(0), None));
-    } else {
-        let cured = if base == PS_KNOCKED_OUT {
-            PlayerState::new(PS_STUNNED)
-        } else {
-            PlayerState::new(PS_RESERVE)
-        };
-        let ctx_mut = result.injury_context_mut();
-        ctx_mut.injury = Some(cured);
-        ctx_mut.serious_injury = None;
-        ctx_mut.apothecary_status = ApothecaryStatus::DoNotUseApothecary;
-        game.report_list.add(ReportApothecaryChoice::new(defender_id, PlayerStateModel::new(0), None));
+        if apothecary_choice {
+            let (old_state, old_si) = (result.injury_context().injury, result.injury_context().serious_injury);
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::ApothecaryChoice(
+                    ffb_model::dialog::dialog_apothecary_choice_parameter::DialogApothecaryChoiceParameter {
+                        player_id: Some(defender_id.clone()),
+                        player_state_old: old_state,
+                        serious_injury_old: old_si,
+                        player_state_new: new_state,
+                        serious_injury_new: new_si,
+                    }), true);
+            return Some(ffb_model::prompts::AgentPrompt::ApothecaryChoice { player_id: defender_id, can_heal: true });
+        }
     }
+    // Java: no choice -> serious injury cleared, KO -> STUNNED (when the injury type allows), else
+    // RESERVE; ReportApothecaryChoice(defender, state, null).
+    let cured = if base == PS_KNOCKED_OUT
+        && crate::injury::can_apo_ko_into_stun(result.injury_context().injury_type_name.as_deref())
+    {
+        PlayerState::new(PS_STUNNED)
+    } else {
+        PlayerState::new(PS_RESERVE)
+    };
+    let ctx_mut = result.injury_context_mut();
+    ctx_mut.injury = Some(cured);
+    ctx_mut.serious_injury = None;
+    game.report_list.add(ReportApothecaryChoice::new(defender_id, cured, None));
+    None
 }
 
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.mutliblock.StepApothecaryMultiple`.
@@ -119,6 +126,9 @@ pub struct StepApothecaryMultiple {
     pub acting_team: Option<bool>,
     /// How many apothecaries have been consumed this step.
     pub apos_used: i32,
+    /// Java `regenerationFailedResults != null`: the regeneration phase has run; re-executions
+    /// after a coach's answer go straight to the apothecary phase.
+    regeneration_done: bool,
 }
 
 impl StepApothecaryMultiple {
@@ -132,6 +142,29 @@ impl StepApothecaryMultiple {
             available_keywords_map: HashMap::new(),
             acting_team: None,
             apos_used: 0,
+            regeneration_done: false,
+        }
+    }
+
+    /// Java `remainingApos()`: the team's TurnData apothecaries plus plague doctors.
+    fn remaining_apos(&self, game: &Game) -> i32 {
+        let td = if self.team_id.as_deref() == Some(game.team_home.id.as_str()) { &game.turn_data_home } else { &game.turn_data_away };
+        td.apothecaries + td.plague_doctors
+    }
+
+    /// Java `ApothecaryType.forPlayer(game, player, playerState)`.
+    fn apothecary_types(game: &Game, player_id: &str, state: Option<PlayerState>) -> Vec<ffb_model::enums::ApothecaryType> {
+        use ffb_mechanics::apothecary_mechanic::ApothecaryMechanic as _;
+        match (game.player(player_id), state) {
+            (Some(defender), Some(ps)) => match game.rules {
+                ffb_model::enums::Rules::Bb2016 => ffb_mechanics::bb2016::apothecary_mechanic::ApothecaryMechanic::new()
+                    .apothecary_types(game, defender, ps),
+                ffb_model::enums::Rules::Bb2020 => ffb_mechanics::bb2020::apothecary_mechanic::ApothecaryMechanic::new()
+                    .apothecary_types(game, defender, ps),
+                _ => ffb_mechanics::bb2025::apothecary_mechanic::ApothecaryMechanic::new()
+                    .apothecary_types(game, defender, ps),
+            },
+            _ => Vec::new(),
         }
     }
 
@@ -174,7 +207,8 @@ impl StepApothecaryMultiple {
         // Successful regeneration: remove from injury_results (injury nullified).
         // Failed: move to regeneration_failed_results for apothecary processing.
         let bb2025 = game.rules == ffb_model::enums::Rules::Bb2025;
-        let first_pass = self.regeneration_failed_results.is_empty();
+        let first_pass = !self.regeneration_done;
+        self.regeneration_done = true;
         if first_pass {
             // Java bb2025 regenerationHandled (first call): "report injuries without cas rolls" —
             // result.report(this) on every result while still preRegeneration (skip CAS), then
@@ -260,51 +294,76 @@ impl StepApothecaryMultiple {
             }
         }
 
-        // Step 4: Get remaining apothecaries.
-        let remaining_apos = if let Some(ref team_id) = self.team_id {
-            let team_apos = if *team_id == game.team_home.id {
-                game.team_home.apothecaries
-            } else {
-                game.team_away.apothecaries
-            };
-            (team_apos - self.apos_used).max(0)
-        } else { 0 };
-
-        // Step 5a: Process DoRequest injuries.
-        let has_do_request = self.injury_results.iter()
-            .any(|r| r.injury_context().apothecary_status == ApothecaryStatus::DoRequest);
-        if has_do_request {
-            if remaining_apos > 0 {
-                // client-only: DialogUseApothecariesParameter — headless auto-declines apothecary use
-            }
-            for r in &mut self.injury_results {
-                if r.injury_context().apothecary_status == ApothecaryStatus::DoRequest {
-                    r.injury_context_mut().apothecary_status = ApothecaryStatus::DoNotUseApothecary;
+        // Java executeStep, DO_REQUEST group: every casualty the team could still patch up is put
+        // to the coach in ONE DialogUseApothecariesParameter (WAIT_FOR_APOTHECARY_USE); the others
+        // get no apothecary. Remaining apothecaries are the team's TurnData ones (+ plague doctors).
+        let do_request: Vec<usize> = (0..self.injury_results.len())
+            .filter(|&i| self.injury_results[i].injury_context().apothecary_status == ApothecaryStatus::DoRequest)
+            .collect();
+        if !do_request.is_empty() {
+            let remaining_apos = self.remaining_apos(game);
+            let mut descriptions: Vec<serde_json::Value> = Vec::new();
+            let mut player_ids = Vec::new();
+            for i in do_request {
+                let (defender_id, state, si) = {
+                    let ctx = self.injury_results[i].injury_context();
+                    (ctx.defender_id.clone().unwrap_or_default(), ctx.injury, ctx.serious_injury)
+                };
+                let types = Self::apothecary_types(game, &defender_id, state);
+                let ctx = self.injury_results[i].injury_context_mut();
+                if remaining_apos > 0 && !types.is_empty() {
+                    ctx.apothecary_status = ApothecaryStatus::WaitForApothecaryUse;
+                    descriptions.push(serde_json::json!({
+                        "apothecaryTypes": types.iter().map(|t| t.name()).collect::<Vec<_>>(),
+                        "playerId": defender_id,
+                        "playerState": state.map(|s| s.0 as i64),
+                        "seriousInjury": ffb_model::factory::serious_injury_factory::kind_to_json(game.rules, si)
+                            .unwrap_or(serde_json::Value::Null),
+                    }));
+                    player_ids.push(defender_id);
+                } else {
+                    ctx.apothecary_status = ApothecaryStatus::DoNotUseApothecary;
                 }
             }
-        }
-
-        // Step 5b: UseApothecary → rollApothecary + headless auto-pick.
-        for r in &mut self.injury_results {
-            if r.injury_context().apothecary_status == ApothecaryStatus::UseApothecary {
-                roll_apothecary_for_injury(r, rng, game);
+            if !descriptions.is_empty() {
+                let team_id = self.team_id.clone().unwrap_or_default();
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::UseApothecaries(
+                        ffb_model::dialog::dialog_use_apothecaries_parameter::DialogUseApothecariesParameter {
+                            team_id: Some(team_id.clone()),
+                            injury_descriptions: descriptions,
+                        }), true);
+                return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::UseApothecaries { team_id, player_ids });
             }
         }
 
-        // Step 6: Apply NoApothecary + DoNotUseApothecary injuries.
+        // Java USE_APOTHECARY group: rollApothecary each; a new casualty the coach may prefer waits
+        // for DialogApothecaryChoiceParameter (WAIT_FOR_APOTHECARY_CHOICE), otherwise RESULT_CHOICE.
+        for i in 0..self.injury_results.len() {
+            if self.injury_results[i].injury_context().apothecary_status != ApothecaryStatus::UseApothecary {
+                continue;
+            }
+            if let Some(prompt) = roll_apothecary_for_injury(&mut self.injury_results[i], rng, game) {
+                self.injury_results[i].injury_context_mut().apothecary_status = ApothecaryStatus::WaitForApothecaryChoice;
+                return StepOutcome::cont().with_prompt(prompt);
+            }
+            self.injury_results[i].injury_context_mut().apothecary_status = ApothecaryStatus::ResultChoice;
+        }
+        if self.injury_results.iter().any(|r| r.injury_context().apothecary_status == ApothecaryStatus::WaitForApothecaryChoice) {
+            return StepOutcome::cont();
+        }
+
+        // Step 6: apply the injuries (Java applies every result; an apothecary's RESULT_CHOICE
+        // carries the chosen state).
+        let applied = |status: ApothecaryStatus| status == ApothecaryStatus::NoApothecary
+            || status == ApothecaryStatus::DoNotUseApothecary
+            || status == ApothecaryStatus::ResultChoice;
         for r in &self.injury_results {
-            let status = r.injury_context().apothecary_status;
-            if status == ApothecaryStatus::NoApothecary
-                || status == ApothecaryStatus::DoNotUseApothecary
-            {
+            if applied(r.injury_context().apothecary_status) {
                 r.apply_to(game);
             }
         }
-        self.injury_results.retain(|r| {
-            let status = r.injury_context().apothecary_status;
-            status != ApothecaryStatus::NoApothecary
-                && status != ApothecaryStatus::DoNotUseApothecary
-        });
+        self.injury_results.retain(|r| !applied(r.injury_context().apothecary_status));
 
         // Java: double-attacker-down: two injury results for same player + regeneration failed.
         {
@@ -376,6 +435,7 @@ impl Default for StepApothecaryMultiple {
             available_keywords_map: HashMap::new(),
             acting_team: None,
             apos_used: 0,
+            regeneration_done: false,
         }
     }
 }
@@ -389,17 +449,61 @@ impl Step for StepApothecaryMultiple {
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         match action {
-            Action::UseApothecary { player_id, use_apothecary } => {
-                // Java: CLIENT_USE_APOTHECARY → find matching injury result; update apothecaryStatus.
-                let new_status = if *use_apothecary {
-                    ApothecaryStatus::UseApothecary
-                } else {
-                    ApothecaryStatus::DoNotUseApothecary
-                };
+            // A declined apothecary-choice dialog (the agents' answer) keeps the original injury.
+            Action::UseApothecary { player_id, use_apothecary: false }
+                if self.injury_results.iter().any(|r| r.injury_context().apothecary_status == ApothecaryStatus::WaitForApothecaryChoice
+                    && r.injury_context().defender_id.as_deref() == Some(player_id.as_str())) =>
+            {
                 for r in &mut self.injury_results {
-                    if r.injury_context().defender_id.as_deref() == Some(player_id.as_str()) {
+                    if r.injury_context().apothecary_status == ApothecaryStatus::WaitForApothecaryChoice
+                        && r.injury_context().defender_id.as_deref() == Some(player_id.as_str())
+                    {
+                        r.injury_context_mut().apothecary_status = ApothecaryStatus::ResultChoice;
+                    }
+                }
+            }
+            Action::UseApothecary { player_id, use_apothecary } => {
+                // Java CLIENT_USE_APOTHECARY: the named casualty uses an apothecary (when one is left:
+                // useApo) or not; every other casualty still waiting is asked again (DO_REQUEST).
+                let remaining = self.remaining_apos(game);
+                let team_home = self.team_id.as_deref() == Some(game.team_home.id.as_str());
+                let mut used = false;
+                for r in &mut self.injury_results {
+                    if r.injury_context().apothecary_status == ApothecaryStatus::WaitForApothecaryUse
+                        && r.injury_context().defender_id.as_deref() == Some(player_id.as_str())
+                        && !used
+                    {
+                        let new_status = if *use_apothecary && remaining > 0 {
+                            used = true;
+                            ApothecaryStatus::UseApothecary
+                        } else {
+                            ApothecaryStatus::DoNotUseApothecary
+                        };
                         r.injury_context_mut().apothecary_status = new_status;
                     }
+                }
+                if used {
+                    let td = if team_home { &mut game.turn_data_home } else { &mut game.turn_data_away };
+                    td.use_apothecary(ffb_model::enums::ApothecaryType::Team);
+                    self.apos_used += 1;
+                }
+                for r in &mut self.injury_results {
+                    if r.injury_context().apothecary_status == ApothecaryStatus::WaitForApothecaryUse {
+                        r.injury_context_mut().apothecary_status = ApothecaryStatus::DoRequest;
+                    }
+                }
+            }
+            // Java CLIENT_APOTHECARY_CHOICE: the chosen state and serious injury (RESULT_CHOICE).
+            Action::ApothecaryChoice { player_state, serious_injury } => {
+                let si: Option<ffb_model::enums::SeriousInjuryKind> = serious_injury.as_deref()
+                    .and_then(|s| serde_json::from_str(&format!("\"{s}\"")).ok());
+                if let Some(r) = self.injury_results.iter_mut()
+                    .find(|r| r.injury_context().apothecary_status == ApothecaryStatus::WaitForApothecaryChoice)
+                {
+                    let ctx = r.injury_context_mut();
+                    ctx.injury = Some(PlayerState::new(*player_state));
+                    ctx.serious_injury = si;
+                    ctx.apothecary_status = ApothecaryStatus::ResultChoice;
                 }
             }
             Action::Acknowledge => {
@@ -709,8 +813,10 @@ mod tests {
         step.team_id = Some("home".to_string());
         // Two injury results for the same defender, with a status untouched by the
         // DoRequest/UseApothecary phases so both survive the apply/retain step.
-        step.injury_results.push(make_injury("home_1", ApothecaryMode::HitPlayer, ApothecaryStatus::ResultChoice));
-        step.injury_results.push(make_injury("home_1", ApothecaryMode::HitPlayer, ApothecaryStatus::ResultChoice));
+        step.injury_results.push(make_injury("home_1", ApothecaryMode::HitPlayer, ApothecaryStatus::WaitForApothecaryUse));
+        step.injury_results.push(make_injury("home_1", ApothecaryMode::HitPlayer, ApothecaryStatus::WaitForApothecaryUse));
+        // The regeneration phase has run (re-execution after a coach's answer).
+        step.regeneration_done = true;
         // Non-empty regeneration_failed_results to enable the doubleAttackerDown branch
         // and skip the phase-1 regeneration filtering.
         step.regeneration_failed_results.push(
@@ -721,5 +827,37 @@ mod tests {
 
         let final_state = game.field_model.player_state("home_1").expect("player state set");
         assert_eq!(final_state.base(), PS_PRONE, "bb2025 double-attacker-down must reset to PRONE, not RESERVE");
+    }
+
+    /// Java DO_REQUEST group: a casualty the team could patch up is put to the coach in one
+    /// DialogUseApothecariesParameter; declining them all (CLIENT_USE_APOTHECARIES) applies it.
+    #[test]
+    fn multi_block_casualties_ask_for_the_apothecary() {
+        use ffb_model::enums::{PlayerState, PS_STANDING, PS_SERIOUS_INJURY};
+        let mut game = make_game();
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: "home_03".into(), name: "home_03".into(), nr: 3, position_id: "lineman".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            ..Default::default()
+        });
+        game.team_home.apothecaries = 1;
+        game.turn_data_home.apothecaries = 1;
+        game.field_model.set_player_coordinate("home_03", FieldCoordinate::new(5, 7));
+        game.field_model.set_player_state("home_03", PlayerState::new(PS_STANDING));
+        let mut step = StepApothecaryMultiple::default();
+        step.team_id = Some("home".to_string());
+        let mut ir = make_injury("home_03", ApothecaryMode::Defender, ApothecaryStatus::DoRequest);
+        ir.injury_context_mut().injury = Some(PlayerState::new(PS_SERIOUS_INJURY));
+        step.injury_results.push(ir);
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::UseApothecaries { ref player_ids, .. })
+            if player_ids == &vec!["home_03".to_string()]), "{:?}", out.prompt);
+        assert!(matches!(game.dialog_parameter,
+            Some(ffb_model::dialog::dialog_parameter_factory::DialogParameter::UseApothecaries(_))));
+        let out = step.handle_command(&Action::Acknowledge, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(game.turn_data_home.apothecaries, 1, "declined: none used");
+        assert_eq!(game.field_model.player_state("home_03").unwrap().base(), PS_SERIOUS_INJURY);
     }
 }

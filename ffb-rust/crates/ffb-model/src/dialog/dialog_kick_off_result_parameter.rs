@@ -20,13 +20,21 @@ impl IDialogParameter for DialogKickOffResultParameter {
 // JSON serialization (BACKLOG §O).
 impl DialogKickOffResultParameter {
     /// Java `initFrom(IFactorySource, JsonValue)`.
-    pub fn init_from(&mut self, _rules: crate::enums::Rules, _json: &serde_json::Value) -> Result<(), String> {
-        Err("DialogKickOffResultParameter.initFrom: not ported yet".to_string())
+    pub fn init_from(&mut self, _rules: crate::enums::Rules, json: &serde_json::Value) -> Result<(), String> {
+        use crate::util::java_json as jj;
+        let obj = jj::to_json_object(json)?;
+        super::util_dialog_parameter::validate_dialog_id_json(DialogId::KICK_OFF_RESULT, obj)?;
+        self.team_id = jj::get_string(obj, "teamId")?;
+        Ok(())
     }
 
-    /// Java `toJsonValue()`.
+    /// Java `toJsonValue()`: dialogId, teamId.
     pub fn to_json_value(&self, _rules: crate::enums::Rules) -> Result<serde_json::Value, String> {
-        Err("DialogKickOffResultParameter.toJsonValue: not ported yet".to_string())
+        use crate::util::java_json as jj;
+        let mut o = serde_json::Map::new();
+        o.insert("dialogId".into(), serde_json::Value::from(DialogId::KICK_OFF_RESULT.get_name()));
+        o.insert("teamId".into(), jj::string_or_null(self.team_id.as_deref()));
+        Ok(serde_json::Value::Object(o))
     }
 }
 

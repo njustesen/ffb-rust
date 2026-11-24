@@ -311,22 +311,94 @@ impl StepBlockRollMultiple {
             }
         }
 
-        // Java: if attackerTeamSelects && (ownChoice unselected || anyReRollLeft)
-        //   → showDialog(DialogReRollBlockForTargetsPropertiesParameter)
-        // client-only: attacker block-roll dialog — headless auto-selects index 0
-
-        // Java: else if defender rolls need selection
-        //   → showDialog(DialogOpponentBlockSelectionPropertiesParameter)
-        // client-only: defender block-roll dialog — headless auto-selects index 0
-
-        // Fallback: auto-select index 0 for unselected rolls and proceed.
-        for roll in &mut self.block_rolls {
-            if roll.needs_selection() {
-                roll.set_selected_index(0);
+        // Java decideNextStep: the attacker chooses (and may re-roll) while one of his own-choice
+        // rolls is open or any re-roll is left; then the defending coach picks the dice of the
+        // rolls that are not the attacker's choice. One target per answer -- the dialog comes back
+        // until every roll has a die (the parity agents pick die 0 of the first open target, as
+        // ParityRunner does).
+        let any_re_roll_left = self.block_rolls.iter().any(|r| r.has_re_rolls_left());
+        if self.attacker_team_selects {
+            if self.block_rolls.iter().any(|r| r.needs_selection() && r.is_own_choice()) || any_re_roll_left {
+                return self.ask_for_block_dice(game, true);
             }
+            self.attacker_team_selects = false;
         }
-
+        if self.block_rolls.iter().any(|r| r.needs_selection() && !r.is_own_choice()) {
+            return self.ask_for_block_dice(game, false);
+        }
         self.next_step(game.rules)
+    }
+
+    /// Java `showDialog(createAttackerDialogParameter(player, blockRolls), false)` /
+    /// `showDialog(createDefenderDialogParameter(otherTeam, defenderRolls), true)` (the bb2025
+    /// PROPERTIES dialogs; DEVIATION: bb2020's BlockRoll dialogs have no JSON form yet, and the GUI
+    /// server runs bb2025 -- bb2020 waits on the prompt alone).
+    fn ask_for_block_dice(&mut self, game: &mut Game, attacker: bool) -> StepOutcome {
+        let acting_home = game.home_playing;
+        let team_id = if attacker == acting_home { game.team_home.id.clone() } else { game.team_away.id.clone() };
+        let rolls: Vec<&BlockRoll> = self.block_rolls.iter().filter(|r| attacker || !r.is_own_choice()).collect();
+        if game.rules == ffb_model::enums::Rules::Bb2025 {
+            let properties: Vec<ffb_model::model::block_roll_properties::BlockRollProperties> =
+                rolls.iter().map(|r| Self::block_roll_properties(r)).collect();
+            let dialog = if attacker {
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::ReRollBlockForTargetsProperties(
+                    ffb_model::dialog::dialog_re_roll_block_for_targets_properties_parameter::DialogReRollBlockForTargetsPropertiesParameter {
+                        player_id: game.acting_player.player_id.clone(),
+                        block_rolls: properties,
+                    })
+            } else {
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::OpponentBlockSelectionProperties(
+                    ffb_model::dialog::dialog_opponent_block_selection_properties_parameter::DialogOpponentBlockSelectionPropertiesParameter {
+                        team_id: Some(team_id.clone()),
+                        block_rolls: properties,
+                    })
+            };
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(game, dialog, !attacker);
+        }
+        let targets = rolls.iter()
+            .filter_map(|r| r.target_id.clone().map(|t| (t, r.needs_selection())))
+            .collect();
+        StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::BlockRollsForTargets { team_id, attacker, targets })
+    }
+
+    /// Java `BlockRollProperties` as the dialog carries it: the step's roll plus its re-roll
+    /// options -- the team re-roll as a ReRollProperty (TRR), the skill sources keyed by Java's
+    /// ReRolledAction name (Pro: Single Die Per Activation, Brawler: Single BothDown, Hatred:
+    /// Single Skull, Consummate Professional: Single Die, Lord of Chaos: Single Block Die).
+    fn block_roll_properties(roll: &BlockRoll) -> ffb_model::model::block_roll_properties::BlockRollProperties {
+        use ffb_model::enums::ReRollProperty;
+        let mut rr_action_to_source: Vec<(String, Option<String>)> = Vec::new();
+        let mut re_roll_properties = Vec::new();
+        let mut sources: Vec<&str> = roll.re_roll_sources.iter().map(|s| s.name.as_str()).collect();
+        sources.sort_unstable();
+        for name in sources {
+            let action = match name {
+                "Team ReRoll" => { re_roll_properties.push(Some(ReRollProperty::Trr)); continue; }
+                "Pro" => "Single Die Per Activation",
+                "Brawler" => "Single BothDown",
+                "Hatred" => "Single Skull",
+                "Consummate Professional" => "Single Die",
+                "Lord of Chaos" => "Single Block Die",
+                _ => continue,
+            };
+            rr_action_to_source.push((action.to_string(), Some(name.to_string())));
+        }
+        ffb_model::model::block_roll_properties::BlockRollProperties {
+            target_id: roll.target_id.clone(),
+            old_player_state: roll.old_player_state,
+            successful_dauntless: roll.successful_dauntless,
+            own_choice: roll.own_choice,
+            double_target_strength: roll.double_target_strength,
+            nr_of_dice: roll.nr_of_dice,
+            id: roll.id,
+            pro_index: roll.pro_index,
+            block_roll: Some(roll.block_roll.clone()),
+            re_roll_dice_indexes: Some(roll.re_roll_dice_indexes.clone()),
+            selected_index: roll.selected_index,
+            rr_action_to_source,
+            re_roll_properties,
+            ..Default::default()
+        }
     }
 
     /// Java: nextStep() — reverse rolls, push evaluation sequence for each. `rules` picks the
@@ -381,10 +453,23 @@ impl Step for StepBlockRollMultiple {
                     .or_else(|| self.block_rolls.iter().position(|r| r.needs_selection()));
                 if let Some(i) = idx {
                     self.block_rolls[i].set_selected_index(*die_index as i32);
+                    // Java: state.selectedTarget = command.getTargetId()
+                    self.selected_target = self.block_rolls[i].target_id.clone();
+                }
+            }
+            // Java CLIENT_BLOCK_OR_RE_ROLL_CHOICE_FOR_TARGET from the client: the re-roll source
+            // (reRollSourceSuccessfully), the target, and that roll's selected / Pro / re-rolled dice.
+            Action::BlockOrReRollChoiceForTarget { target_id, selected_index, pro_index, re_roll_source, any_dice_indexes } => {
+                self.re_roll_source = re_roll_source.clone();
+                self.selected_target = Some(target_id.clone());
+                if let Some(roll) = self.block_rolls.iter_mut().find(|r| r.target_id.as_deref() == Some(target_id.as_str())) {
+                    roll.set_selected_index(*selected_index);
+                    roll.set_pro_index(*pro_index);
+                    roll.set_re_roll_dice_indexes(any_dice_indexes.clone());
                 }
             }
             Action::UseBrawler { target_id } => {
-                self.re_roll_source = Some("BRAWLER".into());
+                self.re_roll_source = Some("Brawler".into()); // Java ReRollSources.BRAWLER name
                 self.selected_target = target_id.clone()
                     .or_else(|| {
                         self.block_rolls.iter().find(|r| r.needs_selection())
@@ -393,7 +478,7 @@ impl Step for StepBlockRollMultiple {
             }
             // BB2025 addition: Hatred re-roll
             Action::UseHatred => {
-                self.re_roll_source = Some("HATRED".into());
+                self.re_roll_source = Some("Hatred".into()); // Java ReRollSources.HATRED name
                 if let Some(roll) = self.block_rolls.iter().find(|r| r.needs_selection()) {
                     self.selected_target = roll.target_id.clone();
                 }
@@ -573,7 +658,9 @@ mod tests {
         step.set_parameter(&StepParameter::BlockTargets(vec!["p1".into()]));
         step.start(&mut game, &mut GameRng::new(0));
         step.handle_command(&Action::UseBrawler { target_id: None }, &mut game, &mut GameRng::new(0));
-        assert_eq!(step.re_roll_source.as_deref(), Some("BRAWLER"));
+        // The re-roll is applied at once (Java ReRollSources.BRAWLER / HATRED): ReportBlock.
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::BLOCK));
+        assert!(step.re_roll_source.is_none(), "consumed");
     }
 
     #[test]
@@ -583,7 +670,9 @@ mod tests {
         step.set_parameter(&StepParameter::BlockTargets(vec!["p1".into()]));
         step.start(&mut game, &mut GameRng::new(0));
         step.handle_command(&Action::UseHatred, &mut game, &mut GameRng::new(0));
-        assert_eq!(step.re_roll_source.as_deref(), Some("HATRED"));
+        // The re-roll is applied at once (Java ReRollSources.BRAWLER / HATRED): ReportBlock.
+        assert!(game.report_list.has_report(ffb_model::report::report_id::ReportId::BLOCK));
+        assert!(step.re_roll_source.is_none(), "consumed");
     }
 
     #[test]
@@ -632,5 +721,41 @@ mod tests {
         assert!(game.report_list.has_report(ReportId::BLOCK));
         assert!(game.report_list.has_report(ReportId::BLOCK_RE_ROLL));
         assert!(game.report_list.has_report(ReportId::BLOCK_ROLL));
+    }
+
+    /// Java decideNextStep: the coach is asked for each target's die (bb2025: the
+    /// reRollBlockForTargetsProperties dialog), one target per answer, until every roll has one.
+    #[test]
+    fn the_attacker_chooses_each_targets_die() {
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        game.home_playing = true;
+        add_player(&mut game, true, "att", 7); // ST 7 against 3+2: the attacker's choice
+        add_player(&mut game, false, "d1", 3);
+        add_player(&mut game, false, "d2", 3);
+        for (id, x, y) in [("att", 5, 5), ("d1", 6, 5), ("d2", 6, 6)] {
+            game.field_model.set_player_coordinate(id, FieldCoordinate::new(x, y));
+            game.field_model.set_player_state(id, ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING).change_active(true));
+        }
+        game.acting_player.player_id = Some("att".into());
+        let mut step = StepBlockRollMultiple::new();
+        step.set_parameter(&StepParameter::BlockTargets(vec!["d1".into(), "d2".into()]));
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        let first = match out.prompt {
+            Some(ffb_model::prompts::AgentPrompt::BlockRollsForTargets { attacker: true, ref targets, .. }) => targets[0].0.clone(),
+            ref other => panic!("expected the attacker's dice dialog, got {other:?}"),
+        };
+        assert!(matches!(game.dialog_parameter,
+            Some(ffb_model::dialog::dialog_parameter_factory::DialogParameter::ReRollBlockForTargetsProperties(_))));
+        let out = step.handle_command(&Action::BlockChoice { die_index: 0, target_id: Some(first.clone()) }, &mut game, &mut GameRng::new(0));
+        let second = match out.prompt {
+            Some(ffb_model::prompts::AgentPrompt::BlockRollsForTargets { ref targets, .. }) =>
+                targets.iter().find(|(_, open)| *open).map(|(t, _)| t.clone()).expect("one target left"),
+            ref other => panic!("expected the dialog again, got {other:?}"),
+        };
+        assert_ne!(first, second);
+        let out = step.handle_command(&Action::BlockChoice { die_index: 0, target_id: Some(second) }, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep, "both dice chosen: evaluation sequences follow");
+        assert!(!out.pushes.is_empty());
     }
 }

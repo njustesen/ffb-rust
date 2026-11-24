@@ -668,7 +668,10 @@ impl StepApplyKickoffResult {
             ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
                 ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
                     team_id: Some(team_id),
-                    player_choice_mode: Some(mode.to_string()),
+                    player_choice_mode: Some(match mode {
+                        "CHARGE" => ffb_model::model::player_choice_mode::PlayerChoiceMode::CHARGE,
+                        _ => ffb_model::model::player_choice_mode::PlayerChoiceMode::SOLID_DEFENCE,
+                    }.get_name().to_string()),
                     player_ids: self.eligible_players.clone(),
                     descriptions: Vec::new(),
                     max_selects: self.nr_of_players_allowed,

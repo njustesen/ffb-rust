@@ -1052,6 +1052,16 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
             player_ids: p.player_ids,
         }),
 
+        // Java StepApothecaryMultiple CLIENT_USE_APOTHECARIES: no apothecary for any of them.
+        AnyClientCommand::ClientUseApothecaries(_) => Ok(Action::Acknowledge),
+        // Java StepBlockRollMultiple CLIENT_BLOCK_OR_RE_ROLL_CHOICE_FOR_TARGET.
+        AnyClientCommand::ClientBlockOrReRollChoiceForTarget(c) => Ok(Action::BlockOrReRollChoiceForTarget {
+            target_id: c.target_id.ok_or_else(|| missing("targetId"))?,
+            selected_index: c.selected_index,
+            pro_index: c.pro_index,
+            re_roll_source: c.re_roll_source.map(|s| s.name),
+            any_dice_indexes: c.any_dice_indexes,
+        }),
         // Java bb2025 StepTrickster CLIENT_PICK_UP_CHOICE.
         AnyClientCommand::ClientPickUpChoice(p) => Ok(Action::PickUpChoice { pick_up: p.attempt_pick_up }),
         // Java StepInitPunt CLIENT_PUNT_TO_CROWD.

@@ -412,7 +412,7 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
         AgentPrompt::ArgueTheCall { player_ids, .. } =>
             Some(WireDialog::ArgueTheCall { player_id: player_ids.first().cloned().unwrap_or_default() }),
         // Legacy hand-made wire layer (not used by the Java-protocol server path, BACKLOG §P).
-        AgentPrompt::Bribes { .. } | AgentPrompt::KickOffResult { .. } | AgentPrompt::PuntToCrowd { .. } | AgentPrompt::PickUpChoice { .. } => None,
+        AgentPrompt::Bribes { .. } | AgentPrompt::KickOffResult { .. } | AgentPrompt::PuntToCrowd { .. } | AgentPrompt::PickUpChoice { .. } | AgentPrompt::BlockRollsForTargets { .. } | AgentPrompt::UseApothecaries { .. } => None,
         AgentPrompt::BriberyAndCorruption { team_id } =>
             Some(WireDialog::BriberyAndCorruption { team_id: team_id.clone() }),
         AgentPrompt::ConcedeGame { team_id } =>

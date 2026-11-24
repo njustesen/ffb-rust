@@ -510,4 +510,49 @@ mod tests {
         assert_eq!(p.get_id(), DialogId::COIN_CHOICE);
         assert_eq!(p.to_json_value(Rules::Bb2020).unwrap(), json!({"dialogId": "coinChoice"}));
     }
+
+    /// BACKLOG §P: every dialog the engine now shows where Java asks the coach must reach the Java
+    /// client -- serialize, and parse back to the same JSON (the client's decode).
+    #[test]
+    fn the_coach_dialogs_serialize_for_the_client() {
+        use super::*;
+        use crate::enums::{PlayerState, SeriousInjuryKind};
+        use crate::model::block_roll_properties::BlockRollProperties;
+        use crate::model::player_choice_mode::PlayerChoiceMode;
+        let mut bribes = DialogBribesParameter::new_with("t1", 1);
+        bribes.player_ids.push("p1".into());
+        let roll = BlockRollProperties {
+            target_id: Some("p2".into()), nr_of_dice: 2, block_roll: Some(vec![3, 6]), re_roll_dice_indexes: Some(vec![]),
+            selected_index: -1, own_choice: true, old_player_state: Some(PlayerState::new(1)), ..Default::default()
+        };
+        let dialogs = vec![
+            DialogParameter::ArgueTheCall(DialogArgueTheCallParameter { team_id: Some("t1".into()), player_ids: vec!["p1".into()],
+                stay_on_pitch: true, friends_with_the_ref: false, biased_refs: 0 }),
+            DialogParameter::Bribes(bribes),
+            DialogParameter::BriberyAndCorruption(DialogBriberyAndCorruptionParameter { team_id: Some("t1".into()) }),
+            DialogParameter::KickOffResult(DialogKickOffResultParameter { team_id: Some("t1".into()) }),
+            DialogParameter::PuntToCrowd(Default::default()),
+            DialogParameter::PickUpChoice(Default::default()),
+            DialogParameter::ConcedeGame(Default::default()),
+            DialogParameter::PlayerChoice(DialogPlayerChoiceParameter { team_id: Some("t1".into()),
+                player_choice_mode: Some(PlayerChoiceMode::SOLID_DEFENCE.get_name().into()), player_ids: vec!["p1".into()],
+                descriptions: vec![], max_selects: 3, min_selects: 0 }),
+            DialogParameter::ApothecaryChoice(DialogApothecaryChoiceParameter { player_id: Some("p1".into()),
+                player_state_old: Some(PlayerState::new(8)), serious_injury_old: Some(SeriousInjuryKind::HeadInjuryAv),
+                player_state_new: Some(PlayerState::new(7)), serious_injury_new: None }),
+            DialogParameter::UseApothecaries(DialogUseApothecariesParameter { team_id: Some("t1".into()),
+                injury_descriptions: vec![serde_json::json!({"apothecaryTypes":["TEAM"],"playerId":"p1","playerState":8,"seriousInjury":null})] }),
+            DialogParameter::ReRollBlockForTargetsProperties(DialogReRollBlockForTargetsPropertiesParameter {
+                player_id: Some("p1".into()), block_rolls: vec![roll.clone()] }),
+            DialogParameter::OpponentBlockSelectionProperties(
+                crate::dialog::dialog_opponent_block_selection_properties_parameter::DialogOpponentBlockSelectionPropertiesParameter {
+                    team_id: Some("t2".into()), block_rolls: vec![roll] }),
+        ];
+        for d in dialogs {
+            let json = d.to_json_value(Rules::Bb2025).unwrap_or_else(|e| panic!("{:?}: {e}", d.get_id()));
+            let back = DialogParameterFactory::new().for_json_value(Rules::Bb2025, &json)
+                .unwrap_or_else(|e| panic!("{:?}: {e}", d.get_id())).expect("a dialog");
+            assert_eq!(back.to_json_value(Rules::Bb2025).unwrap(), json, "{:?}", d.get_id());
+        }
+    }
 }

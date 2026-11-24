@@ -12028,6 +12028,43 @@ parity, which §I-§M closed.
 - **P5 done-check** `scripts/gui_check.py` (written before P4 closes) + docs + push.
 
 ### RESUME HERE
+**2026-11-24 (5): game log ON and the coach is asked where Java asks (open items 2 + 3 of (4) done).**
+
+Done (5):
+- **Reports** (`49328dbf6`..): every Rust report the parity suites reach decodes in the Java client.
+  Oracle: `ffb-ai ReportWireCheck <out> <BB20xx> <perId> <dirs>` -- Java `ReportList.initFrom` +
+  `toJsonValue` round trip of the Rust `seed_N_rust_reports.jsonl` streams (0 problems BB2016/2020/2025
+  on fresh gate streams); `scripts/report_wire_schema.py` = key/type diff against Java's stream. Writer
+  fixes (rollModifiers only when non-empty, statBasedRollModifier omitted when null -- the client crash,
+  `[x,y]` coordinates, null Booleans omitted, BB2016 apothecary report class). Server: reports on by
+  default (`FFB_SERVER_REPORTS=0` turns them off), away coach gets Java's `ReportList.transform`, null
+  fields dropped, ONE SYNC PER STEP THAT REPORTED (driver report snapshots = Java `syncGameModel` after
+  every step; `BlockChoiceMessage` reads the acting player). Apothecary re-roll of a casualty ported 1:1.
+- **Dialogs** (P2 tail): foul argue/bribes/B&C (StepBribes per edition), end-of-drive secret weapons
+  (StepEndTurn: `within_secret_weapon_handling`, per-team argue re-asked, bribes, B&C natural ones),
+  BB2025 Solid Defence + Charge player choices, overtime kick-off result, punt to crowd, Trickster
+  pick-up, Swift As The Breeze (Rush, Jump), Diving Tackle against a leap (was a RULES gap: Rust let the
+  leap stand), concede (driver `concede_game`, server routes CLIENT_CONCEDE_GAME), Multiple Block die
+  choice (attacker / defender dialogs + CLIENT_BLOCK_OR_RE_ROLL_CHOICE_FOR_TARGET decode), multi-block
+  apothecaries (DialogUseApothecaries, rollApothecary 1:1 + choice dialog). Agents answer as ParityRunner.
+  New dialog JSON: KickOffResult, OpponentBlockSelectionProperties; test
+  `the_coach_dialogs_serialize_for_the_client`.
+- Gates (fresh JVM, cert9 jar), all steps + reports identical: bb2025 human/chaos, amazon@0 x18,
+  dwarf/dark elf/slann/slann_sk (leaps), undead_sk/khemri_sk/nippon_sk (multi-block); bb2020 amazon/skaven,
+  amazon@0 x18, goblin x20, human_sk/necromantic_sk (multi-block); bb2016 dwarf/orc, goblin x20.
+  `gui_check` 10/10 with reports + the new dialogs answered by the real client (Solid Defence, Charge,
+  argue) -- 2 of 12 games showed an intermittent AiMain `MoveDecisionEngine.selectMoveTarget` NPE
+  (acting player null while the client state is MOVE; both passed on re-run; the game still finished).
+
+Still not asked (documented at the sites): multi-block regeneration re-roll dialogs
+(DialogReRollRegenerationMultiple / UseInducement), Getting Even keyword and Raise Dead position
+choices (also data gaps: roster keywords / raise positions not loaded), bb2020's multi-block dialogs
+(no JSON form; the GUI server runs BB2025), re-roll dialogs' `modificationSkill` display field.
+
+Open, in order: (1) human smoke test (user); (2) the AiMain NPE above; (3) the multi-block regeneration /
+Getting Even / Raise Dead dialogs; (4) P2 gate (client-view hash); (5) diff coverage for the fallback
+kinds; commit `sync-check` with the setups work.
+
 **2026-11-23 (4): P4 GATE MET -- AiMain vs AiMain plays whole games on the Rust server, 10/10 on one
 build** (`python -I scripts/gui_check.py --start N --games 3 --timeout 180`, logs
 `D:/ffb_gui_check/p4final`: every Kalimar/BattleLore team with a saved setup, 0 panics, 0 client

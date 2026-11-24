@@ -245,6 +245,13 @@ pub enum AgentPrompt {
         player_id: PlayerId,
         apothecary_type: String,
     },
+    /// Java `DialogUseApothecariesParameter(teamId, injuryDescriptions)` (multi-block casualties):
+    /// answered per player with `Action::UseApothecary` (CLIENT_USE_APOTHECARY) or, to decline
+    /// them all, `Action::Acknowledge` (CLIENT_USE_APOTHECARIES).
+    UseApothecaries {
+        team_id: String,
+        player_ids: Vec<PlayerId>,
+    },
 
     // ── Team setup ─────────────────────────────────────────────────────────────
     TeamSetup {
@@ -408,6 +415,16 @@ pub enum AgentPrompt {
     /// `Action::PickUpChoice`).
     PickUpChoice {
         player_id: PlayerId,
+    },
+    /// Java StepBlockRollMultiple's die choice for a Multiple Block: the attacker's
+    /// DialogReRollBlockForTargets(Properties)Parameter (`attacker`) or the defending coach's
+    /// DialogOpponentBlockSelection(Properties)Parameter. `targets` = (target id, still needs a die).
+    /// Answered per target with `Action::BlockChoice { die_index, target_id }` or, from the
+    /// client, CLIENT_BLOCK_OR_RE_ROLL_CHOICE_FOR_TARGET (`Action::BlockOrReRollChoiceForTarget`).
+    BlockRollsForTargets {
+        team_id: String,
+        attacker: bool,
+        targets: Vec<(PlayerId, bool)>,
     },
     ConcedeGame {
         team_id: String,

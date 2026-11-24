@@ -148,6 +148,16 @@ pub enum Action {
     /// `AgentPrompt::ArgueTheCall` (foul ejection, end-of-drive secret weapons).
     ArgueTheCall { player_ids: Vec<PlayerId> },
 
+    /// Java CLIENT_BLOCK_OR_RE_ROLL_CHOICE_FOR_TARGET (Multiple Block): the die chosen for one
+    /// target (`selected_index`, -1 while re-rolling), the Pro die, the re-roll source by Java
+    /// name ("Team ReRoll", "Pro", ...) and the dice an any-dice re-roll replaces.
+    BlockOrReRollChoiceForTarget {
+        target_id: PlayerId,
+        selected_index: i32,
+        pro_index: i32,
+        re_roll_source: Option<String>,
+        any_dice_indexes: Vec<i32>,
+    },
     /// Java CLIENT_PICK_UP_CHOICE: attempt the pick-up or not.
     PickUpChoice { pick_up: bool },
     /// Java CLIENT_PUNT_TO_CROWD: punt into the crowd (a touchback) or not.

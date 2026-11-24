@@ -331,6 +331,11 @@ impl Agent for UniformAgent {
             }
             Some(AgentPrompt::PuntToCrowd { .. }) => Action::PuntToCrowd { punt_to_crowd: self.pick_bool() },
             Some(AgentPrompt::PickUpChoice { .. }) => Action::PickUpChoice { pick_up: self.pick_bool() },
+            Some(AgentPrompt::UseApothecaries { .. }) => Action::Acknowledge,
+            Some(AgentPrompt::BlockRollsForTargets { targets, .. }) => Action::BlockChoice {
+                die_index: 0,
+                target_id: targets.iter().find(|(_, open)| *open).map(|(t, _)| t.clone()),
+            },
             Some(AgentPrompt::KickOffResult { .. }) => Action::KickOffResultChoice {
                 result: if self.pick_bool() { ffb_model::enums::KickoffResult::Charge } else { ffb_model::enums::KickoffResult::SolidDefence },
             },

@@ -753,7 +753,7 @@ impl StepEndTurn {
             ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
                 ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
                     team_id: Some(team_id),
-                    player_choice_mode: Some("BRIBERY_AND_CORRUPTION".into()),
+                    player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::BRIBERY_AND_CORRUPTION.get_name().to_string()),
                     player_ids: players.clone(),
                     descriptions: Vec::new(),
                     max_selects: 1,

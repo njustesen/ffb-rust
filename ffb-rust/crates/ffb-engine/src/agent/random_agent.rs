@@ -1163,6 +1163,16 @@ impl Agent for RandomAgent {
             // via pick_bool (spurious draw + wrong choice).
             Some(AgentPrompt::ArgueTheCall { player_ids, .. }) =>
                 Action::ArgueTheCall { player_ids: player_ids.first().cloned().into_iter().collect() },
+            // Multi-block casualties' apothecary question: ParityRunner declines (the parity
+            // contract never uses an apothecary) -- CLIENT_USE_APOTHECARIES. 0 rng.
+            Some(AgentPrompt::UseApothecaries { .. }) => Action::Acknowledge,
+            // Multiple Block die choice (attacker or defender dialog): ParityRunner's
+            // RE_ROLL_BLOCK_FOR_TARGETS(_PROPERTIES) / OPPONENT_BLOCK_SELECTION(_PROPERTIES) arms pick
+            // DIE 0 of the first still-unselected target, no Pro, no re-roll. 0 rng.
+            Some(AgentPrompt::BlockRollsForTargets { targets, .. }) => Action::BlockChoice {
+                die_index: 0,
+                target_id: targets.iter().find(|(_, open)| *open).map(|(t, _)| t.clone()),
+            },
             // Pick-up choice (bb2025 Trickster): ParityRunner's PICK_UP_CHOICE arm declines, 0 rng.
             Some(AgentPrompt::PickUpChoice { .. }) => Action::PickUpChoice { pick_up: false },
             // Punt to crowd: ParityRunner's PUNT_TO_CROWD case always declines, 0 rng.

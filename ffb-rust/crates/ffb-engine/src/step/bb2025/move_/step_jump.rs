@@ -494,7 +494,7 @@ impl StepJump {
             ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
                 ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
                     team_id: Some(team_id),
-                    player_choice_mode: Some("DIVING_TACKLE".into()),
+                    player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::DIVING_TACKLE.get_name().to_string()),
                     player_ids: tacklers.clone(),
                     descriptions: Vec::new(),
                     max_selects: 1,
