@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setup policy: held-out examples</title>
+<style>
+  :root { --bg:#14171c; --panel:#1d2229; --line:#2e3640; --text:#e6e9ee; --dim:#98a2b0; --home:#ff6b6b; --away:#5aa2ff; --hot:#ffd23f; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui, Segoe UI, sans-serif; }
+  header { padding:14px 20px 4px; }
+  h1 { font-size:18px; margin:0 0 2px; font-weight:600; }
+  h2 { font-size:14px; margin:0 0 6px; font-weight:600; }
+  .sub { color:var(--dim); font-size:13px; }
+  .home { color:var(--home); } .away { color:var(--away); }
+  .controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:8px 20px; }
+  button, select { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:6px 12px; font:inherit; cursor:pointer; }
+  button:hover, select:hover { border-color:var(--dim); }
+  label { color:var(--dim); font-size:13px; display:flex; gap:6px; align-items:center; cursor:pointer; }
+  main { display:flex; flex-wrap:wrap; gap:18px; padding:6px 20px 28px; align-items:flex-start; }
+  .view { flex:0 1 auto; max-width:100%; }
+  .scroll { overflow-x:auto; max-width:100%; }
+  canvas { display:block; border-radius:6px; cursor:pointer; }
+  .benches { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+  .bench { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px 8px; min-height:52px; }
+  .bench .t { font-size:11.5px; color:var(--dim); margin-bottom:4px; }
+  .chips { display:flex; flex-wrap:wrap; gap:4px; }
+  .chip { width:32px; height:32px; border-radius:4px; border:1px solid var(--line); background-color:#2c5e2e; background-repeat:no-repeat; cursor:pointer; position:relative; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; color:#000; }
+  .chip.out { opacity:.4; filter:grayscale(1); }
+  .chip.hl { outline:2px solid var(--hot); }
+  #tip { position:fixed; z-index:10; display:none; max-width:320px; background:#0d1014; border:1px solid var(--hot); border-radius:6px; padding:8px 10px; font-size:13px; pointer-events:none; box-shadow:0 6px 20px rgba(0,0,0,.5); }
+  #tip .n { font-weight:600; }
+  #tip .s { font-variant-numeric:tabular-nums; letter-spacing:.2px; margin:3px 0; }
+  #tip .k { color:var(--dim); }
+  #tip.pin { pointer-events:auto; }
+  .score { font-size:13px; margin:2px 0 6px; }
+  .score b { color:var(--hot); font-weight:600; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title"></h1>
+  <div class="sub" id="meta"></div>
+</header>
+<div class="controls">
+  <button id="prev">&#9664; Prev</button>
+  <select id="pick" aria-label="Kick-off"></select>
+  <button id="next">Next &#9654;</button>
+  <label id="zbox" style="display:none; color:var(--text); border:1px solid var(--hot); border-radius:6px; padding:4px 10px">z
+    <input type="range" id="zs" min="0" step="1" style="width:220px; accent-color:var(--hot)">
+    <b id="zval" style="min-width:150px; font-variant-numeric:tabular-nums"></b></label>
+  <label><input type="checkbox" id="ghost"> outline the squares the other formation uses</label>
+  <span class="sub">Hover a player for its stats and skills; click to pin. The same player is ringed on both pitches.</span>
+</div>
+<main>
+  <div class="view">
+    <h2 id="tM">Model</h2>
+    <div class="score" id="sM"></div>
+    <div class="scroll"><canvas id="cM"></canvas></div>
+    <div class="benches" id="bM"></div>
+  </div>
+  <div class="view">
+    <h2 id="tH">Human coaches <span class="sub">(what was actually played)</span></h2>
+    <div class="score" id="sH"></div>
+    <div class="scroll"><canvas id="cH"></canvas></div>
+    <div class="benches" id="bH"></div>
+  </div>
+</main>
+<div id="tip"></div>
+<script>
+const D = /*PAYLOAD*/null;
+const SQ = 30, OFF = 1;
+const pitch = new Image(); pitch.src = D.pitch; pitch.onload = () => draw();
+const icons = {};
+for (const [k, v] of Object.entries(D.icons)) { const im = new Image(); im.src = v.d; im.onload = () => draw(); icons[k] = {im, s: v.s, d: v.d}; }
+const views = [{key: 'm', other: 'h', cv: document.getElementById('cM'), bench: document.getElementById('bM')},
+               {key: 'h', other: 'm', cv: document.getElementById('cH'), bench: document.getElementById('bH')}];
+for (const v of views) { v.cv.width = D.pw; v.cv.height = D.ph; v.ctx = v.cv.getContext('2d'); }
+const tip = document.getElementById('tip'), pick = document.getElementById('pick'), ghost = document.getElementById('ghost');
+let ei = 0, hover = null, pinned = null;
+
+D.examples.forEach((e, i) => pick.add(new Option(`${i + 1}. ${e.teams.home.race} v ${e.teams.away.race} · replay ${e.replay}, kick-off ${e.drive + 1}`, i)));
+pick.onchange = () => show(+pick.value);
+document.getElementById('prev').onclick = () => show((ei + D.examples.length - 1) % D.examples.length);
+document.getElementById('next').onclick = () => show((ei + 1) % D.examples.length);
+ghost.onchange = () => draw();
+document.addEventListener('keydown', e => { if (e.key === 'ArrowRight') document.getElementById('next').click(); if (e.key === 'ArrowLeft') document.getElementById('prev').click(); });
+
+// z slider: every formation is precomputed per z value; moving the slider swaps them in.
+const zs = document.getElementById('zs');
+let zi = 0;
+function zLabel() { return `${D.zgrid[zi].toFixed(2)}${D.znames[zi] ? ' · ' + D.znames[zi] : ''}`; }
+function applyZ() {
+  for (const e of D.examples) { e.agree = e.agreez[zi]; for (const p of e.players) { p.m = p.mz[zi]; p.conf = p.confz[zi]; } }
+  document.getElementById('zval').textContent = zLabel();
+  for (const v of views) v.benchDrawn = -1;
+}
+if (D.zgrid) {
+  document.getElementById('zbox').style.display = '';
+  zs.max = D.zgrid.length - 1; zi = D.zgrid.length >> 1; zs.value = zi;
+  zs.oninput = () => { zi = +zs.value; applyZ(); show(ei); };
+  zs.addEventListener('keydown', e => e.stopPropagation());
+  applyZ();
+}
+
+function ex() { return D.examples[ei]; }
+function statLine(p, ed) {
+  if (ed === 'bb2016') return `MA ${p.ma} · ST ${p.st} · AG ${p.ag} · AV ${p.av}`;
+  return `MA ${p.ma} · ST ${p.st} · AG ${p.ag}+ · PA ${p.pa > 0 ? p.pa + '+' : '-'} · AV ${p.av}+`;
+}
+function esc(s) { return String(s).replace(/[&<>]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[c])); }
+function where(p, key) { return p[key] ? `(${p[key][0]}, ${p[key][1]})` : 'on the bench'; }
+
+function tipHtml(p) {
+  const e = ex(), role = p.side === e.kicker ? 'kicking' : 'receiving';
+  const hurt = [].concat(p.nig ? [`${p.nig} niggling`] : [], p.inj);
+  return `<div class="n ${p.side}">#${p.nr} ${esc(p.name || p.pos)}</div>` +
+    `<div class="k">${esc(p.pos)} · ${esc(e.teams[p.side].race)} (${role}) · ${(p.cost / 1000) | 0}k</div>` +
+    `<div class="s">${statLine(p, e.edition)}</div>` +
+    `<div>${p.skills.length ? esc(p.skills.join(', ')) : '<span class="k">no skills</span>'}</div>` +
+    (hurt.length ? `<div class="k">injuries: ${esc(hurt.join(', '))}</div>` : '') +
+    (p.state !== 'RESERVE' ? `<div class="k">not available: ${p.state}</div>` :
+      `<div class="k" style="margin-top:4px">${D.zmode ? 'z = 1' : 'model'}: ${where(p, 'm')}${p.conf != null ? ` at ${(p.conf * 100).toFixed(0)}%` : ''} · ${D.zmode ? 'z = 0' : 'human'}: ${where(p, 'h')}</div>`);
+}
+function showTip(p, x, y) {
+  tip.innerHTML = tipHtml(p); tip.style.display = 'block';
+  const r = tip.getBoundingClientRect();
+  tip.style.left = Math.max(4, Math.min(x + 14, innerWidth - r.width - 6)) + 'px';
+  tip.style.top = Math.max(4, Math.min(y + 14, innerHeight - r.height - 6)) + 'px';
+}
+function setHover(p, x, y) {
+  if (pinned) return;
+  hover = p ? p.id : null;
+  if (p) showTip(p, x, y); else tip.style.display = 'none';
+  draw(true);
+}
+function pin(p, x, y) {
+  pinned = null;
+  if (p) { hover = p.id; showTip(p, x, y); pinned = p.id; } else { hover = null; tip.style.display = 'none'; }
+  tip.classList.toggle('pin', !!pinned);
+  draw(true);
+}
+function at(v, ev) {
+  const r = v.cv.getBoundingClientRect();
+  const x = Math.floor(((ev.clientX - r.left) * v.cv.width / r.width - OFF) / SQ), y = Math.floor(((ev.clientY - r.top) * v.cv.height / r.height - OFF) / SQ);
+  return ex().players.find(p => p[v.key] && p[v.key][0] === x && p[v.key][1] === y) || null;
+}
+for (const v of views) {
+  v.cv.addEventListener('mousemove', ev => setHover(at(v, ev), ev.clientX, ev.clientY));
+  v.cv.addEventListener('mouseleave', () => setHover(null));
+  v.cv.addEventListener('click', ev => { ev.stopPropagation(); pin(at(v, ev), ev.clientX, ev.clientY); });
+}
+document.addEventListener('click', () => pin(null));
+
+function drawPlayer(ctx, p, x, y) {
+  const cx = OFF + x * SQ, cy = OFF + y * SQ, ic = icons[p.icon];
+  if (ic && ic.im.complete && ic.im.naturalWidth) {
+    const col = p.side === 'home' ? 0 : 2, s = ic.s, d = Math.min(SQ, s);
+    ctx.drawImage(ic.im, col * s, 0, s, s, cx + (SQ - d) / 2, cy + (SQ - d) / 2, d, d);
+  } else {
+    ctx.fillStyle = p.side === 'home' ? '#ff6b6b' : '#5aa2ff';
+    ctx.beginPath(); ctx.arc(cx + SQ / 2, cy + SQ / 2, 11, 0, 7); ctx.fill();
+    ctx.fillStyle = '#000'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(p.nr, cx + SQ / 2, cy + SQ / 2 + 1);
+  }
+  if (p.id === hover) { ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 2.5; ctx.strokeRect(cx + 1.5, cy + 1.5, SQ - 3, SQ - 3); }
+}
+
+function chip(p) {
+  const ic = icons[p.icon], col = p.side === 'home' ? 0 : 2;
+  const bg = ic ? `background-image:url(${ic.d});background-position:${-col * ic.s + (30 - ic.s) / 2}px ${(30 - ic.s) / 2}px;` : `background-color:${p.side === 'home' ? '#ff6b6b' : '#5aa2ff'};`;
+  return `<div class="chip ${p.state !== 'RESERVE' ? 'out' : ''} ${p.id === hover ? 'hl' : ''}" data-id="${p.id}" style="${bg}">${ic ? '' : p.nr}</div>`;
+}
+
+function draw(light) {
+  const e = ex();
+  for (const v of views) {
+    const ctx = v.ctx;
+    ctx.clearRect(0, 0, v.cv.width, v.cv.height);
+    if (pitch.complete && pitch.naturalWidth) ctx.drawImage(pitch, 0, 0); else { ctx.fillStyle = '#2c5e2e'; ctx.fillRect(0, 0, v.cv.width, v.cv.height); }
+    if (ghost.checked) {
+      ctx.setLineDash([4, 3]); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.75)';
+      for (const p of e.players) if (p[v.other]) ctx.strokeRect(OFF + p[v.other][0] * SQ + 2.5, OFF + p[v.other][1] * SQ + 2.5, SQ - 5, SQ - 5);
+      ctx.setLineDash([]);
+    }
+    for (const p of e.players) if (p[v.key]) drawPlayer(ctx, p, p[v.key][0], p[v.key][1]);
+    if (light && v.benchDrawn === ei) { v.bench.querySelectorAll('.chip').forEach(c => c.classList.toggle('hl', c.dataset.id === hover)); continue; }
+    v.benchDrawn = ei;
+    v.bench.innerHTML = ['home', 'away'].map(side => {
+      const rest = e.players.filter(p => p.side === side && !p[v.key]);
+      const ok = rest.filter(p => p.state === 'RESERVE'), out = rest.filter(p => p.state !== 'RESERVE');
+      return `<div class="bench"><div class="t"><span class="${side}">${esc(e.teams[side].race)}</span> · left on the bench ${ok.length}` +
+        `${out.length ? ` · unavailable ${out.length}` : ''}</div><div class="chips">${ok.concat(out).map(chip).join('')}</div></div>`;
+    }).join('');
+    v.bench.querySelectorAll('.chip').forEach(c => {
+      const p = e.players.find(q => q.id === c.dataset.id);
+      c.addEventListener('mousemove', ev => setHover(p, ev.clientX, ev.clientY));
+      c.addEventListener('mouseleave', () => setHover(null));
+      c.addEventListener('click', ev => { ev.stopPropagation(); pin(p, ev.clientX, ev.clientY); });
+    });
+  }
+}
+
+function agreeText(a, who) {
+  if (!a || !a.n) return '';
+  return `${who}: <b>${a.same}/${a.n}</b> same kind of player on the same square, <b>${a.squares}/${a.n}</b> same squares, players ${a.disp.toFixed(1)} squares off on average`;
+}
+function show(i) {
+  ei = i; pick.value = i; pinned = null; hover = null; tip.style.display = 'none';
+  const e = ex(), recv = e.kicker === 'home' ? 'away' : 'home';
+  const seen = s => e.unseen ? ` <span class="sub">(${e.unseen[s] ? 'coach never seen in training' : 'coach has other games in training'})</span>` : '';
+  const t = s => `<span class="${s}">${esc(e.teams[s].race)}${e.teams[s].name ? ' “' + esc(e.teams[s].name) + '”' : ''}</span>${seen(s)}`;
+  document.getElementById('title').innerHTML = `${t('home')} vs ${t('away')}`;
+  document.getElementById('meta').innerHTML =
+    `${D.split} split · ${e.edition} · half ${e.half} · score ${e.teams.home.score}–${e.teams.away.score} · ${esc(e.weather)} · ` +
+    `<span class="${e.kicker}">${esc(e.teams[e.kicker].race)}</span> kicks (defense head), <span class="${recv}">${esc(e.teams[recv].race)}</span> receives (offense head) · ` +
+    `TV ${(e.teams.home.team_value / 1000) | 0}k / ${(e.teams.away.team_value / 1000) | 0}k · model ${D.ckpt}`;
+  document.getElementById('sM').innerHTML = [agreeText(e.agree.kick, D.zmode ? 'Kicking side, z = 1 vs z = 0' : 'Kicking side vs human'), agreeText(e.agree.recv, D.zmode ? 'Receiving side, z = 1 vs z = 0' : 'Receiving side vs human')].filter(Boolean).join('<br>');
+  if (D.zgrid) document.getElementById('tM').innerHTML = `Model at z = ${zLabel()}`;
+  if (D.zmode) {
+    const zl = D.zlabels || ['set up like a team that goes on to win', 'set up like a team that goes on to lose'];
+    document.getElementById('tM').innerHTML = `z = 1 <span class="sub">(${zl[0]})</span>`;
+    document.getElementById('tH').innerHTML = `z = 0 <span class="sub">(${zl[1]})</span>`;
+  }
+  document.getElementById('sH').innerHTML = D.zmode ? '<span class="sub">Same teams, same situation; only z differs, for both sides.<br>&nbsp;</span>' : '<span class="sub">The receiving side here answered the human kicking formation; on the model pitch it answers the model\'s.<br>&nbsp;</span>';
+  draw();
+}
+show(0);
+</script>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setup policy viewer</title>
+<style>
+  :root { --bg:#14171c; --panel:#1d2229; --line:#2e3640; --text:#e6e9ee; --dim:#98a2b0; --home:#5aa2ff; --away:#ff6b6b; --hot:#ffd23f; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui, Segoe UI, sans-serif; }
+  header { padding:14px 20px 6px; }
+  h1 { font-size:18px; margin:0 0 2px; font-weight:600; }
+  .sub { color:var(--dim); font-size:13px; }
+  .home { color:var(--home); } .away { color:var(--away); }
+  main { display:flex; flex-wrap:wrap; gap:16px; padding:10px 20px 24px; align-items:flex-start; }
+  .stage { flex:0 1 auto; max-width:100%; overflow-x:auto; }
+  canvas { display:block; border-radius:6px; }
+  .controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:10px 0 4px; }
+  button, select { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:6px 12px; font:inherit; cursor:pointer; }
+  button:hover, select:hover { border-color:var(--dim); }
+  input[type=range] { flex:1 1 220px; accent-color:var(--hot); }
+  .now { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:10px 12px; margin-top:8px; min-height:64px; }
+  .now b { font-weight:600; }
+  aside { flex:1 1 300px; min-width:280px; display:grid; gap:12px; }
+  .bench { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:8px 10px; }
+  .bench h2 { font-size:13px; margin:0 0 6px; font-weight:600; }
+  .row { display:grid; grid-template-columns:26px 1fr auto; gap:6px; padding:2px 4px; border-radius:4px; font-size:12.5px; align-items:baseline; }
+  .row .st { color:var(--dim); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .row .sk { grid-column:2 / 4; color:var(--dim); font-size:11.5px; }
+  .row.cur { background:#3a3410; outline:1px solid var(--hot); }
+  .row.placed { opacity:.55; } .row.skipped { opacity:.35; text-decoration:line-through; }
+  .tag { color:var(--dim); font-size:11px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Setup policy: <span class="home" id="th"></span> vs <span class="away" id="ta"></span></h1>
+  <div class="sub" id="meta"></div>
+</header>
+<main>
+  <div class="stage">
+    <canvas id="cv"></canvas>
+    <div class="controls">
+      <select id="variant" aria-label="Formation"></select>
+      <button id="prev">&#9664; Prev</button>
+      <button id="play">Play</button>
+      <button id="next">Next &#9654;</button>
+      <input id="scrub" type="range" min="0" value="0" aria-label="Step">
+      <span id="count" class="sub"></span>
+    </div>
+    <div class="now" id="now"></div>
+  </div>
+  <aside>
+    <div class="bench" id="benchK"></div>
+    <div class="bench" id="benchR"></div>
+  </aside>
+</main>
+<script>
+const D = /*PAYLOAD*/null;
+const SQ = 30, OFF = 1;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+cv.width = D.pw; cv.height = D.ph;
+const pitch = new Image(); pitch.src = D.pitch;
+const icons = {};
+for (const [k, v] of Object.entries(D.icons)) { const im = new Image(); im.src = v.d; im.onload = draw; icons[k] = {im, s: v.s}; }
+pitch.onload = draw;
+const P = Object.fromEntries(D.players.map(p => [p.id, p]));
+const receiver = D.kicker === 'home' ? 'away' : 'home';
+let vi = 0, step = 0, timer = null;
+
+document.getElementById('th').textContent = D.teams.home;
+document.getElementById('ta').textContent = D.teams.away;
+document.getElementById('meta').textContent =
+  `${D.edition} · ${D.teams[D.kicker]} kicks (defense head, sets up first) · ${D.teams[receiver]} receives (offense head) · model ${D.ckpt}`;
+const sel = document.getElementById('variant');
+D.variants.forEach((v, i) => sel.add(new Option(v.name, i)));
+const scrub = document.getElementById('scrub');
+
+function steps() { return D.variants[vi].steps; }
+// step = number of decisions already applied (0..n); the heat-map shown is that of decision `step`.
+function setStep(s) { step = Math.max(0, Math.min(steps().length, s)); scrub.value = step; draw(); }
+sel.onchange = () => { vi = +sel.value; scrub.max = steps().length; setStep(0); };
+scrub.oninput = () => setStep(+scrub.value);
+document.getElementById('prev').onclick = () => setStep(step - 1);
+document.getElementById('next').onclick = () => setStep(step + 1);
+document.getElementById('play').onclick = function () {
+  if (timer) { clearInterval(timer); timer = null; this.textContent = 'Play'; return; }
+  if (step >= steps().length) setStep(0);
+  this.textContent = 'Pause';
+  timer = setInterval(() => { if (step >= steps().length) { clearInterval(timer); timer = null; this.textContent = 'Play'; } else setStep(step + 1); }, 700);
+};
+document.addEventListener('keydown', e => { if (e.key === 'ArrowRight') setStep(step + 1); if (e.key === 'ArrowLeft') setStep(step - 1); });
+scrub.max = steps().length;
+
+function statLine(p) {
+  const pa = p.pa > 0 ? p.pa + '+' : '-';
+  return D.edition === 'bb2016' ? `MA${p.ma} ST${p.st} AG${p.ag} AV${p.av}` : `MA${p.ma} ST${p.st} AG${p.ag}+ PA${pa} AV${p.av}+`;
+}
+function posName(p) { return p.position_id.split('.').pop().replace(/_/g, ' '); }
+
+function drawPlayer(p, x, y, hot) {
+  const cx = OFF + x * SQ, cy = OFF + y * SQ, ic = icons[p.position_id];
+  if (ic && ic.im.complete && ic.im.naturalWidth) {
+    const col = p.side === 'home' ? 0 : 2, s = ic.s, d = Math.min(SQ, s);
+    ctx.drawImage(ic.im, col * s, 0, s, s, cx + (SQ - d) / 2, cy + (SQ - d) / 2, d, d);
+  } else {
+    ctx.fillStyle = p.side === 'home' ? '#5aa2ff' : '#ff6b6b';
+    ctx.beginPath(); ctx.arc(cx + SQ / 2, cy + SQ / 2, 11, 0, 7); ctx.fill();
+    ctx.fillStyle = '#000'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(p.nr, cx + SQ / 2, cy + SQ / 2 + 1);
+  }
+  if (hot) { ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 2.5; ctx.strokeRect(cx + 1.5, cy + 1.5, SQ - 3, SQ - 3); }
+}
+
+function draw() {
+  const S = steps();
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (pitch.complete && pitch.naturalWidth) ctx.drawImage(pitch, 0, 0); else { ctx.fillStyle = '#2c5e2e'; ctx.fillRect(0, 0, cv.width, cv.height); }
+  const cur = S[step];
+  if (cur) {
+    const max = Math.max(...cur.heat.map(h => h[2]), 1e-6);
+    for (const [x, y, p] of cur.heat) {
+      ctx.fillStyle = `rgba(255,210,63,${0.12 + 0.68 * Math.sqrt(p / max)})`;
+      ctx.fillRect(OFF + x * SQ, OFF + y * SQ, SQ, SQ);
+      if (p >= 0.05) {
+        ctx.fillStyle = '#111'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(Math.round(p * 100), OFF + x * SQ + SQ / 2, OFF + y * SQ + SQ / 2);
+      }
+    }
+  }
+  const status = {};
+  S.slice(0, step).forEach((s, i) => {
+    status[s.id] = s.to ? 'placed' : 'skipped';
+    if (s.to) drawPlayer(P[s.id], s.to[0], s.to[1], i === step - 1);
+  });
+  document.getElementById('count').textContent = `${step} / ${S.length}`;
+  const now = document.getElementById('now');
+  if (cur) {
+    const p = P[cur.id], head = cur.side === D.kicker ? 'defense' : 'offense';
+    now.innerHTML = `<b class="${cur.side}">${D.teams[cur.side]}</b> · ${head} head · next off the bench: <b>#${p.nr} ${posName(p)}</b>` +
+      `<br><span class="sub">${statLine(p)} · ${(p.cost / 1000) | 0}k · ${p.skills.join(', ') || 'no skills'}</span>` +
+      `<br>Policy: ${cur.to ? `places at (${cur.to[0]}, ${cur.to[1]}) with ${(cur.p * 100).toFixed(1)}%` : 'leaves the player on the bench'}` +
+      ` · skip probability ${(cur.skip * 100).toFixed(1)}% <span class="tag">(numbers on the pitch are % per square)</span>`;
+  } else {
+    now.innerHTML = '<b>Both formations complete.</b><br><span class="sub">Use the scrubber or the arrow keys to step back through the placements.</span>';
+  }
+  for (const [el, side, head] of [['benchK', D.kicker, 'kicking · defense'], ['benchR', receiver, 'receiving · offense']]) {
+    const order = S.filter(s => s.side === side).map(s => s.id);
+    const rest = D.players.filter(p => p.side === side && !order.includes(p.id)).map(p => p.id);
+    document.getElementById(el).innerHTML = `<h2 class="${side}">${D.teams[side]} <span class="tag">${head} · bench order</span></h2>` +
+      order.concat(rest).map(id => {
+        const p = P[id], c = cur && cur.id === id ? 'cur' : (status[id] || (order.includes(id) ? '' : 'placed'));
+        return `<div class="row ${c}"><span>#${p.nr}</span><span>${posName(p)}</span><span class="st">${statLine(p)}</span>` +
+          (p.skills.length ? `<span class="sk">${p.skills.join(', ')}</span>` : '') + '</div>';
+      }).join('');
+  }
+}
+draw();
+</script>
+</body>
+</html>

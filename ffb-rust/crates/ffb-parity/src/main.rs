@@ -9,6 +9,7 @@ mod state_hash;
 mod coverage_report;
 mod t3_checklist;
 mod visual;
+mod setup_record;
 
 #[allow(dead_code)] mod debug_rng;
 
@@ -235,6 +236,14 @@ fn main() {
     env_logger::init();
 
     let args = ParityArgs::parse();
+
+    // ml/setup_bc viewer input: the two drafted teams before their first setup, as one
+    // setup record (the schema of `ffb-replay setups`) on stdout. Rust only, no JVM.
+    if std::env::args().any(|a| a == "--setup-scenario") {
+        let game = runner::setup_scenario_game(&args.home, &args.away, &args.edition);
+        println!("{}", setup_record::snapshot(&game, &format!("{}-vs-{}", args.home, args.away), 0, 0, "scenario", true));
+        return;
+    }
 
     // BACKLOG §M phase 3: both agents must score skill offers from the SAME policy table. Export
     // its absolute path once; this process (SkillPolicy::get) and the Java child (SkillPolicy.java)

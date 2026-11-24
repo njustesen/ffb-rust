@@ -21,6 +21,8 @@
 //!   actions <out_dir> <java_dir> <dir|file>...
 //!                                      the same replay with the action records (actions.rs), written
 //!                                      in the Java formats and diffed with the Java run (actions_gate.rs)
+//!   setups <out.jsonl> <dir|file>...   the human kick-off formations of every replay, one JSON
+//!                                      record per finished setup (see setups.rs; ml/setup_bc)
 //!   double-check <java_dir>            every number text in the "scores" arrays of the Java
 //!                                      <id>.actions.jsonl files == java_double::json_double(parse(text))
 
@@ -36,9 +38,13 @@ mod java_double;
 mod java_names;
 mod mde;
 mod replay_report;
+#[path = "../setup_record.rs"]
+mod setup_record;
+mod setups;
 mod start_check;
 mod start_of_game;
 mod states;
+mod sync_check;
 mod zap_player;
 
 use serde_json::Value;
@@ -53,6 +59,8 @@ fn usage() -> ! {
     eprintln!("       ffb-replay states <out_dir> <java_dir> <dir|file>...");
     eprintln!("       ffb-replay actions <out_dir> <java_dir> <dir|file>...");
     eprintln!("       ffb-replay double-check <java_dir>");
+    eprintln!("       ffb-replay setups <out.jsonl> <dir|file>...");
+    eprintln!("       ffb-replay sync-check <dir|file>...");
     std::process::exit(2);
 }
 
@@ -78,6 +86,10 @@ fn main() {
             &args[3..].iter().map(PathBuf::from).collect::<Vec<_>>(),
         ),
         "double-check" if args.len() == 2 => double_check(Path::new(&args[1])),
+        "setups" if args.len() >= 3 => {
+            setups::setups(Path::new(&args[1]), &args[2..].iter().map(PathBuf::from).collect::<Vec<_>>())
+        }
+        "sync-check" if args.len() >= 2 => sync_check::sync_check(&args[1..].iter().map(PathBuf::from).collect::<Vec<_>>()),
         "dialog-check" if args.len() >= 2 => dialog_check::dialog_check(Path::new(&args[1]), &args[2..]),
         _ => usage(),
     };

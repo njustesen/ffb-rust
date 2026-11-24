@@ -1489,6 +1489,22 @@ fn snap(engine: &GameState, step: usize, label: String,
     }
 }
 
+/// The game of two drafted teams before anything is played (ml/setup_bc viewer input): the
+/// teams exactly as every headless run builds them, each side's turn data carrying its team's
+/// re-rolls and apothecaries so the record reads like a first kick-off.
+pub fn setup_scenario_game(home_roster: &str, away_roster: &str, edition: &str) -> ffb_model::model::game::Game {
+    let rules = edition_to_rules(edition);
+    let home = make_team(home_roster, "home", edition);
+    let away = make_team(away_roster, "away", edition);
+    let mut game = GameState::new_full_pregame(home, away, rules, 1, BASELINE_SETUP_OPTIONS).game;
+    game.half = 1;
+    game.turn_data_home.rerolls = game.team_home.rerolls;
+    game.turn_data_home.apothecaries = game.team_home.apothecaries;
+    game.turn_data_away.rerolls = game.team_away.rerolls;
+    game.turn_data_away.apothecaries = game.team_away.apothecaries;
+    game
+}
+
 /// Run a complete game using RandomAgent for both sides, collecting snapshots after
 /// every engine action for HTML replay generation.
 pub fn run_visual_game(

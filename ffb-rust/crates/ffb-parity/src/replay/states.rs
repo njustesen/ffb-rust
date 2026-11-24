@@ -67,7 +67,25 @@ pub fn replay_with(path: &Path, keep_texts: bool, mut recorder: Option<&mut Reco
         end_check: "not reached".into(),
         end_score: (0, 0),
     };
-    if let Err(e) = replay_into(path, keep_texts, &mut out, &mut recorder) {
+    if let Err(e) = replay_into(path, keep_texts, &mut out, &mut recorder, &mut None) {
+        out.error = Some(e);
+    }
+    out
+}
+
+/// Replays one `.ffbr`, calling `observer(command index, game)` after every applied model sync.
+/// No state hashes are computed (`lines` stays empty) -- this is the dataset path (`setups.rs`),
+/// not a parity gate.
+pub fn replay_observe(path: &Path, observer: &mut dyn FnMut(usize, &Game)) -> ReplayStates {
+    let mut out = ReplayStates {
+        lines: Vec::new(),
+        texts: Vec::new(),
+        unknown: BTreeMap::new(),
+        error: None,
+        end_check: "not reached".into(),
+        end_score: (0, 0),
+    };
+    if let Err(e) = replay_into(path, false, &mut out, &mut None, &mut Some(observer)) {
         out.error = Some(e);
     }
     out
@@ -105,6 +123,7 @@ fn replay_into(
     keep_texts: bool,
     out: &mut ReplayStates,
     recorder: &mut Option<&mut Recorder>,
+    observer: &mut Option<&mut dyn FnMut(usize, &Game)>,
 ) -> Result<(), String> {
     let mut root = ffbr::read_ffbr(path)?;
     let commands = root.get_mut("commandArray").and_then(Value::as_array_mut).ok_or("no commandArray")?;
@@ -194,10 +213,14 @@ fn replay_into(
             reset_inducements(&mut game.turn_data_away.inducement_set);
             reset_inducements(&mut game.turn_data_home.inducement_set);
         }
-        let text = canonical::canonical_game_json(&game.to_json_value().map_err(|e| format!("command {i}: toJsonValue {e}"))?)?;
-        out.lines.push(format!("{i} {}", canonical::sha256_hex(text.as_bytes())));
-        if keep_texts {
-            out.texts.push(text);
+        if let Some(obs) = observer.as_deref_mut() {
+            obs(i, &game);
+        } else {
+            let text = canonical::canonical_game_json(&game.to_json_value().map_err(|e| format!("command {i}: toJsonValue {e}"))?)?;
+            out.lines.push(format!("{i} {}", canonical::sha256_hex(text.as_bytes())));
+            if keep_texts {
+                out.texts.push(text);
+            }
         }
         if let Some(rec) = recorder.as_deref_mut() {
             rec.post_sync(&game);
