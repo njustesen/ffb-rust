@@ -1,0 +1,2 @@
+{"java": {"tool": "D:/ffb_replay_parity/bin/ffb-ai-replay-o3.jar", "out": "D:/ffb_replay_parity/run6_java"},
+ "rust": {"tool": "D:/ffb_replay_parity/bin/ffb-replay-o3b.exe", "out": "D:/ffb_replay_parity/rust6"}}

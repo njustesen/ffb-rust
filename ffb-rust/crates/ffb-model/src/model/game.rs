@@ -211,11 +211,17 @@ impl Game {
             weather: Weather::Nice,
             team_home: home,
             team_away: away,
-            turn_data_home: TurnData::new(),
+            // Java `new TurnData(this, true)`: the home turn data knows it is the home side
+            // (serialized as `homeData`, what a client's model-change keys rely on).
+            turn_data_home: TurnData { home_data: true, ..TurnData::new() },
             turn_data_away: TurnData::new(),
             field_model: FieldModel::new(),
             acting_player: ActingPlayer::new(),
-            game_result: GameResult::default(),
+            // Java `new GameResult(this)` -> `new TeamResult(..)`: `penaltyScore = -1` (no shootout).
+            game_result: GameResult {
+                home: crate::model::game_result::TeamResult { penalty_score: -1, ..Default::default() },
+                away: crate::model::game_result::TeamResult { penalty_score: -1, ..Default::default() },
+            },
             options: GameOptions::new(),
             defender_id: None,
             defender_action: None,

@@ -190,8 +190,8 @@ mod tests {
         game.game_result.away.score = 1;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(matches!(out.action, StepAction::NextStep));
-        assert_eq!(game.game_result.home.penalty_score, 0);
-        assert_eq!(game.game_result.away.penalty_score, 0);
+        assert_eq!(game.game_result.home.penalty_score, -1, "Java's initial penaltyScore, untouched");
+        assert_eq!(game.game_result.away.penalty_score, -1, "Java's initial penaltyScore, untouched");
     }
 
     #[test]
@@ -203,8 +203,8 @@ mod tests {
         game.game_result.away.score = 1;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(matches!(out.action, StepAction::NextStep));
-        assert_eq!(game.game_result.home.penalty_score, 0);
-        assert_eq!(game.game_result.away.penalty_score, 0);
+        assert_eq!(game.game_result.home.penalty_score, -1, "Java's initial penaltyScore, untouched");
+        assert_eq!(game.game_result.away.penalty_score, -1, "Java's initial penaltyScore, untouched");
     }
 
     #[test]

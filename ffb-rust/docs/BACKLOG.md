@@ -11758,6 +11758,13 @@ equal (1) on all 2,224 replays, and Rust startOfGame must equal (2).
   the tree of commit `0d6966c27`), re-verified 10/10 on fumbbl/ as the frozen copy.
 
 ### RESUME HERE
+**2026-11-24 06:30: §O DONE-CHECK PASSED.** The night chain finished: run6 (o3 jar) `Done. 2224 replays, 0
+incomplete`, record-building errors `{}`; `o3_sort_check` `OK 0`; `double-check` 0 different over 2224
+files; rust6 `actions (all records): 2224 identical, 0 different, 0 errors` (1,140,873 records).
+`docs/replay_manifest.json` written; `python -I scripts/replay_parity_check.py` -> states identical
+2224/2224, actions identical 2224/2224, DONE. Next tier = a goal decision (ask).
+
+> History -- RESUME HERE of 2026-11-23 (loop iteration 17), superseded:
 **This iteration (2026-11-23, loop iteration 17):** O3(b) COMPLETE -- canonical move_target order (harness),
 Java number printing, the Rust MDE port; every record identical on 63/63 checked replays (see "O3 log --
 iteration 17"). **RUNNING (detached, `.loop_wait.json` = pids 14612 cmd + 26088 chain, until 2026-11-24 07:30):**
@@ -12081,11 +12088,13 @@ Done (6):
     `testing`, gameTime/turnTime/started.
   - engine model gaps (client-visible; port 1:1, gate each): `lastTurnMode` never set (Java
     `setTurnMode` records it -- Rust writes `turn_mode` directly at hundreds of sites: needs a setter
-    sweep); `turnDataHome.homeData` false; `penaltyScore` 0 vs Java -1; blood spots never added;
-    move squares and dice decorations left over at activation start; player results lack
-    sendToBoxReason/Turn/Half/ByPlayerId, `casualties`, `seriousInjury`; team results lack
-    ripSuffered/seriousInjurySuffered; Getting Even's hatred (`gainedHatred`, temporary skill/
-    modifier/property maps) not recorded; a team player's `usedSkills` carries Horns where Java has none.
+    sweep); blood spots never added; move squares and dice decorations left over at activation start;
+    player results lack sendToBoxReason/Turn/Half/ByPlayerId, `casualties`, `seriousInjury`,
+    `completions`/`passing`; team results lack ripSuffered/seriousInjurySuffered/badlyHurtSuffered;
+    Getting Even's hatred (`gainedHatred`, temporary skill/modifier/property maps) not recorded; team
+    players' `usedSkills` carry skills (Horns, ...) where Java has none; `passCoordinate` (7 steps).
+    DONE: `turnDataHome.homeData` (Java `new TurnData(this, true)`), `penaltyScore` -1 (Java TeamResult
+    constructor) -- parity bb2025 human/chaos x10 identical, the two paths gone from the view check.
 
 Open, in order: (1) human smoke test (user); (2) the P2 worklist above, until the client-view check
 passes on the mirror/cross suites (the corpus `ffb-replay sync-check` still lists the
