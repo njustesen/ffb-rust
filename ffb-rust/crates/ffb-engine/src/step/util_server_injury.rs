@@ -736,6 +736,8 @@ pub(crate) fn raise_player(
         game.team_away.players.iter().map(|p| p.nr).max().unwrap_or(0)
     };
 
+    // Java: playerResult.setSendToBoxTurn(pGame.getTurnData().getTurnNr()) -- the ACTING team's turn.
+    let acting_turn_nr = game.turn_data().turn_nr;
     let team_result_mut = game.game_result.team_result_mut(necro_is_home);
     team_result_mut.raised_dead += 1;
     let raised_id = format!("{}R{}", dead_player_id, team_result_mut.raised_dead);
@@ -759,7 +761,7 @@ pub(crate) fn raise_player(
 
     let player_result = team_result_mut.player_result_mut(&raised_id);
     player_result.send_to_box_half = game.half;
-    player_result.send_to_box_turn = if necro_is_home { game.turn_data_home.turn_nr } else { game.turn_data_away.turn_nr };
+    player_result.send_to_box_turn = acting_turn_nr;
     player_result.send_to_box_reason = send_to_box_reason;
 
     if necro_is_home {

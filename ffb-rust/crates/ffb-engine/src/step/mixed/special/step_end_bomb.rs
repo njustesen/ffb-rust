@@ -58,12 +58,13 @@ impl StepEndBomb {
                     TurnMode::BombHome | TurnMode::BombHomeBlitz
                 );
                 // Restore turn mode: blitz → BLITZ, other bomb → REGULAR
-                game.turn_mode =
+                let mode =
                     if matches!(game.turn_mode, TurnMode::BombHomeBlitz | TurnMode::BombAwayBlitz) {
                         TurnMode::Blitz
                     } else {
                         TurnMode::Regular
                     };
+                game.set_turn_mode(mode);
             }
 
             // Java: PassState state = getGameState().getPassState();

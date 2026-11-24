@@ -1145,7 +1145,10 @@ impl StepApplyKickoffResult {
                 use ffb_model::model::player::{stat_limit, STAT_MA, STAT_AV};
                 let (ma_limit, av_limit) =
                     (stat_limit(game.rules, STAT_MA), stat_limit(game.rules, STAT_AV));
-                if let Some(p) = game.player_mut(id) {
+                // Java: fieldModel.addEnhancements(player, "Dodgy Snack") -> player.addEnhancement
+                // (a no-op while active; the source goes into all three client maps).
+                if let Some(p) = game.player_mut(id).filter(|p| !p.has_active_enhancement("Dodgy Snack")) {
+                    p.begin_enhancement("Dodgy Snack");
                     p.add_temporary_stat_mod_limited("Dodgy Snack", STAT_MA, -1, ma_limit);
                     p.add_temporary_stat_mod_limited("Dodgy Snack", STAT_AV, -1, av_limit);
                 }

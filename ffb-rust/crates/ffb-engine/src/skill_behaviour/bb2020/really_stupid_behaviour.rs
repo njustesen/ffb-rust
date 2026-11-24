@@ -211,9 +211,7 @@ impl StepModifierTrait for ReallyStupidStepModifier {
             // Java: doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill) — guards against
             // re-firing the roll when StepReallyStupid is re-entered later in the same player
             // action (e.g. Blitz's move phase and block phase both push StepId::ReallyStupid).
-            let already_used = game.player(&player_id)
-                .map(|p| p.used_skills.contains(&SkillId::ReallyStupid))
-                .unwrap_or(false);
+            let already_used = game.acting_player.used_skills.contains(&SkillId::ReallyStupid);
             do_roll = !already_used;
         }
 
@@ -253,15 +251,8 @@ impl StepModifierTrait for ReallyStupidStepModifier {
         // leaves 2..6, which is exactly when it matters.
         let successful = crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(roll, min_roll);
 
-        // Java: actingPlayer.markSkillUsed(skill)
-        let is_home = game.team_home.player(&player_id).is_some();
-        if is_home {
-            if let Some(p) = game.team_home.player_mut(&player_id) {
-                p.used_skills.insert(SkillId::ReallyStupid);
-            }
-        } else if let Some(p) = game.team_away.player_mut(&player_id) {
-            p.used_skills.insert(SkillId::ReallyStupid);
-        }
+        // Java: actingPlayer.markSkillUsed(skill) -- the acting player's set, not the player's
+        crate::step::util_server_steps::mark_skill_used(game, &player_id, SkillId::ReallyStupid);
 
         let re_rolled = state.re_rolled_action.as_deref() == Some("REALLY_STUPID")
             && state.re_roll_source.is_some();
@@ -423,9 +414,9 @@ mod tests {
             starting_skills: vec![SkillWithValue { skill_id: SkillId::ReallyStupid, value: None }],
             ..Default::default()
         };
-        p.used_skills.insert(SkillId::ReallyStupid);
         game.team_home.players.push(p);
         game.acting_player.player_id = Some("p1".into());
+        game.acting_player.used_skills.insert(SkillId::ReallyStupid);
 
         let m = ReallyStupidStepModifier;
         let mut hook = StepReallyStupidHookState {

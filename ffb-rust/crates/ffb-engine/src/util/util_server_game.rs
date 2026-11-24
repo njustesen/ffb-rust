@@ -148,6 +148,7 @@ impl UtilServerGame {
                 if let Some(p) = game.player_mut(partner_id) {
                     // TwoForOne.postConstruct: withSkills({SkillClassWithValue(Loner.class, "2")})
                     if !p.has_active_enhancement(skill_name) {
+                        p.begin_enhancement(skill_name);
                         p.add_prayer_skill(skill_name, SkillId::Loner, Some("2".to_string()));
                     }
                 }

@@ -216,7 +216,8 @@ impl StepBalefulHex {
                     // TemporaryEnhancements grant the bare hasToMissTurn PROPERTY, which
                     // refreshPlayersForTurnStart reads to keep the target inactive through their
                     // team's next turn (and removes when not setting active).
-                    if let Some(target) = game.player_mut(target_id) {
+                    if let Some(target) = game.player_mut(target_id).filter(|p| !p.has_active_enhancement("Baleful Hex")) {
+                        target.begin_enhancement("Baleful Hex");
                         target.add_temporary_properties(
                             "Baleful Hex",
                             &[ffb_model::model::property::NamedProperties::HAS_TO_MISS_TURN],

@@ -12,13 +12,23 @@ use ffb_model::model::player::{STAT_MA, STAT_AV};
 
 /// Java: Prayer.enhancements(mechanic) + Player.addEnhancement.
 /// Applies the prayer's stat/skill effect to the given player.
-pub fn apply_prayer_player_effect(game: &mut Game, player_id: &str, prayer_name: &str) {
+pub fn apply_prayer_player_effect(game: &mut Game, player_id: &str, prayer_enum_name: &str) {
+    // Java FieldModel.addPrayerEnhancements: player.addEnhancement(prayer.getName(), ...) -- the
+    // DISPLAY name is the source the client sees; a no-op while that source is active.
+    let source = java_prayer_source(game.rules, prayer_enum_name);
+    let prayer_name = source.as_str();
+    if game.player(player_id).map(|p| p.has_active_enhancement(prayer_name)).unwrap_or(true) {
+        return;
+    }
+    if let Some(p) = game.player_mut(player_id) {
+        p.begin_enhancement(prayer_name);
+    }
     // Java attaches the edition's PlayerStatLimit to every temporary modifier
     // (`StatsMechanic.limit`), and `getStatWithModifiers` clamps to it. Without the limit an
     // IRON_MAN prayer pushed a BB2020 Treeman to AV 12 where Java caps AV at 11.
     let rules = game.rules;
     let Some(player) = game.player_mut(player_id) else { return };
-    match prayer_name {
+    match prayer_enum_name {
         // GREASY_CLEATS: TemporaryStatDecrementer(PlayerStatKey.MA)
         "GREASY_CLEATS" => {
             player.add_temporary_stat_mod_limited(prayer_name, STAT_MA, -1,
@@ -53,10 +63,24 @@ pub fn apply_prayer_player_effect(game: &mut Game, player_id: &str, prayer_name:
 
 /// Java: Player.removeEnhancements(prayerName) + FieldModel.removePrayerEnhancements.
 /// Removes prayer-granted stat mods and skills from the player.
-pub fn remove_prayer_player_effect(game: &mut Game, player_id: &str, prayer_name: &str) {
+pub fn remove_prayer_player_effect(game: &mut Game, player_id: &str, prayer_enum_name: &str) {
+    let source = java_prayer_source(game.rules, prayer_enum_name);
     if let Some(player) = game.player_mut(player_id) {
-        player.remove_enhancements(prayer_name);
+        player.remove_enhancements(&source);
     }
+}
+
+/// Java `Prayer.getName()` of the edition's prayer enum constant (the enhancement source);
+/// a name that is not an enum constant is taken as the source itself.
+pub fn java_prayer_source(rules: ffb_model::enums::Rules, prayer_enum_name: &str) -> String {
+    use ffb_model::enums::Rules;
+    match rules {
+        Rules::Bb2020 => ffb_model::inducement::bb2020::prayer::Prayer::for_enum_name(prayer_enum_name).map(|p| p.get_name()),
+        Rules::Bb2025 => ffb_model::inducement::bb2025::prayer::Prayer::for_enum_name(prayer_enum_name).map(|p| p.get_name()),
+        _ => None,
+    }
+    .map(str::to_string)
+    .unwrap_or_else(|| prayer_enum_name.to_string())
 }
 
 #[cfg(test)]

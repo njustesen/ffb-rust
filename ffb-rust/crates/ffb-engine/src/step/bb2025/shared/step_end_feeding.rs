@@ -138,7 +138,8 @@ impl StepEndFeeding {
                 .publish(StepParameter::EndPlayerAction(true));
         }
 
-        // Java: else → changePlayerAction(null, null, false); Select.pushSequence(false)
+        // Java: else → setPassCoordinate(null); changePlayerAction(null, null, false); Select.pushSequence(false)
+        game.pass_coordinate = None;
         crate::step::util_server_steps::change_player_action_to_none(game);
         let seq = Select::build_sequence(&SelectParams { update_persistence: false, is_blitz_move: false, ..Default::default() });
         StepOutcome::next().push_seq(seq)

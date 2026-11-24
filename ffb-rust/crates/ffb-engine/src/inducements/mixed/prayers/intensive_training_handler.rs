@@ -151,8 +151,13 @@ fn conflicts_with_any_skill(player: &ffb_model::model::player::Player, skill: Sk
 /// `game.getFieldModel().addIntensiveTrainingSkill(selection.getPlayerId(), selection.getSkill())`,
 /// which is `player.addTemporarySkills(intensivePrayer().getName(), {skill})`.
 pub fn apply_skill_selection(_prayer_state: &mut PrayerState, game: &mut Game, player_id: &str, skill_id: SkillId) {
+    // Java: new SkillWithValue(skill, String.valueOf(skill.getDefaultSkillValue()))
+    let value = ffb_model::factory::skill_factory::SkillFactory::default_skill_value_in(game.rules, skill_id)
+        .map(|v| v.to_string());
+    // Java source: intensivePrayer().getName() (the display name)
+    let source = crate::inducements::mixed::prayers::prayer_player_effect::java_prayer_source(game.rules, PRAYER_NAME);
     if let Some(player) = game.player_mut(player_id) {
-        player.add_prayer_skill(PRAYER_NAME, skill_id, None);
+        player.add_prayer_skill(&source, skill_id, value);
     }
     // Java applySelection: reports.add(new ReportPlayerEvent(playerId, "gains " + skill.getName())).
     let skill_name = skill_id.category_and_name_for(game.rules).1.to_string();
@@ -250,9 +255,12 @@ mod tests {
         add_reserve_player(&mut game, "h1");
         apply_skill_selection(&mut state, &mut game, "h1", SkillId::Block);
         assert!(game.player("h1").unwrap().has_skill(SkillId::Block));
-        // Tracked against the prayer name so `remove_effect_internal` can take it away again.
+        // Tracked against Java's source (the prayer's display name) so `remove_effect_internal`
+        // can take it away again, with the default skill value (Java String.valueOf).
+        let source = crate::inducements::mixed::prayers::prayer_player_effect::java_prayer_source(game.rules, PRAYER_NAME);
         assert!(game.player("h1").unwrap().temporary_skill_sources.iter()
-            .any(|(src, s)| src == PRAYER_NAME && *s == SkillId::Block));
+            .any(|(src, s)| *src == source && *s == SkillId::Block));
+        assert!(game.player("h1").unwrap().temporary_skills_map.iter().any(|(src, _)| *src == source));
         // Java: ReportPlayerEvent(playerId, "gains " + skill.getName()).
         let ev = game.report_list.get_reports().iter().filter_map(|r| r.to_json())
             .find(|j| j["reportId"] == "playerEvent").expect("gains event");

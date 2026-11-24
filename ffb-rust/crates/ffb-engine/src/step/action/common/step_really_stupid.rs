@@ -278,7 +278,7 @@ mod tests {
         game.field_model.set_player_coordinate("p2", FieldCoordinate::new(6, 7));
 
         StepReallyStupid::new().start(&mut game, &mut GameRng::new(seed));
-        assert!(game.team_home.player(&pid).unwrap().used_skills.contains(&SkillId::ReallyStupid));
+        assert!(game.acting_player.used_skills.contains(&SkillId::ReallyStupid)); // Java actingPlayer.markSkillUsed
     }
 
     #[test]

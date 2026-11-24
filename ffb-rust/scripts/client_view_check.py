@@ -22,7 +22,23 @@ import sys
 from collections import defaultdict
 
 # path patterns (fnmatch-like: '*' = one segment) that are not client-visible game state.
+# Wall clocks: the Java harness game runs a real-time clock, the Rust harness has none.
 IGNORED = {
+    "gameTime", "turnTime", "started", "finished",
+}
+
+# Game SETUP the two harnesses build from different sources (Rust parity teams from
+# data/teams, Java from the generated team XML + its server's default game options). They may
+# differ ONLY while each side keeps one value for the whole game: a setup path whose value
+# changes mid-game on either side is engine behaviour and counts as a difference again. The GUI
+# server loads the Java XML itself, so there these fields are Java's by construction.
+SETUP = {
+    "testing", "gameOptions.gameOptionArray",
+    "*.coach", "*.teamName", "*.roster",
+    "*.playerArray.<p>.playerName", "*.playerArray.<p>.playerStatus",
+    "*.playerArray.<p>.positionIconIndex",
+    "*.playerArray.<p>.skillValuesMap.*", "*.playerArray.<p>.skillDisplayValuesMap.*",
+    "*.teamValue", "gameResult.*.teamValue",
 }
 
 
@@ -98,8 +114,12 @@ def pattern(path, ids):
     return ".".join("<p>" if p in ids else ("<n>" if p.isdigit() else p) for p in path)
 
 
+def matches(pat, keys):
+    return any(re.fullmatch(k.replace(".", r"\.").replace("*", r"[^.]+"), pat) for k in keys)
+
+
 def ignored(pat):
-    return any(re.fullmatch(k.replace(".", r"\.").replace("*", r"[^.]+"), pat) for k in IGNORED)
+    return matches(pat, IGNORED)
 
 
 def main(argv):
@@ -114,6 +134,7 @@ def main(argv):
             dirs.append(argv[i])
             i += 1
     stats = defaultdict(lambda: [0, []])
+    setup_seen = set()
     steps = identical = 0
     for d in dirs:
         for name in sorted(os.listdir(d)):
@@ -124,16 +145,34 @@ def main(argv):
             if not os.path.exists(rust_path):
                 continue
             java, rust = load(os.path.join(d, name)), load(rust_path)
+            game_diffs = []
+            # per concrete setup path: the values each side shows over the whole game
+            setup_values = defaultdict(lambda: (set(), set()))
             for idx in sorted(set(java) & set(rust)):
                 m = id_map(java[idx], rust[idx])
                 rust_ids = set(m.values())
                 diffs = []
                 walk(remap(java[idx], m), rust[idx], [], diffs)
+                game_diffs.append((idx, rust_ids, diffs))
+                for path, jv, rv in diffs:
+                    if matches(pattern(path, rust_ids), SETUP):
+                        jvals, rvals = setup_values[tuple(path)]
+                        jvals.add(json.dumps(jv, sort_keys=True))
+                        rvals.add(json.dumps(rv, sort_keys=True))
+            for idx, rust_ids, diffs in game_diffs:
                 seen = set()
                 for path, jv, rv in diffs:
                     pat = pattern(path, rust_ids)
                     if ignored(pat) or pat in seen:
                         continue
+                    if matches(pat, SETUP):
+                        jvals, rvals = setup_values[tuple(path)]
+                        if len(jvals) == 1 and len(rvals) == 1:
+                            setup_seen.add(next(k for k in SETUP if matches(pat, {k})))
+                            continue
+                        pat = pat + "  (SETUP CHANGED MID-GAME)"
+                        if pat in seen:
+                            continue
                     seen.add(pat)
                     s = stats[pat]
                     s[0] += 1
@@ -145,6 +184,8 @@ def main(argv):
         print(f"{n:6d}  {pat}")
         for where, jv, rv in ex:
             print(f"          {where}: java={json.dumps(jv)[:120]} rust={json.dumps(rv)[:120]}")
+    for pat in sorted(setup_seen):
+        print(f"setup   {pat}  (harness setup, one value per side all game)")
     print(f"CLIENT VIEW: {steps} steps, {identical} identical")
 
 

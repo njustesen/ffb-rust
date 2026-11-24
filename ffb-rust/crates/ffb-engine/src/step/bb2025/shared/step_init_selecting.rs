@@ -886,6 +886,7 @@ impl StepInitSelecting {
         let name = skill_id.category_and_name_for(game.rules).1;
         if let Some(p) = game.player_mut(&id) {
             if !p.has_active_enhancement(name) {
+                p.begin_enhancement(name);
                 p.add_temporary_properties(name, &[NamedProperties::IGNORE_TACKLEZONES_WHEN_MOVING]);
             }
         }

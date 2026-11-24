@@ -328,28 +328,86 @@ impl Player {
     /// code should prefer `add_temporary_stat_mod_limited`; this remains for tests and for the
     /// handful of sources Java gives `PlayerStatLimit(0, 0)`.
     pub fn add_temporary_stat_mod(&mut self, source: &str, stat: u8, delta: i32) {
-        self.temporary_stat_mods.push((source.to_string(), stat, delta, 0, 0));
+        self.add_temporary_stat_mod_limited(source, stat, delta, (0, 0));
     }
 
     /// Java: the same, with the `PlayerStatLimit` the edition's `StatsMechanic` attaches to the
     /// modifier. Use `stat_limit(rules, stat)` to obtain it.
     pub fn add_temporary_stat_mod_limited(&mut self, source: &str, stat: u8, delta: i32, limit: (i32, i32)) {
+        // the client's `temporaryModifiersMap` (a Java HashSet per source; the modifier classes
+        // have no equals, so a second instance is a second entry)
+        if let Some(name) = Self::temporary_stat_modifier_name(stat, delta) {
+            Self::map_entry(&mut self.temporary_modifiers_map, source).push(name);
+        }
+        self.add_temporary_stat_mod_cache(source, stat, delta, limit);
+    }
+
+    /// The engine-side cache of a temporary stat modifier only (the client map is already set,
+    /// e.g. when decoding the Java JSON).
+    pub(crate) fn add_temporary_stat_mod_cache(&mut self, source: &str, stat: u8, delta: i32, limit: (i32, i32)) {
         self.temporary_stat_mods.push((source.to_string(), stat, delta, limit.0, limit.1));
+    }
+
+    /// Java `TemporaryStatModifier.getName()`: `<STAT>-<class>` of the +1/-1 modifier classes.
+    fn temporary_stat_modifier_name(stat: u8, delta: i32) -> Option<String> {
+        let class = match delta {
+            1 => "com.fumbbl.ffb.modifiers.TemporaryStatIncrementer",
+            -1 => "com.fumbbl.ffb.modifiers.TemporaryStatDecrementer",
+            _ => return None,
+        };
+        let key = match stat {
+            STAT_MA => "MA",
+            STAT_ST => "ST",
+            STAT_AG => "AG",
+            STAT_PA => "PA",
+            STAT_AV => "AV",
+            _ => return None,
+        };
+        Some(format!("{key}-{class}"))
+    }
+
+    /// `map.computeIfAbsent(source, new HashSet<>())` on one of the client-visible source maps.
+    fn map_entry<'a, T>(map: &'a mut Vec<(String, Vec<T>)>, source: &str) -> &'a mut Vec<T> {
+        if let Some(pos) = map.iter().position(|(s, _)| s == source) {
+            &mut map[pos].1
+        } else {
+            map.push((source.to_string(), Vec::new()));
+            &mut map.last_mut().expect("just pushed").1
+        }
+    }
+
+    /// Java `Player.addEnhancement(name, ...)` puts `name` into ALL THREE source maps (modifiers,
+    /// properties, skills) even when one of its sets is empty -- the client sees `name: []`.
+    /// Call before the individual adds of an enhancement.
+    pub fn begin_enhancement(&mut self, name: &str) {
+        Self::map_entry(&mut self.temporary_modifiers_map, name);
+        Self::map_entry(&mut self.temporary_properties_map, name);
+        Self::map_entry(&mut self.temporary_skills_map, name);
     }
 
     /// Java: Player.removeTemporaryModifiers(source) — remove all stat mods for this source.
     pub fn remove_temporary_stat_mods(&mut self, source: &str) {
         self.temporary_stat_mods.retain(|(s, _, _, _, _)| s != source);
+        self.temporary_modifiers_map.retain(|(s, _)| s != source);
     }
 
     /// Java: Player.addTemporarySkills(source, skills) — add a skill grant tagged by source.
     pub fn add_prayer_skill(&mut self, source: &str, skill_id: SkillId, value: Option<String>) {
+        // the client's `temporarySkillsMap` (SkillWithValue has no equals: no dedup)
+        Self::map_entry(&mut self.temporary_skills_map, source)
+            .push(SkillWithValue { skill_id, value: value.clone() });
+        self.add_temporary_skill_cache(source, skill_id, value);
+    }
+
+    /// The engine-side cache of a temporary skill only (see `add_temporary_stat_mod_cache`).
+    pub(crate) fn add_temporary_skill_cache(&mut self, source: &str, skill_id: SkillId, value: Option<String>) {
         self.temporary_skill_sources.push((source.to_string(), skill_id));
         self.temporary_skills.push(SkillWithValue { skill_id, value });
     }
 
     /// Java: Player.removeTemporarySkills(source) — remove all skills granted by this source.
     pub fn remove_prayer_skills(&mut self, source: &str) {
+        self.temporary_skills_map.retain(|(s, _)| s != source);
         let to_remove: Vec<SkillId> = self.temporary_skill_sources.iter()
             .filter(|(s, _)| s == source)
             .map(|(_, id)| *id)
@@ -364,6 +422,13 @@ impl Player {
 
     /// Java: Player.addTemporaryProperties(source, properties).
     pub fn add_temporary_properties(&mut self, source: &str, properties: &[&str]) {
+        // the client's `temporaryPropertiesMap` (properties are singletons: a set by identity)
+        let names = Self::map_entry(&mut self.temporary_properties_map, source);
+        for prop in properties {
+            if !names.iter().any(|n| n == prop) {
+                names.push((*prop).to_string());
+            }
+        }
         for prop in properties {
             self.temporary_properties.push((source.to_string(), (*prop).to_string()));
         }
@@ -372,6 +437,7 @@ impl Player {
     /// Java: Player.removeTemporaryProperties(source).
     pub fn remove_temporary_properties(&mut self, source: &str) {
         self.temporary_properties.retain(|(s, _)| s != source);
+        self.temporary_properties_map.retain(|(s, _)| s != source);
     }
 
     /// Java: Player.removeEnhancements(source) — remove all stat mods, properties AND skill
@@ -385,7 +451,10 @@ impl Player {
     /// Java: Player.hasActiveEnhancement(name) — `getEnhancementSources().contains(name)`, the
     /// union of the temporary modifier, skill and property source keys.
     pub fn has_active_enhancement(&self, name: &str) -> bool {
-        self.temporary_stat_mods.iter().any(|(s, ..)| s == name)
+        self.temporary_modifiers_map.iter().any(|(s, _)| s == name)
+            || self.temporary_properties_map.iter().any(|(s, _)| s == name)
+            || self.temporary_skills_map.iter().any(|(s, _)| s == name)
+            || self.temporary_stat_mods.iter().any(|(s, ..)| s == name)
             || self.temporary_skill_sources.iter().any(|(s, _)| s == name)
             || self.temporary_properties.iter().any(|(s, _)| s == name)
     }
@@ -396,6 +465,7 @@ impl Player {
         if self.has_active_enhancement(name) {
             return;
         }
+        self.begin_enhancement(name);
         for skill_id in skills {
             self.add_prayer_skill(name, *skill_id, None);
         }
@@ -894,7 +964,7 @@ impl Player {
             .flat_map(|(source, skills)| skills.iter().map(move |sw| (source.clone(), sw.clone())))
             .collect();
         for (source, sw) in grants {
-            self.add_prayer_skill(&source, sw.skill_id, sw.value);
+            self.add_temporary_skill_cache(&source, sw.skill_id, sw.value);
         }
         // ... and of the temporary stat modifiers (limit = the edition's `StatsMechanic.limit`).
         self.temporary_stat_mods.clear();
@@ -905,7 +975,7 @@ impl Player {
             .collect();
         for (source, name) in modifiers {
             let (stat, delta) = Self::temporary_stat_modifier_for_name(&name)?;
-            self.add_temporary_stat_mod_limited(&source, stat, delta, stat_limit(rules, stat));
+            self.add_temporary_stat_mod_cache(&source, stat, delta, stat_limit(rules, stat));
         }
 
         self.skill_values_map = Self::skill_values_from(rules, o, "skillValuesMap")?;

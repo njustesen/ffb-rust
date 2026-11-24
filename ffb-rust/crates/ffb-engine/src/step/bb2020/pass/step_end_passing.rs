@@ -198,44 +198,40 @@ impl StepEndPassing {
             return StepOutcome::next().push_seq(seq);
         }
 
-        // Java: completions SPP and passing yards — accurate, non-intercepted pass.
-        if self.pass_accurate && !self.pass_fumble && self.interceptor_id.is_none()
-            && !game.acting_player.suffering_animosity
-        {
-            if let Some(ref thrower_id) = game.thrower_id.clone() {
-                let is_home = game.team_home.has_player(thrower_id);
-                let thrower_team_id = if is_home {
-                    game.team_home.id.clone()
-                } else {
-                    game.team_away.id.clone()
-                };
+        // Java "completions and passing statistic": the thrower's teammate must hold the ball (or
+        // have had it snatched) on the pass target; the completion needs an accurate pass, the
+        // yards (catcher's square - thrower's, east = forward, flipped for a dump-off) do not.
+        let ball_was_snatched = self.ball_snatcher_id.as_deref().map(|s| !s.is_empty()).unwrap_or(false);
+        if let (Some(thrower_id), Some(catcher)) = (game.thrower_id.clone(), self.catcher_id.clone()) {
+            let catcher_has_ball = ffb_model::util::util_player::UtilPlayer::has_ball(game, &catcher);
+            let is_home = game.team_home.has_player(&thrower_id);
+            let same_team = if is_home { game.team_home.has_player(&catcher) } else { game.team_away.has_player(&catcher) };
+            let end_coordinate = game.field_model.player_coordinate(&catcher);
+            if (catcher_has_ball || ball_was_snatched) && same_team
+                && end_coordinate.is_some() && end_coordinate == game.pass_coordinate
+            {
+                let end_coord = end_coordinate.unwrap();
+                let thrower_team_id = if is_home { game.team_home.id.clone() } else { game.team_away.id.clone() };
                 // Java: spp.addCompletion(prayerState.getAdditionalCompletionSppTeams(), throwerResult)
                 let has_prayer_bonus = game.prayer_state
                     .get_additional_completion_spp_teams()
                     .contains(&thrower_team_id);
+                let start = game.field_model.player_coordinate(&thrower_id);
+                let east_is_forward = if game.turn_mode == TurnMode::DumpOff { !game.home_playing } else { game.home_playing };
+                let rules = game.rules;
+                let pass_accurate = self.pass_accurate;
                 let team_result = if is_home { &mut game.game_result.home } else { &mut game.game_result.away };
                 let pr = team_result.player_results.entry(thrower_id.clone()).or_default();
-                pr.completions += 1;
-                pr.spp_gained += SppCalc::completion_spp();
-                if has_prayer_bonus {
-                    pr.completions_with_additional_spp += 1;
-                    pr.spp_gained += SppCalc::additional_spp(game.rules);
+                if pass_accurate {
+                    pr.completions += 1;
+                    pr.spp_gained += SppCalc::completion_spp();
+                    if has_prayer_bonus {
+                        pr.completions_with_additional_spp += 1;
+                        pr.spp_gained += SppCalc::additional_spp(rules);
+                    }
                 }
-                // Java: deltaX = endCoord.x - startCoord.x (east=forward), reversed for dump-off
-                if let (Some(thrower_coord), Some(end_coord)) = (
-                    game.field_model.player_coordinate(thrower_id),
-                    game.pass_coordinate,
-                ) {
-                    let east_is_forward = if game.turn_mode == TurnMode::DumpOff {
-                        !game.home_playing
-                    } else {
-                        game.home_playing
-                    };
-                    let delta_x = if east_is_forward {
-                        end_coord.x - thrower_coord.x
-                    } else {
-                        thrower_coord.x - end_coord.x
-                    };
+                if let Some(start) = start {
+                    let delta_x = if east_is_forward { end_coord.x - start.x } else { start.x - end_coord.x };
                     pr.passing += delta_x;
                 }
             }
@@ -584,11 +580,26 @@ mod tests {
         game
     }
 
+    /// A home team-mate "c1" holding the ball on the pass target (Java's completion condition).
+    fn catch_at(game: &mut Game, step: &mut StepEndPassing, coord: ffb_model::types::FieldCoordinate) {
+        let mut catcher = game.team_home.players[0].clone();
+        catcher.id = "c1".into();
+        catcher.nr = 2;
+        game.team_home.players.push(catcher);
+        game.field_model.set_player_coordinate("c1", coord);
+        game.field_model.ball_coordinate = Some(coord);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
+        game.pass_coordinate = Some(coord);
+        step.catcher_id = Some("c1".into());
+    }
+
     #[test]
     fn accurate_pass_awards_completion_spp() {
         let mut game = make_game_with_home_thrower("t1");
         let mut step = StepEndPassing::new();
         step.pass_accurate = true;
+        catch_at(&mut game, &mut step, ffb_model::types::FieldCoordinate::new(9, 7));
         step.start(&mut game, &mut GameRng::new(0));
         let pr = game.game_result.home.player_results.get("t1").unwrap();
         assert_eq!(pr.completions, 1);
@@ -622,6 +633,7 @@ mod tests {
         game.prayer_state.add_get_additional_completion_spp(&game.team_home.id.clone());
         let mut step = StepEndPassing::new();
         step.pass_accurate = true;
+        catch_at(&mut game, &mut step, ffb_model::types::FieldCoordinate::new(9, 7));
         step.start(&mut game, &mut GameRng::new(0));
         let pr = game.game_result.home.player_results.get("t1").unwrap();
         assert_eq!(pr.completions, 1);
@@ -635,6 +647,7 @@ mod tests {
         game.prayer_state.add_get_additional_completion_spp(&game.team_away.id.clone());
         let mut step = StepEndPassing::new();
         step.pass_accurate = true;
+        catch_at(&mut game, &mut step, ffb_model::types::FieldCoordinate::new(9, 7));
         step.start(&mut game, &mut GameRng::new(0));
         let pr = game.game_result.home.player_results.get("t1").unwrap();
         assert_eq!(pr.completions_with_additional_spp, 0);
@@ -645,10 +658,10 @@ mod tests {
     fn passing_yards_calculated_on_accurate_pass() {
         let mut game = make_game_with_home_thrower("t1");
         game.field_model.set_player_coordinate("t1", ffb_model::types::FieldCoordinate::new(5, 7));
-        game.pass_coordinate = Some(ffb_model::types::FieldCoordinate::new(12, 7));
         game.home_playing = true;
         let mut step = StepEndPassing::new();
         step.pass_accurate = true;
+        catch_at(&mut game, &mut step, ffb_model::types::FieldCoordinate::new(12, 7));
         step.start(&mut game, &mut GameRng::new(0));
         let pr = game.game_result.home.player_results.get("t1").unwrap();
         assert_eq!(pr.passing, 7); // 12 - 5 = 7 yards

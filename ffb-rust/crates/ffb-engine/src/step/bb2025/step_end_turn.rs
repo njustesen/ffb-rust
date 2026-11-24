@@ -889,14 +889,17 @@ impl StepEndTurn {
                     .map(|s| if is_bb2016_sw { s.base() == PS_BANNED } else { s.is_casualty() || s.base() == PS_BANNED })
                     .unwrap_or(true);
                 if removed { continue; }
-                // Java removeUsedSecretWeapon: setPlayerState(BANNED) + putPlayerIntoBox. remove_player
-                // clears the field coordinate + state; BANNED keeps it out of the setup.
-                game.field_model.remove_player(&pid);
-                game.field_model.set_player_state(&pid, PlayerState::new(PS_BANNED));
+                // Java removeUsedSecretWeapon: setPlayerState(playerState.changeBase(BANNED)), the
+                // send-to-box fields (by-player null), then UtilBox.putPlayerIntoBox -- the banned
+                // player sits in his team's box (the client draws him there), not nowhere.
+                let state = game.field_model.player_state(&pid).unwrap_or_default();
+                game.field_model.set_player_state(&pid, state.change_base(PS_BANNED));
                 let pr = game.game_result.team_result_mut(is_home).player_result_mut(&pid);
+                pr.send_to_box_by_player_id = None;
                 pr.send_to_box_reason = Some(SendToBoxReason::SecretWeaponBan);
                 pr.send_to_box_turn = self.turn_nr;
                 pr.send_to_box_half = self.half;
+                ffb_model::util::util_box::UtilBox::put_player_into_box(game, &pid);
             }
         }
     }
@@ -1617,7 +1620,9 @@ mod tests {
         let mut rng_fail = GameRng::new(seed_fail);
         step.report_secret_weapons_used(&mut game, &mut rng_fail);
         step.argue_and_remove_secret_weapons(&mut game, &mut rng_fail);
-        assert!(game.field_model.player_coordinate("sw").is_none(), "failed argue → removed from pitch");
+        // Java UtilBox.putPlayerIntoBox: the banned player sits in his box (off the pitch).
+        let box_coord = game.field_model.player_coordinate("sw").expect("failed argue → in the box");
+        assert!(box_coord.is_box_coordinate(), "failed argue → removed from pitch into the box: {box_coord:?}");
         assert_eq!(game.field_model.player_state("sw").unwrap().base(), PS_BANNED);
         assert!(!game.game_result.team_result_mut(true).player_result_mut("sw").has_used_secret_weapon);
     }

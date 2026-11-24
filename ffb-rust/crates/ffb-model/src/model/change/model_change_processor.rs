@@ -376,9 +376,6 @@ fn java_remove_chomp(game: &mut Game, chomper: Option<&str>, chompee: Option<&st
 /// Java: `Player.removeEnhancements(String)` = remove the source from the temporary modifier,
 /// property and skill maps (the engine caches follow).
 fn java_remove_enhancements(player: &mut Player, source: &str) {
-    player.temporary_modifiers_map.retain(|(s, _)| s != source);
-    player.temporary_properties_map.retain(|(s, _)| s != source);
-    player.temporary_skills_map.retain(|(s, _)| s != source);
     player.remove_enhancements(source);
 }
 
@@ -456,24 +453,13 @@ fn java_add_enhancement(player: &mut Player, rules: crate::enums::Rules, name: &
         // factory.forClass(cls): a skill the ruleset has no class for is null (NPE on write).
         SkillFactory::name_in(rules, *id).ok_or_else(|| format!("addEnhancement {name}: {id:?} is not a {rules:?} skill"))?;
     }
-    fn entry<'a, T>(map: &'a mut Vec<(String, Vec<T>)>, name: &str) -> &'a mut Vec<T> {
-        if let Some(pos) = map.iter().position(|(s, _)| s == name) {
-            &mut map[pos].1
-        } else {
-            map.push((name.to_string(), Vec::new()));
-            &mut map.last_mut().expect("just pushed").1
-        }
-    }
-    let modifiers = entry(&mut player.temporary_modifiers_map, name);
-    modifiers.extend(e.modifiers.iter().map(|m| m.to_string()));
+    // the Player's add methods write the client maps and the engine caches together
+    player.begin_enhancement(name);
     for m in &e.modifiers {
         let (stat, delta) = Player::temporary_stat_modifier_for_name(m)?;
         player.add_temporary_stat_mod_limited(name, stat, delta, crate::model::player::stat_limit(rules, stat));
     }
-    entry(&mut player.temporary_properties_map, name).extend(e.properties.iter().map(|p| p.to_string()));
     player.add_temporary_properties(name, &e.properties);
-    let skills = entry(&mut player.temporary_skills_map, name);
-    skills.extend(e.skills.iter().map(|(id, value)| SkillWithValue { skill_id: *id, value: value.clone() }));
     for (id, value) in &e.skills {
         player.add_prayer_skill(name, *id, value.clone());
     }
@@ -530,10 +516,7 @@ fn java_add_wisdom_skill(game: &mut Game, change: &DecodedModelChange, swv: crat
         other => return Err(format!("fieldModelAddWisdom: no Wisdom of the White Dwarf in {other:?} (NPE)")),
     };
     let player = require_player(game, change)?;
-    match player.temporary_skills_map.iter_mut().find(|(s, _)| s == source) {
-        Some((_, set)) => set.push(swv.clone()),
-        None => player.temporary_skills_map.push((source.to_string(), vec![swv.clone()])),
-    }
+    // addTemporarySkills: the client map and the engine cache together
     player.add_prayer_skill(source, swv.skill_id, swv.value);
     Ok(())
 }
@@ -849,13 +832,7 @@ impl ModelChangeProcessor {
                     .ok_or_else(|| format!("fieldModelAddIntensiveTraining: {skill:?} is not a {rules:?} skill"))?;
                 let player = require_player(game, change)?;
                 let value = Some(default.to_string());
-                match player.temporary_skills_map.iter_mut().find(|(s, _)| s == source) {
-                    Some((_, set)) => set.push(crate::model::skill_def::SkillWithValue { skill_id: skill, value: value.clone() }),
-                    None => player.temporary_skills_map.push((
-                        source.to_string(),
-                        vec![crate::model::skill_def::SkillWithValue { skill_id: skill, value: value.clone() }],
-                    )),
-                }
+                // addTemporarySkills: the client map and the engine cache together
                 player.add_prayer_skill(source, skill, value);
             }
             // Constant.getGrantAbleSkills(skillFactory).stream().filter(swv.getSkill().equals(value))
