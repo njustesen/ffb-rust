@@ -164,6 +164,10 @@ pub enum Action {
     PuntToCrowd { punt_to_crowd: bool },
     /// Java CLIENT_KICK_OFF_RESULT_CHOICE: the overtime kick-off result the coach picked.
     KickOffResultChoice { result: ffb_model::enums::KickoffResult },
+    /// Java CLIENT_KEYWORD_SELECTION: the Getting Even keyword(s) chosen for a player.
+    KeywordSelection { player_id: PlayerId, keywords: Vec<String> },
+    /// Java CLIENT_POSITION_SELECTION: the Raise Dead roster position(s) chosen by a team.
+    PositionSelection { team_id: String, positions: Vec<String> },
 
     // ── Inducement ────────────────────────────────────────────────────────────
     /// Purchase inducements before the game.

@@ -81,15 +81,20 @@ impl InjuryMechanicTrait for InjuryMechanic {
     /// why a roster that declares no raise position (khemri: `undead: true`, no `raisedPositionId`)
     /// still raises in BB2025 -- its one Lineman-keyword position is the one entry.
     ///
-    /// Order follows the roster's declaration order, as Java's `Arrays.stream` does.
+    /// Order is Java's `HashMap` iteration order of the roster's position ids (declaration order
+    /// within a bucket) -- see `java_hash_map_order`.
     fn raise_positions(&self, team: &Team, rules: Rules) -> Vec<RosterPosition> {
         let roster = match ffb_model::data::loader::find_roster(&team.roster_id, rules) {
             Some(r) => r,
             None => return vec![],
         };
-        roster
-            .positions
-            .iter()
+        // Java `team.getRoster().getPositions()` is `fRosterPositionById.values()`, a HashMap keyed
+        // by position id: its iteration order is the one the RAISE_DEAD dialog lists (and the
+        // parity harness answers with the first entry). undead bb2025 lists Zombie before Skeleton.
+        let positions = ffb_model::util::java_hash_map::java_hash_map_order(
+            roster.positions.iter().collect(), |pos| pos.id.as_str());
+        positions
+            .into_iter()
             .filter(|pos| {
                 pos.has_keyword(Keyword::LINEMAN)
                     && pos.player_type != PlayerType::Star

@@ -356,8 +356,29 @@ pub enum AgentPrompt {
         /// many eligible players there are). Empty when the Java call site passes `null`.
         descriptions: Vec<String>,
     },
+    /// Java `DialogSelectPositionParameter(positionIds, PositionChoiceMode.RAISE_DEAD, 1, 1, teamId)`
+    /// (bb2025 StepApothecary / StepApothecaryMultiple): the raising team picks the roster position
+    /// of the raised player. Answered by CLIENT_POSITION_SELECTION (`Action::PositionSelection`).
     SelectPosition {
+        team_id: String,
         available_positions: Vec<String>,
+    },
+    /// Java `DialogSelectKeywordParameter(playerId, keywords, KeywordChoiceMode.GETTING_EVEN, 1, 1)`:
+    /// the seriously injured player's coach picks which attacker keyword to get even with
+    /// (keywords in Java's sorted order). Answered by CLIENT_KEYWORD_SELECTION
+    /// (`Action::KeywordSelection`).
+    SelectKeyword {
+        player_id: PlayerId,
+        keywords: Vec<String>,
+    },
+    /// Java bb2025 StepApothecaryMultiple: a failed Regeneration may be re-rolled with a
+    /// Regeneration inducement -- DialogUseInducementParameter for one player,
+    /// DialogReRollRegenerationMultipleParameter for several. Answered by CLIENT_USE_INDUCEMENT
+    /// (`Action::UseInducement`): the chosen player, or no player to decline.
+    RegenerationReRolls {
+        team_id: String,
+        player_ids: Vec<PlayerId>,
+        inducement_type: Option<String>,
     },
     /// Java: `DialogSelectSkillParameter(playerId, List<Skill> skills, SkillChoiceMode)` —
     /// choose ONE skill from a flat list. Shared by two mechanics: the Intensive Training prayer

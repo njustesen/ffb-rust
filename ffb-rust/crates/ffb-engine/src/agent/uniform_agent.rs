@@ -504,16 +504,26 @@ impl Agent for UniformAgent {
             | Some(AgentPrompt::WizardSpell { .. })
             | Some(AgentPrompt::Journeymen { .. }) =>
                 Action::Acknowledge,
-            // SelectPosition: available_positions is a real option list, but there is no Action
-            // variant that carries a position choice back to the engine yet — same category of
-            // data-model gap as SelectSkill above. Flagged as unhandled instead of silently
-            // treated as "resolved".
-            Some(AgentPrompt::SelectPosition { available_positions }) => {
-                if !available_positions.is_empty() {
-                    let _ = self.pick(available_positions.len());
+            // Raise Dead position / Getting Even keyword: one uniform pick from the option list.
+            Some(AgentPrompt::SelectPosition { team_id, available_positions }) => {
+                let positions = if available_positions.is_empty() { vec![] } else {
+                    vec![available_positions[self.pick(available_positions.len())].clone()]
+                };
+                Action::PositionSelection { team_id: team_id.clone(), positions }
+            }
+            Some(AgentPrompt::SelectKeyword { player_id, keywords }) => {
+                let keywords = if keywords.is_empty() { vec![] } else {
+                    vec![keywords[self.pick(keywords.len())].clone()]
+                };
+                Action::KeywordSelection { player_id: player_id.clone(), keywords }
+            }
+            // A failed Regeneration: re-roll one of the players (uniformly) or decline.
+            Some(AgentPrompt::RegenerationReRolls { player_ids, inducement_type, .. }) => {
+                let i = self.pick(player_ids.len() + 1);
+                Action::UseInducement {
+                    inducement_type: inducement_type.clone(), card_id: None,
+                    player_ids: player_ids.get(i).cloned().into_iter().collect(),
                 }
-                self.mark_unhandled("SelectPosition");
-                Action::Acknowledge
             }
             // Team setup: deterministic canonical formation, 0 RNG — same handler as
             // RandomAgent (this isn't a "uniform vs random" divergence; there's exactly one

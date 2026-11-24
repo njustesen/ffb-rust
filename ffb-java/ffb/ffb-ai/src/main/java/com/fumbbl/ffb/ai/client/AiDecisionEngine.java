@@ -758,6 +758,13 @@ public class AiDecisionEngine implements Runnable {
         MoveSquare[] adjacentSquares = game.getFieldModel().getMoveSquares();
         ActingPlayer actingPlayer = game.getActingPlayer();
 
+        // The client state is updated only after a model sync is fully applied, so this poll can
+        // see the MOVE state of the previous sync together with a model whose acting player was
+        // already cleared. Wait for the state update instead of acting on the stale state.
+        if (actingPlayer != null && actingPlayer.getPlayer() == null) {
+            return;
+        }
+
         if (actingPlayer == null || adjacentSquares == null || adjacentSquares.length == 0) {
             client.getCommunication().sendActingPlayer(null, null, false);
             return;

@@ -15,6 +15,7 @@ pub mod util_box;
 // Translated Java utility classes
 pub mod array_tool;
 pub mod java_json;
+pub mod java_hash_map;
 pub mod date_tool;
 pub mod file_iterator;
 pub mod list_tool;

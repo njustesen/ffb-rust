@@ -1710,9 +1710,24 @@ impl Agent for RandomAgent {
             | Some(AgentPrompt::WizardSpell { .. })
             | Some(AgentPrompt::BriberyAndCorruption { .. })
             | Some(AgentPrompt::ConcedeGame { .. })
-            | Some(AgentPrompt::Journeymen { .. })
-            | Some(AgentPrompt::SelectPosition { .. }) =>
+            | Some(AgentPrompt::Journeymen { .. }) =>
                 Action::Acknowledge,
+            // ParityRunner leaves SELECT_POSITION / SELECT_KEYWORD to RandomStrategy, which picks
+            // the FIRST listed position / keyword (no RNG).
+            Some(AgentPrompt::SelectPosition { team_id, available_positions }) => Action::PositionSelection {
+                team_id: team_id.clone(),
+                positions: available_positions.first().cloned().into_iter().collect(),
+            },
+            Some(AgentPrompt::SelectKeyword { player_id, keywords }) => Action::KeywordSelection {
+                player_id: player_id.clone(),
+                keywords: keywords.first().cloned().into_iter().collect(),
+            },
+            // ParityRunner: USE_INDUCEMENT -> RandomStrategy's sendUseInducement(null) and
+            // RE_ROLL_REGENERATION_MULTIPLE -> sendUseInducement(type, null): no player, the
+            // failed Regeneration stands.
+            Some(AgentPrompt::RegenerationReRolls { inducement_type, .. }) => Action::UseInducement {
+                inducement_type: inducement_type.clone(), card_id: None, player_ids: vec![],
+            },
             // Each remaining prompt is wired as its producing step lands in Phase D; the loud
             // failure here names exactly which handler is still missing.
             other => panic!("RandomAgent::act: no handler yet for prompt {other:?}"),

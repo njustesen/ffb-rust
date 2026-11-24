@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use ffb_model::enums::{ApothecaryStatus, ApothecaryMode, PS_BADLY_HURT, PS_KNOCKED_OUT, PS_STUNNED, PS_PRONE, PS_RESERVE, PS_RIP, PS_SERIOUS_INJURY, PlayerState};
+use ffb_model::enums::{ApothecaryStatus, ApothecaryMode, Keyword, PS_BADLY_HURT, PS_KNOCKED_OUT, PS_STUNNED, PS_PRONE, PS_RESERVE, PS_RIP, PS_SERIOUS_INJURY, PlayerState};
 use ffb_model::model::game::Game;
 use ffb_model::model::player_state::PlayerState as PlayerStateModel;
 use ffb_model::util::rng::GameRng;
@@ -116,12 +116,12 @@ pub struct StepApothecaryMultiple {
     pub injury_results: Vec<Box<InjuryResult>>,
     /// Java: regenerationFailedResults — populated after regeneration phase.
     pub regeneration_failed_results: Vec<Box<InjuryResult>>,
-    /// Java: gettingEvenResults — BB2025: SI players eligible for Getting Even.
+    /// Java: gettingEvenResults — BB2025: SI players (defender ids) still to get even.
     pub getting_even_results: Vec<String>,
-    /// Java: deadResults — BB2025: RIP players eligible for Raise Dead.
+    /// Java: deadResults — BB2025: RIP players (defender ids) whose raise position is still open.
     pub dead_results: Vec<String>,
-    /// Java: availableKeyWordsMap (Map<String, List<Keyword>>)
-    pub available_keywords_map: HashMap<String, Vec<String>>,
+    /// Java: availableKeyWordsMap -- keyed by the defender id here (Java: the result's index).
+    pub available_keywords_map: HashMap<String, Vec<Keyword>>,
     /// Whether ACTING_TEAM init param was set.
     pub acting_team: Option<bool>,
     /// How many apothecaries have been consumed this step.
@@ -129,6 +129,12 @@ pub struct StepApothecaryMultiple {
     /// Java `regenerationFailedResults != null`: the regeneration phase has run; re-executions
     /// after a coach's answer go straight to the apothecary phase.
     regeneration_done: bool,
+    /// The casualty whose failed Regeneration is offered a team re-roll (Java
+    /// `askForReRollIfAvailable(player, REGENERATION, 4)`), answered by CLIENT_USE_RE_ROLL.
+    regen_reroll_pending: Option<String>,
+    /// Java bb2025 executeStep reports the regeneration-failed results ("only report cas rolls")
+    /// once the regeneration phase is over; later executions find them already reported.
+    post_regeneration_reported: bool,
 }
 
 impl StepApothecaryMultiple {
@@ -143,6 +149,8 @@ impl StepApothecaryMultiple {
             acting_team: None,
             apos_used: 0,
             regeneration_done: false,
+            regen_reroll_pending: None,
+            post_regeneration_reported: false,
         }
     }
 
@@ -256,8 +264,35 @@ impl StepApothecaryMultiple {
                 }
             }
             let mut results_to_keep = Vec::new();
-            for r in self.injury_results.drain(..) {
+            let drained: Vec<Box<InjuryResult>> = self.injury_results.drain(..).collect();
+            for r in drained {
                 let player_id = r.injury_context().defender_id.clone();
+                if bb2025 {
+                    // Java bb2025 regenerationHandled: results are grouped by
+                    // `canRollToSaveFromInjury && injuryType.canUseApo()`; the others pass
+                    // regeneration untouched. A casualty that regenerates is cured; one that fails
+                    // with a re-roll (Regeneration inducement or team re-roll) left stays
+                    // PRE-regeneration for the re-roll question below; any other passes.
+                    let mut r = r;
+                    let can_regen = player_id.as_deref().and_then(|id| game.player(id))
+                        .map(|p| p.has_skill_property(ffb_model::model::property::named_properties::NamedProperties::CAN_ROLL_TO_SAVE_FROM_INJURY))
+                        .unwrap_or(false) && r.injury_context().can_use_apo;
+                    let ctx_state = r.injury_context().injury;
+                    let is_casualty = ctx_state.map(|s| s.is_casualty()).unwrap_or(false);
+                    match (player_id.as_deref(), ctx_state) {
+                        (Some(pid), Some(state)) if can_regen && is_casualty => {
+                            if crate::step::util_server_injury::handle_regeneration_with_state(game, rng, pid, state, false).0 {
+                                continue; // regenerated: the injury is nullified
+                            }
+                            if !self.regeneration_re_rolls_available(game, pid) {
+                                r.passed_regeneration();
+                            }
+                        }
+                        _ => r.passed_regeneration(),
+                    }
+                    results_to_keep.push(r);
+                    continue;
+                }
                 // Java `regenerationHandled`: `injuryContext.isCasualty() && handleRegeneration(this,
                 // player, injuryContext.getPlayerState())` -- the CONTEXT's state; the injury has
                 // not been applied to the field yet. Rust read the field state (not a casualty
@@ -286,9 +321,18 @@ impl StepApothecaryMultiple {
             std::mem::swap(&mut self.injury_results, &mut self.regeneration_failed_results);
         }
 
+        // Java bb2025 `if (!regenerationHandled()) { CONTINUE; return; }`: a failed Regeneration
+        // that can still be re-rolled is put to the coach first.
+        if bb2025 {
+            if let Some(out) = self.ask_for_regeneration_re_rolls(game) {
+                return out;
+            }
+        }
+
         // Java bb2025 executeStep: `regenerationFailedResults.forEach(result -> result.report(this))`
         // — "only report cas rolls" (preRegeneration is now false: EVERYTHING_BUT_CAS).
-        if bb2025 && first_pass {
+        if bb2025 && !self.post_regeneration_reported {
+            self.post_regeneration_reported = true;
             for r in self.injury_results.iter_mut() {
                 r.report(game);
             }
@@ -363,6 +407,9 @@ impl StepApothecaryMultiple {
                 r.apply_to(game);
             }
         }
+        // Java walks `regenerationFailedResults` for Getting Even and Raise Dead after applying.
+        let final_contexts: Vec<crate::injury::InjuryContext> = self.injury_results.iter()
+            .map(|r| r.injury_context().clone()).collect();
         self.injury_results.retain(|r| !applied(r.injury_context().apothecary_status));
 
         // Java: double-attacker-down: two injury results for same player + regeneration failed.
@@ -414,13 +461,206 @@ impl StepApothecaryMultiple {
             }
         }
 
-        // no-op: BB2025 Raise Dead — can_raise_dead check ported but raise_positions returns empty
-        // (Necromantic roster position keywords not yet loaded from roster data).
+        if !bb2025 {
+            return StepOutcome::next();
+        }
 
-        // headless: BB2025 Getting Even keyword selection — requires attacker position keywords
-        // (RosterPosition.keywords loaded from roster data, not stored on Player).
+        // Java: an SI caused by an attacker whose position carries keywords the defender can get
+        // even with joins gettingEvenResults (keywords per result in availableKeyWordsMap).
+        use crate::step::bb2025::shared::step_apothecary as apo;
+        for ctx in &final_contexts {
+            let (Some(defender_id), Some(attacker_id)) = (ctx.defender_id.as_deref(), ctx.attacker_id.as_deref()) else { continue };
+            if !ctx.injury.map(|s| s.is_si()).unwrap_or(false) {
+                continue;
+            }
+            let keywords = apo::getting_even_keywords(game, attacker_id, defender_id);
+            if !keywords.is_empty() {
+                self.getting_even_results.push(defender_id.to_string());
+                self.available_keywords_map.insert(defender_id.to_string(), keywords);
+            }
+        }
+        // Java: a dead player gets no Getting Even; the first one per raising team that the team
+        // can raise joins deadResults.
+        let mut raising_teams: Vec<String> = Vec::new();
+        for ctx in &final_contexts {
+            let Some(defender_id) = ctx.defender_id.as_deref() else { continue };
+            if ctx.injury.map(|s| s.base()) != Some(PS_RIP) {
+                continue;
+            }
+            self.getting_even_results.retain(|id| !id.eq_ignore_ascii_case(defender_id));
+            if let Some((raising_team_id, _)) = apo::raise_dead_positions(game, defender_id, ctx.attacker_id.as_deref()) {
+                if !raising_teams.contains(&raising_team_id) {
+                    self.dead_results.push(defender_id.to_string());
+                    raising_teams.push(raising_team_id);
+                }
+            }
+        }
+        // Java: a single keyword needs no question -- push GETTING_EVEN for it right away.
+        let mut out = StepOutcome::next();
+        for defender_id in self.getting_even_results.clone() {
+            let keywords = self.available_keywords_map.get(&defender_id).cloned().unwrap_or_default();
+            if keywords.len() == 1 {
+                out = out.push_seq(apo::getting_even_sequence(&defender_id, keywords[0]));
+                self.getting_even_results.retain(|id| *id != defender_id);
+            }
+        }
+        if self.dead_results.is_empty() {
+            return self.check_getting_even(game, out);
+        }
+        // Java: a raising team with fewer than two positions needs no question (one: raised now).
+        for defender_id in self.dead_results.clone() {
+            let positions = Self::raise_positions_against(game, &defender_id);
+            if positions.len() < 2 {
+                self.dead_results.retain(|id| *id != defender_id);
+                if positions.len() == 1 {
+                    for ev in apo::raise_dead_player(game, &defender_id, &positions[0]) { out = out.with_event(ev); }
+                }
+            }
+        }
+        self.check_raise_dead(game, out)
+    }
 
-        StepOutcome::next()
+    /// Java `injuryMechanic.raisePositions(game.getOtherTeam(defender.getTeam()))`.
+    fn raise_positions_against(game: &Game, defender_id: &str) -> Vec<ffb_model::model::roster_position::RosterPosition> {
+        let raising_is_home = !game.team_home.has_player(defender_id);
+        let raising_team = if raising_is_home { &game.team_home } else { &game.team_away };
+        crate::step::util_server_injury::injury_mechanic_for(game.rules).raise_positions(raising_team, game.rules)
+    }
+
+    /// Java `checkGettingEven()`: NEXT_STEP when no keyword question is left, else the
+    /// SELECT_KEYWORD dialog for the first remaining player (CONTINUE).
+    fn check_getting_even(&mut self, game: &mut Game, out: StepOutcome) -> StepOutcome {
+        let Some(defender_id) = self.getting_even_results.first().cloned() else { return out };
+        let keywords = self.available_keywords_map.get(&defender_id).cloned().unwrap_or_default();
+        let prompt = crate::step::bb2025::shared::step_apothecary::show_getting_even_dialog(game, &defender_id, &keywords);
+        Self::waiting(out, prompt)
+    }
+
+    /// Java `checkRaiseDead()`: Getting Even when no position question is left, else the
+    /// RAISE_DEAD SELECT_POSITION dialog for the first dead player's raising team (CONTINUE).
+    fn check_raise_dead(&mut self, game: &mut Game, out: StepOutcome) -> StepOutcome {
+        let Some(defender_id) = self.dead_results.first().cloned() else { return self.check_getting_even(game, out) };
+        let raising_is_home = !game.team_home.has_player(&defender_id);
+        let raising_team_id = if raising_is_home { game.team_home.id.clone() } else { game.team_away.id.clone() };
+        let positions = Self::raise_positions_against(game, &defender_id);
+        let prompt = crate::step::bb2025::shared::step_apothecary::show_raise_dead_dialog(game, raising_team_id, &positions);
+        Self::waiting(out, prompt)
+    }
+
+    /// `out` (its pushes and events kept) turned into a CONTINUE waiting on `prompt`.
+    fn waiting(out: StepOutcome, prompt: ffb_model::prompts::AgentPrompt) -> StepOutcome {
+        let mut waiting = StepOutcome::cont().with_prompt(prompt);
+        waiting.pushes = out.pushes;
+        waiting.events = out.events;
+        waiting
+    }
+
+    /// The TurnData of the step's team (Java `getTurnData()`).
+    fn turn_data<'a>(&self, game: &'a mut Game) -> &'a mut ffb_model::model::turn_data::TurnData {
+        if self.team_id.as_deref() == Some(game.team_home.id.as_str()) { &mut game.turn_data_home } else { &mut game.turn_data_away }
+    }
+
+    /// Java `regenerationTypes(inducementSet)`: the Regeneration inducements with uses left, by
+    /// InducementType priority (Mortuary Assistants 1, Plague Doctors -- which also count as an
+    /// apothecary -- 2).
+    fn regeneration_inducement_types(&self, game: &Game) -> Vec<String> {
+        let td = if self.team_id.as_deref() == Some(game.team_home.id.as_str()) { &game.turn_data_home } else { &game.turn_data_away };
+        let mut types: Vec<(i32, String)> = td.inducement_set.get_inducements().into_iter()
+            .filter(|i| i.has_usage(ffb_model::inducement::usage::Usage::REGENERATION) && i.get_uses_left() > 0)
+            .map(|i| (if i.has_usage(ffb_model::inducement::usage::Usage::APOTHECARY_JOURNEYMEN) { 2 } else { 1 }, i.type_id.clone()))
+            .collect();
+        types.sort();
+        types.into_iter().map(|(_, t)| t).collect()
+    }
+
+    /// Java `regenerationReRollsAvailable(player)`: a Regeneration inducement use left, or a
+    /// team re-roll the player may use.
+    fn regeneration_re_rolls_available(&self, game: &Game, player_id: &str) -> bool {
+        !self.regeneration_inducement_types(game).is_empty()
+            || game.player(player_id)
+                .map(|p| crate::util::util_server_re_roll::UtilServerReRoll::is_team_re_roll_available(game, p))
+                .unwrap_or(false)
+    }
+
+    /// Java bb2025 `regenerationHandled()` after the first regeneration pass: the failed
+    /// regenerations that can still be re-rolled are asked about -- one player with an inducement
+    /// gets DialogUseInducementParameter, one without gets the team re-roll offer
+    /// (`askForReRollIfAvailable(player, REGENERATION, 4)`), several get
+    /// DialogReRollRegenerationMultipleParameter. `None` when nothing is left to ask.
+    fn ask_for_regeneration_re_rolls(&mut self, game: &mut Game) -> Option<StepOutcome> {
+        use ffb_model::dialog::dialog_parameter_factory::DialogParameter;
+        let fails: Vec<String> = self.injury_results.iter()
+            .filter(|r| r.is_pre_regeneration())
+            .filter_map(|r| r.injury_context().defender_id.clone())
+            .filter(|pid| self.regeneration_re_rolls_available(game, pid))
+            .collect();
+        let team_id = self.team_id.clone().unwrap_or_default();
+        let team_is_home = team_id == game.team_home.id;
+        let opponent_asked = team_is_home != game.home_playing;
+        let inducement = self.regeneration_inducement_types(game).into_iter().next();
+        match fails.len() {
+            0 => None,
+            1 => {
+                let pid = fails[0].clone();
+                if let Some(inducement_type) = inducement {
+                    crate::util::util_server_dialog::UtilServerDialog::show_dialog(game, DialogParameter::UseInducement(
+                        ffb_model::dialog::dialog_use_inducement_parameter::DialogUseInducementParameter {
+                            team_id: Some(team_id.clone()),
+                            inducement_types: vec![Some(inducement_type.clone())],
+                            cards: vec![],
+                            player_id: Some(pid.clone()),
+                        }), opponent_asked);
+                    return Some(StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::RegenerationReRolls {
+                        team_id, player_ids: vec![pid], inducement_type: Some(inducement_type),
+                    }));
+                }
+                match crate::step::util_server_re_roll::ask_for_reroll_if_available_for(game, Some(&pid), "REGENERATION", 4, false) {
+                    Some(mut prompt) => {
+                        // Java StepApothecaryMultiple extends AbstractStep: no CLIENT_USE_SKILL arm,
+                        // so only the team re-roll can answer (as in StepApothecary).
+                        if let ffb_model::prompts::AgentPrompt::ReRollOffer { re_roll_skill, .. } = &mut prompt {
+                            *re_roll_skill = None;
+                        }
+                        self.regen_reroll_pending = Some(pid);
+                        Some(StepOutcome::cont().with_prompt(prompt))
+                    }
+                    None => {
+                        for r in self.injury_results.iter_mut() {
+                            if r.injury_context().defender_id.as_deref() == Some(pid.as_str()) {
+                                r.passed_regeneration();
+                            }
+                        }
+                        None
+                    }
+                }
+            }
+            _ => {
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(game, DialogParameter::ReRollRegenerationMultiple(
+                    ffb_model::dialog::dialog_re_roll_regeneration_multiple_parameter::DialogReRollRegenerationMultipleParameter {
+                        player_ids: fails.clone(),
+                        inducement_type: inducement.clone(),
+                        re_roll_options: vec![],
+                    }), opponent_asked);
+                Some(StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::RegenerationReRolls {
+                    team_id, player_ids: fails, inducement_type: inducement,
+                }))
+            }
+        }
+    }
+
+    /// Java: the re-rolled Regeneration of `player_id` (CLIENT_USE_INDUCEMENT / CLIENT_USE_RE_ROLL):
+    /// a success cures the casualty (the result leaves the list); either way it has passed
+    /// regeneration.
+    fn re_roll_regeneration(&mut self, game: &mut Game, rng: &mut GameRng, player_id: &str, do_roll: bool) {
+        let Some(i) = self.injury_results.iter().position(|r| r.injury_context().defender_id.as_deref() == Some(player_id)) else { return };
+        if do_roll {
+            let state = self.injury_results[i].injury_context().injury.unwrap_or_default();
+            if crate::step::util_server_injury::handle_regeneration_with_state(game, rng, player_id, state, true).0 {
+                self.injury_results.remove(i);
+                return;
+            }
+        }
+        self.injury_results[i].passed_regeneration();
     }
 }
 
@@ -436,6 +676,8 @@ impl Default for StepApothecaryMultiple {
             acting_team: None,
             apos_used: 0,
             regeneration_done: false,
+            regen_reroll_pending: None,
+            post_regeneration_reported: false,
         }
     }
 }
@@ -514,8 +756,75 @@ impl Step for StepApothecaryMultiple {
                     }
                 }
             }
-            Action::UseReRoll { use_reroll: _ } => {
-                // client-only: CLIENT_USE_RE_ROLL for regeneration re-roll — headless never asks
+            // Java CLIENT_USE_RE_ROLL (REGENERATION): an accepted team re-roll is spent and the
+            // Regeneration rolled again; either way the player has passed regeneration.
+            Action::UseReRoll { use_reroll } => {
+                if let Some(pid) = self.regen_reroll_pending.take() {
+                    let do_roll = *use_reroll
+                        && crate::step::util_server_re_roll::use_reroll(game, &ffb_model::enums::ReRollSource::new("TRR"), &pid, rng);
+                    self.re_roll_regeneration(game, rng, &pid, do_roll);
+                }
+            }
+            // Java CLIENT_USE_INDUCEMENT: the chosen player's Regeneration is re-rolled with the
+            // inducement (a Plague Doctor also counts as an apothecary used) or, without one, a
+            // team re-roll; no player declines every open re-roll.
+            Action::UseInducement { inducement_type, player_ids, .. } => {
+                match player_ids.first() {
+                    Some(pid) if self.injury_results.iter().any(|r| r.injury_context().defender_id.as_deref() == Some(pid.as_str())) => {
+                        let pid = pid.clone();
+                        let do_roll = match inducement_type {
+                            Some(t) => {
+                                let used = self.turn_data(game).inducement_set.use_one_of(t);
+                                if used {
+                                    let journeymen = self.turn_data(game).inducement_set.get(t)
+                                        .map(|i| i.has_usage(ffb_model::inducement::usage::Usage::APOTHECARY_JOURNEYMEN))
+                                        .unwrap_or(false);
+                                    let player_home = game.team_home.has_player(&pid);
+                                    if journeymen {
+                                        let td = if player_home { &mut game.turn_data_home } else { &mut game.turn_data_away };
+                                        td.use_apothecary(ffb_model::enums::ApothecaryType::Plague);
+                                    }
+                                    let team_id = if player_home { game.team_home.id.clone() } else { game.team_away.id.clone() };
+                                    game.report_list.add(ffb_model::report::report_inducement::ReportInducement::new(team_id, t.clone(), 1));
+                                }
+                                used
+                            }
+                            None => crate::step::util_server_re_roll::use_reroll(game, &ffb_model::enums::ReRollSource::new("TRR"), &pid, rng),
+                        };
+                        self.re_roll_regeneration(game, rng, &pid, do_roll);
+                    }
+                    _ => {
+                        for r in self.injury_results.iter_mut() {
+                            r.passed_regeneration();
+                        }
+                    }
+                }
+            }
+            // Java CLIENT_KEYWORD_SELECTION: hideDialog, one GETTING_EVEN per chosen keyword
+            // (pushed in reverse), then the next Getting Even question or NEXT_STEP.
+            Action::KeywordSelection { player_id, keywords }
+                if self.getting_even_results.first() == Some(player_id) =>
+            {
+                crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
+                let mut out = StepOutcome::next();
+                for keyword in keywords.iter().rev() {
+                    out = out.push_seq(crate::step::bb2025::shared::step_apothecary::getting_even_sequence(player_id, Keyword::for_name(keyword)));
+                }
+                self.getting_even_results.remove(0);
+                return self.check_getting_even(game, out);
+            }
+            // Java CLIENT_POSITION_SELECTION: hideDialog, raise the first dead player as the chosen
+            // position, then the next Raise Dead question (or Getting Even).
+            Action::PositionSelection { positions, .. } if !self.dead_results.is_empty() => {
+                crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
+                let defender_id = self.dead_results.remove(0);
+                let mut out = StepOutcome::next();
+                if let Some(position_id) = positions.first() {
+                    for ev in crate::step::bb2025::shared::step_apothecary::raise_dead_player_as(game, &defender_id, position_id) {
+                        out = out.with_event(ev);
+                    }
+                }
+                return self.check_raise_dead(game, out);
             }
             _ => {}
         }
@@ -859,5 +1168,110 @@ mod tests {
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(game.turn_data_home.apothecaries, 1, "declined: none used");
         assert_eq!(game.field_model.player_state("home_03").unwrap().base(), PS_SERIOUS_INJURY);
+    }
+
+    fn regenerating_home_player(game: &mut Game, id: &str, x: i32) {
+        use ffb_model::enums::{PlayerState, PS_STANDING};
+        game.team_home.players.push(ffb_model::model::player::Player {
+            id: id.into(), name: id.into(), nr: x, position_id: "lineman".into(),
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            starting_skills: vec![ffb_model::model::skill_def::SkillWithValue::new(ffb_model::enums::SkillId::Regeneration)],
+            ..Default::default()
+        });
+        game.field_model.set_player_coordinate(id, FieldCoordinate::new(x, 7));
+        game.field_model.set_player_state(id, PlayerState::new(PS_STANDING));
+    }
+
+    fn two_regenerating_casualties(seed: u64) -> (Game, StepApothecaryMultiple, StepOutcome, GameRng) {
+        use ffb_model::enums::{PlayerState, PS_SERIOUS_INJURY};
+        use ffb_model::inducement::{inducement::Inducement, usage::Usage};
+        let mut game = make_game();
+        regenerating_home_player(&mut game, "home_03", 3);
+        regenerating_home_player(&mut game, "home_04", 4);
+        game.turn_data_home.inducement_set.add_inducement(Inducement::new("mortuaryAssistant", 1, vec![Usage::REGENERATION]));
+        let mut step = StepApothecaryMultiple::default();
+        step.team_id = Some("home".to_string());
+        for id in ["home_03", "home_04"] {
+            let mut ir = make_injury(id, ApothecaryMode::Defender, ApothecaryStatus::NoApothecary);
+            ir.injury_context_mut().injury = Some(PlayerState::new(PS_SERIOUS_INJURY));
+            step.injury_results.push(ir);
+        }
+        let mut rng = GameRng::new(seed);
+        let out = step.start(&mut game, &mut rng);
+        (game, step, out, rng)
+    }
+
+    /// Java bb2025 StepApothecaryMultiple.regenerationHandled: SEVERAL failed Regenerations that a
+    /// Regeneration inducement could re-roll -> one DialogReRollRegenerationMultipleParameter; no
+    /// player chosen (CLIENT_USE_INDUCEMENT without players) lets every failure stand.
+    #[test]
+    fn several_failed_regenerations_are_asked_together() {
+        let (mut game, mut step, out, mut rng) = (0..200u64)
+            .map(two_regenerating_casualties)
+            .find(|(_, _, out, _)| matches!(out.prompt,
+                Some(ffb_model::prompts::AgentPrompt::RegenerationReRolls { ref player_ids, .. }) if player_ids.len() == 2))
+            .expect("a seed where both Regenerations fail");
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::RegenerationReRolls { ref inducement_type, .. })
+            if inducement_type.as_deref() == Some("mortuaryAssistant")));
+        assert!(matches!(game.dialog_parameter,
+            Some(ffb_model::dialog::dialog_parameter_factory::DialogParameter::ReRollRegenerationMultiple(_))));
+
+        let calls = rng.call_count;
+        let decline = Action::UseInducement { inducement_type: Some("mortuaryAssistant".into()), card_id: None, player_ids: vec![] };
+        let out = step.handle_command(&decline, &mut game, &mut rng);
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(rng.call_count, calls, "declined: no Regeneration re-rolled");
+        assert!(game.turn_data_home.inducement_set.has_uses_left("mortuaryAssistant"));
+        assert_eq!(game.field_model.player_state("home_03").unwrap().base(), ffb_model::enums::PS_SERIOUS_INJURY);
+    }
+
+    /// Java CLIENT_USE_INDUCEMENT with a player: the inducement is spent (ReportInducement) and
+    /// that player's Regeneration rolled again; the other failure stands.
+    #[test]
+    fn a_chosen_regeneration_is_re_rolled_with_the_inducement() {
+        let (mut game, mut step, _, mut rng) = (0..200u64)
+            .map(two_regenerating_casualties)
+            .find(|(_, _, out, _)| matches!(out.prompt,
+                Some(ffb_model::prompts::AgentPrompt::RegenerationReRolls { ref player_ids, .. }) if player_ids.len() == 2))
+            .expect("a seed where both Regenerations fail");
+        let calls = rng.call_count;
+        let accept = Action::UseInducement { inducement_type: Some("mortuaryAssistant".into()), card_id: None, player_ids: vec!["home_03".into()] };
+        let out = step.handle_command(&accept, &mut game, &mut rng);
+        assert_eq!(rng.call_count, calls + 1, "one fresh Regeneration die");
+        assert!(!game.turn_data_home.inducement_set.has_uses_left("mortuaryAssistant"), "the inducement is spent");
+        assert!(game.report_list.get_reports().iter().any(|r| r.get_id() == ffb_model::report::report_id::ReportId::INDUCEMENT));
+        // No inducement left: the remaining failure is not asked again.
+        assert_eq!(out.action, StepAction::NextStep, "{:?}", out.prompt);
+    }
+
+    /// Java bb2025 StepApothecaryMultiple: an SI from an attacker with several get-even keywords
+    /// -> checkGettingEven's DialogSelectKeywordParameter; the answer pushes GETTING_EVEN.
+    #[test]
+    fn a_multi_block_serious_injury_asks_which_keyword_to_get_even_with() {
+        use ffb_model::enums::{PlayerState, PS_SERIOUS_INJURY, PS_STANDING};
+        let mut game = make_game();
+        game.team_home.players.push(ffb_model::model::player::Player { id: "home_05".into(), name: "home_05".into(), ..Default::default() });
+        game.team_away.players.push(ffb_model::model::player::Player {
+            id: "away_01".into(), keywords: vec!["Troll".into(), "Goblin".into()], ..Default::default()
+        });
+        game.field_model.set_player_coordinate("home_05", FieldCoordinate::new(5, 7));
+        game.field_model.set_player_state("home_05", PlayerState::new(PS_STANDING));
+        let mut step = StepApothecaryMultiple::default();
+        step.team_id = Some("home".to_string());
+        let mut ir = make_injury("home_05", ApothecaryMode::Defender, ApothecaryStatus::NoApothecary);
+        ir.injury_context_mut().injury = Some(PlayerState::new(PS_SERIOUS_INJURY));
+        ir.injury_context_mut().attacker_id = Some("away_01".into());
+        step.injury_results.push(ir);
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::SelectKeyword { ref keywords, .. })
+            if keywords == &vec!["Goblin".to_string(), "Troll".to_string()]), "{:?}", out.prompt);
+        let answer = Action::KeywordSelection { player_id: "home_05".into(), keywords: vec!["Goblin".into()] };
+        let out = step.handle_command(&answer, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.pushes.iter().flatten().any(|s| s.step_id == StepId::GettingEven));
+        assert!(game.dialog_parameter.is_none());
     }
 }

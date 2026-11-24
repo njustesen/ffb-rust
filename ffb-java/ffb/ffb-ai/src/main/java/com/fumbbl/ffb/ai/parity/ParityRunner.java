@@ -2220,6 +2220,22 @@ public class ParityRunner {
             // ONE actionRng draw; none → CLIENT_ACTING_PLAYER(null) (fEndPlayerAction). Rust:
             // AgentPrompt::DumpOffTarget, RandomAgent's arm. Anywhere else the dialog is a
             // leftover display: clear it, zero draws.
+            // bb2025 StepApothecaryMultiple: several failed Regenerations that could be re-rolled.
+            // RandomStrategy has no arm for it (the step would wait forever); decline like the
+            // client's dialog closed without a target: CLIENT_USE_INDUCEMENT with no player, every
+            // failed Regeneration stands. Zero draws. Rust: AgentPrompt::RegenerationReRolls.
+            case RE_ROLL_REGENERATION_MULTIPLE: {
+                com.fumbbl.ffb.dialog.DialogReRollRegenerationMultipleParameter rm =
+                    (com.fumbbl.ffb.dialog.DialogReRollRegenerationMultipleParameter) dialog;
+                comm.clearCaptured();
+                comm.sendUseInducement(rm.getInducementType(), (String) null);
+                injectCaptured(dialog, game, gameState);
+                if (game.getDialogParameter() == dialog) {
+                    game.setDialogParameter(null);
+                }
+                break;
+            }
+
             case DEFENDER_ACTION:
                 game.setDialogParameter(null);
                 if (game.getTurnMode() == TurnMode.DUMP_OFF

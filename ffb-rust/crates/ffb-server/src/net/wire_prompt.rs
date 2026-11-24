@@ -395,7 +395,7 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
             Some(WireDialog::Journeymen { team_id: team_id.clone(), count: *count }),
         AgentPrompt::PlayerChoice { eligible_players, reason, descriptions } =>
             Some(WireDialog::PlayerChoice { eligible_players: eligible_players.clone(), reason: reason.clone(), descriptions: descriptions.clone() }),
-        AgentPrompt::SelectPosition { available_positions } =>
+        AgentPrompt::SelectPosition { available_positions, .. } =>
             Some(WireDialog::SelectPosition { available_positions: available_positions.clone() }),
         // Java's DialogSelectSkillParameter carries a FLAT skill list plus a SkillChoiceMode;
         // the wire shape's per-category grouping has no Java counterpart, so emit one group
@@ -412,7 +412,8 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
         AgentPrompt::ArgueTheCall { player_ids, .. } =>
             Some(WireDialog::ArgueTheCall { player_id: player_ids.first().cloned().unwrap_or_default() }),
         // Legacy hand-made wire layer (not used by the Java-protocol server path, BACKLOG §P).
-        AgentPrompt::Bribes { .. } | AgentPrompt::KickOffResult { .. } | AgentPrompt::PuntToCrowd { .. } | AgentPrompt::PickUpChoice { .. } | AgentPrompt::BlockRollsForTargets { .. } | AgentPrompt::UseApothecaries { .. } => None,
+        AgentPrompt::Bribes { .. } | AgentPrompt::KickOffResult { .. } | AgentPrompt::PuntToCrowd { .. } | AgentPrompt::PickUpChoice { .. } | AgentPrompt::BlockRollsForTargets { .. } | AgentPrompt::UseApothecaries { .. }
+        | AgentPrompt::SelectKeyword { .. } | AgentPrompt::RegenerationReRolls { .. } => None,
         AgentPrompt::BriberyAndCorruption { team_id } =>
             Some(WireDialog::BriberyAndCorruption { team_id: team_id.clone() }),
         AgentPrompt::ConcedeGame { team_id } =>

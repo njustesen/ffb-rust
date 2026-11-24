@@ -27,13 +27,30 @@ impl IDialogParameter for DialogReRollRegenerationMultipleParameter {
 // JSON serialization (BACKLOG §O).
 impl DialogReRollRegenerationMultipleParameter {
     /// Java `initFrom(IFactorySource, JsonValue)`.
-    pub fn init_from(&mut self, _rules: crate::enums::Rules, _json: &serde_json::Value) -> Result<(), String> {
-        Err("DialogReRollRegenerationMultipleParameter.initFrom: not ported yet".to_string())
+    pub fn init_from(&mut self, rules: crate::enums::Rules, json: &serde_json::Value) -> Result<(), String> {
+        use crate::util::java_json as jj;
+        let obj = jj::to_json_object(json)?;
+        super::util_dialog_parameter::validate_dialog_id_json(DialogId::RE_ROLL_REGENERATION_MULTIPLE, obj)?;
+        // `Arrays.asList(playerIds)` with no null check: absent -> NullPointerException.
+        let ids = jj::get_string_array(obj, "playerIds")?
+            .ok_or_else(|| "playerIds: null (NullPointerException)".to_string())?;
+        self.player_ids = ids.into_iter().map(|id| id.unwrap_or_default()).collect();
+        // JsonEnumWithNameOption over the ruleset's InducementTypeFactory; null or unknown -> null.
+        self.inducement_type = jj::get_string(obj, "inducementType")?
+            .and_then(|n| crate::factory::inducement_type_factory::for_name_in(rules, &n))
+            .map(|t| t.id);
+        Ok(())
     }
 
-    /// Java `toJsonValue()`.
+    /// Java `toJsonValue()`: dialogId, playerIds, inducementType (Java has no reRollOptions on the wire).
     pub fn to_json_value(&self, _rules: crate::enums::Rules) -> Result<serde_json::Value, String> {
-        Err("DialogReRollRegenerationMultipleParameter.toJsonValue: not ported yet".to_string())
+        use crate::util::java_json as jj;
+        use serde_json::Value;
+        let mut o = serde_json::Map::new();
+        o.insert("dialogId".to_string(), Value::String(DialogId::RE_ROLL_REGENERATION_MULTIPLE.get_name().to_string()));
+        o.insert("playerIds".to_string(), jj::string_array(&self.player_ids));
+        o.insert("inducementType".to_string(), jj::string_or_null(self.inducement_type.as_deref()));
+        Ok(Value::Object(o))
     }
 }
 

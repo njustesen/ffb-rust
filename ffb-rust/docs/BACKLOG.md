@@ -12028,6 +12028,41 @@ parity, which §I-§M closed.
 - **P5 done-check** `scripts/gui_check.py` (written before P4 closes) + docs + push.
 
 ### RESUME HERE
+**2026-11-24 (6): open items (2) and (3) of (5) done -- the AiMain NPE and the last inline decisions.**
+
+Done (6):
+- **AiMain NPE** (harness `AiDecisionEngine.handleMove`): a RACE, not a server desync. The client updates
+  its state only after a whole model sync is applied, so the 100 ms poll can see the previous sync's MOVE
+  state with an acting player the new sync already cleared; `run()` retries an exception with no sleep,
+  hence 42-91 identical traces in a few ms. Now the poll waits for the state update (returns) instead of
+  sending a stray deselect. gui_check 10/10, 0 errors in all 20 AI logs (`D:/ffb_gui_check/aifix1..3`).
+- **Multi-block Regeneration re-rolls** (bb2025 StepApothecaryMultiple `regenerationHandled` 1:1): the
+  Regeneration group is `canRollToSaveFromInjury && injuryType.canUseApo` (Rust ignored canUseApo); a
+  failure with a re-roll left stays pre-regeneration and is asked -- one player: DialogUseInducement
+  (Mortuary Assistant / Plague Doctor, by priority) or the team re-roll offer; several:
+  DialogReRollRegenerationMultiple (JSON ported). CLIENT_USE_INDUCEMENT / CLIENT_USE_RE_ROLL answer.
+  `AgentPrompt::RegenerationReRolls`; ParityRunner got an explicit RE_ROLL_REGENERATION_MULTIPLE decline
+  (RandomStrategy had no arm: Java would have waited forever).
+- **Getting Even / Raise Dead** in BOTH apothecary steps: several keywords -> DialogSelectKeyword
+  (GETTING_EVEN, WAIT_FOR_GETTING_EVEN), several raise positions -> DialogSelectPosition (RAISE_DEAD);
+  CLIENT_KEYWORD_SELECTION / CLIENT_POSITION_SELECTION decoded (`Action::KeywordSelection` /
+  `PositionSelection`); the multi-block step now does both at all (it did neither). Shared helpers in
+  `bb2025/shared/step_apothecary.rs`.
+- **Engine bug found by the new dialog** (undead_sk bb2025 seed 10 i=124): bb2025 StepApothecary never
+  calls `handleInjurySideEffects`, so it has NO roster-default raise -- its only raise is the RIP branch.
+  Rust ran both: with undead's two raise positions the RIP branch used to no-op and the default raise
+  happened to produce Java's Zombie; asking the question raised a second player. Fix: bb2025 runs
+  `handle_pump_up` only; `raise_positions` lists Java's order -- `Roster.getPositions()` is a HashMap
+  (`util::java_hash_map::java_hash_map_order`; undead: Zombie before Skeleton).
+- Gates (cert9 jar, fresh JVM), steps + reports identical: bb2025 undead_sk/khemri_sk/nippon_sk x20,
+  necromantic x20 + high_elf/nurgle x20 (raises), goblin x20 + renegades_37733/old_world_alliance_treeman
+  x20 (Getting Even fired in 15 games), undead x20, amazon@0 x18; bb2020 necromantic_sk/human_sk x20;
+  bb2016 undead x20. Workspace tests green.
+
+Open, in order: (1) human smoke test (user); (2) P2 gate (client-view hash); (3) diff coverage for the
+fallback kinds; commit `sync-check` with the setups work. Not asked by design: bb2020's multi-block
+dialogs (no JSON form; the GUI server runs BB2025), re-roll dialogs' `modificationSkill` display field.
+
 **2026-11-24 (5): game log ON and the coach is asked where Java asks (open items 2 + 3 of (4) done).**
 
 Done (5):

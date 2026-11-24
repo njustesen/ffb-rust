@@ -1052,6 +1052,16 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
             player_ids: p.player_ids,
         }),
 
+        // Java CLIENT_KEYWORD_SELECTION (Getting Even) / CLIENT_POSITION_SELECTION (Raise Dead).
+        AnyClientCommand::ClientKeywordSelection(k) => Ok(Action::KeywordSelection {
+            player_id: k.player_id.ok_or_else(|| missing("playerId"))?,
+            keywords: k.keywords.iter().map(|kw| kw.get_name().to_string()).collect(),
+        }),
+        AnyClientCommand::ClientPositionSelection(p) => Ok(Action::PositionSelection {
+            team_id: p.team_id.ok_or_else(|| missing("teamId"))?,
+            positions: p.position,
+        }),
+
         // Java StepApothecaryMultiple CLIENT_USE_APOTHECARIES: no apothecary for any of them.
         AnyClientCommand::ClientUseApothecaries(_) => Ok(Action::Acknowledge),
         // Java StepBlockRollMultiple CLIENT_BLOCK_OR_RE_ROLL_CHOICE_FOR_TARGET.

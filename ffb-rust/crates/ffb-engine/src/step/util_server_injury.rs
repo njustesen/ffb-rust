@@ -586,11 +586,23 @@ pub fn handle_injury_side_effects(
     game: &mut Game,
     injury_result: &InjuryResult,
 ) -> Vec<ffb_model::events::GameEvent> {
+    let mut events = handle_raise_dead(game, injury_result.injury_context());
+    events.extend(handle_pump_up(game, injury_result));
+    events
+}
+
+/// Java `stateMechanic.handlePumpUp(step, injuryResult)` alone -- what bb2025 StepApothecary
+/// calls after `applyTo` (it never calls `handleInjurySideEffects`, so no roster-default raise:
+/// bb2025 raises from its own `PlayerState.RIP` branch).
+pub fn handle_pump_up(
+    game: &mut Game,
+    injury_result: &InjuryResult,
+) -> Vec<ffb_model::events::GameEvent> {
     use ffb_model::enums::Rules;
     use ffb_model::events::GameEvent;
     use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
 
-    let mut events = handle_raise_dead(game, injury_result.injury_context());
+    let mut events = Vec::new();
 
     // Java: mechanic.handlePumpUp(pStep, pInjuryResult) — dispatch on edition
     let injury_context = injury_result.injury_context();

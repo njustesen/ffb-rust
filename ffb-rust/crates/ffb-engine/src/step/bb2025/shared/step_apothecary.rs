@@ -368,68 +368,31 @@ impl StepApothecary {
     /// }
     /// ```
     ///
-    /// The `size() > 1` dialog is NOT ported: it needs an agent answer, and the harness has no
-    /// channel for a RAISE_DEAD position choice. Every BB2025 roster that reaches this branch today
-    /// has exactly one Lineman-keyword position, so the branch is unreachable rather than skipped --
-    /// but a roster with two would silently raise nothing here, so it is logged.
-    ///
-    /// Java's raise type comes from `injuryMechanic.raiseType(raisingTeam)`, unlike
-    /// `UtilServerInjury.handleRaiseDead`'s `hasVampireLord() ? THRALL : ZOMBIE`.
-    fn handle_rip_raise(&self, game: &mut Game) -> Vec<GameEvent> {
+    /// Returns the raise events, or the RAISE_DEAD position prompt when the raising team has more
+    /// than one position to choose from (answered by `Action::PositionSelection`).
+    fn handle_rip_raise(&self, game: &mut Game) -> (Vec<GameEvent>, Option<AgentPrompt>) {
         use ffb_model::enums::PS_RIP;
 
-        let ir = match &self.injury_result { Some(ir) => ir, None => return vec![] };
-        let defender_id = match ir.injury_context.defender_id.clone() { Some(id) => id, None => return vec![] };
+        let ir = match &self.injury_result { Some(ir) => ir, None => return (vec![], None) };
+        let defender_id = match ir.injury_context.defender_id.clone() { Some(id) => id, None => return (vec![], None) };
         // Java: `playerState` is the injury context's FINAL state, and the RIP arm is the `else` of
         // `isSi() && attacker != null`.
         let is_rip = ir.injury_context.injury.map(|ps| ps.base() == PS_RIP).unwrap_or(false);
         if !is_rip {
-            return vec![];
+            return (vec![], None);
         }
         let is_si = game.field_model.player_state(&defender_id).map(|s| s.is_si()).unwrap_or(false);
         if is_si && ir.injury_context.attacker_id.is_some() {
-            return vec![];
+            return (vec![], None);
         }
-
-        let defender = match game.player(&defender_id) { Some(p) => p.clone(), None => return vec![] };
-        let attacker = ir.injury_context.attacker_id.as_deref().and_then(|id| game.player(id).cloned());
-
-        // Java: game.getOtherTeam(defender.getTeam())
-        let raising_is_home = !game.team_home.has_player(&defender_id);
-        let raising_team = if raising_is_home { game.team_home.clone() } else { game.team_away.clone() };
-        let raising_team_result = game.game_result.team_result(raising_is_home).clone();
-
-        let mechanic = crate::step::util_server_injury::injury_mechanic_for(game.rules);
-        if !(mechanic.can_raise_dead(&raising_team, &raising_team_result, &defender)
-            || mechanic.can_raise_infected_players(&raising_team, &raising_team_result, attacker.as_ref(), &defender))
-        {
-            return vec![];
-        }
-
-        let raise_positions = mechanic.raise_positions(&raising_team, game.rules);
-        if raise_positions.len() != 1 {
-            if raise_positions.len() > 1 {
-                log::warn!(
-                    "bb2025 raise-dead position choice not ported: {} candidates for roster {}",
-                    raise_positions.len(),
-                    raising_team.roster_id
-                );
+        let attacker_id = ir.injury_context.attacker_id.clone();
+        match raise_dead_positions(game, &defender_id, attacker_id.as_deref()) {
+            Some((_, positions)) if positions.len() == 1 => (raise_dead_player(game, &defender_id, &positions[0]), None),
+            Some((raising_team_id, positions)) if positions.len() > 1 => {
+                (vec![], Some(show_raise_dead_dialog(game, raising_team_id, &positions)))
             }
-            return vec![];
+            _ => (vec![], None),
         }
-
-        let raise_type = mechanic.raise_type(&raising_team);
-        crate::step::util_server_injury::raise_player(
-            game,
-            raising_is_home,
-            &defender_id,
-            &defender.name,
-            raise_type,
-            &raise_positions[0],
-            // Java: sendRaisedPlayer(..., raiseType == RaiseType.ROTTER) — a Nurgle raise reports
-            // nurglesRot=true (high_elf_vs_nurgle bb2025 seed 1).
-            raise_type == ffb_model::util::raise_type::RaiseType::ROTTER,
-        )
     }
 
     /// Java StepApothecary.executeStep tail — Getting Even + injury side effects. Split out so
@@ -444,7 +407,11 @@ impl StepApothecary {
             // but the chosen keyword only feeds the report / addHatred (client/model-only) and the
             // parity harness answers that dialog via non-seeded RandomStrategy — consuming no seeded
             // dice. So the d6 in StepGettingEven is the only game die, and we push the step directly.
-            let getting_even: Option<Vec<SequenceStep>> = self.injury_result.as_ref().and_then(|ir| {
+            // Java: `if (playerState.isSi() && attacker != null)` -- the keywords of the attacker's
+            // position the defender can get even with (see `getting_even_keywords`). One keyword
+            // pushes GETTING_EVEN (which rolls a d6) directly; several are put to the defender's
+            // coach in a SELECT_KEYWORD dialog (WAIT_FOR_GETTING_EVEN), answered in handle_command.
+            let getting_even: Option<(String, Vec<Keyword>)> = self.injury_result.as_ref().and_then(|ir| {
                 let defender_id = ir.injury_context.defender_id.clone()?;
                 let attacker_id = ir.injury_context.attacker_id.clone()?;
                 let is_si = game.field_model.player_state(&defender_id)
@@ -453,58 +420,8 @@ impl StepApothecary {
                 if !is_si {
                     return None;
                 }
-                // Java: attacker.getPosition().getKeywords().filter(Keyword::isCanGetEvenWith)
-                // (minus the defender's canRerollSingleSkull keywords — no goblin position has
-                // that skill, so the subtraction is a no-op for the only roster carrying keywords).
-                // Java collects the qualifying keywords into a Set, sorts it (enum ORDINAL
-                // order -- `Keyword` is Comparable by declaration position, not by name) and,
-                // when exactly one qualifies, pushes GETTING_EVEN with it. Rust pushed the step
-                // with no keyword at all, so the report's `keyword` was always "".
-                let mut keywords: Vec<Keyword> = game.player(&attacker_id)
-                    .map(|attacker| attacker.keywords.iter()
-                        .map(|k| Keyword::for_name(k))
-                        .filter(|k| k.is_can_get_even_with())
-                        .collect::<Vec<_>>())
-                    .unwrap_or_default();
-                // Java: UtilCards.getSkillWithProperty(defender, canRerollSingleSkull).ifPresent(
-                //   skill -> skill.evaluator().values(skill, defender).stream().map(Keyword::forName)
-                //            .forEach(availableKeywords::remove))
-                // -- a keyword the defender ALREADY hates (Hatred's values: the configured one plus
-                // any temporary ones) cannot be gained again. The comment that used to sit here
-                // called this a no-op "for the only roster carrying keywords" (goblin); the Old World
-                // Alliance Troll Slayer carries Hatred(troll), and a Renegade Troll put it in the SI
-                // box: Rust pushed GETTING_EVEN and rolled a d6 Java never rolled
-                // (renegades_37733 vs old_world_alliance_treeman bb2025 seed 2 i=91, BACKLOG §I.7).
-                if let Some(defender) = game.player(&defender_id) {
-                    if defender.has_skill_property_in(game.rules, ffb_model::model::property::named_properties::NamedProperties::CAN_REROLL_SINGLE_SKULL) {
-                        let mut hated: Vec<String> = defender.temporary_skill_values(ffb_model::enums::SkillId::Hatred).into_iter().collect();
-                        if let Some(v) = defender.skill_value_excluding_temporary_ones(ffb_model::enums::SkillId::Hatred) {
-                            hated.push(v);
-                        }
-                        for v in hated {
-                            let k = Keyword::for_name(&v);
-                            keywords.retain(|kw| *kw != k);
-                        }
-                    }
-                }
-                if keywords.is_empty() {
-                    return None;
-                }
-                keywords.sort_by_key(|k| *k as usize);
-                keywords.dedup();
-                // When more than one qualifies Java shows a SELECT_KEYWORD dialog that the parity
-                // harness answers with a non-seeded RandomStrategy, so the pick cannot be mirrored
-                // exactly; the first sorted keyword matches Java whenever the set has one member,
-                // which is every case the drafted squads produce. The value is report-only
-                // (`addHatred` is client/model-only), so a mismatch cannot move the game.
-                let keyword_name = keywords[0].get_name().to_string();
-                Some(vec![SequenceStep::with_params(
-                    StepId::GettingEven,
-                    vec![
-                        StepParameter::PlayerId(defender_id),
-                        StepParameter::Keyword(keyword_name),
-                    ],
-                )])
+                let keywords = getting_even_keywords(game, &attacker_id, &defender_id);
+                if keywords.is_empty() { None } else { Some((defender_id, keywords)) }
             });
 
             // Java StepApothecary.java:382-407 -- the `else if (playerState.getBase() ==
@@ -513,24 +430,44 @@ impl StepApothecary {
             // Lineman-keyword positions -- which is BB2025's replacement for BB2016/BB2020's single
             // `raisedPositionId`. A roster that declares no raise position therefore still raises in
             // BB2025 (khemri: `undead: true`, `Masters of Undeath` on the team spec, one Lineman
-            // position), and `UtilServerInjury.handleRaiseDead`'s roster-default route -- which both
-            // engines run first -- correctly does nothing for it.
-            //
-            // `canRaiseDead` requires `raisedDead == 0`, so this cannot double-raise after the
-            // roster-default route already raised: that path increments `raised_dead` first.
-            let raise_events = self.handle_rip_raise(game);
+            // position). It is BB2025's ONLY raise: bb2025 StepApothecary never calls
+            // `UtilServerInjury.handleInjurySideEffects`, so the roster-default `handleRaiseDead`
+            // route (BB2016/BB2020) does not run (see the side effects below).
+            let (raise_events, raise_prompt) = self.handle_rip_raise(game);
 
             // Java: UtilServerInjury.handleInjurySideEffects(this, fInjuryResult)
             let side_events = if let Some(ir) = &self.injury_result {
-                crate::step::util_server_injury::handle_injury_side_effects(game, ir)
+                // bb2016/bb2020 StepApothecary: UtilServerInjury.handleInjurySideEffects (the
+                // roster-default raise + Pump Up the Crowd). bb2025 StepApothecary calls only
+                // handlePumpUp and raises from its RIP branch (handle_rip_raise): running the
+                // default raise as well raised a second player there (undead_sk bb2025 seed 10).
+                if game.rules == ffb_model::enums::Rules::Bb2025 {
+                    crate::step::util_server_injury::handle_pump_up(game, ir)
+                } else {
+                    crate::step::util_server_injury::handle_injury_side_effects(game, ir)
+                }
             } else {
                 vec![]
             };
             let mut out = StepOutcome::next();
+            match getting_even {
+                Some((defender_id, keywords)) if keywords.len() == 1 => {
+                    out = out.push_seq(getting_even_sequence(&defender_id, keywords[0]));
+                }
+                Some((defender_id, keywords)) => {
+                    out = StepOutcome::cont().with_prompt(show_getting_even_dialog(game, &defender_id, &keywords));
+                    if let Some(ir) = self.injury_result.as_mut() {
+                        ir.injury_context.apothecary_status = ApothecaryStatus::WaitForGettingEven;
+                    }
+                }
+                None => {}
+            }
+            if let Some(prompt) = raise_prompt {
+                out = StepOutcome::cont().with_prompt(prompt);
+            }
             for ev in raise_events { out = out.with_event(ev); }
             for ev in pending_events { out = out.with_event(ev); }
             for ev in side_events { out = out.with_event(ev); }
-            if let Some(seq) = getting_even { out = out.push_seq(seq); }
             out
         }
     }
@@ -693,6 +630,136 @@ impl Default for StepApothecary {
     fn default() -> Self { Self::new() }
 }
 
+/// Java bb2025 StepApothecary / StepApothecaryMultiple, Getting Even:
+/// `attacker.getPosition().getKeywords().filter(Keyword::isCanGetEvenWith)`, minus the keywords the
+/// defender already hates (`UtilCards.getSkillWithProperty(defender, canRerollSingleSkull)` ->
+/// `skill.evaluator().values(skill, defender)`), as a Set sorted by enum ORDINAL (`Keyword` is
+/// Comparable by declaration position).
+///
+/// The hated-keyword subtraction matters: the Old World Alliance Troll Slayer carries
+/// Hatred(troll), and a Renegade Troll put it in the SI box -- Rust once rolled a Getting Even d6
+/// Java never rolled (renegades_37733 vs old_world_alliance_treeman bb2025 seed 2 i=91, §I.7).
+pub(crate) fn getting_even_keywords(game: &Game, attacker_id: &str, defender_id: &str) -> Vec<Keyword> {
+    let mut keywords: Vec<Keyword> = game.player(attacker_id)
+        .map(|attacker| attacker.keywords.iter()
+            .map(|k| Keyword::for_name(k))
+            .filter(|k| k.is_can_get_even_with())
+            .collect::<Vec<_>>())
+        .unwrap_or_default();
+    if let Some(defender) = game.player(defender_id) {
+        if defender.has_skill_property_in(game.rules, ffb_model::model::property::named_properties::NamedProperties::CAN_REROLL_SINGLE_SKULL) {
+            let mut hated: Vec<String> = defender.temporary_skill_values(ffb_model::enums::SkillId::Hatred).into_iter().collect();
+            if let Some(v) = defender.skill_value_excluding_temporary_ones(ffb_model::enums::SkillId::Hatred) {
+                hated.push(v);
+            }
+            for v in hated {
+                let k = Keyword::for_name(&v);
+                keywords.retain(|kw| *kw != k);
+            }
+        }
+    }
+    keywords.sort_by_key(|k| *k as usize);
+    keywords.dedup();
+    keywords
+}
+
+/// Java `pushGettingEven(defenderId, keyword)`: a GETTING_EVEN step with PLAYER_ID and KEYWORD.
+pub(crate) fn getting_even_sequence(defender_id: &str, keyword: Keyword) -> Vec<SequenceStep> {
+    vec![SequenceStep::with_params(
+        StepId::GettingEven,
+        vec![
+            StepParameter::PlayerId(defender_id.to_string()),
+            StepParameter::Keyword(keyword.get_name().to_string()),
+        ],
+    )]
+}
+
+/// Java `showDialog(new DialogSelectKeywordParameter(defenderId, keywords, GETTING_EVEN, 1, 1),
+/// !game.getActingTeam().hasPlayer(defender))`.
+pub(crate) fn show_getting_even_dialog(game: &mut Game, defender_id: &str, keywords: &[Keyword]) -> AgentPrompt {
+    use ffb_model::dialog::dialog_parameter_factory::DialogParameter;
+    use ffb_model::dialog::dialog_select_keyword_parameter::DialogSelectKeywordParameter;
+    let names: Vec<String> = keywords.iter().map(|k| k.get_name().to_string()).collect();
+    let acting_has_defender = if game.home_playing { game.team_home.has_player(defender_id) } else { game.team_away.has_player(defender_id) };
+    crate::util::util_server_dialog::UtilServerDialog::show_dialog(game, DialogParameter::SelectKeyword(DialogSelectKeywordParameter {
+        keywords: names.clone(),
+        player_id: Some(defender_id.to_string()),
+        keyword_choice_mode: Some("GETTING_EVEN".to_string()),
+        min_select: 1,
+        max_select: 1,
+    }), !acting_has_defender);
+    AgentPrompt::SelectKeyword { player_id: defender_id.to_string(), keywords: names }
+}
+
+/// Java (bb2025): the raising team -- `game.getOtherTeam(defender.getTeam())` -- and its
+/// `injuryMechanic.raisePositions(raisingTeam)`, when `canRaiseDead || canRaiseInfectedPlayers`.
+pub(crate) fn raise_dead_positions(game: &Game, defender_id: &str, attacker_id: Option<&str>)
+    -> Option<(String, Vec<ffb_model::model::roster_position::RosterPosition>)>
+{
+    let defender = game.player(defender_id)?.clone();
+    let attacker = attacker_id.and_then(|id| game.player(id).cloned());
+    let raising_is_home = !game.team_home.has_player(defender_id);
+    let raising_team = if raising_is_home { &game.team_home } else { &game.team_away };
+    let raising_team_result = game.game_result.team_result(raising_is_home);
+    let mechanic = crate::step::util_server_injury::injury_mechanic_for(game.rules);
+    if !(mechanic.can_raise_dead(raising_team, raising_team_result, &defender)
+        || mechanic.can_raise_infected_players(raising_team, raising_team_result, attacker.as_ref(), &defender))
+    {
+        return None;
+    }
+    Some((raising_team.id.clone(), mechanic.raise_positions(raising_team, game.rules)))
+}
+
+/// Java `raisePlayer(...)`: `UtilServerInjury.raisePlayer` with `injuryMechanic.raiseType(raisingTeam)`
+/// (unlike `UtilServerInjury.handleRaiseDead`'s `hasVampireLord() ? THRALL : ZOMBIE`), then
+/// `sendRaisedPlayer(..., raiseType == ROTTER)` -- a Nurgle raise reports nurglesRot=true
+/// (high_elf_vs_nurgle bb2025 seed 1).
+pub(crate) fn raise_dead_player(
+    game: &mut Game,
+    defender_id: &str,
+    position: &ffb_model::model::roster_position::RosterPosition,
+) -> Vec<GameEvent> {
+    let defender_name = match game.player(defender_id) { Some(p) => p.name.clone(), None => return vec![] };
+    let raising_is_home = !game.team_home.has_player(defender_id);
+    let mechanic = crate::step::util_server_injury::injury_mechanic_for(game.rules);
+    let raise_type = mechanic.raise_type(if raising_is_home { &game.team_home } else { &game.team_away });
+    crate::step::util_server_injury::raise_player(
+        game, raising_is_home, defender_id, &defender_name, raise_type, position,
+        raise_type == ffb_model::util::raise_type::RaiseType::ROTTER,
+    )
+}
+
+/// Java CLIENT_POSITION_SELECTION: `teamById.getRoster().getPositionById(position[0])` -> raisePlayer.
+pub(crate) fn raise_dead_player_as(game: &mut Game, defender_id: &str, position_id: &str) -> Vec<GameEvent> {
+    let raising_is_home = !game.team_home.has_player(defender_id);
+    let mechanic = crate::step::util_server_injury::injury_mechanic_for(game.rules);
+    let raising_team = if raising_is_home { &game.team_home } else { &game.team_away };
+    let position = mechanic.raise_positions(raising_team, game.rules).into_iter().find(|p| p.id == position_id);
+    match position {
+        Some(position) => raise_dead_player(game, defender_id, &position),
+        None => vec![],
+    }
+}
+
+/// Java `showDialog(new DialogSelectPositionParameter(positionIds, RAISE_DEAD, 1, 1, raisingTeamId), true)`.
+pub(crate) fn show_raise_dead_dialog(
+    game: &mut Game,
+    raising_team_id: String,
+    positions: &[ffb_model::model::roster_position::RosterPosition],
+) -> AgentPrompt {
+    use ffb_model::dialog::dialog_parameter_factory::DialogParameter;
+    use ffb_model::dialog::dialog_select_position_parameter::DialogSelectPositionParameter;
+    let ids: Vec<String> = positions.iter().map(|p| p.id.clone()).collect();
+    crate::util::util_server_dialog::UtilServerDialog::show_dialog(game, DialogParameter::SelectPosition(DialogSelectPositionParameter {
+        positions: ids.iter().cloned().map(Some).collect(),
+        position_choice_mode: Some("RAISE_DEAD".to_string()),
+        min_select: 1,
+        max_select: 1,
+        team_id: Some(raising_team_id.clone()),
+    }), true);
+    AgentPrompt::SelectPosition { team_id: raising_team_id, available_positions: ids }
+}
+
 impl Step for StepApothecary {
     fn id(&self) -> StepId { StepId::Apothecary }
 
@@ -761,6 +828,30 @@ impl Step for StepApothecary {
                     if let Some(ir) = self.injury_result.as_mut() { ir.passed_regeneration(); }
                     return self.execute_step(game, rng);
                 }
+            }
+            // Java CLIENT_KEYWORD_SELECTION (WAIT_FOR_GETTING_EVEN): hideDialog, one GETTING_EVEN
+            // per chosen keyword (pushed in reverse, so they run in the chosen order), NEXT_STEP.
+            Action::KeywordSelection { player_id, keywords }
+                if self.injury_result.as_ref().map(|ir| ir.injury_context.apothecary_status)
+                    == Some(ApothecaryStatus::WaitForGettingEven) =>
+            {
+                crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
+                let mut out = StepOutcome::next();
+                for keyword in keywords.iter().rev() {
+                    out = out.push_seq(getting_even_sequence(player_id, Keyword::for_name(keyword)));
+                }
+                return out;
+            }
+            // Java CLIENT_POSITION_SELECTION: hideDialog, raise the dead player as the chosen
+            // position of the selecting team, NEXT_STEP.
+            Action::PositionSelection { positions, .. } => {
+                crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
+                let mut out = StepOutcome::next();
+                let defender_id = self.injury_result.as_ref().and_then(|ir| ir.injury_context.defender_id.clone());
+                if let (Some(defender_id), Some(position_id)) = (defender_id, positions.first()) {
+                    for ev in raise_dead_player_as(game, &defender_id, position_id) { out = out.with_event(ev); }
+                }
+                return out;
             }
             // Java: CLIENT_APOTHECARY_CHOICE → handleApothecaryChoice(state, seriousInjury)
             Action::ApothecaryChoice { player_state, serious_injury } => {
@@ -1392,5 +1483,91 @@ mod tests {
         step.injury_result = Some(ir);
         step.roll_apothecary(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::APOTHECARY_ROLL));
+    }
+
+    /// Java bb2025 StepApothecary: an attacker with SEVERAL keywords the defender can get even
+    /// with -> DialogSelectKeywordParameter(GETTING_EVEN) to the defender's coach
+    /// (WAIT_FOR_GETTING_EVEN); the answer pushes one GETTING_EVEN per chosen keyword.
+    #[test]
+    fn several_getting_even_keywords_ask_the_defenders_coach() {
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_game();
+        game.team_home.players.push(Player { id: "d1".into(), ..Default::default() });
+        game.team_away.players.push(Player { id: "a1".into(), keywords: vec!["Troll".into(), "Goblin".into()], ..Default::default() });
+        game.field_model.set_player_coordinate("d1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("d1", PlayerState::new(PS_SERIOUS_INJURY));
+        let mut step = StepApothecary::default();
+        step.apothecary_mode = Some(ApothecaryMode::Defender);
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context.defender_id = Some("d1".into());
+        ir.injury_context.attacker_id = Some("a1".into());
+        ir.injury_context.set_injury(PlayerState::new(PS_SERIOUS_INJURY));
+        ir.injury_context.apothecary_status = ApothecaryStatus::NoApothecary;
+        step.injury_result = Some(ir);
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, crate::step::framework::StepAction::Continue);
+        assert!(out.pushes.is_empty(), "nothing pushed before the coach answers");
+        // Java sorts the keyword Set by enum ordinal: GOBLIN before TROLL.
+        assert!(matches!(out.prompt, Some(AgentPrompt::SelectKeyword { ref player_id, ref keywords })
+            if player_id == "d1" && keywords == &vec!["Goblin".to_string(), "Troll".to_string()]), "{:?}", out.prompt);
+        assert!(matches!(game.dialog_parameter,
+            Some(ffb_model::dialog::dialog_parameter_factory::DialogParameter::SelectKeyword(_))));
+
+        let answer = Action::KeywordSelection { player_id: "d1".into(), keywords: vec!["Troll".into()] };
+        let out = step.handle_command(&answer, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, crate::step::framework::StepAction::NextStep);
+        assert!(game.dialog_parameter.is_none());
+        let pushed: Vec<_> = out.pushes.iter().flatten().collect();
+        assert_eq!(pushed.len(), 1);
+        assert_eq!(pushed[0].step_id, StepId::GettingEven);
+        assert!(pushed[0].params.iter().any(|p| matches!(p, StepParameter::Keyword(k) if k == "Troll")));
+    }
+
+    /// Regression (undead_sk bb2025 seed 10 i=124): bb2025 StepApothecary raises ONLY from its
+    /// RIP branch -- it never runs handleInjurySideEffects' roster-default raise. Undead have two
+    /// Lineman-keyword positions, so Java asks the raising coach (SELECT_POSITION, RAISE_DEAD) in
+    /// its roster HashMap order -- Zombie before Skeleton -- and raises ONE player. Rust ran the
+    /// default raise as well and raised two (Zombie, then the answered Skeleton).
+    #[test]
+    fn a_bb2025_raise_with_two_positions_asks_once_and_raises_once() {
+        use ffb_model::enums::PS_RIP;
+        use ffb_model::model::player::Player;
+        use ffb_model::types::FieldCoordinate;
+        let mut home = test_team("home", 0);
+        home.roster_id = "undead.lrb6".into();
+        home.special_rules = vec!["Masters of Undeath".into()];
+        let mut game = Game::new(home, test_team("away", 0), ffb_model::enums::Rules::Bb2025);
+        let mut d = Player { id: "d1".into(), name: "Dead One".into(), nr: 3, ..Default::default() };
+        d.strength = 3;
+        game.team_away.players.push(d);
+        game.field_model.set_player_coordinate("d1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("d1", PlayerState::new(PS_RIP));
+        let mut step = StepApothecary::default();
+        step.apothecary_mode = Some(ApothecaryMode::Defender);
+        let mut ir = InjuryResult::new(ApothecaryMode::Defender);
+        ir.injury_context.defender_id = Some("d1".into());
+        ir.injury_context.set_injury(PlayerState::new(PS_RIP));
+        ir.injury_context.apothecary_status = ApothecaryStatus::NoApothecary;
+        step.injury_result = Some(ir);
+
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(game.team_home.players.is_empty(), "nothing raised before the coach answers");
+        let positions = match out.prompt {
+            Some(AgentPrompt::SelectPosition { ref team_id, ref available_positions }) => {
+                assert_eq!(team_id, "home");
+                available_positions.clone()
+            }
+            ref other => panic!("expected the RAISE_DEAD question, got {other:?}"),
+        };
+        assert_eq!(positions, vec!["undead.zombie".to_string(), "undead.skeleton".to_string()]);
+
+        let answer = Action::PositionSelection { team_id: "home".into(), positions: vec!["undead.zombie".into()] };
+        let out = step.handle_command(&answer, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, crate::step::framework::StepAction::NextStep);
+        assert_eq!(game.team_home.players.len(), 1, "exactly one raise");
+        assert_eq!(game.team_home.players[0].position_id, "undead.zombie");
+        assert_eq!(game.game_result.home.raised_dead, 1);
     }
 }

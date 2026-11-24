@@ -547,6 +547,16 @@ mod tests {
             DialogParameter::OpponentBlockSelectionProperties(
                 crate::dialog::dialog_opponent_block_selection_properties_parameter::DialogOpponentBlockSelectionPropertiesParameter {
                     team_id: Some("t2".into()), block_rolls: vec![roll] }),
+            DialogParameter::ReRollRegenerationMultiple(DialogReRollRegenerationMultipleParameter {
+                player_ids: vec!["p1".into(), "p2".into()], inducement_type: Some("mortuaryAssistant".into()), re_roll_options: vec![] }),
+            DialogParameter::ReRollRegenerationMultiple(DialogReRollRegenerationMultipleParameter {
+                player_ids: vec!["p1".into(), "p2".into()], inducement_type: None, re_roll_options: vec![] }),
+            DialogParameter::UseInducement(DialogUseInducementParameter { team_id: Some("t1".into()),
+                inducement_types: vec![Some("mortuaryAssistant".into())], cards: vec![], player_id: Some("p1".into()) }),
+            DialogParameter::SelectKeyword(DialogSelectKeywordParameter { keywords: vec!["Goblin".into(), "Troll".into()],
+                player_id: Some("p1".into()), keyword_choice_mode: Some("GETTING_EVEN".into()), min_select: 1, max_select: 1 }),
+            DialogParameter::SelectPosition(DialogSelectPositionParameter { positions: vec![Some("pos1".into()), Some("pos2".into())],
+                position_choice_mode: Some("RAISE_DEAD".into()), min_select: 1, max_select: 1, team_id: Some("t2".into()) }),
         ];
         for d in dialogs {
             let json = d.to_json_value(Rules::Bb2025).unwrap_or_else(|e| panic!("{:?}: {e}", d.get_id()));
