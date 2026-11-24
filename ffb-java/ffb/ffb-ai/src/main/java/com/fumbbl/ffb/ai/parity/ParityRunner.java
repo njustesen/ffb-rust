@@ -2310,6 +2310,18 @@ public class ParityRunner {
             }
             System.err.println(sb.toString());
         }
+        // BACKLOG §P P2 gate: the whole client-visible game before the step (Game.toJsonValue, what
+        // a client holds), next to Rust's twin when FFB_CLIENT_VIEW_DIR is set.
+        String viewDir = System.getenv("FFB_CLIENT_VIEW_DIR");
+        if (viewDir != null) {
+            java.io.File file = new java.io.File(viewDir, "seed_" + currentSeed + "_java_view.jsonl");
+            try (java.io.Writer w = new java.io.OutputStreamWriter(
+                new java.io.FileOutputStream(file, true), java.nio.charset.StandardCharsets.UTF_8)) {
+                w.write("{\"i\":" + stepIndex + ",\"game\":" + game.toJsonValue().toString() + "}\n");
+            } catch (java.io.IOException e) {
+                System.err.println("CLIENT_VIEW write failed: " + e.getMessage());
+            }
+        }
         pending.add(new PendingStep(stepIndex++, turn, half, active, hash, chosen));
     }
 

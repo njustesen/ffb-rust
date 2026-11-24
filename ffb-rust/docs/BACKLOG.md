@@ -12069,9 +12069,27 @@ Done (6):
   server now sends it and diffs the rest from the client's `ClientCommandHandlerAddPlayer` result
   (unit-tested; no live raise happened in the 10 games). The processor's NPE message names the skill.
 
-Open, in order: (1) human smoke test (user); (2) P2 gate (client-view hash); commit `sync-check` with
-the setups work (the corpus `ffb-replay sync-check` still lists the prayer/enhancement/Getting-Even/chomp
-fallback kinds of (4)). Not asked by design: bb2020's multi-block
+- **P2 gate tooling** (the "client-view hash", done as a full compare): `FFB_CLIENT_VIEW_DIR=<dir>` makes
+  ParityRunner.recordStep and ffb-parity runner.rs dump `Game.toJsonValue()` before every recorded step
+  (`seed_<n>_{java,rust}_view.jsonl`); `python -I scripts/client_view_check.py <dir>` maps Java ids to
+  Rust ids (side + shirt nr, raised `R<n>`), keys player lists by id, ignores set order, and prints the
+  differing path patterns + `CLIENT VIEW: <steps> steps, <identical> identical`. Use the in-repo jar
+  (frozen copy `D:/ffb_star/bin/ffb-ai-view.jar`). First run, bb2025 human/chaos seeds 1-2: 0/577
+  identical -- the P2 WORKLIST:
+  - harness/setup only (align the harness game setup or document as ignored): gameOptions array,
+    coach/team/player names, `teamX.roster` absent in Rust's team JSON, positionIconIndex, playerStatus,
+    `testing`, gameTime/turnTime/started.
+  - engine model gaps (client-visible; port 1:1, gate each): `lastTurnMode` never set (Java
+    `setTurnMode` records it -- Rust writes `turn_mode` directly at hundreds of sites: needs a setter
+    sweep); `turnDataHome.homeData` false; `penaltyScore` 0 vs Java -1; blood spots never added;
+    move squares and dice decorations left over at activation start; player results lack
+    sendToBoxReason/Turn/Half/ByPlayerId, `casualties`, `seriousInjury`; team results lack
+    ripSuffered/seriousInjurySuffered; Getting Even's hatred (`gainedHatred`, temporary skill/
+    modifier/property maps) not recorded; a team player's `usedSkills` carries Horns where Java has none.
+
+Open, in order: (1) human smoke test (user); (2) the P2 worklist above, until the client-view check
+passes on the mirror/cross suites (the corpus `ffb-replay sync-check` still lists the
+prayer/enhancement/Getting-Even/chomp fallback kinds of (4)). Not asked by design: bb2020's multi-block
 dialogs (no JSON form; the GUI server runs BB2025), re-roll dialogs' `modificationSkill` display field.
 
 **2026-11-24 (5): game log ON and the coach is asked where Java asks (open items 2 + 3 of (4) done).**

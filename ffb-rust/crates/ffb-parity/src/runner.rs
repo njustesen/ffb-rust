@@ -705,6 +705,10 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         };
         let half = engine.game.half;
         let pre_hash = state_hash(&engine.game);
+        // BACKLOG §P P2 gate: the whole client-visible game (Java JSON) before the step, written
+        // next to Java's twin when FFB_CLIENT_VIEW_DIR is set (scripts/client_view_check.py).
+        let pre_view = std::env::var_os("FFB_CLIENT_VIEW_DIR")
+            .map(|_| engine.game.to_json_value().unwrap_or_else(|e| serde_json::json!({ "error": e })));
         let active_str = if engine.game.home_playing { "home" } else { "away" };
         let pre_rng = engine.rng_call_count();
         let pre_state_str = if verbose || std::env::var_os("FFB_TRACE").is_some() {
@@ -802,6 +806,13 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         if log_step && turn_nr >= 1 {
             if let Some(ref ids) = pre_idstate {
                 eprintln!("RIDSTATE i={} {}", step_index, ids);
+            }
+            if let (Some(view), Some(dir)) = (&pre_view, std::env::var_os("FFB_CLIENT_VIEW_DIR")) {
+                use std::io::Write;
+                let path = std::path::Path::new(&dir).join(format!("seed_{seed}_rust_view.jsonl"));
+                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                    let _ = writeln!(f, "{}", serde_json::json!({ "i": step_index, "game": view }));
+                }
             }
             pending_steps.push(PendingStep {
                 i: step_index,
