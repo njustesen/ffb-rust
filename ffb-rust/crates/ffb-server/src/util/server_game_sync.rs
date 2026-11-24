@@ -265,13 +265,83 @@ pub fn sync_game(game_state: &mut GameState, session_manager: &Mutex<SessionMana
     }
 }
 
+/// Java `UtilServerInjury.sendRaisedPlayer` -> `ServerCommunication.sendAddPlayer`: a player that
+/// joins a team mid-game (Raise Dead) is not a model change but its own `serverAddPlayer`, sent
+/// as is to every session. `before` (the clients' game) gets what the client's
+/// `ClientCommandHandlerAddPlayer` does with it -- `team.addPlayer`, `setPlayerState`,
+/// `UtilBox.putPlayerIntoBox`, the send-to-box fields of its player result -- so the model sync
+/// that follows only carries the rest.
+fn send_added_players(game_state: &mut GameState, before: &mut Game, after: &Game, session_manager: &Mutex<SessionManager>) {
+    let added = |home: bool| -> Vec<ffb_model::model::player::Player> {
+        let (b, a) = if home { (&before.team_home, &after.team_home) } else { (&before.team_away, &after.team_away) };
+        a.players.iter().filter(|p| !b.has_player(&p.id)).cloned().collect()
+    };
+    let (home_added, away_added) = (added(true), added(false));
+    if home_added.is_empty() && away_added.is_empty() {
+        return;
+    }
+    let Ok(after_json) = after.to_json_value() else { return };
+    for (home, players) in [(true, home_added), (false, away_added)] {
+        let team_key = if home { "teamHome" } else { "teamAway" };
+        let team_id = if home { after.team_home.id.clone() } else { after.team_away.id.clone() };
+        for player in players {
+            let player_json = after_json[team_key]["playerArray"].as_array()
+                .and_then(|ps| ps.iter().find(|p| p["playerId"].as_str() == Some(player.id.as_str())))
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            let state = after.field_model.player_state(&player.id).unwrap_or_default();
+            let result = after.game_result.team_result(home).player_result(&player.id).cloned().unwrap_or_default();
+            let result_json = after_json["gameResult"][if home { "teamResultHome" } else { "teamResultAway" }]["playerResults"]
+                .as_array()
+                .and_then(|rs| rs.iter().find(|r| r["playerId"].as_str() == Some(player.id.as_str())))
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            let mut o = serde_json::Map::new();
+            o.insert("netCommandId".into(), "serverAddPlayer".into());
+            o.insert("commandNr".into(), game_state.generate_command_nr().into());
+            o.insert("teamId".into(), team_id.clone().into());
+            o.insert("player".into(), player_json);
+            o.insert("playerState".into(), (state.0 as i64).into());
+            for k in ["sendToBoxReason", "sendToBoxTurn", "sendToBoxHalf"] {
+                o.insert(k.into(), result_json.get(k).cloned().unwrap_or(serde_json::Value::Null));
+            }
+            let text = client_form(serde_json::Value::Object(o)).to_string();
+            {
+                let sm = session_manager.lock().unwrap();
+                sm.send_home_and_spectators(game_state.get_id(), &text);
+                sm.send_away(game_state.get_id(), &text);
+            }
+            client_add_player(before, home, player, state, &result);
+        }
+    }
+}
+
+/// Java `ClientCommandHandlerAddPlayer.handleNetCommand` on the clients' game.
+fn client_add_player(
+    game: &mut Game,
+    home: bool,
+    player: ffb_model::model::player::Player,
+    state: ffb_model::enums::PlayerState,
+    result: &ffb_model::model::game_result::PlayerResult,
+) {
+    let id = player.id.clone();
+    if home { game.team_home.players.push(player); } else { game.team_away.players.push(player); }
+    game.field_model.set_player_state(&id, state);
+    ffb_model::util::util_box::UtilBox::put_player_into_box(game, &id);
+    let pr = game.game_result.team_result_mut(home).player_result_mut(&id);
+    pr.send_to_box_reason = result.send_to_box_reason;
+    pr.send_to_box_turn = result.send_to_box_turn;
+    pr.send_to_box_half = result.send_to_box_half;
+}
+
 /// One `serverModelSync` from the game the clients hold to `after`, with the engine's reports up
 /// to `upto` (all of them when `None`).
 fn sync_to(game_state: &mut GameState, after: Game, upto: Option<usize>, session_manager: &Mutex<SessionManager>) {
-    let Some(before) = game_state.synced.clone() else {
+    let Some(mut before) = game_state.synced.clone() else {
         send_game(game_state, Some(after), session_manager);
         return;
     };
+    send_added_players(game_state, &mut before, &after, session_manager);
     let list = match diff(&before, &after) {
         Ok(list) => list,
         Err(paths) => {
@@ -342,6 +412,40 @@ mod tests {
             "homeTeam": false, "number": 3}));
         assert_eq!(r, json!({"reportId": "prayerAmount", "teamValue": 2, "opponentTeamValue": 1,
             "homeTeam": true, "number": 3}));
+    }
+
+    /// A raised player (Raise Dead) reaches the clients as `serverAddPlayer`, not as a model
+    /// change: after the client's handling of that command the rest of the step diffs and passes
+    /// the self-check, where the bare diff could not express the new player at all.
+    #[test]
+    fn a_raised_player_travels_as_add_player_then_diffs() {
+        use ffb_model::enums::{PlayerState, Rules, PS_RESERVE};
+        use ffb_model::model::player::Player;
+        use ffb_model::model::team::Team;
+        let mut home = Team::default();
+        home.id = "h".into();
+        home.players.push(Player { id: "h1".into(), nr: 1, ..Default::default() });
+        let mut away = Team::default();
+        away.id = "a".into();
+        away.players.push(Player { id: "a1".into(), nr: 1, ..Default::default() });
+        let mut before = Game::new(home, away, Rules::Bb2025);
+        before.options.init_from(&json!({"gameOptionArray": [
+            {"gameOptionId": "rulesVersion", "gameOptionValue": "BB2025"}]})).unwrap();
+
+        // The engine raises a1 onto the home team.
+        let mut after = before.clone();
+        let raised = Player { id: "a1R1".into(), nr: 2, ..Default::default() };
+        after.team_home.players.push(raised.clone());
+        after.field_model.set_player_state("a1R1", PlayerState::new(PS_RESERVE));
+        ffb_model::util::util_box::UtilBox::put_player_into_box(&mut after, "a1R1");
+        after.game_result.team_result_mut(true).raised_dead = 1;
+        after.game_result.team_result_mut(true).player_result_mut("a1R1");
+
+        assert!(diff(&before, &after).is_err(), "the bare diff cannot add a player");
+        let result = after.game_result.team_result(true).player_result("a1R1").cloned().unwrap();
+        client_add_player(&mut before, true, raised, PlayerState::new(PS_RESERVE), &result);
+        let list = diff(&before, &after).expect("the rest diffs");
+        self_check(&before, &after, &list).expect("and reproduces the game");
     }
 
     #[test]

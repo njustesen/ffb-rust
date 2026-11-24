@@ -12059,8 +12059,19 @@ Done (6):
   x20 (Getting Even fired in 15 games), undead x20, amazon@0 x18; bb2020 necromantic_sk/human_sk x20;
   bb2016 undead x20. Workspace tests green.
 
-Open, in order: (1) human smoke test (user); (2) P2 gate (client-view hash); (3) diff coverage for the
-fallback kinds; commit `sync-check` with the setups work. Not asked by design: bb2020's multi-block
+- **Whole-game fallbacks -> 0** (gui_check 10/10, `D:/ffb_gui_check/fb1..3`: 0 fallbacks, was 0-5 per
+  game). The live kinds were two: (a) `actingPlayerMarkSkillUsed(Dodge|SureFeet)` on an acting player
+  with no player -- an ENGINE bug: `change_player_action_to_none` (Java `setPlayer(null)` ->
+  `setPlayerId`) kept the used skills and half the per-activation flags; it now resets what
+  `set_player` resets (parity: bb2025 human/chaos, vampire, slann_sk, amazon@0, chaos_dwarf; bb2020
+  amazon/skaven, human_sk, vampire; bb2016 dwarf/orc, goblin, vampire -- all x20 identical);
+  (b) a raised player: Java sends `serverAddPlayer` (`sendRaisedPlayer`), not a model change -- the
+  server now sends it and diffs the rest from the client's `ClientCommandHandlerAddPlayer` result
+  (unit-tested; no live raise happened in the 10 games). The processor's NPE message names the skill.
+
+Open, in order: (1) human smoke test (user); (2) P2 gate (client-view hash); commit `sync-check` with
+the setups work (the corpus `ffb-replay sync-check` still lists the prayer/enhancement/Getting-Even/chomp
+fallback kinds of (4)). Not asked by design: bb2020's multi-block
 dialogs (no JSON form; the GUI server runs BB2025), re-roll dialogs' `modificationSkill` display field.
 
 **2026-11-24 (5): game log ON and the coach is asked where Java asks (open items 2 + 3 of (4) done).**

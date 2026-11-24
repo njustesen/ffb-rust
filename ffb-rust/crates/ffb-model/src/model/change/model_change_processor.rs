@@ -252,7 +252,7 @@ fn java_acting_player_mark_skill_used(game: &mut Game, skill: Option<SkillId>) -
         let player = id
             .as_deref()
             .and_then(|id| player_mut(game, id))
-            .ok_or("actingPlayerMarkSkillUsed: getPlayer() is null (NPE)")?;
+            .ok_or_else(|| format!("actingPlayerMarkSkillUsed({skill:?}): getPlayer() is null (NPE)"))?;
         if !player.used_skills.contains(&skill) {
             player.used_skills.insert(skill);
         }
@@ -269,7 +269,7 @@ fn java_acting_player_mark_skill_unused(game: &mut Game, skill: Option<SkillId>)
         let player = id
             .as_deref()
             .and_then(|id| player_mut(game, id))
-            .ok_or("actingPlayerMarkSkillUnused: getPlayer() is null (NPE)")?;
+            .ok_or_else(|| format!("actingPlayerMarkSkillUnused({skill:?}): getPlayer() is null (NPE)"))?;
         if !player.used_skills.contains(&skill) {
             return Ok(());
         }
@@ -279,7 +279,7 @@ fn java_acting_player_mark_skill_unused(game: &mut Game, skill: Option<SkillId>)
         let player = id
             .as_deref()
             .and_then(|id| player_mut(game, id))
-            .ok_or("actingPlayerMarkSkillUnused: getPlayer() is null (NPE)")?;
+            .ok_or_else(|| format!("actingPlayerMarkSkillUnused({skill:?}): getPlayer() is null (NPE)"))?;
         player.used_skills.remove(&skill);
     }
     Ok(())

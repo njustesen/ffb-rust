@@ -462,6 +462,21 @@ pub fn change_player_action_to_none(game: &mut Game) {
     ap.standing_up = false;
     ap.took_square = false;
     ap.old_player_state = None;
+    // Java setPlayerId resets the rest of the activation too -- fUsedSkills.clear() above all.
+    // Rust kept the used skills of the deselected player, so the GUI server's model sync told
+    // the client to mark e.g. Dodge used on an acting player with no player (the client's
+    // markSkillUsed -> getPlayer() NPE; the server fell back to sending the whole game).
+    ap.set_jumping(false);
+    ap.suffering_blood_lust = false;
+    ap.blood_lust_discards_move_stack = false;
+    ap.suffering_animosity = false;
+    ap.fumblerooskie_pending = false;
+    ap.held_in_place = false;
+    ap.must_complete_action = false;
+    ap.fell_from_rush = false;
+    ap.has_triggered_effect = false;
+    ap.forgone = false;
+    ap.used_skills.clear();
     // Java setPlayerId: skillsGrantedBy.clear().
     ap.skills_granted_by.clear();
 }
