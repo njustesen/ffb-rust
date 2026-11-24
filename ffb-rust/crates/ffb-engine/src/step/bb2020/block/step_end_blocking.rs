@@ -262,7 +262,7 @@ impl StepEndBlocking {
                     let sid = p.all_skill_ids().find(|s| {
                         s.properties().contains(&NamedProperties::ADD_STRENGTH_ON_BLITZ)
                     })?;
-                    Some(p.used_skills.contains(&sid))
+                    Some(game.acting_player.used_skills.contains(&sid)) // Java actingPlayer.isSkillUsed
                 })
                 .unwrap_or(false);
             let dauntless_used = game.player(pid)
@@ -270,7 +270,7 @@ impl StepEndBlocking {
                     let sid = p.all_skill_ids().find(|s| {
                         s.properties().contains(&NamedProperties::CAN_ROLL_TO_MATCH_OPPONENTS_STRENGTH)
                     })?;
-                    Some(p.used_skills.contains(&sid))
+                    Some(game.acting_player.used_skills.contains(&sid)) // Java actingPlayer.isSkillUsed
                 })
                 .unwrap_or(false);
             if horns_used || dauntless_used {

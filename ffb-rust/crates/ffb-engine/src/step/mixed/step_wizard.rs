@@ -138,6 +138,14 @@ impl StepWizard {
                 if let Some(old) = self.old_turn_mode {
                     game.turn_mode = old;
                 }
+                // Java: fieldModel.add(new BloodSpot(fTargetCoordinate, FIREBALL ? HIT_BY_FIREBALL : HIT_BY_LIGHTNING))
+                let blood = if spell == SpecialEffect::FIREBALL {
+                    ffb_model::enums::PS_HIT_BY_FIREBALL
+                } else {
+                    ffb_model::enums::PS_HIT_BY_LIGHTNING
+                };
+                game.field_model.bloodspots.push(ffb_model::model::blood_spot::BloodSpot::new(
+                    coord, ffb_model::enums::PlayerState::new(blood)));
 
                 // Push SpecialEffect sequences for each affected player
                 let mut out = StepOutcome::next().with_event(wizard_event);

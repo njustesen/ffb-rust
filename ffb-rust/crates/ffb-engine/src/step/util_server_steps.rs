@@ -325,11 +325,24 @@ pub fn change_acting_player(game: &mut Game, player_id: &str, action: PlayerActi
                 }
             }
         }
+        if changed {
+            clear_activation_markers(game);
+        }
         // Java UtilActingPlayer.changeActingPlayer (`if (changed)` block): resets transient
         // BLOCKED/MOVING states whenever the acting player changes. A block declared then cancelled
         // (e.g. failed Bone Head) leaves the defender BLOCKED until this runs (human seed 16 i=11).
         reset_blocked_and_moving_players(game);
     }
+}
+
+/// Java `UtilActingPlayer.changeActingPlayer`, head of the `if (changed)` block:
+/// `clearTrackNumbers(); clearDiceDecorations(); clearPushbackSquares(); clearMoveSquares();` --
+/// the client-visible markers of the previous activation go when the acting player changes.
+fn clear_activation_markers(game: &mut Game) {
+    game.field_model.clear_track_numbers();
+    game.field_model.clear_dice_decorations();
+    game.field_model.pushback_squares.clear();
+    game.field_model.clear_move_squares();
 }
 
 /// Java `ActingPlayer.markSkillUsed(Skill)`:
@@ -441,6 +454,7 @@ pub fn change_player_action_to_none(game: &mut Game) {
         // Java: the `if (!actingPlayer.hasActed())` granted-skill cleanup (unmark the granter,
         // strip the receivers' enhancements) — same placement as the non-null path.
         cleanup_granted_skills_on_deselect(game);
+        clear_activation_markers(game);
         // Java UtilActingPlayer.changeActingPlayer `if (changed)` block: reset transient
         // BLOCKED/MOVING states (same as the non-null path in change_player_action).
         reset_blocked_and_moving_players(game);

@@ -336,6 +336,78 @@ impl InjuryResult {
     ///    the active bit (Java: sets the player inactive so the turn ends).
     /// 4. If the player is KO, a casualty, or reserve, puts them into the dugout box.
     pub fn apply_to(&self, game: &mut Game) {
+        self.apply_to_with_stats(game, true);
+    }
+
+    /// Java: `InjuryResult.applyTo(IStep, boolean updateStats)`. The state change (nested in the
+    /// precedence guard) is followed -- OUTSIDE that guard -- by the player result's serious injury
+    /// and send-to-box fields, the team's suffered counters, the attacker's casualty and the blood
+    /// spot. The multi-block apothecary steps pass `update_stats = false` (Java does too).
+    pub fn apply_to_with_stats(&self, game: &mut Game, update_stats: bool) {
+        let Some(defender_id) = self.injury_context.defender_id.clone() else { return };
+        self.apply_player_state(game);
+        let ctx = &self.injury_context;
+        let defender_is_home = game.team_home.player(&defender_id).is_some();
+        let player_state = ctx.get_player_state();
+        // death is also a serious injury
+        {
+            let pr = game.game_result.team_result_mut(defender_is_home).player_result_mut(&defender_id);
+            if player_state.map(|s| s.base() == PS_RIP).unwrap_or(false) {
+                pr.serious_injury = Some(SeriousInjuryKind::Dead);
+                pr.serious_injury_decay = None;
+            } else if pr.serious_injury.is_some() {
+                // hacky workaround for 2 cas against an attacker during multiblock
+                pr.serious_injury_decay = ctx.serious_injury;
+            } else {
+                pr.serious_injury = ctx.serious_injury;
+                pr.serious_injury_decay = ctx.serious_injury_decay;
+            }
+            if let Some(reason) = ctx.send_to_box_reason {
+                pr.send_to_box_reason = Some(reason);
+                pr.send_to_box_turn = ctx.send_to_box_turn;
+                pr.send_to_box_half = ctx.send_to_box_half;
+                pr.send_to_box_by_player_id = ctx.attacker_id.clone();
+            }
+        }
+        if let (Some(suffered), true) = (ctx.suffered_injury, update_stats) {
+            if ctx.is_caused_by_opponent {
+                let counted = if ctx.apothecary_status == ApothecaryStatus::ResultChoice
+                    && player_state.map(|s| s.base() == PS_RESERVE).unwrap_or(false)
+                {
+                    Some(PlayerState::new(PS_BADLY_HURT))
+                } else {
+                    player_state
+                };
+                if let Some(s) = counted {
+                    game.game_result.team_result_mut(defender_is_home).suffer_injury(s);
+                }
+                let attacker = ctx.attacker_id.as_deref()
+                    .filter(|id| game.player(id).is_some())
+                    .map(|id| (id.to_owned(), game.team_home.player(id).is_some()));
+                if let Some((attacker_id, attacker_is_home)) = attacker {
+                    if suffered.is_casualty() && ctx.is_worth_spps && attacker_is_home != defender_is_home {
+                        let teams = game.prayer_state.get_additional_cas_spp_teams().clone();
+                        let team_id = if attacker_is_home { game.team_home.id.clone() } else { game.team_away.id.clone() };
+                        let pr = game.game_result.team_result_mut(attacker_is_home).player_result_mut(&attacker_id);
+                        use ffb_mechanics::spp_mechanic::SppMechanic as _;
+                        match game.rules {
+                            ffb_model::enums::Rules::Bb2016 => ffb_mechanics::bb2016::spp_mechanic::SppMechanic::new().add_casualty(&teams, pr, &team_id),
+                            ffb_model::enums::Rules::Bb2020 => ffb_mechanics::bb2020::spp_mechanic::SppMechanic::new().add_casualty(&teams, pr, &team_id),
+                            _ => ffb_mechanics::bb2025::spp_mechanic::SppMechanic::new().add_casualty(&teams, pr, &team_id),
+                        }
+                    }
+                }
+            }
+            game.field_model.bloodspots.push(ffb_model::model::blood_spot::BloodSpot {
+                coordinate: ctx.defender_coordinate,
+                injury: Some(suffered),
+            });
+        }
+    }
+
+    /// The first half of Java `InjuryResult.applyTo`: the secret-weapon flag and the defender's
+    /// state change, nested in the precedence guard.
+    fn apply_player_state(&self, game: &mut Game) {
         // Java: basePrecedenceList — the exact list from InjuryResult.java.
         // States NOT in this list (STANDING, MOVING, etc.) are always overridden.
         // States IN this list are only overridden by states with higher index (worse).
@@ -1086,6 +1158,43 @@ mod tests {
 
         let coord = game.field_model.player_coordinate("h1").expect("player should be placed");
         assert_eq!(coord.x, KO_HOME_X);
+    }
+
+    /// Java `InjuryResult.applyTo` after the state change: the dead player's result reads Dead
+    /// and records the send-off, his team suffered a RIP, the opposing attacker gets the casualty
+    /// and the square gets a blood spot -- what the client shows in the game statistics.
+    #[test]
+    fn apply_to_records_the_casualty_for_the_client() {
+        let mut game = make_game_with_players(&["h1"], &["a1"]);
+        game.field_model.set_player_coordinate("h1", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("h1", PlayerState::new(PS_STANDING));
+        let mut ir = make_ir_with_state("h1", PlayerState::new(PS_RIP));
+        ir.injury_context.attacker_id = Some("a1".into());
+        ir.injury_context.defender_coordinate = Some(FieldCoordinate::new(5, 5));
+        ir.injury_context.suffered_injury = Some(PlayerState::new(PS_RIP));
+        ir.injury_context.send_to_box_reason = Some(SendToBoxReason::Blocked);
+        ir.injury_context.send_to_box_turn = 3;
+        ir.injury_context.send_to_box_half = 1;
+        ir.injury_context.is_caused_by_opponent = true;
+        ir.injury_context.is_worth_spps = true;
+        ir.apply_to(&mut game);
+
+        let pr = &game.game_result.home.player_results["h1"];
+        assert_eq!(pr.serious_injury, Some(SeriousInjuryKind::Dead));
+        assert_eq!(pr.send_to_box_reason, Some(SendToBoxReason::Blocked));
+        assert_eq!((pr.send_to_box_turn, pr.send_to_box_half), (3, 1));
+        assert_eq!(pr.send_to_box_by_player_id.as_deref(), Some("a1"));
+        assert_eq!(game.game_result.home.rip_suffered, 1);
+        assert_eq!(game.game_result.away.player_results["a1"].casualties, 1);
+        assert_eq!(game.field_model.bloodspots.len(), 1);
+
+        // the multi-block apothecary passes updateStats=false: no stats, no blood spot
+        let mut game2 = make_game_with_players(&["h1"], &["a1"]);
+        game2.field_model.set_player_state("h1", PlayerState::new(PS_STANDING));
+        ir.apply_to_with_stats(&mut game2, false);
+        assert_eq!(game2.game_result.home.rip_suffered, 0);
+        assert!(game2.field_model.bloodspots.is_empty());
+        assert_eq!(game2.game_result.home.player_results["h1"].serious_injury, Some(SeriousInjuryKind::Dead));
     }
 
     /// apply_to does NOT override a worse existing state with a less severe one.

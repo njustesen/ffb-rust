@@ -421,6 +421,26 @@ fn java_has_active_enhancement(player: &Player, name: &str) -> bool {
         || player.temporary_properties_map.iter().any(|(s, _)| s == name)
 }
 
+/// Java `Game.addHatred(player, keyword)`: `PlayerResult.addGainedHatred(keyword)`, then
+/// `FieldModel.addHatred` -- the ruleset's skill with canBeGainedByGettingEven (only bb2025
+/// Hatred) as an enhancement named "Getting Even <keyword>". Shared by the engine's
+/// StepGettingEven and the `fieldModelAddHatred` model change.
+pub fn add_hatred(game: &mut Game, player_id: &str, keyword: crate::model::keyword::Keyword) -> Result<(), String> {
+    let side = player_side(game, Some(player_id)).ok_or_else(|| format!("addHatred: no player {player_id} (NPE)"))?;
+    game.game_result.team_result_mut(side).player_result_mut(player_id).gained_hatred.push(keyword);
+    if game.rules != crate::enums::Rules::Bb2025 {
+        return Err(format!("addHatred: no canBeGainedByGettingEven skill in {:?} (NPE)", game.rules));
+    }
+    let enhancements = JavaEnhancements {
+        skills: vec![(SkillId::Hatred, Some(keyword.get_name().to_string()))],
+        ..Default::default()
+    };
+    let rules = game.rules;
+    let source = format!("Getting Even {}", keyword.get_name());
+    let player = player_mut(game, player_id).ok_or_else(|| format!("addHatred: no player {player_id} (NPE)"))?;
+    java_add_enhancement(player, rules, &source, &enhancements)
+}
+
 /// Java `Player.addEnhancement(name, enhancements, factory)`: a no-op while `name` is active,
 /// else `addTemporaryModifiers` / `addTemporaryProperties` / `addTemporarySkills` -- each creates
 /// the source key (even for an EMPTY set) and adds the elements (no equals on the elements: every
@@ -857,17 +877,10 @@ impl ModelChangeProcessor {
             Id::FieldModelAddHatred => {
                 let name = opt_string(change)?.ok_or("fieldModelAddHatred: Keyword.forName(null)")?;
                 let keyword = crate::model::keyword::Keyword::for_name(&name);
-                player_result_mut(game, change)?.gained_hatred.push(keyword);
-                if game.rules != crate::enums::Rules::Bb2025 {
-                    return Err(format!("fieldModelAddHatred: no canBeGainedByGettingEven skill in {:?} (NPE)", game.rules));
-                }
-                let enhancements = JavaEnhancements {
-                    skills: vec![(SkillId::Hatred, Some(keyword.get_name().to_string()))],
-                    ..Default::default()
-                };
-                let rules = game.rules;
-                let source = format!("Getting Even {}", keyword.get_name());
-                java_add_enhancement(require_player(game, change)?, rules, &source, &enhancements)?;
+                player_result_mut(game, change)?;
+                require_player(game, change)?;
+                let id = key.unwrap_or_default().to_string();
+                add_hatred(game, &id, keyword)?;
             }
 
             Id::GameSetConcededLegally => game.conceded_legally = unbox_bool(change)?,

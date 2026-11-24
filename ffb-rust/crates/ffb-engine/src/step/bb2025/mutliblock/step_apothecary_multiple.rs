@@ -404,7 +404,7 @@ impl StepApothecaryMultiple {
             || status == ApothecaryStatus::ResultChoice;
         for r in &self.injury_results {
             if applied(r.injury_context().apothecary_status) {
-                r.apply_to(game);
+                r.apply_to_with_stats(game, false);
             }
         }
         // Java walks `regenerationFailedResults` for Getting Even and Raise Dead after applying.
@@ -442,7 +442,7 @@ impl StepApothecaryMultiple {
                         .any(|rf| rf.injury_context().defender_id == r.injury_context().defender_id
                             && rf.injury_context().injury == r.injury_context().injury);
                     if is_regen_failed {
-                        r.apply_to(game);
+                        r.apply_to_with_stats(game, false);
                     }
                 }
             }

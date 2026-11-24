@@ -270,7 +270,7 @@ impl StepApothecaryMultiple {
                             && rf.injury_context().injury == r.injury_context().injury);
                     let _ = regen_failed_ids; // suppress unused warning
                     if is_regen_failed {
-                        r.apply_to(game);
+                        r.apply_to_with_stats(game, false);
                     }
                 }
             }

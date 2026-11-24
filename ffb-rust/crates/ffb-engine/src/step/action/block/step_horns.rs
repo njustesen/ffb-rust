@@ -176,7 +176,7 @@ mod tests {
     fn horns_with_blitz_marks_skill_used() {
         let (mut game, pid) = make_game(vec![SkillId::Horns], PlayerAction::Blitz);
         StepHorns::new().start(&mut game, &mut GameRng::new(0));
-        assert!(game.team_home.player(&pid).unwrap().used_skills.contains(&SkillId::Horns));
+        assert!(game.acting_player.used_skills.contains(&SkillId::Horns));
     }
 
     #[test]

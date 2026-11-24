@@ -69,7 +69,8 @@ impl StepInitBomb {
                 // Clear bomb from field.
                 let coord = self.bomb_coordinate.unwrap();
                 game.field_model.bomb_coordinate = None;
-                // client-only: BloodSpot(HIT_BY_BOMB) — field model visual decoration, client display only
+                // Java: game.getFieldModel().add(new BloodSpot(fBombCoordinate, new PlayerState(HIT_BY_BOMB)))
+                game.field_model.bloodspots.push(ffb_model::model::blood_spot::BloodSpot::new(coord, ffb_model::enums::PlayerState::new(ffb_model::enums::PS_HIT_BY_BOMB)));
 
                 // Collect affected players: the bomb square + all 8 adjacent squares.
                 let mut coords = vec![coord];

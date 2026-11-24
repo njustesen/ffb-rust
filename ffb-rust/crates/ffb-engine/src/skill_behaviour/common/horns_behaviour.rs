@@ -61,14 +61,8 @@ impl StepModifierTrait for HornsStepModifier {
 
         if state.using_horns == Some(true) {
             // Java: actingPlayer.markSkillUsed(skill)
-            let is_home = game.team_home.player(&player_id).is_some();
-            if is_home {
-                if let Some(p) = game.team_home.player_mut(&player_id) {
-                    p.used_skills.insert(SkillId::Horns);
-                }
-            } else if let Some(p) = game.team_away.player_mut(&player_id) {
-                p.used_skills.insert(SkillId::Horns);
-            }
+            // (the ACTING player's set; the player's own only for trackOutsideActivation skills)
+            crate::step::util_server_steps::mark_skill_used(game, &player_id, SkillId::Horns);
 
             // Java: step.getResult().addReport(new ReportSkillUse(id, skill, true, INCREASE_STRENGTH_BY_1))
             game.report_list.add(ReportSkillUse::new(
@@ -187,7 +181,7 @@ mod tests {
         let (mut game, pid) = make_game_with_horns(PlayerAction::Blitz);
         let mut hook_state = StepHornsHookState::default();
         HornsStepModifier.handle_execute_step(&mut game, &mut GameRng::new(0), &mut hook_state);
-        assert!(game.team_home.player(&pid).unwrap().used_skills.contains(&SkillId::Horns));
+        assert!(game.acting_player.used_skills.contains(&SkillId::Horns));
     }
 
     #[test]

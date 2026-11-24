@@ -97,10 +97,12 @@ impl StepGettingEven {
             ));
 
             if successful {
-                // Java: game.addHatred(player, keyword);
-                // client/model-only: FieldModel.addHatred only notifies observers (client sync)
-                // and updates PlayerResult stats — no gameplay mechanic reads it, so there is
-                // no engine-side effect to replicate here.
+                // Java: game.addHatred(player, keyword) -- the gained hatred on the player result
+                // and Hatred(<keyword>) as the temporary "Getting Even <keyword>" enhancement.
+                let keyword = ffb_model::model::keyword::Keyword::for_name(self.keyword_name.as_deref().unwrap_or_default());
+                if let Err(e) = ffb_model::model::change::model_change_processor::add_hatred(game, player_id.as_deref().unwrap_or_default(), keyword) {
+                    panic!("StepGettingEven: {e}");
+                }
             } else if self.re_rolled_action.is_none() {
                 // Java: `askForReRollIfAvailable(getGameState(), player, GETTING_EVEN, ...)`, where
                 // `player` is THIS STEP's `playerId` -- not the acting player. The distinction is

@@ -61,7 +61,8 @@ impl StepResolveBomb {
         game.field_model.bomb_moving = false;
         game.field_model.bomb_coordinate = None;
         // client-only: setAnimation(AnimationType.BOMB_EXPLOSION, fBombCoordinate)
-        // client-only: syncGameModel, fieldModel.add(BloodSpot) — client-side display
+        // Java: fieldModel.add(new BloodSpot(fBombCoordinate, new PlayerState(HIT_BY_BOMB)))
+        game.field_model.bloodspots.push(ffb_model::model::blood_spot::BloodSpot::new(bomb_coordinate, ffb_model::enums::PlayerState::new(ffb_model::enums::PS_HIT_BY_BOMB)));
 
         // Java: targetCoordinates = fieldModel.findAdjacentCoordinates(fBombCoordinate, FIELD, 1, true)
         // `findAdjacentCoordinates` iterates `y` in -1..=1 (outer), `x` in -1..=1 (inner), and
