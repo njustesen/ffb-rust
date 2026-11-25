@@ -463,6 +463,13 @@ impl SkillId {
     /// tier), Frenzied Rush and Putrid Regurgitation ONCE_PER_GAME (bb2025: ONCE_PER_HALF).
     pub fn usage_type_for(self, rules: crate::enums::Rules) -> crate::enums::SkillUsageType {
         use crate::enums::SkillUsageType::*;
+        // The generated per-ruleset table (Java's class of that edition) first: the hand-kept
+        // `usage_type()` gave bb2016/bb2020 Dodge, Pro, Sure Feet ... their bb2025 ONCE_PER_TURN,
+        // so they reached the client-visible Player.usedSkills where Java's REGULAR class never
+        // marks the player (BACKLOG §O note in SkillFactory::usage_type_in).
+        if let Some(u) = crate::factory::skill_factory::SkillFactory::usage_type_in(rules, self) {
+            return u;
+        }
         match (self, rules) {
             (SkillId::WisdomOfTheWhiteDwarf, crate::enums::Rules::Bb2020) => OncePerTurnByTeamMate,
             (SkillId::FrenziedRush | SkillId::PutridRegurgitation, crate::enums::Rules::Bb2020) => OncePerGame,

@@ -95,10 +95,15 @@ impl StepMove {
 
             // Java: actingPlayer.getCurrentMove() + (jumping ? 2 : 1)
             let move_increment = if jumping { 2 } else { 1 };
+            // Java: TrackNumber trackNumber = new TrackNumber(fCoordinateFrom, currentMove) (before the increment)
+            let track_number = self.coordinate_from
+                .map(|from| ffb_model::model::track_number::TrackNumber::new(from, game.acting_player.current_move));
             game.acting_player.current_move += move_increment;
 
             // Java: game.getFieldModel().add(trackNumber)
-            // client-only: TrackNumber animation — field_model.track_numbers is client-side display only
+            if let Some(tn) = track_number {
+                game.field_model.add_track_number(tn);
+            }
 
             // Java: updatePlayerAndBallPosition(actingPlayer, coordinateTo)
             if let Some(ref player_id) = game.acting_player.player_id.clone() {

@@ -187,7 +187,7 @@ impl StepAlwaysHungry {
             });
             if let Some(sid) = skill_id {
                 game.acting_player.used_skills.insert(sid);
-                if sid.usage_type().track_outside_activation() {
+                if sid.usage_type_for(game.rules).track_outside_activation() {
                     if let Some(p) = game.team_home.player_mut(&acting_player_id)
                         .or_else(|| game.team_away.player_mut(&acting_player_id))
                     {

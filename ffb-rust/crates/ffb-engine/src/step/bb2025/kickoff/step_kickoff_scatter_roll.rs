@@ -251,7 +251,11 @@ impl StepKickoffScatterRoll {
             self.kickoff_bounds = None;
         }
         self.touchback = self.kickoff_bounds.is_none();
-        game.field_model.out_of_bounds = self.touchback;
+        // Java bb2020/bb2025: `if (fTouchback) setOutOfBounds(true)` -- never cleared here (a stale
+        // true from the last drive stays for the client; bb2016's own step assigns either way).
+        if self.touchback {
+            game.field_model.out_of_bounds = true;
+        }
 
         if self.touchback {
             game.report_list.add(ReportEvent::new(Some("The ball lands out of bounds -> TOUCHBACK!!".to_string())));

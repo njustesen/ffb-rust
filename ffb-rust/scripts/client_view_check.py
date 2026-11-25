@@ -36,6 +36,7 @@ SETUP = {
     "testing", "gameOptions.gameOptionArray",
     "*.coach", "*.teamName", "*.roster",
     "*.playerArray.<p>.playerName", "*.playerArray.<p>.playerStatus",
+    "*.playerArray.<p>.playerType",
     "*.playerArray.<p>.positionIconIndex",
     "*.playerArray.<p>.skillValuesMap.*", "*.playerArray.<p>.skillDisplayValuesMap.*",
     "*.teamValue", "gameResult.*.teamValue",
@@ -87,9 +88,15 @@ def remap(v, m):
 
 
 def keyed(v):
-    """A list of objects that all carry a playerId -> a dict by playerId."""
-    if isinstance(v, list) and v and all(isinstance(x, dict) and "playerId" in x for x in v):
-        return {x["playerId"]: x for x in v}
+    """A list of objects that all carry a playerId -> a dict by playerId. Likewise the
+    InducementSet array: Java serializes `HashMap<InducementType, Inducement>.values()`, keyed by
+    objects with identity hash codes, so its order is arbitrary (not game state)."""
+    for key in ("playerId", "inducementType"):
+        if isinstance(v, list) and v and all(isinstance(x, dict) and key in x for x in v):
+            return {x[key]: x for x in v}
+    # FieldModel track numbers: a HashSet<TrackNumber> whose equality is the coordinate.
+    if isinstance(v, list) and v and all(isinstance(x, dict) and set(x) == {"number", "coordinate"} for x in v):
+        return {json.dumps(x["coordinate"]): x for x in v}
     return v
 
 

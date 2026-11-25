@@ -194,13 +194,11 @@ impl StepEndBlocking {
         if player_action == Some(PlayerAction::ViciousVines) {
             if let Some(pid) = game.acting_player.player_id.as_deref() {
                 let pid = pid.to_owned();
+                // Java actingPlayer.markSkillUsed(canBlockOverDistance): the property's skill.
                 let sid = game.player(&pid)
-                    .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_BLOCK_OVER_DISTANCE));
+                    .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_BLOCK_OVER_DISTANCE));
                 if let Some(sid) = sid {
-                    let is_home = game.team_home.player(&pid).is_some();
-                    let player_mut = if is_home { game.team_home.player_mut(&pid) }
-                                     else { game.team_away.player_mut(&pid) };
-                    if let Some(p) = player_mut { p.used_skills.insert(sid); }
+                    crate::step::util_server_steps::mark_skill_used(game, &pid, sid);
                 }
             }
         }
@@ -282,8 +280,8 @@ impl StepEndBlocking {
         // Java: Skill unusedPlayerMustMakeSecondBlockSkill =
         //   UtilCards.getUnusedSkillWithProperty(actingPlayer, forceSecondBlock)
         let unused_force_second_block = attacker_id.as_deref()
-            .and_then(|id| game.player(id))
-            .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::FORCE_SECOND_BLOCK));
+            .and_then(|id| crate::step::util_server_steps::acting_unused_skill_with_property(
+                game, id, NamedProperties::FORCE_SECOND_BLOCK));
 
         // Java: if (activePlayer.hasSkillProperty(forceSecondBlock)) actingPlayer.setGoingForIt(true)
         if unused_force_second_block.is_some() {
@@ -318,10 +316,7 @@ impl StepEndBlocking {
         if force_second_block {
             // Java: actingPlayer.markSkillUsed(unusedPlayerMustMakeSecondBlockSkill)
             if let (Some(sid), Some(pid)) = (unused_force_second_block, attacker_id.as_deref()) {
-                let is_home = game.team_home.player(pid).is_some();
-                let player_mut = if is_home { game.team_home.player_mut(pid) }
-                                 else { game.team_away.player_mut(pid) };
-                if let Some(p) = player_mut { p.used_skills.insert(sid); }
+                crate::step::util_server_steps::mark_skill_used(game, pid, sid);
             }
 
             if is_blitz {
@@ -575,12 +570,10 @@ impl StepEndBlocking {
             // Java: actingPlayer.markSkillUsed(canStabAndMoveAfterwards)
             if let Some(pid) = attacker_id.as_deref() {
                 let pid = pid.to_owned();
-                let sid = game.player(&pid).and_then(|p| UtilCards::get_unused_skill_with_property(
-                    p, NamedProperties::CAN_STAB_AND_MOVE_AFTERWARDS));
+                let sid = game.player(&pid)
+                    .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_STAB_AND_MOVE_AFTERWARDS));
                 if let Some(sid) = sid {
-                    let is_home = game.team_home.player(&pid).is_some();
-                    if is_home { game.team_home.player_mut(&pid).map(|p| p.used_skills.insert(sid)); }
-                    else { game.team_away.player_mut(&pid).map(|p| p.used_skills.insert(sid)); }
+                    crate::step::util_server_steps::mark_skill_used(game, &pid, sid);
                 }
             }
         }
@@ -658,9 +651,7 @@ impl StepEndBlocking {
                     p.all_skill_ids().find(|id| id.properties().contains(&NamedProperties::FORCE_SECOND_BLOCK))
                 });
                 if let Some(sid) = sid {
-                    let is_home = game.team_home.player(&pid).is_some();
-                    if is_home { game.team_home.player_mut(&pid).map(|p| { p.used_skills.remove(&sid); }); }
-                    else { game.team_away.player_mut(&pid).map(|p| { p.used_skills.remove(&sid); }); }
+                    crate::step::util_server_steps::mark_skill_unused(game, &pid, sid);
                 }
             }
             // BB2020: no using_chomp field

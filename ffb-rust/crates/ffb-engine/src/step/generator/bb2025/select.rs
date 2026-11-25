@@ -35,6 +35,18 @@ impl Select {
 
     /// Build the select step sequence (Java `pushSequence`).
     pub fn build_sequence(params: &SelectParams) -> Vec<SequenceStep> {
+        // Java resolves `Select` through the game's per-ruleset SequenceGeneratorFactory, so a
+        // BB2016 game always builds `generator/bb2016/Select` (INIT_SELECTING, BONE_HEAD,
+        // REALLY_STUPID, TAKE_ROOT, WILD_ANIMAL, BLOOD_LUST, JUMP_UP, STAND_UP, END_SELECTING).
+        // The shared push sites (EndFeeding, EndInducement, BlitzTurn, PassBlock) build this
+        // generator for every edition; without the hand-off a failed Wild Animal still let
+        // STAND_UP run and mark the turn started (bb2016 chaos_dwarf seed 14 i=82).
+        if params.rules == ffb_model::enums::Rules::Bb2016 {
+            return crate::step::generator::bb2016::select::Select::build_sequence(
+                &crate::step::generator::bb2016::select::SelectParams {
+                    update_persistence: params.update_persistence,
+                });
+        }
         let mut seq = Sequence::new();
         let fl = labels::END_SELECTING;
 
@@ -166,6 +178,20 @@ mod tests {
         assert!(blood_lust < fa && fa < jump_up && jump_up < stand_up);
         assert!(steps[fa].params.iter().any(|p| matches!(p, StepParameter::InSelect(true))),
             "the select copy must be flagged so it no-ops outside a BB2020 blitz");
+    }
+
+    /// Java builds `generator/bb2016/Select` for a BB2016 game: WILD_ANIMAL precedes STAND_UP
+    /// and there is no activation block (no ANIMAL_SAVAGERY / UNCHANNELLED_FURY).
+    #[test]
+    fn bb2016_rules_build_the_bb2016_select_sequence() {
+        let params = SelectParams { update_persistence: true, rules: ffb_model::enums::Rules::Bb2016, ..Default::default() };
+        let steps = Select::build_sequence(&params);
+        let ids: Vec<StepId> = steps.iter().map(|s| s.step_id).collect();
+        assert_eq!(ids, vec![
+            StepId::InitSelecting, StepId::BoneHead, StepId::ReallyStupid, StepId::TakeRoot,
+            StepId::WildAnimal, StepId::BloodLust, StepId::JumpUp, StepId::StandUp, StepId::EndSelecting,
+        ]);
+        assert!(steps[0].params.iter().any(|p| matches!(p, StepParameter::UpdatePersistence(true))));
     }
 
     #[test]

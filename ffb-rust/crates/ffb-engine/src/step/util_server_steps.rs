@@ -366,11 +366,44 @@ pub fn mark_skill_used(game: &mut Game, player_id: &str, skill_id: ffb_model::en
     if game.acting_player.player_id.as_deref() == Some(player_id) {
         game.acting_player.used_skills.insert(skill_id);
     }
-    if skill_id.usage_type().track_outside_activation() {
+    if skill_id.usage_type_for(game.rules).track_outside_activation() {
         if let Some(p) = game.team_home.player_mut(player_id)
             .or_else(|| game.team_away.player_mut(player_id))
         {
             p.used_skills.insert(skill_id);
+        }
+    }
+}
+
+/// Java `ActingPlayer.isSkillUsed(skill)`: the activation's set OR `Player.isUsed`.
+pub fn acting_skill_used(game: &Game, player_id: &str, skill_id: ffb_model::enums::SkillId) -> bool {
+    (game.acting_player.player_id.as_deref() == Some(player_id)
+        && game.acting_player.used_skills.contains(&skill_id))
+        || game.player(player_id).map(|p| p.used_skills.contains(&skill_id)).unwrap_or(false)
+}
+
+/// Java `UtilCards.getUnusedSkillWithProperty(actingPlayer, property)`: the player's first skill
+/// with the property that `ActingPlayer.isSkillUsed` does not report.
+pub fn acting_unused_skill_with_property(game: &Game, player_id: &str, property: &str)
+    -> Option<ffb_model::enums::SkillId>
+{
+    let player = game.player(player_id)?;
+    player.all_skill_ids()
+        .find(|id| id.properties().contains(&property) && !acting_skill_used(game, player_id, *id))
+}
+
+/// Java `ActingPlayer.markSkillUnused(skill)`: a no-op unless used; drops it from the activation's
+/// set and, for a skill tracked outside the activation, `Player.markUnused`.
+pub fn mark_skill_unused(game: &mut Game, player_id: &str, skill_id: ffb_model::enums::SkillId) {
+    if !acting_skill_used(game, player_id, skill_id) {
+        return;
+    }
+    if game.acting_player.player_id.as_deref() == Some(player_id) {
+        game.acting_player.used_skills.remove(&skill_id);
+    }
+    if skill_id.usage_type_for(game.rules).track_outside_activation() {
+        if let Some(p) = game.player_mut(player_id) {
+            p.used_skills.remove(&skill_id);
         }
     }
 }
@@ -927,7 +960,21 @@ mod mark_skill_used_tests {
             g.acting_player.set_player("h1".into(), PlayerAction::Move);
             mark_skill_used(&mut g, "h1", skill);
             let on_player = g.team_home.player("h1").unwrap().used_skills.contains(&skill);
-            assert_eq!(on_player, skill.usage_type().track_outside_activation(), "{skill:?}");
+            assert_eq!(on_player, skill.usage_type_for(g.rules).track_outside_activation(), "{skill:?}");
+        }
+    }
+
+    /// The edition's usage type decides: Dodge is ONCE_PER_TURN in bb2025 (marked on the Player)
+    /// but REGULAR in bb2020 (`skill/mixed/Dodge`, the activation's set only).
+    #[test]
+    fn the_player_mark_follows_the_editions_usage_type() {
+        for (rules, on_player) in [(ffb_model::enums::Rules::Bb2025, true), (ffb_model::enums::Rules::Bb2020, false)] {
+            let mut g = game();
+            g.rules = rules;
+            g.acting_player.set_player("h1".into(), PlayerAction::Move);
+            mark_skill_used(&mut g, "h1", SkillId::Dodge);
+            assert!(g.acting_player.used_skills.contains(&SkillId::Dodge));
+            assert_eq!(g.team_home.player("h1").unwrap().used_skills.contains(&SkillId::Dodge), on_player, "{rules:?}");
         }
     }
 }

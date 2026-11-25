@@ -364,6 +364,10 @@ impl StepEndTurn {
                     }
                     if any_recovering {
                         game.field_model.set_player_state(player_id, player_state.change_base(PS_RESERVE));
+                        // Java (all editions): UtilBox.putPlayerIntoBox(game, player) right away --
+                        // the reserve box fills in call order, so a recovered KO takes its slot
+                        // before putAllPlayersIntoBox boxes the pitch players.
+                        UtilBox::put_player_into_box(game, player_id);
                     }
                 }
                 // Java mixed/bb2025: `EXHAUSTED || SETUP_PREVENTED` -> RESERVE (a Keen Player kept
@@ -704,6 +708,11 @@ impl StepEndTurn {
                 self.re_roll_argue(game, rng, is_home, pid, bribery.as_deref().unwrap());
             } else if coach_banned {
                 Self::turn_data_of(game, is_home).coach_banned = true;
+                // bb2020 only: `removeUsedSecretWeapon(game, player)` right here -- the banned
+                // player takes his box slot before the later removeUsedSecretWeapons loop.
+                if game.rules == Rules::Bb2020 {
+                    self.remove_used_secret_weapon(game, is_home, pid);
+                }
             } else if can_be_re_rolled {
                 self.player_ids_natural_ones.push(pid.clone());
             }
@@ -873,35 +882,42 @@ impl StepEndTurn {
     ///   bb2016: no removed-from-play guard (a casualty secret weapon is banned too);
     ///   bb2020/bb2025: players already out of play are skipped.
     fn remove_used_secret_weapons(&mut self, game: &mut Game) {
-        use ffb_model::enums::{PS_BANNED, PlayerState, SendToBoxReason};
         for is_home in [true, false] {
             let ids: Vec<String> = {
                 let t = if is_home { &game.team_home } else { &game.team_away };
                 t.players.iter().map(|p| p.id.clone()).collect()
             };
             for pid in ids {
-                if !game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon {
-                    continue;
-                }
-                game.game_result.team_result_mut(is_home).player_result_mut(&pid).has_used_secret_weapon = false;
-                let is_bb2016_sw = game.rules == Rules::Bb2016;
-                let removed = game.field_model.player_state(&pid)
-                    .map(|s| if is_bb2016_sw { s.base() == PS_BANNED } else { s.is_casualty() || s.base() == PS_BANNED })
-                    .unwrap_or(true);
-                if removed { continue; }
-                // Java removeUsedSecretWeapon: setPlayerState(playerState.changeBase(BANNED)), the
-                // send-to-box fields (by-player null), then UtilBox.putPlayerIntoBox -- the banned
-                // player sits in his team's box (the client draws him there), not nowhere.
-                let state = game.field_model.player_state(&pid).unwrap_or_default();
-                game.field_model.set_player_state(&pid, state.change_base(PS_BANNED));
-                let pr = game.game_result.team_result_mut(is_home).player_result_mut(&pid);
-                pr.send_to_box_by_player_id = None;
-                pr.send_to_box_reason = Some(SendToBoxReason::SecretWeaponBan);
-                pr.send_to_box_turn = self.turn_nr;
-                pr.send_to_box_half = self.half;
-                ffb_model::util::util_box::UtilBox::put_player_into_box(game, &pid);
+                self.remove_used_secret_weapon(game, is_home, &pid);
             }
         }
+    }
+
+    /// Java `removeUsedSecretWeapon(game, player)`: one flagged player BANNED and boxed.
+    fn remove_used_secret_weapon(&mut self, game: &mut Game, is_home: bool, pid: &str) {
+        use ffb_model::enums::{PS_BANNED, SendToBoxReason};
+        if !game.game_result.team_result_mut(is_home).player_result_mut(pid).has_used_secret_weapon {
+            return;
+        }
+        game.game_result.team_result_mut(is_home).player_result_mut(pid).has_used_secret_weapon = false;
+        let is_bb2016_sw = game.rules == Rules::Bb2016;
+        let removed = game.field_model.player_state(pid)
+            // bb2016 has no guard at all: a player already sent off for a foul is re-banned and
+            // the reason becomes SECRET_WEAPON_BAN (Java bb2016 StepEndTurn.removeUsedSecretWeapons).
+            .map(|s| if is_bb2016_sw { false } else { s.is_casualty() || s.base() == PS_BANNED })
+            .unwrap_or(true);
+        if removed { return; }
+        // Java removeUsedSecretWeapon: setPlayerState(playerState.changeBase(BANNED)), the
+        // send-to-box fields (by-player null), then UtilBox.putPlayerIntoBox -- the banned
+        // player sits in his team's box (the client draws him there), not nowhere.
+        let state = game.field_model.player_state(pid).unwrap_or_default();
+        game.field_model.set_player_state(pid, state.change_base(PS_BANNED));
+        let pr = game.game_result.team_result_mut(is_home).player_result_mut(pid);
+        pr.send_to_box_by_player_id = None;
+        pr.send_to_box_reason = Some(SendToBoxReason::SecretWeaponBan);
+        pr.send_to_box_turn = self.turn_nr;
+        pr.send_to_box_half = self.half;
+        ffb_model::util::util_box::UtilBox::put_player_into_box(game, pid);
     }
 
     /// Test driver: the gates answered as the parity agents do (argue for the first listed player,
@@ -1087,6 +1103,10 @@ impl StepEndTurn {
                             coord: ball_coord,
                         });
                         let home_has_carrier = game.team_home.player(&carrier_id).is_some();
+                        // Java: touchdownPlayerResult.setTouchdowns(getTouchdowns() + 1)
+                        let team_result = if home_has_carrier { &mut game.game_result.home }
+                            else { &mut game.game_result.away };
+                        team_result.player_results.entry(carrier_id.clone()).or_default().touchdowns += 1;
                         let off_turn_touchdown;
                         if home_has_carrier {
                             game.game_result.home.score += 1;
@@ -1159,7 +1179,10 @@ impl StepEndTurn {
                 ffb_model::util::util_player::UtilPlayer::refresh_players_for_turn_start(game, &etr, &etr_wna);
             }
 
-            // Java: fieldModel.clearMoveSquares / clearTrackNumbers / clearDiceDecorations → stub
+            // Java: fieldModel.clearMoveSquares(); clearTrackNumbers(); clearDiceDecorations()
+            game.field_model.clear_move_squares();
+            game.field_model.clear_track_numbers();
+            game.field_model.clear_dice_decorations();
             // Java: reportSecretWeaponsUsed → below, once (`secret_weapons_reported`)
         }
         }
@@ -1262,10 +1285,14 @@ impl StepEndTurn {
                     // across drives, so a player snacked in an earlier drive kept AV-1 forever and its
                     // armour broke on a roll Java's (restored) AV survives (elf seed 38 i=265: away_03
                     // eff_av 6 vs Java 7 → Rust breaks armour 6 & casualties where Java stays Prone).
+                    // Java: filter(hasActiveEnhancement(DODGY_SNACK)) -> fieldModel.removeSkillEnhancements
+                    // = player.removeEnhancements(name): all three client-visible maps, not just the
+                    // modifiers (Rust left empty skill/property keys behind).
                     for p in game.team_home.players.iter_mut()
                         .chain(game.team_away.players.iter_mut())
+                        .filter(|p| p.has_active_enhancement("Dodgy Snack"))
                     {
-                        p.remove_temporary_stat_mods("Dodgy Snack");
+                        p.remove_enhancements("Dodgy Snack");
                     }
                     // Java: removeReRollsLastingForDrive(true); removeReRollsLastingForDrive(false)
                     // — `StepEndTurn.java:497-498`, inside this same (fNewHalf || fTouchdown) block.
@@ -2026,6 +2053,8 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert_eq!(game.game_result.home.score, 1);
+        assert_eq!(game.game_result.home.player_results.get("scorer").map(|r| r.touchdowns), Some(1),
+            "Java credits the scorer's PlayerResult.touchdowns");
         assert_eq!(game.turn_mode, TurnMode::Setup);
         assert_eq!(step.touchdown_player_id.as_deref(), Some("scorer"));
     }

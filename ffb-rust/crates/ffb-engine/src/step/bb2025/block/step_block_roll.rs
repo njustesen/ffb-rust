@@ -282,8 +282,17 @@ impl StepBlockRoll {
                     self.handle_brawler_bb2020(game, rng);
                 }
                 Some("Brawler") => {
-                    // Java: actingPlayer.markSkillUsed(BRAWLER, SINGLE_BOTH_DOWN) if no game option
-                    // (use_reroll above already marked the skill used)
+                    // Java: actingPlayer.markSkillUsed(BRAWLER, SINGLE_BOTH_DOWN) unless the option
+                    // allows Brawler on both blocks (bb2025 useReRoll marks only tracked skills).
+                    if !ffb_model::option::util_game_option::is_option_enabled(
+                        game, ffb_model::option::game_option_id::ALLOW_BRAWLER_ON_BOTH_BLOCKS)
+                    {
+                        if let Some(b) = game.player(&player_id)
+                            .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_REROLL_SINGLE_BOTH_DOWN))
+                        {
+                            crate::step::util_server_steps::mark_skill_used(game, &player_id, b);
+                        }
+                    }
                     self.handle_implicit_reroll_index(game, rng, BlockResult::BothDown);
                 }
                 Some("Hatred") => {
@@ -657,7 +666,7 @@ impl StepBlockRoll {
             let allowed = !blitzing
                 && (ffb_model::option::util_game_option::is_option_enabled(
                         game, ffb_model::option::game_option_id::ALLOW_BRAWLER_ON_BOTH_BLOCKS)
-                    || !player.used_skills.contains(&brawler));
+                    || !game.acting_player.used_skills.contains(&brawler));
             if allowed && results.contains(&Some(BlockResult::BothDown)) && source_for("SINGLE_BOTH_DOWN") {
                 return true;
             }

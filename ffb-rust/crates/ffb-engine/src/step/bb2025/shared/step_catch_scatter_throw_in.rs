@@ -104,6 +104,9 @@ pub struct StepCatchScatterThrowIn {
     pub re_roll_state: ReRollState,
     /// Java: transient boolean repeat
     pub repeat: bool,
+    /// Java `getGameState().getPassState().isDeflectionSuccessful()` -- Rust carries the pass
+    /// state as published parameters (bb2020 StepIntercept / StepCloudBurster).
+    pub deflection_successful: bool,
     /// Pending prompt (mirrors Java's game.dialogParameter). Set by catch_ball/diving_catch.
     pending_prompt: Option<AgentPrompt>,
     /// Events accumulated during this invocation of execute_step.
@@ -131,6 +134,7 @@ impl StepCatchScatterThrowIn {
             reroll_catch: false,
             re_roll_state: ReRollState::new(),
             repeat: false,
+            deflection_successful: false,
             pending_prompt: None,
             pending_events: Vec::new(),
             pending_published: Vec::new(),
@@ -224,6 +228,8 @@ impl Step for StepCatchScatterThrowIn {
             }
             StepParameter::ThrowInCoordinate(v) => { self.throw_in_coordinate = Some(*v); true }
             StepParameter::UsingModifyingSkill(v) => { self.using_modifying_skill = Some(*v); true }
+            // The PassState flag (not a Java step parameter): observed, never consumed.
+            StepParameter::DeflectionSuccessful(v) => { self.deflection_successful = *v; true }
             _ => false,
         }
     }
@@ -527,10 +533,14 @@ impl StepCatchScatterThrowIn {
                     let new_mode = self.catch_ball(game, rng);
                     // Java has two branches:
                     //   1. result==null && deflectedPass && passState.isDeflectionSuccessful() → setInterceptionSuccessful(true)
-                    //      In bb2025, StepIntercept uses setInterceptionSuccessful() directly; setDeflectionSuccessful() is
-                    //      never called, so isDeflectionSuccessful() always returns false — this branch is dead code.
+                    //      bb2025's StepIntercept never sets the deflection flag (dead there); in bb2020 a
+                    //      deflector who then CATCHES the ball has intercepted it -- StepEndPassing counts
+                    //      the interception (PlayerResult.interceptions) and settles the ball on him.
                     //   2. result==FAILED_CATCH && deflectedPass → FAILED_DEFLECTION_CONVERSION  [implemented below]
-                    if new_mode == Some(CatchScatterThrowInMode::FailedCatch) && deflected_pass {
+                    if new_mode.is_none() && self.pending_prompt.is_none() && deflected_pass && self.deflection_successful {
+                        self.pending_published.push(StepParameter::InterceptionSuccessful(true));
+                        self.catch_scatter_throw_in_mode = new_mode;
+                    } else if new_mode == Some(CatchScatterThrowInMode::FailedCatch) && deflected_pass {
                         self.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::FailedDeflectionConversion);
                     } else {
                         self.catch_scatter_throw_in_mode = new_mode;
@@ -1196,6 +1206,38 @@ mod tests {
         }
     }
 
+    /// bb2020 `StepCatchScatterThrowIn`: a deflector who CATCHES the deflected pass
+    /// (`passState.isDeflectionSuccessful()`) has intercepted it -- `setInterceptionSuccessful(true)`,
+    /// and the step is done (mode null, NEXT_STEP). Rust first published the flag but left the
+    /// DEFLECTED mode set, so the step repeated and scattered the caught ball (dark_elf bb2020 seed 4).
+    #[test]
+    fn a_caught_deflection_is_an_interception_and_ends_the_step() {
+        let mut checked = false;
+        for seed in 0..60u64 {
+            let mut game = make_game();
+            game.rules = Rules::Bb2020;
+            let coord = FieldCoordinate::new(12, 7);
+            game.field_model.ball_coordinate = Some(coord);
+            game.field_model.ball_in_play = true;
+            game.field_model.ball_moving = true;
+            game.team_away.players.push(make_player("d1", 2));
+            game.field_model.set_player_coordinate("d1", coord);
+            game.field_model.set_player_state("d1", PlayerState::new(PS_STANDING));
+            let mut step = StepCatchScatterThrowIn::new();
+            step.catch_scatter_throw_in_mode = Some(CatchScatterThrowInMode::Deflected);
+            step.set_parameter(&StepParameter::DeflectionSuccessful(true));
+            let out = step.start(&mut game, &mut GameRng::new(seed));
+            if game.field_model.ball_moving || out.prompt.is_some() {
+                continue; // the catch failed or asks for a re-roll -- not this case
+            }
+            assert_eq!(out.action, StepAction::NextStep, "seed {seed}: a caught ball ends the step");
+            assert!(out.published.iter().any(|p| matches!(p, StepParameter::InterceptionSuccessful(true))));
+            checked = true;
+            break;
+        }
+        assert!(checked, "no seed produced a successful catch");
+    }
+
     // ── basic parameter/mode tests ────────────────────────────────────────────────
 
     #[test]
@@ -1378,8 +1420,9 @@ mod tests {
 
         step.start(&mut game, &mut GameRng::new(7));
 
-        assert!(game.player("c1").unwrap().used_skills.contains(&SkillId::Catch),
-            "the Catch re-roll must be consumed (skill marked used)");
+        // Java useReRoll: an untracked skill of a non-acting catcher is not marked anywhere.
+        assert!(!game.player("c1").unwrap().used_skills.contains(&SkillId::Catch),
+            "an untracked skill is not marked on the player");
         assert_ne!(step.roll, 1, "the re-roll must draw a FRESH catch die, not reuse the failed roll");
     }
 

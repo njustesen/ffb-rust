@@ -174,7 +174,10 @@ fn evaluate_injury_context(
     }
 
     // Java lines 120–133: apothecary eligibility
-    if let Some(state) = ctx.injury {
+    // Java reads `injuryContext.getPlayerState()` -- the WORSE of the casualty and Decay's second
+    // roll -- for every test here and for `setSufferedInjury` (the blood spot's injury): nurgle
+    // bb2016 seed 12 i=129, a Decay casualty BH then SI, Java blood spot 7 (SI), Rust 6 (BH).
+    if let Some(state) = ctx.get_player_state() {
         if state.base() == PS_KNOCKED_OUT || state.is_casualty() {
             ctx.suffered_injury = Some(state);
             let is_ball_and_chain = state.base() == PS_KNOCKED_OUT

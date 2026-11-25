@@ -310,7 +310,8 @@ impl StepDropFallingPlayers {
                     || use_reroll(game, &ReRollSource::new("TRR"), &attacker_id, rng);
 
                 if using && reroll_spent {
-                    game.mark_skill_used(&attacker_id, ffb_model::enums::SkillId::PilingOn);
+                    // Java actingPlayer.markSkillUsed(skill)
+                    crate::step::util_server_steps::mark_skill_used(game, &attacker_id, ffb_model::enums::SkillId::PilingOn);
                     for p in drop_player(game, &attacker_id, false) {
                         out = out.publish(p);
                     }
@@ -360,7 +361,10 @@ impl StepDropFallingPlayers {
                     // Java resolves canPileOnOpponent through the edition's PilingOn class; bb2020's
                     // has none, so the edition-blind union offered a pile-on Java never shows.
                     && game.player(&attacker_id)
-                        .map(|p| p.has_unused_skill_with_property_in(game.rules, NamedProperties::CAN_PILE_ON_OPPONENT))
+                        .map(|p| p.has_unused_skill_with_property_in(game.rules, NamedProperties::CAN_PILE_ON_OPPONENT)
+                            // hasUnusedSkillWithProperty(actingPlayer, ..): the activation's set too
+                            && p.all_skill_ids().any(|s| s.has_property_in(game.rules, NamedProperties::CAN_PILE_ON_OPPONENT)
+                                && !crate::step::util_server_steps::acting_skill_used(game, &attacker_id, s)))
                         .unwrap_or(false)
                     && (!uses_a_team_reroll
                         || game.player(&attacker_id)
@@ -917,9 +921,11 @@ mod tests {
             &Action::UseSkill { skill_id: ffb_model::enums::SkillId::PilingOn, use_skill: true },
             &mut game, &mut GameRng::new(0),
         );
+        // Java actingPlayer.markSkillUsed: the activation's set (the Player too only when the
+        // edition's usage type tracks it outside the activation).
         assert!(
-            game.player("atk").unwrap().used_skills.contains(&ffb_model::enums::SkillId::PilingOn),
-            "PilingOn should be marked used on the attacker"
+            game.acting_player.used_skills.contains(&ffb_model::enums::SkillId::PilingOn),
+            "PilingOn should be marked used on the acting attacker"
         );
         assert_eq!(game.field_model.player_state("atk").unwrap().base(), ffb_model::enums::PS_PRONE);
     }

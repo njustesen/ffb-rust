@@ -204,7 +204,7 @@ impl StepAlwaysHungry {
                 game.acting_player.used_skills.insert(sid);
                 // Java markSkillUsed: `if (skill.getSkillUsageType().isTrackOutsideActivation()
                 // && !getPlayer().isUsed(skill)) getPlayer().markUsed(skill, game)`.
-                if sid.usage_type().track_outside_activation() {
+                if sid.usage_type_for(game.rules).track_outside_activation() {
                     if let Some(p) = game.team_home.player_mut(&acting_player_id)
                         .or_else(|| game.team_away.player_mut(&acting_player_id))
                     {

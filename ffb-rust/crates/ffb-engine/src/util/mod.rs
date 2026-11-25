@@ -29,6 +29,7 @@ pub mod util_server_injury;
 pub mod util_server_player_move;
 pub mod util_server_player_swoop;
 pub mod util_server_pushback;
+pub mod util_range_ruler;
 pub mod util_server_re_roll;
 pub mod util_server_setup;
 pub mod util_server_start_game;

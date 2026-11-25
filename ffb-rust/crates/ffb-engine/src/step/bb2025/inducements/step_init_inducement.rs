@@ -93,7 +93,11 @@ impl StepInitInducement {
         if matches!(phase, InducementPhase::EndOfOwnTurn | InducementPhase::EndOfOpponentTurn)
             && !self.touchdown_or_end_of_half
         {
-            game.set_turn_mode(ffb_model::enums::TurnMode::BetweenTurns);
+            // bb2016's StepInitInducement has no turn-mode change (lastTurnMode stays KICKOFF for
+            // the client); the home_playing handover below is Rust's shared turn chain and stays.
+            if game.rules != ffb_model::enums::Rules::Bb2016 {
+                game.set_turn_mode(ffb_model::enums::TurnMode::BetweenTurns);
+            }
             if phase == InducementPhase::EndOfOpponentTurn && self.home_team != game.home_playing {
                 game.home_playing = !game.home_playing;
             }

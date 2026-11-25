@@ -36,6 +36,14 @@ pub struct StepInitPassing {
 impl StepInitPassing {
     pub fn new() -> Self { Self::default() }
 
+    /// Java `game.getFieldModel().setRangeRuler(UtilRangeRuler.createRangeRuler(game,
+    /// game.getThrower(), game.getPassCoordinate(), false))`.
+    fn set_range_ruler(game: &mut Game) {
+        let ruler = game.thrower_id.clone().and_then(|tid|
+            crate::util::util_range_ruler::create_range_ruler(game, &tid, game.pass_coordinate, false));
+        game.field_model.range_ruler = ruler;
+    }
+
     fn execute_step(&mut self, game: &mut Game) -> StepOutcome {
         // Rust bridging: a TARGET_COORDINATE init param stands in for Java's CLIENT_PASS
         // command — apply the same state setup its handler performs. Java sets the thrower
@@ -205,6 +213,10 @@ impl StepInitPassing {
             }
             game.turn_data_mut().turn_started = true;
             game.concession_possible = false;
+            // Java: if (THROW_BOMB) setRangeRuler(UtilRangeRuler.createRangeRuler(game, thrower, passCoordinate, false))
+            if thrower_action == Some(PlayerAction::ThrowBomb) {
+                Self::set_range_ruler(game);
+            }
             return outcome;
         }
         // Java: PASS (thrower==actingPlayer) / HAIL_MARY_PASS — range-gated.
@@ -215,6 +227,10 @@ impl StepInitPassing {
             game.turn_data_mut().turn_started = true;
             game.concession_possible = false;
             game.turn_data_mut().pass_used = true;
+            // Java: if (PASS) setRangeRuler(UtilRangeRuler.createRangeRuler(..))
+            if thrower_action == Some(PlayerAction::Pass) {
+                Self::set_range_ruler(game);
+            }
             return outcome;
         }
         // Java: (THROW_BOMB || DUMP_OFF) / HAIL_MARY_BOMB — no thrower==actingPlayer requirement.
@@ -224,6 +240,10 @@ impl StepInitPassing {
         {
             if thrower_is_acting {
                 game.acting_player.has_passed = true;
+            }
+            // Java: if (HAIL_MARY_BOMB != throwerAction) setRangeRuler(..)
+            if thrower_action != Some(PlayerAction::HailMaryBomb) {
+                Self::set_range_ruler(game);
             }
             return outcome;
         }

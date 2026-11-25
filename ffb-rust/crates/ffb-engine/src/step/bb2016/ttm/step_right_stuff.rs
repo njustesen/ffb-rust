@@ -256,7 +256,8 @@ impl StepRightStuff {
         // state is unchanged because Java's apothecary step applies the same injury over the
         // PRONE that dropPlayer set.
         let mut drop_params = util_server_injury::drop_player_no_sph(game, player_id);
-        ir.apply_to(game);
+        // No applyTo here: Java's StepRightStuff only publishes the result, StepApothecary applies
+        // it ONCE (applying here too doubled the client's blood spot and statistics).
 
         let mut out = StepOutcome::next()
             .publish(StepParameter::InjuryResult(Box::new(ir)))
@@ -658,8 +659,7 @@ mod tests {
             p, StepParameter::CatchScatterThrowInMode(CatchScatterThrowInMode::ScatterBall))),
             "the ball must still bounce when the landing injury takes the player off the pitch");
         assert!(game.field_model.ball_moving, "dropPlayer sets ballMoving on the ball square");
-        // ...and the injury is still applied afterwards, so the player really did leave the pitch.
-        assert!(game.field_model.player_coordinate("p1").map(|c| c.x < 0).unwrap_or(true),
-            "the KO'd player is off the pitch once the injury is applied");
+        // The injury itself travels as INJURY_RESULT; StepApothecary applies it (once).
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::InjuryResult(_))));
     }
 }

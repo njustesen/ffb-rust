@@ -530,10 +530,17 @@ impl FieldModel {
         self.prayer_enhancements.remove(prayer_name);
     }
 
-    /// Java: FieldModel.clearTrackNumbers() — clears the client-side movement-track visualisation.
-    /// No game-state effect; track numbers are purely a UI concern.
+    /// Java: FieldModel.clearTrackNumbers() — clears the movement-track the client draws.
     pub fn clear_track_numbers(&mut self) {
-        // No-op: track numbers are client-side visualisation data not stored in the engine model.
+        self.track_numbers.clear();
+    }
+
+    /// Java: FieldModel.add(TrackNumber) — `fTrackNumbers` is a HashSet whose TrackNumber equality
+    /// is the coordinate: a square already numbered keeps its first number.
+    pub fn add_track_number(&mut self, track_number: TrackNumber) {
+        if !self.track_numbers.iter().any(|t| t.coordinate == track_number.coordinate) {
+            self.track_numbers.push(track_number);
+        }
     }
 
     /// Java: FieldModel.getPlayerMarkers()

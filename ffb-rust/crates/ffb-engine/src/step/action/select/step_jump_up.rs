@@ -77,7 +77,9 @@ impl StepJumpUp {
 
         // Java: (isStandingUp && !hasMoved && hasUnusedSkill(JumpUp)) || reRolledAction == JUMP_UP
         let has_unused_jump_up = game.player(&player_id)
-            .map(|p| p.has_skill(SkillId::JumpUp) && !p.used_skills.contains(&SkillId::JumpUp))
+            // ActingPlayer.isSkillUsed = the activation's set OR Player.isUsed
+            .map(|p| p.has_skill(SkillId::JumpUp) && !p.used_skills.contains(&SkillId::JumpUp)
+                && !game.acting_player.used_skills.contains(&SkillId::JumpUp))
             .unwrap_or(false);
 
         let enter_logic = (game.acting_player.standing_up
@@ -89,7 +91,8 @@ impl StepJumpUp {
             return StepOutcome::next();
         }
 
-        // Java: game.setConcessionPossible(false) — stub: concession_possible not yet in model.
+        // Java: game.setConcessionPossible(false)
+        game.concession_possible = false;
 
         let action = game.acting_player.player_action;
 
@@ -196,15 +199,10 @@ impl StepJumpUp {
     }
 }
 
+/// Java `actingPlayer.markSkillUsed(skill)`: the activation's set; the Player only for a skill
+/// tracked outside the activation.
 fn mark_used(game: &mut Game, player_id: &str) {
-    let is_home = game.team_home.player(player_id).is_some();
-    if is_home {
-        if let Some(p) = game.team_home.player_mut(player_id) {
-            p.used_skills.insert(SkillId::JumpUp);
-        }
-    } else if let Some(p) = game.team_away.player_mut(player_id) {
-        p.used_skills.insert(SkillId::JumpUp);
-    }
+    crate::step::util_server_steps::mark_skill_used(game, player_id, SkillId::JumpUp);
 }
 
 #[cfg(test)]
@@ -384,7 +382,10 @@ mod tests {
         let seed = seed_for_d6(4);
         let (mut game, pid) = make_game_block_standing_up(vec![SkillId::JumpUp], 3);
         StepJumpUp::new().start(&mut game, &mut GameRng::new(seed));
-        assert!(game.team_home.player(&pid).unwrap().used_skills.contains(&SkillId::JumpUp));
+        // Java actingPlayer.markSkillUsed: the activation's set; Jump Up is not tracked outside
+        // the activation, so the client-visible Player.usedSkills stays empty.
+        assert!(game.acting_player.used_skills.contains(&SkillId::JumpUp));
+        assert!(!game.team_home.player(&pid).unwrap().used_skills.contains(&SkillId::JumpUp));
     }
 
     #[test]

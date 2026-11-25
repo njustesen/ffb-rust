@@ -191,12 +191,8 @@ impl StepMoveDodge {
         if bt_saved_it {
             self.using_break_tackle = true;
             if let Some(pid) = player_id.as_deref() {
-                // Rust convention: the factory gate reads Player.used_skills; acted() reads the
-                // acting set — write both (the keg/Zzharg lesson).
-                if let Some(p) = game.team_home.player_mut(pid).or_else(|| game.team_away.player_mut(pid)) {
-                    p.used_skills.insert(ffb_model::enums::SkillId::BreakTackle);
-                }
-                game.acting_player.used_skills.insert(ffb_model::enums::SkillId::BreakTackle);
+                // Java actingPlayer.markSkillUsed(btSkill): the activation set only (Regular usage).
+                crate::step::util_server_steps::mark_skill_used(game, pid, ffb_model::enums::SkillId::BreakTackle);
             }
         }
         let successful = DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll);

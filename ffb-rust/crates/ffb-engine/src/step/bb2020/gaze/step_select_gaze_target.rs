@@ -203,6 +203,12 @@ impl StepSelectGazeTarget {
             }
             // Java: showDialog(DialogSelectGazeTargetParameter) -- the agent's question. A bare
             // cont() here parked the step with nothing asked (BACKLOG §K bb2020 gaze).
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::SelectGazeTarget(
+                    ffb_model::dialog::dialog_select_gaze_target_parameter::DialogSelectGazeTargetParameter),
+                false,
+            );
             let attacker_id = game.acting_player.player_id.clone().unwrap_or_default();
             let gain_skill = if self.used_skill.is_none() {
                 game.player(&attacker_id).and_then(|p| p.all_skill_ids().find(|id|
@@ -225,8 +231,16 @@ impl StepSelectGazeTarget {
         if selected_id == acting_player_id {
             let has_acted = game.acting_player.has_acted;
             if has_acted && !self.confirmed {
-                // Java: showDialog(ConfirmEndAction); CONTINUE
-                // client-only: DialogConfirmEndActionParameter
+                // Java: showDialog(new DialogConfirmEndActionParameter(actingTeamId, playerAction)); CONTINUE
+                let parameter = ffb_model::dialog::dialog_confirm_end_action_parameter::DialogConfirmEndActionParameter {
+                    team_id: Some(game.active_team().id.clone()),
+                    player_action: game.acting_player.player_action,
+                };
+                crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                    game,
+                    ffb_model::dialog::dialog_parameter_factory::DialogParameter::ConfirmEndAction(parameter),
+                    false,
+                );
                 return StepOutcome::cont();
             } else {
                 // Java: game.setTurnMode(lastTurnMode); setTargetSelectionState(cancel()); GOTO_LABEL

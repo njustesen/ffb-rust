@@ -236,6 +236,12 @@ impl StepFollowup {
                     game.field_model.set_player_coordinate(attacker_id, followup_coord);
                     UtilServerPlayerMove::update_move_squares(game, false);
                     outcome = outcome.publish(StepParameter::PlayerEnteringSquare(attacker_id.clone()));
+                    if game.acting_player.player_action == Some(PlayerAction::Blitz) {
+                        if let Some(from) = self.coordinate_from {
+                            game.field_model.add_track_number(ffb_model::model::track_number::TrackNumber::new(
+                                from, game.acting_player.current_move - 1));
+                        }
+                    }
                 }
             } else {
                 // Java: publishParameter(COORDINATE_FROM, null) → null/zero coord

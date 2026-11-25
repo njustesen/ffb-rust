@@ -531,6 +531,11 @@ pub trait Step: Send {
     fn start(&mut self, game: &mut ffb_model::model::game::Game, rng: &mut ffb_model::util::rng::GameRng) -> StepOutcome;
     fn handle_command(&mut self, action: &crate::action::Action, game: &mut ffb_model::model::game::Game, rng: &mut ffb_model::util::rng::GameRng) -> StepOutcome;
     fn set_parameter(&mut self, _param: &StepParameter) -> bool { false }
+    /// Java: `IStep.init(StepParameterSet)` -- the parameters a sequence generator attaches to the
+    /// step. Most Java steps' `init` loops the set through `setParameter`, which is the default
+    /// here (Rust's historic behaviour); a step whose Java `init` reads a key that its `setParameter` does NOT
+    /// accept overrides this, so a later PUBLISHED value of that key cannot overwrite it.
+    fn init_parameter(&mut self, param: &StepParameter) -> bool { self.set_parameter(param) }
     /// Java: `AbstractStep.consume(parameter)` — a `setParameter` implementation that calls
     /// `consume()` stops `StepStack.publishStepParameter`'s delivery loop at this step; every
     /// step ABOVE it still receives the parameter, everything below does not. Most steps set

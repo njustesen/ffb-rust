@@ -1384,11 +1384,12 @@ mod tests {
                 &mut GameRng::new(0),
             );
             assert_eq!(step.re_rolled_action.as_deref(), Some("PASS"), "accept={accept}");
-            assert_eq!(
-                game.player("t1").unwrap().used_skills.contains(&SkillId::Pass),
-                accept,
-                "the Pass skill is spent only on accept (accept={accept})"
-            );
+            // bb2025 useReRoll marks only tracked skills (Pass is not); the spend shows as the
+            // ReportReRoll, written only on accept.
+            let re_rolled = game.report_list.get_reports().iter()
+                .any(|r| r.get_id() == ffb_model::report::report_id::ReportId::RE_ROLL);
+            assert_eq!(re_rolled, accept, "the Pass skill is used only on accept (accept={accept})");
+            assert!(!game.player("t1").unwrap().used_skills.contains(&SkillId::Pass));
         }
     }
 

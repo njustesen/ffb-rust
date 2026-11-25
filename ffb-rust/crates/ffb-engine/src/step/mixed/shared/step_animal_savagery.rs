@@ -144,7 +144,8 @@ impl StepAnimalSavagery {
                 // Java: doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill)
                 do_roll = game
                     .player(&acting_player_id)
-                    .map(|p| p.has_skill(SkillId::AnimalSavagery) && !p.used_skills.contains(&SkillId::AnimalSavagery))
+                    .map(|p| p.has_skill(SkillId::AnimalSavagery)
+                        && !crate::step::util_server_steps::acting_skill_used(game, &p.id, SkillId::AnimalSavagery))
                     .unwrap_or(false);
             }
 
@@ -227,10 +228,8 @@ impl StepAnimalSavagery {
                 .player(&acting_player_id)
                 .and_then(|p| p.skill_id_with_property(NamedProperties::CAN_LASH_OUT_AGAINST_OPPONENTS));
             if let Some(skill_id) = lash_out_skill {
-                let has_unused = game
-                    .player(&acting_player_id)
-                    .map(|p| p.has_unused_skill_with_property(NamedProperties::CAN_LASH_OUT_AGAINST_OPPONENTS))
-                    .unwrap_or(false);
+                let has_unused = crate::step::util_server_steps::acting_unused_skill_with_property(
+                    game, &acting_player_id, NamedProperties::CAN_LASH_OUT_AGAINST_OPPONENTS).is_some();
                 if has_unused {
                     let opponent_team: &Team = if home_active { &game.team_away } else { &game.team_home };
                     let adjacent = adjacent_targets(game, opponent_team, player_coordinate);
@@ -285,8 +284,13 @@ impl StepAnimalSavagery {
             if is_bb2025 {
                 AnimalSavageryCancelActionCommand.execute(game, rng);
                 if let Some(state) = game.field_model.player_state(&acting_player_id) {
-                    let base = if game.acting_player.standing_up { PS_PRONE } else { PS_STANDING };
-                    let new_state = state.change_base(base).change_active(false).change_confused(true);
+                    // Java: standing up -> PRONE + inactive; else STANDING + inactive + CONFUSED (the
+                    // confused bit only on the standing branch).
+                    let new_state = if game.acting_player.standing_up {
+                        state.change_base(PS_PRONE).change_active(false)
+                    } else {
+                        state.change_base(PS_STANDING).change_active(false).change_confused(true)
+                    };
                     game.field_model.set_player_state(&acting_player_id, new_state);
                 }
                 // Java: step.getResult().setSound(SoundId.ROAR) — client-only, no Rust equivalent hook.
@@ -799,18 +803,10 @@ fn good_conditions_for_savagery(player_action: Option<PlayerAction>) -> bool {
 /// `isStandingUp() || wasProne()` branch back to PRONE. Rust marked only the Player, leaving
 /// `acting_player.used_skills` empty — so a prone Rat Ogre whose Unchannelled Fury failed before the
 /// stand-up ended the activation PRONE in Rust and STANDING in Java (skaven bb2025 seed 30 i=29).
+/// The Player is marked only for a skill tracked outside the activation (`markSkillUsed` :226),
+/// so a Regular negatrait never reaches the client-visible `Player.usedSkills`.
 fn mark_skill_used(game: &mut Game, player_id: &str, skill: SkillId) {
-    if game.acting_player.player_id.as_deref() == Some(player_id) {
-        game.acting_player.used_skills.insert(skill);
-    }
-    let is_home = game.team_home.player(player_id).is_some();
-    if is_home {
-        if let Some(p) = game.team_home.player_mut(player_id) {
-            p.used_skills.insert(skill);
-        }
-    } else if let Some(p) = game.team_away.player_mut(player_id) {
-        p.used_skills.insert(skill);
-    }
+    crate::step::util_server_steps::mark_skill_used(game, player_id, skill);
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -1519,8 +1515,8 @@ mod tests {
             "Java marks the skill on the ACTING player, not only on the Player");
         assert!(game.acting_player.acted(),
             "a used negatrait makes hasActed() true, which decides STANDING vs PRONE at activation end");
-        assert!(game.team_home.player("p1").unwrap().used_skills.contains(&SkillId::AnimalSavagery),
-            "the Player-side flag still gates the once-per-activation re-roll");
+        assert!(!game.team_home.player("p1").unwrap().used_skills.contains(&SkillId::AnimalSavagery),
+            "a Regular skill is not tracked outside the activation: Player.usedSkills stays empty");
     }
 
     /// The acting-player mark is scoped to the acting player: marking a DIFFERENT player's skill

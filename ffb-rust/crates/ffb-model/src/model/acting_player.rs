@@ -172,6 +172,20 @@ impl ActingPlayer {
         self.player_action = Some(action);
     }
 
+    /// Java `ActingPlayer.setPlayerId(null)`: a no-op when no player is set; otherwise the same
+    /// per-activation reset as a player change, plus `fPlayerAction = null` and `setStrength(0)`
+    /// (no player). The client sees the cleared acting player (e.g. the pass-block window).
+    pub fn clear_player_id(&mut self) {
+        if self.player_id.is_none() {
+            return;
+        }
+        let action = self.player_action.unwrap_or(PlayerAction::Move);
+        self.set_player(String::new(), action);
+        self.player_id = None;
+        self.player_action = None;
+        self.strength = 0;
+    }
+
     /// Java: `setJumping(boolean)` -- clearing the flag also clears `jumpsWithoutModifiers`.
     pub fn set_jumping(&mut self, jumping: bool) {
         if jumping == self.jumping {

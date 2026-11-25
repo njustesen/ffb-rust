@@ -44,6 +44,14 @@ impl StepInitPassing {
         }
     }
 
+    /// Java `game.getFieldModel().setRangeRuler(UtilRangeRuler.createRangeRuler(game,
+    /// game.getThrower(), game.getPassCoordinate(), false))`.
+    fn set_range_ruler(game: &mut Game) {
+        let ruler = game.thrower_id.clone().and_then(|tid|
+            crate::util::util_range_ruler::create_range_ruler(game, &tid, game.pass_coordinate, false));
+        game.field_model.range_ruler = ruler;
+    }
+
     fn execute_step(&self, game: &mut Game) -> StepOutcome {
         // Bomb re-throw window -- see the mixed StepInitPassing for the full note. Java parks
         // here with no dialog; the prompt only surfaces that wait so the agent can decline.
@@ -137,7 +145,10 @@ impl StepInitPassing {
             game.acting_player.has_passed = true;
             game.turn_data_mut().turn_started = true;
             game.concession_possible = false;
-            // client-only: UtilRangeRuler.createRangeRuler — client display only (THROW_BOMB case)
+            // Java: if (THROW_BOMB) setRangeRuler(UtilRangeRuler.createRangeRuler(..))
+            if thrower_action == Some(PlayerAction::ThrowBomb) {
+                Self::set_range_ruler(game);
+            }
             return out;
         }
 
@@ -151,7 +162,10 @@ impl StepInitPassing {
             game.turn_data_mut().turn_started = true;
             game.concession_possible = false;
             game.turn_data_mut().pass_used = true;
-            // client-only: UtilRangeRuler.createRangeRuler — client display only (PASS case)
+            // Java: if (PASS) setRangeRuler(UtilRangeRuler.createRangeRuler(..))
+            if thrower_action == Some(PlayerAction::Pass) {
+                Self::set_range_ruler(game);
+            }
             return out;
         }
 
@@ -164,7 +178,10 @@ impl StepInitPassing {
             if thrower_is_acting {
                 game.acting_player.has_passed = true;
             }
-            // client-only: UtilRangeRuler.createRangeRuler — client display only (non-HAIL_MARY_BOMB case)
+            // Java: if (HAIL_MARY_BOMB != throwerAction) setRangeRuler(UtilRangeRuler.createRangeRuler(..))
+            if thrower_action != Some(PlayerAction::HailMaryBomb) {
+                Self::set_range_ruler(game);
+            }
             return out;
         }
 

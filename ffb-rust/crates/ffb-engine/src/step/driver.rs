@@ -370,7 +370,7 @@ impl DriverStepEntry {
 
 fn seq_step_to_driver_entry(s: SequenceStep, rules: Rules) -> DriverStepEntry {
     let mut step = make_step_for(s.step_id, rules);
-    for param in &s.params { step.set_parameter(param); }
+    for param in &s.params { step.init_parameter(param); }
     DriverStepEntry { step, label: s.label }
 }
 

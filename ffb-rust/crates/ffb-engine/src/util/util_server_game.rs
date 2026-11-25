@@ -219,7 +219,9 @@ impl UtilServerGame {
     ///
     /// Only runs for `TurnMode::Regular` and `TurnMode::Kickoff`.
     pub fn mark_played_and_secret_weapons(game: &mut Game) {
-        if game.turn_mode != TurnMode::Regular && game.turn_mode != TurnMode::Kickoff {
+        // bb2016's StepEndTurn runs it in REGULAR only; bb2020/bb2025 also in KICKOFF.
+        let kickoff_counts = game.rules != ffb_model::enums::Rules::Bb2016;
+        if game.turn_mode != TurnMode::Regular && !(kickoff_counts && game.turn_mode == TurnMode::Kickoff) {
             return;
         }
         let is_regular = game.turn_mode == TurnMode::Regular;

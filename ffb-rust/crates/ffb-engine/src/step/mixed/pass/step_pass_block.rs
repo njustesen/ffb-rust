@@ -289,8 +289,10 @@ impl StepPassBlock {
 
             game.set_turn_mode(TurnMode::PassBlock);
             game.home_playing = !game.home_playing;
-            // Java: game.getActingPlayer().setPlayerId(null) — raw id clear, NOT changeActingPlayer.
-            game.acting_player.player_id = None;
+            // Java: game.getActingPlayer().setPlayerId(null) — NOT changeActingPlayer, but
+            // setPlayerId itself resets the activation (action, hasPassed, currentMove, used
+            // skills ...); the client sees no acting player during the window.
+            game.acting_player.clear_player_id();
 
             // Java: save every on-pitch defender's state, then activate exactly the available blockers.
             for player in &opposing_team.players {
@@ -319,8 +321,15 @@ impl StepPassBlock {
                 game.field_model.bomb_coordinate = game.pass_coordinate;
             }
 
-            // Java: game.setDialogParameter(new DialogPassBlockParameter()) — headless: the
+            // Java: game.setDialogParameter(new DialogPassBlockParameter()) -- the client's pass-block
+            // notice (showDialog without the turn-timer stop is exactly setDialogParameter). The
             // pushed Select sequence emits the ActivatePlayer prompt that drives the window.
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::PassBlock(
+                    ffb_model::dialog::dialog_pass_block_parameter::DialogPassBlockParameter),
+                false,
+            );
             StepOutcome::next()
                 .with_event(ffb_model::events::GameEvent::PassBlock { player_id: None })
                 .with_event(ffb_model::events::GameEvent::PassBlockEligible {

@@ -57,8 +57,12 @@ impl StepResolveBomb {
             return StepOutcome::next();
         }
 
-        // Java: fieldModel.setBombMoving(false); fieldModel.setBombCoordinate(null)
-        game.field_model.bomb_moving = false;
+        // Java bb2025: fieldModel.setBombMoving(false); fieldModel.setBombCoordinate(null).
+        // bb2016/bb2020 explode inside their StepInitBomb, which clears only the coordinate --
+        // bombMoving stays as the throw left it (the client sees it until the next bomb).
+        if game.rules == ffb_model::enums::Rules::Bb2025 {
+            game.field_model.bomb_moving = false;
+        }
         game.field_model.bomb_coordinate = None;
         // client-only: setAnimation(AnimationType.BOMB_EXPLOSION, fBombCoordinate)
         // Java: fieldModel.add(new BloodSpot(fBombCoordinate, new PlayerState(HIT_BY_BOMB)))

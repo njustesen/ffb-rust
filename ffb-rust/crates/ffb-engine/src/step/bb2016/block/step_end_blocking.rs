@@ -84,7 +84,8 @@ impl StepEndBlocking {
                     let sid = p.all_skill_ids().find(|s| {
                         s.properties().contains(&NamedProperties::ADD_STRENGTH_ON_BLITZ)
                     })?;
-                    Some(p.used_skills.contains(&sid))
+                    // Java actingPlayer.isSkillUsed(skillHorns)
+                    Some(crate::step::util_server_steps::acting_skill_used(game, pid, sid))
                 })
                 .unwrap_or(false);
             let dauntless_used = game.player(pid)
@@ -92,7 +93,8 @@ impl StepEndBlocking {
                     let sid = p.all_skill_ids().find(|s| {
                         s.properties().contains(&NamedProperties::CAN_ROLL_TO_MATCH_OPPONENTS_STRENGTH)
                     })?;
-                    Some(p.used_skills.contains(&sid))
+                    // Java actingPlayer.isSkillUsed(skillDauntless)
+                    Some(crate::step::util_server_steps::acting_skill_used(game, pid, sid))
                 })
                 .unwrap_or(false);
             if horns_used || dauntless_used {
@@ -116,8 +118,8 @@ impl StepEndBlocking {
 
         // Java: Skill canBlockMultipleTimesSkill = UtilCards.getUnusedSkillWithProperty(actingPlayer, canBlockMoreThanOnce)
         let can_block_multiple_times = attacker_id.as_deref()
-            .and_then(|id| game.player(id))
-            .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::CAN_BLOCK_MORE_THAN_ONCE));
+            .and_then(|id| crate::step::util_server_steps::acting_unused_skill_with_property(
+                game, id, NamedProperties::CAN_BLOCK_MORE_THAN_ONCE));
 
         // Java: if ((playerAction == MULTIPLE_BLOCK) && canBlockMultipleTimesSkill != null
         //   && !hasSkillToCancelProperty(canBlockMoreThanOnce)
@@ -143,10 +145,7 @@ impl StepEndBlocking {
             && game.acting_player.has_blocked
         {
             if let (Some(sid), Some(pid)) = (can_block_multiple_times, attacker_id.as_deref()) {
-                let pid = pid.to_owned();
-                let is_home = game.team_home.player(&pid).is_some();
-                if is_home { game.team_home.player_mut(&pid).map(|p| p.used_skills.insert(sid)); }
-                else { game.team_away.player_mut(&pid).map(|p| p.used_skills.insert(sid)); }
+                crate::step::util_server_steps::mark_skill_used(game, pid, sid);
             }
             game.acting_player.has_blocked = false;
             ServerUtilBlock::update_dice_decorations(game);
@@ -174,8 +173,8 @@ impl StepEndBlocking {
         // Java: Skill unusedPlayerMustMakeSecondBlockSkill =
         //   UtilCards.getUnusedSkillWithProperty(actingPlayer, forceSecondBlock)
         let unused_force_second_block = attacker_id.as_deref()
-            .and_then(|id| game.player(id))
-            .and_then(|p| UtilCards::get_unused_skill_with_property(p, NamedProperties::FORCE_SECOND_BLOCK));
+            .and_then(|id| crate::step::util_server_steps::acting_unused_skill_with_property(
+                game, id, NamedProperties::FORCE_SECOND_BLOCK));
 
         // Java: if (activePlayer.hasSkillProperty(forceSecondBlock)) actingPlayer.setGoingForIt(true)
         if attacker_id.as_deref()
@@ -210,10 +209,7 @@ impl StepEndBlocking {
         if force_second_block {
             game.acting_player.goes_for_it = true;
             if let (Some(sid), Some(pid)) = (unused_force_second_block, attacker_id.as_deref()) {
-                let pid = pid.to_owned();
-                let is_home = game.team_home.player(&pid).is_some();
-                if is_home { game.team_home.player_mut(&pid).map(|p| p.used_skills.insert(sid)); }
-                else { game.team_away.player_mut(&pid).map(|p| p.used_skills.insert(sid)); }
+                crate::step::util_server_steps::mark_skill_used(game, pid, sid);
             }
             let seq = Block::build_sequence(&BlockParams {
                 block_defender_id: defender_id.clone(),

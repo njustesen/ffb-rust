@@ -1192,6 +1192,20 @@ impl StepInitSelecting {
                         _ => {}
                     }
                 }
+                // Java never sets `defenderId` for a ball action: CLIENT_PASS / CLIENT_HAND_OVER
+                // carry the target in the command and `StepInitSelecting` only publishes it, so the
+                // client's `game.defenderId` stays null through the whole pass (incl. the pass-block
+                // window). The receiver was parked here only to be turned into TARGET_COORDINATE
+                // above -- clear it once it has been, so the client view matches (lizardman bb2025
+                // seed 10 i=86: passBlock window, Rust defenderId=home_09, Java null). The declared
+                // *_MOVE forms do not dispatch here and keep the parked target for the later give.
+                if matches!(dispatch,
+                        PlayerAction::Pass | PlayerAction::HandOver | PlayerAction::ThrowBomb
+                        | PlayerAction::HailMaryPass)
+                    && target_params.iter().any(|p| matches!(p, StepParameter::TargetCoordinate(_)))
+                {
+                    game.defender_id = None;
+                }
                 // A prone player (standing_up) must run the Select sequence's StandUp before its
                 // action, so it always proceeds via next() — even for Block/Blitz where
                 // force_goto_on_dispatch is set. Java reaches the StandUp via SelectBlitzTarget (which

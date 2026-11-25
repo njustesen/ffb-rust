@@ -63,8 +63,13 @@ impl StepEndFeeding {
         // Java: fEndTurn |= UtilServerSteps.checkTouchdown(getGameState())
         self.end_turn |= check_touchdown(game);
 
-        // Java: game.setDefenderId(null)
-        game.defender_id = None;
+        // Java (bb2020/bb2025 shared StepEndFeeding): game.setDefenderId(null). The bb2016
+        // StepEndFeeding has no such line: after a foul the fouled player stays the client's
+        // defender until the next block/foul/gaze sets or clears it (amazon bb2016 seed 10 i=23,
+        // Java defenderId=home_02 after away_09's foul, Rust null).
+        if game.rules != ffb_model::enums::Rules::Bb2016 {
+            game.defender_id = None;
+        }
 
         // Java: markSkillsTrackedOutsideOfActivationAndRemoveEffects(game)
         crate::step::util_server_steps::mark_skills_tracked_outside_of_activation_and_remove_effects(game);
@@ -141,7 +146,7 @@ impl StepEndFeeding {
         // Java: else → setPassCoordinate(null); changePlayerAction(null, null, false); Select.pushSequence(false)
         game.pass_coordinate = None;
         crate::step::util_server_steps::change_player_action_to_none(game);
-        let seq = Select::build_sequence(&SelectParams { update_persistence: false, is_blitz_move: false, ..Default::default() });
+        let seq = Select::build_sequence(&SelectParams { update_persistence: false, is_blitz_move: false, rules: game.rules, ..Default::default() });
         StepOutcome::next().push_seq(seq)
     }
 }

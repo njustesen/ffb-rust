@@ -204,9 +204,7 @@ impl StepModifierTrait for BoneHeadStepModifier {
             // Java: doRoll = UtilCards.hasUnusedSkill(actingPlayer, skill) — guards against
             // re-firing the roll when StepBoneHead is re-entered later in the same player
             // action (e.g. Blitz's move phase and block phase both push StepId::BoneHead).
-            let already_used = game.player(&player_id)
-                .map(|p| p.used_skills.contains(&SkillId::BoneHead))
-                .unwrap_or(false);
+            let already_used = crate::step::util_server_steps::acting_skill_used(game, &player_id, SkillId::BoneHead);
             do_roll = !already_used;
         }
 
@@ -239,15 +237,8 @@ impl StepModifierTrait for BoneHeadStepModifier {
         // leaves 2..6, which is exactly when it matters.
         let successful = crate::dice_interpreter::DiceInterpreter::is_skill_roll_successful(roll, min_roll);
 
-        // Java: actingPlayer.markSkillUsed(skill)
-        let is_home = game.team_home.player(&player_id).is_some();
-        if is_home {
-            if let Some(p) = game.team_home.player_mut(&player_id) {
-                p.used_skills.insert(SkillId::BoneHead);
-            }
-        } else if let Some(p) = game.team_away.player_mut(&player_id) {
-            p.used_skills.insert(SkillId::BoneHead);
-        }
+        // Java: actingPlayer.markSkillUsed(skill) -- the activation's set (Bone Head is Regular).
+        crate::step::util_server_steps::mark_skill_used(game, &player_id, SkillId::BoneHead);
 
         let re_rolled = state.re_rolled_action.as_deref() == Some("BONE_HEAD")
             && state.re_roll_source.is_some();

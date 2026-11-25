@@ -71,7 +71,9 @@ pub fn find_skill_reroll_source_ignoring(
     let player = game.player(acting_id)?;
 
     player.all_skill_ids()
-        .filter(|id| !player.used_skills.contains(id) && !ignore.contains(id))
+        // ActingPlayer.isSkillUsed: the activation's set OR Player.isUsed
+        .filter(|id| !player.used_skills.contains(id) && !game.acting_player.used_skills.contains(id)
+            && !ignore.contains(id))
         .filter_map(|id| {
             // Edition-aware: Java registers a skill's re-roll sources in the PER-EDITION skill
             // class' postConstruct, and `Swoop` genuinely differs (bb2025 registers RIGHT_STUFF,

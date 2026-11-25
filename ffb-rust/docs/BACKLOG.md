@@ -12035,6 +12035,68 @@ parity, which §I-§M closed.
 - **P5 done-check** `scripts/gui_check.py` (written before P4 closes) + docs + push.
 
 ### RESUME HERE
+**2026-11-24 night (8): client-view sweep over ALL skill squads x3 editions, ported to near zero.**
+
+Sweep tooling (scratchpad, not in repo): `sweepv.py <root> <seeds> [edition]` runs every squad of
+`D:/ffb_sksweep/cert9/results.txt` with the skill-sweep settings + `FFB_CLIENT_VIEW_DIR`, then
+`client_view_check.py`; a frozen exe per round (`D:/ffb_star/bin/ffb-parity-viewN.exe`), roots
+`D:/ffb_viewsweepN`. view5 (4 games/squad): bb2025 + bb2020 every squad identical in steps, reports
+AND client view except one bomb case (fixed after); bb2016 all squads steps+reports identical, view
+mostly identical (fixed after: TTM landing applied twice, secret-weapon mark in KICKOFF, Piling On
+on the player, bb2016 range ruler). view6 (20 games/squad, all fixes) is the gate.
+Done (8): skills marked where Java marks them (`util_server_steps::mark_skill_used` /
+`acting_skill_used` / `acting_unused_skill_with_property` / `mark_skill_unused`; useReRoll per
+edition; Brawler, Frenzy, multiple block, Hit and Run, Jump Up, Animosity, Animal Savagery, Break
+Tackle, Bone Head bb2020, Piling On, Vicious Vines, Flashing Blade, extra-rush skill);
+`SkillId::usage_type_for` reads the generated per-ruleset table first (bb2016/bb2020 Dodge, Pro,
+Sure Feet are REGULAR -- the hand-kept table had bb2025's ONCE_PER_TURN); getUnusedRerollSource
+readers check both stores; touchdowns/interceptions (acting player's own pass too)/bb2025 KTM
+completion/bb2025-only landings; Dodgy Snack fully removed; KO-recovery and bb2020 coach-ban box
+order; Animal Savagery confused only when standing; Jump Up concession; pass block
+(`ActingPlayer.clear_player_id` = Java setPlayerId(null), DialogPassBlock); TRACK NUMBERS (StepMove,
+blitz followup, end-turn clear -- `clear_track_numbers` was a no-op) and the RANGE RULER
+(`util::util_range_ruler`, mixed + bb2016 StepInitPassing); bb2020: hypnotized gaze, gaze/confirm
+dialogs, multi-block apothecary with stats + RESERVE, deflection-caught = interception, Knuckle
+Dusters without value, landings none, bomb moving kept (resolve bomb, init-bomb out), outOfBounds
+never cleared by the kickoff scatter, trap doors in HashSet order; bb2016: spectators (not fan
+factor), no BETWEEN_TURNS in the inducement steps. Checker: inducement array and track numbers
+compared as sets (Java HashMap/HashSet order), playerType is SETUP.
+view6 (20 games/squad, 114 squad gates): steps + reports identical in EVERY squad of all three
+editions. Its client-view residue, ported in (9) below. Open: (1) human two-window test (user);
+(2) bb2016 runs the BB2025 activation/Select sequence (ActivationSequenceBuilder: Animal Savagery,
+Steady Footing, Unchannelled Fury) instead of Java bb2016 `Select` (BONE_HEAD, REALLY_STUPID,
+TAKE_ROOT, WILD_ANIMAL, BLOOD_LUST, JUMP_UP, STAND_UP). Rust's `generator::bb2016::Select` exists but
+only dead/bb2016-only steps push it; ~30 push sites build `bb2025::SelectParams{..Default}`. Visible
+effect today: a PRONE Wild Animal that fails stands up first in Rust (turnStarted=true,
+concessionPossible=false; ~13 view steps over 4 squads x 20 games), Wild Animal rolls in the Move
+sequence instead. A real port = route Select by rules at every push site (edition-gated-default
+lesson) and re-gate all bb2016 suites; not a patch.
+
+**2026-11-25 night (9): view6 residue ported (frozen view7 = all but the Decay fix, view8 = all).**
+- bb2016 `removeUsedSecretWeapons` has NO guard: a player already foul-banned is re-banned, reason
+  SECRET_WEAPON_BAN, turn = end of drive (dwarf/goblin).
+- Java never sets `defenderId` for a ball action: `StepInitSelecting` clears the bridged receiver once
+  it is turned into TARGET_COORDINATE (Pass/HandOver/ThrowBomb/HailMaryPass); *_MOVE keep it.
+- bb2016 `StepEndFeeding` has no `setDefenderId(null)` -- the fouled player stays the defender (the
+  big bb2016 "stale defenderId" family, 2,635 steps, was this, not a blitz).
+- `Step::init_parameter` (default = set_parameter; driver applies sequence params through it):
+  StepRightStuff takes IS_KICKED_PLAYER / GOTO_LABEL_ON_SUCCESS at init only, so bb2020
+  StepInitScatterPlayer's published `false` no longer made a Kick Team-Mate a completion (ogre).
+- bb2020 multi-block apothecary: a regenerated casualty is applied first (casualty, RIP, send-to-box,
+  blood spot), then regenerated, as Java's apply-then-handleRegeneration (necromantic).
+- `suffered_injury` = `get_player_state()` (worse of casualty and Decay roll) -> blood spot (nurgle).
+- bb2016 Foul Appearance failure keeps the defender (only bb2020/bb2025 setDefenderId(null)).
+Gates: view7 on the 10 touched squads 20 games, steps+reports identical, client view identical in 9
+(nurgle: the two fixes above, made after view7). Full re-sweep: bb2025 on view8
+(`D:/ffb_viewsweep8`), bb2016 + bb2020 on view9 (`D:/ffb_viewsweep9`).
+- view9 bb2016: all 31 squads steps+reports identical, client view identical except open item (2)
+  above (turnStarted/concessionPossible, chaos_dwarf/chaos_pact/norse/skaven). **Item (2) DONE:**
+  `generator::bb2025::Select::build_sequence` hands a `rules == Bb2016` build to the bb2016 `Select`
+  (Java's per-ruleset generator factory), and the shared push sites that ran for every edition
+  (bb2025 StepEndFeeding, StepEndInducement, StepBlitzTurn) now pass `rules: game.rules` (PassBlock
+  and KickoffReturn already did). Gate view10 (`D:/ffb_viewgate10`): the four bb2016 squads + bb2020
+  chaos_dwarf/amazon/chaos_chaosogre, 20 games each, steps+reports+client view ALL identical.
+
 **2026-11-24 (7): the P2 worklist of (6), engine side, done for the suites run so far.**
 
 Done (7), three pushed commits, every gate steps + reports identical (cert9 jar, fresh JVM):

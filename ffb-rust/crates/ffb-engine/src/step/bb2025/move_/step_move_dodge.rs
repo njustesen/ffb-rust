@@ -337,10 +337,7 @@ impl StepMoveDodge {
                 // Java: `actingPlayer.markSkillUsed(skill); addReport(ReportSkillUse(pid, skill,
                 // true, PASS_DODGE_WITHOUT_MODIFIERS)); return SUCCESS` — no ReportDodgeRoll.
                 if let Some(pid) = player_id.as_deref() {
-                    if let Some(p) = game.team_home.player_mut(pid).or_else(|| game.team_away.player_mut(pid)) {
-                        p.used_skills.insert(skill);
-                    }
-                    game.acting_player.used_skills.insert(skill);
+                    crate::step::util_server_steps::mark_skill_used(game, pid, skill);
                     game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
                         Some(pid.to_string()), skill, true,
                         ffb_model::model::skill_use::SkillUse::PASS_DODGE_WITHOUT_MODIFIERS,
@@ -387,10 +384,7 @@ impl StepMoveDodge {
         };
         if let Some((skill, _)) = stat_used {
             if let Some(pid) = player_id.as_deref() {
-                if let Some(p) = game.team_home.player_mut(pid).or_else(|| game.team_away.player_mut(pid)) {
-                    p.used_skills.insert(skill);
-                }
-                game.acting_player.used_skills.insert(skill);
+                crate::step::util_server_steps::mark_skill_used(game, pid, skill);
                 game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
                     Some(pid.to_string()), skill, true,
                     ffb_model::model::skill_use::SkillUse::ADD_STRENGTH_TO_ROLL,
@@ -494,12 +488,9 @@ impl StepMoveDodge {
         if bt_saved_it {
             self.using_break_tackle = true;
             if let Some(pid) = player_id.as_deref() {
-                // Rust convention: the factory gate reads Player.used_skills; acted() reads the
-                // acting set — write both (the keg/Zzharg lesson).
-                if let Some(p) = game.team_home.player_mut(pid).or_else(|| game.team_away.player_mut(pid)) {
-                    p.used_skills.insert(ffb_model::enums::SkillId::BreakTackle);
-                }
-                game.acting_player.used_skills.insert(ffb_model::enums::SkillId::BreakTackle);
+                // Java actingPlayer.markSkillUsed(btSkill): the activation set (the dodge-modifier
+                // gate reads ActingPlayer.isSkillUsed); Break Tackle is not tracked outside it.
+                crate::step::util_server_steps::mark_skill_used(game, pid, ffb_model::enums::SkillId::BreakTackle);
             }
         }
         let successful = DiceInterpreter::is_skill_roll_successful(self.dodge_roll, minimum_roll);
@@ -593,6 +584,7 @@ impl StepMoveDodge {
                             use ffb_model::enums::SkillId;
                             if p.has_skill(SkillId::BreakTackle)
                                 && !p.used_skills.contains(&SkillId::BreakTackle)
+                                && !game.acting_player.used_skills.contains(&SkillId::BreakTackle)
                             {
                                 let st = p.strength_with_modifiers();
                                 Some(if st >= 5 { -3 } else if st == 4 { -2 } else { -1 })
@@ -609,12 +601,9 @@ impl StepMoveDodge {
                             if DiceInterpreter::is_skill_roll_successful(self.dodge_roll, min_with_dt_bt) {
                                 self.using_break_tackle = true;
                                 if let Some(pid) = player_id.as_deref() {
-                                    if let Some(p) = game.team_home.player_mut(pid)
-                                        .or_else(|| game.team_away.player_mut(pid))
-                                    {
-                                        p.used_skills.insert(ffb_model::enums::SkillId::BreakTackle);
-                                    }
-                                    game.acting_player.used_skills.insert(ffb_model::enums::SkillId::BreakTackle);
+                                    // Java actingPlayer.markSkillUsed(btSkill)
+                                    crate::step::util_server_steps::mark_skill_used(
+                                        game, pid, ffb_model::enums::SkillId::BreakTackle);
                                 }
                                 fails_with_dt = false;
                             }
@@ -1172,9 +1161,10 @@ mod tests {
         let out = step.execute_step(&mut game, &mut rng);
         assert_eq!(out.action, crate::step::framework::StepAction::NextStep);
         assert!(step.using_break_tackle, "BT saved the dodge -> fUsingBreakTackle");
-        assert!(game.player("dodger").unwrap().used_skills.contains(&SkillId::BreakTackle),
+        // Java actingPlayer.markSkillUsed: one per activation, the activation's set only.
+        assert!(game.acting_player.used_skills.contains(&SkillId::BreakTackle),
             "BT must be marked used (one per activation)");
-        assert!(game.acting_player.used_skills.contains(&SkillId::BreakTackle));
+        assert!(!game.player("dodger").unwrap().used_skills.contains(&SkillId::BreakTackle));
     }
 
     /// Java: when the roll succeeds even WITHOUT Break Tackle, the modifier is dropped and BT is

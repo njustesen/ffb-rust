@@ -413,13 +413,8 @@ impl StepDivingTackle {
             self.using_break_tackle = true;
             // Java: `actingPlayer.markSkillUsed(strengthSkill)` — the activation set, plus the
             // player only for a usage type tracked outside the activation.
-            // `DodgeModifierFactory` reads `Player.used_skills`, so mark that too, exactly as
-            // both StepMoveDodge twins do when Break Tackle saves a dodge.
             if let Some(pid) = acting.player_id.as_deref() {
                 crate::step::util_server_steps::mark_skill_used(game, pid, SkillId::BreakTackle);
-                if let Some(player) = game.player_mut(pid) {
-                    player.used_skills.insert(SkillId::BreakTackle);
-                }
             }
         }
 
@@ -809,7 +804,9 @@ mod tests {
         assert_eq!(outcome.action, StepAction::GotoLabel);
         assert!(step.using_break_tackle);
         assert!(outcome.published.iter().any(|p| matches!(p, StepParameter::UsingBreakTackle(true))));
-        assert!(game.player("home1").unwrap().used_skills.contains(&SkillId::BreakTackle));
+        // Java actingPlayer.markSkillUsed: the activation's set (Break Tackle is Regular usage).
+        assert!(game.acting_player.used_skills.contains(&SkillId::BreakTackle));
+        assert!(!game.player("home1").unwrap().used_skills.contains(&SkillId::BreakTackle));
     }
 
     #[test]

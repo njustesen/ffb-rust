@@ -368,8 +368,11 @@ impl StepEndPassing {
             return StepOutcome::next().push_seq(seq);
         }
 
-        // Java path 6: interception handling (thrower is NOT the acting player — dump-off path)
-        if !thrower_is_acting {
+        // Java else-branch: the interception statistic and ball placement run for EVERY pass that
+        // gets here -- the acting player's own intercepted pass included (Rust ran them only on the
+        // dump-off path, so a normal pass's interception never reached PlayerResult.interceptions);
+        // then the thrower-is-acting split (path 7) or the dump-off reset.
+        {
             if std::env::var_os("FFB_DRIVE_TRACE").is_some() {
                 eprintln!("ENDPASSING path6 thrower={:?} acting={:?} action={:?}", game.thrower_id, game.acting_player.player_id, game.thrower_action);
             }
@@ -417,7 +420,9 @@ impl StepEndPassing {
                     }
                 }
             }
-            // Java: game.setDefenderAction(null)
+        }
+        if !thrower_is_acting {
+            // Java: game.setDefenderAction(null) -- reset dump-off action
             game.defender_action = None;
             return StepOutcome::next();
         }
@@ -431,8 +436,13 @@ impl StepEndPassing {
         // off the stored catcher_id), so an accurate pass that bounced to and was CAUGHT BY AN OPPONENT
         // never turned over (khemri seed 40 i=185: home_04's pass bounced to away_02, who caught it;
         // Java turned the ball over, Rust let home keep its turn).
-        let ball_catcher_id: Option<String> = game.field_model.ball_coordinate
-            .and_then(|c| game.field_model.player_at(c).cloned());
+        // Java: if (ballWasSnatched) catcher = getPlayerById(fCatcherId) else the player under the ball
+        let ball_was_snatched = self.ball_snatcher_id.as_deref().map(|s| !s.is_empty()).unwrap_or(false);
+        let ball_catcher_id: Option<String> = if ball_was_snatched {
+            self.catcher_id.clone().filter(|c| game.player(c).is_some())
+        } else {
+            game.field_model.ball_coordinate.and_then(|c| game.field_model.player_at(c).cloned())
+        };
         let ball_catcher_is_opponent = match (game.thrower_id.as_deref(), ball_catcher_id.as_deref()) {
             (Some(tid), Some(cid)) => {
                 if game.team_home.has_player(tid) { game.team_away.has_player(cid) }
@@ -954,6 +964,20 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         let pr = game.game_result.away.player_results.get(&interceptor_id).unwrap();
         assert_eq!(pr.interceptions, 1);
+
+        // Java's else-branch counts it for the ACTING player's own pass too (then path 7).
+        let mut game = make_game_with_home_thrower("thrower");
+        game.home_playing = true;
+        game.acting_player.player_id = Some("thrower".into());
+        game.team_away.players.push(Player { id: interceptor_id.clone(), nr: 2, ..Default::default() });
+        game.field_model.set_player_coordinate(&interceptor_id, FieldCoordinate::new(9, 9));
+        let mut step = StepEndPassing::new();
+        step.interceptor_id = Some(interceptor_id.clone());
+        step.interception_successful = true;
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(game.game_result.away.player_results.get(&interceptor_id).map(|r| r.interceptions), Some(1));
+        assert_eq!(game.field_model.ball_coordinate, Some(FieldCoordinate::new(9, 9)));
+        assert!(step.end_turn, "the ball ends with an opponent: turnover");
     }
 
     /// Java bb2020 else-branch: a DEFLECTION (deflectionSuccessful, interception not successful)

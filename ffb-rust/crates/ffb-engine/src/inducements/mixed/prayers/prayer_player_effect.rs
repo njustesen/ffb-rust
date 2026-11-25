@@ -47,9 +47,10 @@ pub fn apply_prayer_player_effect(game: &mut Game, player_id: &str, prayer_enum_
         "BAD_HABITS" => {
             player.add_prayer_skill(prayer_name, SkillId::Loner, Some("2".to_string()));
         }
-        // KNUCKLE_DUSTERS: withSkills({MightyBlow})
+        // KNUCKLE_DUSTERS: withSkills({new SkillClassWithValue(MightyBlow.class)}) -- NO value (the
+        // client shows "Mighty Blow"); the armour/injury modifier falls back to the default +1.
         "KNUCKLE_DUSTERS" => {
-            player.add_prayer_skill(prayer_name, SkillId::MightyBlow, Some("+1".to_string()));
+            player.add_prayer_skill(prayer_name, SkillId::MightyBlow, None);
         }
         // BLESSED_STATUE_OF_NUFFLE: withSkills({Pro}) — dialog-based, applied here post-selection
         // Bug (fixed, #11): BLESSING_OF_NUFFLE (the bb2025 prayer id, Java bb2025 Prayer enum)

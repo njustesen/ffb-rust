@@ -292,7 +292,11 @@ impl StepInitBomb {
             let mut out_event: Option<GameEvent> = None;
             if bomb_out {
                 game.field_model.bomb_coordinate = None;
-                game.field_model.bomb_moving = false;
+                // bb2025: setBombCoordinate(null); setBombMoving(false). bb2016/bb2020's StepInitBomb
+                // only reports the out-of-bounds bomb (bombMoving stays as the throw left it).
+                if game.rules == ffb_model::enums::Rules::Bb2025 {
+                    game.field_model.bomb_moving = false;
+                }
                 // Java: getResult().addReport(new ReportBombOutOfBounds())
                 game.report_list.add(ReportBombOutOfBounds::new());
                 out_event = Some(GameEvent::BombOutOfBounds {

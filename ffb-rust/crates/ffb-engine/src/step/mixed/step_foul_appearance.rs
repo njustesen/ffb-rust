@@ -325,8 +325,13 @@ impl StepFoulAppearance {
                 || (game.rules == ffb_model::enums::Rules::Bb2025 && pa.is_blitzing())
         ).unwrap_or(false);
 
-        // Java: game.setDefenderId(null)
-        game.defender_id = None;
+        // Java bb2020/bb2025 handleFailure: game.setDefenderId(null). The bb2016
+        // FoulAppearanceBehaviour failure branch only sets hasBlocked/turnStarted and jumps: the
+        // blitz target stays the client's defender while EndBlocking continues the BLITZ_MOVE
+        // (nurgle bb2016 seed 13 i=37: Java defenderId=home_03, Rust null).
+        if game.rules != ffb_model::enums::Rules::Bb2016 {
+            game.defender_id = None;
+        }
 
         let label = self.goto_label_on_failure.clone();
         let out = StepOutcome::goto(&label);

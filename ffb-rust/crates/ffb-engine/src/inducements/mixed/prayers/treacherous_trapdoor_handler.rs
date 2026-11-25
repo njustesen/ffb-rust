@@ -5,8 +5,10 @@ use ffb_model::model::game::Game;
 use ffb_model::types::FieldCoordinate;
 use crate::prayer_state::PrayerState;
 
-/// Fixed coordinates where trapdoors appear. Java: (6,1) and (19,13).
-const TRAPDOOR_COORDINATES: [(i32, i32); 2] = [(6, 1), (19, 13)];
+/// Fixed coordinates where trapdoors appear. Java: a `HashSet<FieldCoordinate>` of (6,1) and
+/// (19,13), iterated in bucket order (hashCode 31*x+y, 16 buckets: (19,13) -> 10, (6,1) -> 11), so
+/// `fieldModel.add` -- and the client's trapDoors list -- sees (19,13) first.
+const TRAPDOOR_COORDINATES: [(i32, i32); 2] = [(19, 13), (6, 1)];
 
 pub fn animation_type() -> AnimationType {
     AnimationType::PRAYER_TREACHEROUS_TRAPDOOR

@@ -30,9 +30,10 @@ impl StepSpectators {
         let fan_roll_away = [rng.d6(), rng.d6()];
         let spectators_away = (fan_roll_away[0] + fan_roll_away[1] + game.team_away.fan_factor) * 1000;
 
-        // fan_factor in TeamResult = dedicated_fans + 2D6 (same convention as mixed version).
-        game.game_result.home.fan_factor = fan_roll_home[0] + fan_roll_home[1] + game.team_home.fan_factor;
-        game.game_result.away.fan_factor = fan_roll_away[0] + fan_roll_away[1] + game.team_away.fan_factor;
+        // Java bb2016: teamResult.setSpectators((2D6 + team fan factor) * 1000) -- the TeamResult's
+        // fanFactor stays 0 (that field is the bb2020+ mixed StepSpectators' "dedicated fans + d3").
+        game.game_result.home.spectators = spectators_home;
+        game.game_result.away.spectators = spectators_away;
 
         // Fame: ≥ 2× opponent → 2; more → 1; else 0
         game.game_result.home.fame = if spectators_home >= 2 * spectators_away {
@@ -106,14 +107,16 @@ mod tests {
     }
 
     #[test]
-    fn fan_factor_at_least_base_plus_2() {
+    fn spectators_are_two_d6_plus_fan_factor_thousands() {
         let mut step = StepSpectators::new();
         let mut game = make_game(5, 4);
         let mut rng = GameRng::new(0);
         step.start(&mut game, &mut rng);
-        // fan_factor in TeamResult = 2D6 + base fan_factor; minimum 2D6 = 2
-        assert!(game.game_result.home.fan_factor >= 5 + 2);
-        assert!(game.game_result.away.fan_factor >= 4 + 2);
+        // Java bb2016: spectators = (2D6 + team fan factor) * 1000; TeamResult.fanFactor untouched
+        assert!(game.game_result.home.spectators >= (5 + 2) * 1000);
+        assert!(game.game_result.away.spectators >= (4 + 2) * 1000);
+        assert_eq!(game.game_result.home.spectators % 1000, 0);
+        assert_eq!((game.game_result.home.fan_factor, game.game_result.away.fan_factor), (0, 0));
     }
 
     #[test]

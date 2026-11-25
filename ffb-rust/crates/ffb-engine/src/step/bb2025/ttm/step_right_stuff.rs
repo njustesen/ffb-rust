@@ -158,11 +158,21 @@ impl Step for StepRightStuff {
         self.execute_step(game, rng)
     }
 
-    fn set_parameter(&mut self, param: &StepParameter) -> bool {
+    /// Java `init()` (bb2020 and bb2025 alike) reads GOTO_LABEL_ON_SUCCESS and IS_KICKED_PLAYER;
+    /// `setParameter` accepts neither. A PUBLISHED IS_KICKED_PLAYER therefore never reaches the
+    /// step: bb2020 `StepInitScatterPlayer` publishes `false` (its own flag is never set, see
+    /// StepDispatchScatterPlayer), and taking it here turned an accurate Kick Team-Mate into a
+    /// completion (ogre bb2020 seed 20 i=123: Rust completions=1, Java 0).
+    fn init_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
-            // Java init(): GOTO_LABEL_ON_SUCCESS, IS_KICKED_PLAYER
             StepParameter::GotoLabelOnSuccess(v) => { self.goto_on_success = v.clone(); true }
             StepParameter::IsKickedPlayer(v) => { self.kicked_player = *v; true }
+            _ => self.set_parameter(param),
+        }
+    }
+
+    fn set_parameter(&mut self, param: &StepParameter) -> bool {
+        match param {
             StepParameter::ThrownPlayerHasBall(v) => { self.thrown_player_has_ball = Some(*v); true }
             StepParameter::ThrownPlayerId(v) => { self.thrown_player_id = v.clone(); true }
             StepParameter::DropThrownPlayer(v) => { self.drop_thrown_player = *v; true }
@@ -303,20 +313,25 @@ impl StepRightStuff {
             });
 
             if successful {
-                // Java: spp.addLanding(playerResult)
-                // BB2025: landing_spp = 1
+                // Java bb2025 only: spp.addLanding(playerResult) -- bb2020's StepRightStuff has no
+                // landing statistic (the client's PlayerResult.landings stays 0).
                 let is_home_player = game.team_home.player(&player_id).is_some();
+                let rules = game.rules;
                 let team_result = if is_home_player {
                     &mut game.game_result.home
                 } else {
                     &mut game.game_result.away
                 };
-                let pr = team_result.player_results.entry(player_id.clone()).or_default();
-                pr.landings += 1;
-                pr.spp_gained += SppCalc::landing_spp(game.rules);
+                if rules == ffb_model::enums::Rules::Bb2025 {
+                    let pr = team_result.player_results.entry(player_id.clone()).or_default();
+                    pr.landings += 1;
+                    pr.spp_gained += SppCalc::landing_spp(rules);
+                }
 
-                // Java: if passResult==ACCURATE && !kickedPlayer: spp.addCompletion(throwerResult)
-                if self.pass_result == Some(ModelPassResult::Complete) && !self.kicked_player {
+                // Java bb2020: if (passResult==ACCURATE && !kickedPlayer) spp.addCompletion(..);
+                // bb2025 drops the !kickedPlayer term -- an accurate Kick Team-Mate is a completion.
+                let kicked_excluded = game.rules == ffb_model::enums::Rules::Bb2020 && self.kicked_player;
+                if self.pass_result == Some(ModelPassResult::Complete) && !kicked_excluded {
                     if let Some(thrower_id) = game.thrower_id.clone() {
                         let is_home_thrower = game.team_home.player(&thrower_id).is_some();
                         let thrower_team_id = if is_home_thrower {
@@ -524,6 +539,22 @@ mod tests {
     fn set_drop_thrown_player() {
         let mut step = StepRightStuff::default();
         assert!(step.set_parameter(&StepParameter::DropThrownPlayer(true)));
+        assert!(step.drop_thrown_player);
+    }
+
+    /// Java StepRightStuff reads IS_KICKED_PLAYER / GOTO_LABEL_ON_SUCCESS in `init` only; a
+    /// published value (bb2020 StepInitScatterPlayer publishes IS_KICKED_PLAYER=false) is ignored.
+    #[test]
+    fn kicked_flag_is_an_init_parameter_only() {
+        let mut step = StepRightStuff::default();
+        assert!(step.init_parameter(&StepParameter::IsKickedPlayer(true)));
+        assert!(step.init_parameter(&StepParameter::GotoLabelOnSuccess("end".into())));
+        assert!(!step.set_parameter(&StepParameter::IsKickedPlayer(false)));
+        assert!(!step.set_parameter(&StepParameter::GotoLabelOnSuccess("other".into())));
+        assert!(step.kicked_player);
+        assert_eq!(step.goto_on_success, "end");
+        // the other keys still arrive through init as through a publish
+        assert!(step.init_parameter(&StepParameter::DropThrownPlayer(true)));
         assert!(step.drop_thrown_player);
     }
 

@@ -309,8 +309,26 @@ impl StepApothecaryMultiple {
                     let mut r = r;
                     r.passed_regeneration();
                     results_to_keep.push(r);
+                } else if let (Some(pid), Some(state)) = (player_id.as_deref(), ctx_state) {
+                    // Java bb2020 applies EVERY result (`injuryResult.applyTo(this)`: casualty and
+                    // RIP statistics, send-to-box fields, the blood spot) and only then rolls
+                    // `handleRegeneration`, whose success puts the player into the reserve box and
+                    // clears the serious injury. The die is the same one rolled above, so replay the
+                    // apply and then the regeneration outcome (necromantic bb2020 seed 13 i=83: a
+                    // Multiple-Block death regenerated, Java ripSuffered=1 + casualty + blood spot,
+                    // Rust none of them).
+                    r.apply_to_with_stats(game, true);
+                    game.field_model.set_player_state(pid, state.change_base(ffb_model::enums::PS_RESERVE));
+                    {
+                        let is_home = game.team_home.has_player(pid);
+                        let pr = game.game_result.team_result_mut(is_home).player_result_mut(pid);
+                        pr.serious_injury = None;
+                        pr.serious_injury_decay = None;
+                    }
+                    ffb_model::util::util_box::UtilBox::put_player_into_box(game, pid);
+                    ffb_model::util::util_box::UtilBox::refresh_boxes(game);
                 }
-                // regen succeeded → injury nullified, not added back
+                // regen succeeded → not kept for the apothecary phase
             }
             self.regeneration_failed_results = results_to_keep;
         }
@@ -402,9 +420,12 @@ impl StepApothecaryMultiple {
         let applied = |status: ApothecaryStatus| status == ApothecaryStatus::NoApothecary
             || status == ApothecaryStatus::DoNotUseApothecary
             || status == ApothecaryStatus::ResultChoice;
+        // bb2025 `applyTo(this, false)`; bb2020 `injuryResult.applyTo(this)` -- WITH the
+        // statistics, casualty SPPs and the blood spot.
+        let update_stats = game.rules != ffb_model::enums::Rules::Bb2025;
         for r in &self.injury_results {
             if applied(r.injury_context().apothecary_status) {
-                r.apply_to_with_stats(game, false);
+                r.apply_to_with_stats(game, update_stats);
             }
         }
         // Java walks `regenerationFailedResults` for Getting Even and Raise Dead after applying.
@@ -427,7 +448,12 @@ impl StepApothecaryMultiple {
                 // from the bb2020 sibling which uses PlayerState.RESERVE here.
                 let player_id = self.injury_results[0].injury_context().defender_id.clone().unwrap_or_default();
                 if let Some(ps) = game.field_model.player_state(&player_id) {
-                    game.field_model.set_player_state(&player_id, ps.change_base(PS_PRONE));
+                    let base = if game.rules == ffb_model::enums::Rules::Bb2020 {
+                        ffb_model::enums::PS_RESERVE
+                    } else {
+                        PS_PRONE
+                    };
+                    game.field_model.set_player_state(&player_id, ps.change_base(base));
                 }
                 {
                     let is_home = game.team_home.players.iter().any(|p| p.id == player_id);

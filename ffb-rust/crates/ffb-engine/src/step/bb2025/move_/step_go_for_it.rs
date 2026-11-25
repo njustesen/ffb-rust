@@ -229,10 +229,7 @@ impl StepGoForIt {
             // Java: actingPlayer.markSkillUsed(skill); addReport(new ReportSkillUse(pid, skill, true,
             // PASS_RUSH_WITHOUT_MODIFIERS)); return SUCCESS.
             if let Some(pid) = player_id.as_deref() {
-                if let Some(p) = game.team_home.player_mut(pid).or_else(|| game.team_away.player_mut(pid)) {
-                    p.used_skills.insert(skill);
-                }
-                game.acting_player.used_skills.insert(skill);
+                crate::step::util_server_steps::mark_skill_used(game, pid, skill);
                 game.report_list.add(ffb_model::report::report_skill_use::ReportSkillUse::new(
                     Some(pid.to_string()), skill, true, ffb_model::model::skill_use::SkillUse::PASS_RUSH_WITHOUT_MODIFIERS));
             }

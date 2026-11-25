@@ -137,9 +137,7 @@ impl StepHitAndRun {
                     let sid = game.player(attacker_id).and_then(|p| UtilCards::get_unused_skill_with_property(
                         p, NamedProperties::CAN_MOVE_AFTER_BLOCK));
                     if let Some(sid) = sid {
-                        let is_home = game.team_home.player(attacker_id).is_some();
-                        if is_home { game.team_home.player_mut(attacker_id).map(|p| p.used_skills.insert(sid)); }
-                        else { game.team_away.player_mut(attacker_id).map(|p| p.used_skills.insert(sid)); }
+                        crate::step::util_server_steps::mark_skill_used(game, attacker_id, sid);
                     }
                 }
                 self.reset_state(game);

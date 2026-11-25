@@ -149,9 +149,14 @@ impl StepHypnoticGaze {
             if successful {
                 // Java: PlayerState oldVictimState = ...; if (!oldVictimState.isConfused())
                 //         setPlayerState(defender, oldVictimState.changeConfused(true));
+                // bb2020 StepHypnoticGaze: if (!isConfused() && !isHypnotized()) changeHypnotized(true).
                 if let Some(ref did) = defender_id {
                     if let Some(old_state) = game.field_model.player_state(did) {
-                        if !old_state.is_confused() {
+                        if game.rules == ffb_model::enums::Rules::Bb2020 {
+                            if !old_state.is_confused() && !old_state.is_hypnotized() {
+                                game.field_model.set_player_state(did, old_state.change_hypnotized(true));
+                            }
+                        } else if !old_state.is_confused() {
                             game.field_model.set_player_state(did, old_state.change_confused(true));
                         }
                     }

@@ -175,7 +175,7 @@ impl StepAnimosity {
                 let successful = is_skill_roll_successful(roll, min_roll);
                 let thrower_id = thrower.as_ref().map(|t| t.id.clone()).unwrap_or_default();
                 if !thrower_id.is_empty() {
-                    game.mark_skill_used(&thrower_id, SkillId::Animosity);
+                    crate::step::util_server_steps::mark_skill_used(game, &thrower_id, SkillId::Animosity); // Java actingPlayer.markSkillUsed
                 }
                 let event = GameEvent::AnimosityRoll { player_id: thrower_id.clone(), roll, success: successful };
 
@@ -302,7 +302,7 @@ impl StepAnimosity {
             let successful = is_skill_roll_successful(roll, min_roll);
             let thrower_id = game.thrower().map(|t| t.id.clone()).unwrap_or_default();
             if !thrower_id.is_empty() {
-                game.mark_skill_used(&thrower_id, SkillId::Animosity);
+                crate::step::util_server_steps::mark_skill_used(game, &thrower_id, SkillId::Animosity); // Java actingPlayer.markSkillUsed
             }
             let event = GameEvent::AnimosityRoll { player_id: thrower_id.clone(), roll, success: successful };
 

@@ -84,8 +84,10 @@ impl StepEndInducement {
         // Java: fEndTurn |= UtilServerSteps.checkTouchdown(getGameState())
         self.end_turn |= check_touchdown(game);
 
+        // bb2020/bb2025 only: bb2016's StepEndInducement never touches the turn mode.
         match phase {
-            InducementPhase::EndOfOwnTurn | InducementPhase::EndOfOpponentTurn => {
+            InducementPhase::EndOfOwnTurn | InducementPhase::EndOfOpponentTurn
+                if game.rules != ffb_model::enums::Rules::Bb2016 => {
                 game.set_turn_mode(TurnMode::Regular);
             }
             _ => {}
@@ -104,7 +106,7 @@ impl StepEndInducement {
                     return StepOutcome::next().push_seq(end_turn_seq);
                 }
                 InducementPhase::StartOfOwnTurn => {
-                    let seq = Select::build_sequence(&SelectParams { update_persistence: true, is_blitz_move: false, ..Default::default() });
+                    let seq = Select::build_sequence(&SelectParams { update_persistence: true, is_blitz_move: false, rules: game.rules, ..Default::default() });
                     // Java BB2016 (`bb2016/StepEndInducement:100-102`) and BB2020
                     // (`bb2020/inducements/StepEndInducement:113-115`) push the Select sequence and
                     // then `new StepCheckStalling(gameState)` on top of it, so the stalling check

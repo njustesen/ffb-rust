@@ -174,7 +174,9 @@ impl DodgeModifierFactory {
                     // Java: bb2016.BreakTackle registers DodgeModifier("Break Tackle", 0, REGULAR, useStrength=true)
                     // with predicate: context.isUseBreakTackle() || hasUnusedSkill(actingPlayer, skill).
                     let use_break_tackle = context.use_break_tackle
-                        || (player.has_skill(SkillId::BreakTackle) && !player.used_skills.contains(&SkillId::BreakTackle));
+                        // hasUnusedSkill(actingPlayer, ..): ActingPlayer.isSkillUsed = activation set || Player.isUsed
+                        || (player.has_skill(SkillId::BreakTackle) && !player.used_skills.contains(&SkillId::BreakTackle)
+                            && !context.acting_player.used_skills.contains(&SkillId::BreakTackle));
                     if use_break_tackle {
                         result.push(DodgeModifier::new_with_use_strength(
                             "Break Tackle", 0, ModifierType::REGULAR, true,
@@ -186,7 +188,9 @@ impl DodgeModifierFactory {
                     // player.getStrengthWithModifiers(): ST 5+ => -2, ST 4- => -1, both further
                     // gated on (isUseBreakTackle() || hasUnusedSkill).
                     let use_break_tackle = context.use_break_tackle
-                        || (player.has_skill(SkillId::BreakTackle) && !player.used_skills.contains(&SkillId::BreakTackle));
+                        // hasUnusedSkill(actingPlayer, ..): ActingPlayer.isSkillUsed = activation set || Player.isUsed
+                        || (player.has_skill(SkillId::BreakTackle) && !player.used_skills.contains(&SkillId::BreakTackle)
+                            && !context.acting_player.used_skills.contains(&SkillId::BreakTackle));
                     if use_break_tackle {
                         let strength = player.strength_with_modifiers();
                         if strength >= 5 {
@@ -205,7 +209,9 @@ impl DodgeModifierFactory {
                     // player.getStrengthWithModifiers(): ST 5+ => -3, ST 4 => -2, ST 3- => -1, all
                     // further gated on (isUseBreakTackle() || hasUnusedSkill).
                     let use_break_tackle = context.use_break_tackle
-                        || (player.has_skill(SkillId::BreakTackle) && !player.used_skills.contains(&SkillId::BreakTackle));
+                        // hasUnusedSkill(actingPlayer, ..): ActingPlayer.isSkillUsed = activation set || Player.isUsed
+                        || (player.has_skill(SkillId::BreakTackle) && !player.used_skills.contains(&SkillId::BreakTackle)
+                            && !context.acting_player.used_skills.contains(&SkillId::BreakTackle));
                     if use_break_tackle {
                         let strength = player.strength_with_modifiers();
                         if strength >= 5 {

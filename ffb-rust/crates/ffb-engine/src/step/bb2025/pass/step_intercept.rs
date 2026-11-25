@@ -1341,8 +1341,10 @@ mod tests {
 
         assert_eq!(calls_without, 1, "no Catch skill -> a single interception die");
         assert_eq!(calls_with, 2, "Catch re-rolls the failed interception exactly once");
-        assert!(with.team_away.player("opp1").unwrap().used_skills.contains(&SkillId::Catch),
-            "the re-roll consumes the skill");
+        // Java useReRoll marks a NON-acting roller's skill only when it is tracked outside the
+        // activation; Catch is not, so the client-visible Player.usedSkills stays empty.
+        assert!(!with.team_away.player("opp1").unwrap().used_skills.contains(&SkillId::Catch),
+            "an untracked skill is not marked on the player");
         // Java useReRoll writes ReportReRoll(interceptor, Catch, ...) between the two rolls.
         let ids: Vec<ffb_model::report::report_id::ReportId> =
             with.report_list.get_reports().iter().map(|r| r.get_id()).collect();

@@ -173,6 +173,10 @@ impl StepEndTurn {
                     if let Some(carrier_id) = game.field_model.player_at(ball_coord).cloned() {
                         self.touchdown_player_id = Some(carrier_id.clone());
                         let home_has_carrier = game.team_home.player(&carrier_id).is_some();
+                        // Java: touchdownPlayerResult.setTouchdowns(getTouchdowns() + 1)
+                        let team_result = if home_has_carrier { &mut game.game_result.home }
+                            else { &mut game.game_result.away };
+                        team_result.player_results.entry(carrier_id.clone()).or_default().touchdowns += 1;
                         let off_turn_touchdown;
                         if home_has_carrier {
                             game.game_result.home.score += 1;

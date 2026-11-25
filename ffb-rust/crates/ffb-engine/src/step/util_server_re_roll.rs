@@ -294,7 +294,8 @@ pub fn show_skill_re_roll_dialog(
     let Some(acting_id) = game.acting_player.player_id.clone() else { return };
     let Some(player) = game.player(&acting_id) else { return };
     let skill = player.all_skill_ids()
-        .filter(|id| !player.used_skills.contains(id))
+        // getUnusedRerollSource(actingPlayer, ..): ActingPlayer.isSkillUsed
+        .filter(|id| !player.used_skills.contains(id) && !game.acting_player.used_skills.contains(id))
         .filter_map(|id| {
             id.reroll_sources_for(game.rules)
                 .iter()
@@ -824,11 +825,17 @@ pub fn use_reroll_with_events(
                 // `addReport(new ReportReRoll(pid, reRollSource, successful, 0))`.
                 let tracked = id.usage_type_for(game.rules).track_outside_activation();
                 let successful = if tracked { !player.used_skills.contains(&id) } else { true };
-                player.used_skills.insert(id);
-                // Java :391-397: a tracked skill is `actingPlayer.markSkillUsed` when the roller
-                // IS the acting player (that also marks the player), else `player.markUsed`.
-                if tracked && game.acting_player.player_id.as_deref() == Some(player_id) {
+                // Java bb2025 :391-397: only a tracked skill is marked -- `actingPlayer.markSkillUsed`
+                // when the roller IS the acting player, else `player.markUsed`. bb2016/bb2020 mark the
+                // acting player for EVERY skill (`markSkillUsed`) and a non-acting roller's skill only
+                // when tracked. `markSkillUsed` reaches the Player only for a tracked skill, so an
+                // untracked skill never lands in the client-visible `Player.usedSkills`.
+                let acting = game.acting_player.player_id.as_deref() == Some(player_id);
+                if acting && (tracked || game.rules != ffb_model::enums::Rules::Bb2025) {
                     game.acting_player.used_skills.insert(id);
+                }
+                if tracked {
+                    player.used_skills.insert(id);
                 }
                 game.report_list.add(ffb_model::report::report_re_roll::ReportReRoll::new(
                     Some(player_id.to_string()),

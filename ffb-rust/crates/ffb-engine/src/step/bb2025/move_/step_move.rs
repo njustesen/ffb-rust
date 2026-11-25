@@ -80,6 +80,9 @@ impl StepMove {
             return StepOutcome::next();
         };
 
+        // Java: TrackNumber trackNumber = new TrackNumber(fCoordinateFrom, actingPlayer.getCurrentMove())
+        let track_number = self.coordinate_from
+            .map(|from| ffb_model::model::track_number::TrackNumber::new(from, game.acting_player.current_move));
         // Java: actingPlayer.setCurrentMove(currentMove + (jumping ? 2 : 1))
         let jump_inc = if game.acting_player.jumping { 2 } else { 1 };
         game.acting_player.current_move += jump_inc;
@@ -101,9 +104,7 @@ impl StepMove {
             if game.acting_player.current_move > movement + possible_free_rushes {
                 // Java: actingPlayer.markSkillUsed(extraGfiOnceSkill.get())
                 if let Some(pid) = game.acting_player.player_id.clone() {
-                    if let Some(p) = game.team_home.player_mut(&pid).or_else(|| game.team_away.player_mut(&pid)) {
-                        p.used_skills.insert(skill_id);
-                    }
+                    crate::step::util_server_steps::mark_skill_used(game, &pid, skill_id);
                 }
                 game.report_list.add(ReportSkillUse::new(
                     game.acting_player.player_id.clone(),
@@ -114,7 +115,10 @@ impl StepMove {
             }
         }
 
-        // Java: game.getFieldModel().add(trackNumber) — TODO: TrackNumber not ported
+        // Java: game.getFieldModel().add(trackNumber)
+        if let Some(tn) = track_number {
+            game.field_model.add_track_number(tn);
+        }
         // Java: updatePlayerAndBallPosition(actingPlayer.getPlayer(), fCoordinateTo)
         // If player is carrying ball (not moving), move ball to new square first.
         let old_pos = game.field_model.player_coordinate(attacker_id);
