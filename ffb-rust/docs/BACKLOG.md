@@ -12096,6 +12096,10 @@ Gates: view7 on the 10 touched squads 20 games, steps+reports identical, client 
   (bb2025 StepEndFeeding, StepEndInducement, StepBlitzTurn) now pass `rules: game.rules` (PassBlock
   and KickoffReturn already did). Gate view10 (`D:/ffb_viewgate10`): the four bb2016 squads + bb2020
   chaos_dwarf/amazon/chaos_chaosogre, 20 games each, steps+reports+client view ALL identical.
+- **SKILL SWEEP CLIENT VIEW CLEAN, all three editions** (20 games/squad): bb2016 31/31 + bb2020
+  42/42 on view10 (`D:/ffb_viewsweep10`, = pushed head), bb2025 43/43 on view8 (bb2025 sequences
+  unchanged since): every squad steps + reports + client view identical. Open: (1) human two-window
+  GUI test (user); (2) next view-check suites (mirror/cross/star) = goal decision.
 
 **2026-11-24 (7): the P2 worklist of (6), engine side, done for the suites run so far.**
 
