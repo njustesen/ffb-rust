@@ -302,6 +302,12 @@ pub enum AgentPrompt {
     /// `Action::UseSkill { skill_id, use_skill: true }` (StepInitSelecting's canAddBlockDie arm).
     BlitzBlockSkill { player_id: PlayerId, defender_id: PlayerId, skill_id: SkillId },
 
+    /// `StepInitBlocking` pushed with ASK_FOR_BLOCK_KIND (bb2020 forced second block of a player
+    /// holding an unused `providesBlockAlternative` skill): TurnMode SELECT_BLOCK_KIND, waiting for
+    /// a CLIENT_BLOCK that names the block kind. The parity agents answer the plain block,
+    /// `Action::Block { defender_id }`, zero draws (ParityRunner's INIT_BLOCKING arm).
+    BlockKind { player_id: PlayerId, defender_id: PlayerId },
+
     // ── Inducements ────────────────────────────────────────────────────────────
     /// bb2016 `StepBuyCards` / `DialogBuyCardsParameter`: the team may buy one card at a time
     /// with `available_gold`. Answered with `Action::BuyCard { card_type }`; `None` = done.

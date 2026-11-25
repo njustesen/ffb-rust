@@ -76,6 +76,7 @@ fn prompt_without_dialog(prompt: &ffb_model::prompts::AgentPrompt) -> bool {
             | P::BombRethrow { .. }
             | P::MultiBlockTargets { .. }
             | P::BlitzBlockSkill { .. }
+            | P::BlockKind { .. }
             | P::StartGame
     )
 }

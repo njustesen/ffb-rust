@@ -271,6 +271,8 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
         AgentPrompt::KickSkill { .. } => None,
         // Rust-only bridging prompt (the Java client picks CLIENT_BLOCK vs UseSkill itself).
         AgentPrompt::BlitzBlockSkill { .. } => None,
+        // TurnMode SELECT_BLOCK_KIND alone drives the Java client (BlockKindLogicModule).
+        AgentPrompt::BlockKind { .. } => None,
         AgentPrompt::BlockChoice { attacker_id, defender_id, dice, own_choice, nr_of_dice } =>
             Some(WireDialog::BlockChoice {
                 attacker_id: attacker_id.clone(), defender_id: defender_id.clone(),

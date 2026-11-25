@@ -12100,6 +12100,15 @@ Gates: view7 on the 10 touched squads 20 games, steps+reports identical, client 
   42/42 on view10 (`D:/ffb_viewsweep10`, = pushed head), bb2025 43/43 on view8 (bb2025 sequences
   unchanged since): every squad steps + reports + client view identical. Open: (1) human two-window
   GUI test (user); (2) next view-check suites (mirror/cross/star) = goal decision.
+- **MIRROR VIEW CHECK** (user: "anything you can do on your own?"), every race of all three
+  editions, 10 games, view10 (`D:/ffb_viewmirror1`, scratchpad mirrorall.py): bb2016 29/29, bb2025
+  41/41, bb2020 all but norse identical. Norse: the bb2020 forced (Frenzy) second block asks for the
+  block kind when the player holds an unused providesBlockAlternative skill (a Stiletto Stab;
+  `bb2020/StepEndBlocking:282`) -- Rust never asked, so lastTurnMode differed. Ported:
+  `ask_for_block_kind` on that push (bb2020 only), and the SELECT_BLOCK_KIND wait now raises
+  `AgentPrompt::BlockKind`, answered by every agent with the plain block, zero draws (= ParityRunner's
+  INIT_BLOCKING arm). Gate view11 (`D:/ffb_viewgate11`): bb2020 norse, norse_sk, goblin_sk,
+  dark_elf_sk, khorne_sk + bb2025 norse_sk, 20 games each, all identical. Next: cross suite view check.
 
 **2026-11-24 (7): the P2 worklist of (6), engine side, done for the suites run so far.**
 

@@ -1628,6 +1628,9 @@ impl Agent for RandomAgent {
             // ParityRunner's blitz arm applies in every agent mode.
             Some(AgentPrompt::BlitzBlockSkill { defender_id, skill_id, .. }) =>
                 crate::legal_actions::gored_blitz_block_action(&gs.game, defender_id, *skill_id),
+            // SELECT_BLOCK_KIND: the plain block (ParityRunner's INIT_BLOCKING arm), zero draws.
+            Some(AgentPrompt::BlockKind { defender_id, .. }) =>
+                Action::Block { defender_id: defender_id.clone() },
             Some(AgentPrompt::BuyCards { team_id, .. }) =>
                 Action::BuyCard { home: *team_id == gs.game.team_home.id, card_type: None },
             Some(AgentPrompt::BuyInducements { team_id, .. }) =>

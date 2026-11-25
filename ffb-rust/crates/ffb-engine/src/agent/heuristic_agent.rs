@@ -4098,6 +4098,10 @@ impl Agent for HeuristicAgent {
         if let AgentPrompt::BlitzBlockSkill { defender_id, skill_id, .. } = &prompt {
             return crate::legal_actions::gored_blitz_block_action(g, defender_id, *skill_id);
         }
+        // SELECT_BLOCK_KIND: the plain block, zero draws (ParityRunner's INIT_BLOCKING arm).
+        if let AgentPrompt::BlockKind { defender_id, .. } = &prompt {
+            return Action::Block { defender_id: defender_id.clone() };
+        }
         if !self.classes.has(prompt_class_of(&prompt)) {
             return self.parity.act(gs);
         }

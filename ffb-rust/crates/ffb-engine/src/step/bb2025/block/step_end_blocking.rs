@@ -375,23 +375,37 @@ impl StepEndBlocking {
                 crate::step::util_server_steps::mark_skill_used(game, pid, sid);
             }
 
+            // bb2020 `StepEndBlocking:282-283` asks for the block kind of the forced second block:
+            //   askForBlockKind = UtilCards.hasUnusedSkillWithProperty(player, providesBlockAlternative)
+            //     || (hasUnusedSkillWithProperty(player, providesBlockAlternativeDuringBlitz) && isBlitz)
+            // (Player overload: the player's own used skills, temporary ones included -- a Stiletto
+            // Stab on a Frenzy Ulfwerener, norse bb2020 seed 1 i=108). bb2025 passes `false`.
+            let ask_for_block_kind = game.rules == ffb_model::enums::Rules::Bb2020
+                && attacker_id.as_deref().and_then(|id| game.player(id)).map(|p| {
+                    p.has_unused_skill_with_property_in(game.rules, NamedProperties::PROVIDES_BLOCK_ALTERNATIVE)
+                        || (is_blitz && p.has_unused_skill_with_property_in(
+                            game.rules, NamedProperties::PROVIDES_BLOCK_ALTERNATIVE_DURING_BLITZ))
+                }).unwrap_or(false);
+
             if is_blitz {
-                // Java: blitzBlockGenerator.pushSequence(BlitzBlock.SequenceParams(gs, defenderId, usingStab, true, null, false))
+                // Java: blitzBlockGenerator.pushSequence(BlitzBlock.SequenceParams(gs, defenderId, usingStab, true, null, askForBlockKind))
                 let seq = BlitzBlock::build_sequence(&BlitzBlockParams {
                     block_defender_id: defender_id,
                     using_stab: self.using_stab,
                     publish_defender: true,
                     frenzy_block: true,
+                    ask_for_block_kind,
                     rules: game.rules,
                     ..Default::default()
                 });
                 return StepOutcome::next().push_seq(seq);
             } else {
-                // Java: blockGenerator.pushSequence(Block.Builder(gs).withDefenderId(defenderId).useStab(usingStab).build())
+                // Java: blockGenerator.pushSequence(Block.Builder(gs).withDefenderId(defenderId).useStab(usingStab).askForBlockKind(askForBlockKind).build())
                 // Java: publishParameter(ALLOW_SECOND_BLOCK_ACTION, allowSecondBlockAction)
                 let seq = Block::build_sequence(&BlockParams {
                     block_defender_id: defender_id,
                     using_stab: self.using_stab,
+                    ask_for_block_kind,
                     rules: game.rules,
                     ..Default::default()
                 });

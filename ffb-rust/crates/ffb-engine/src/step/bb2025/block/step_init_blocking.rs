@@ -207,6 +207,13 @@ impl StepInitBlocking {
             }
             game.set_turn_mode(TurnMode::SelectBlockKind);
             self.ask_for_block_kind = false;
+            // The wait for CLIENT_BLOCK surfaces as a prompt so the agent has something to answer.
+            if let Some(player_id) = game.acting_player.player_id.clone() {
+                return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::BlockKind {
+                    player_id,
+                    defender_id: defender_id.clone(),
+                });
+            }
             return StepOutcome::cont();
         }
 
@@ -524,6 +531,25 @@ mod tests {
         assert!(!step.ask_for_block_kind);
         // Should cont() waiting for a block-kind choice
         assert_eq!(out.action, StepAction::Continue);
+    }
+
+    /// The SELECT_BLOCK_KIND wait is surfaced to the acting coach's agent as `BlockKind`; a plain
+    /// CLIENT_BLOCK answer restores the turn mode (SELECT_BLOCK_KIND becomes the last mode, as
+    /// Java's `setTurnMode(getLastTurnMode())`).
+    #[test]
+    fn ask_for_block_kind_prompts_and_a_plain_block_restores_the_turn_mode() {
+        let mut step = StepInitBlocking::new("end".into());
+        step.block_defender_id = Some("def6".into());
+        step.ask_for_block_kind = true;
+        let mut game = make_game();
+        game.acting_player.player_id = Some("att".into());
+        game.set_turn_mode(ffb_model::enums::TurnMode::Regular);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::BlockKind { ref defender_id, .. })
+            if defender_id == "def6"));
+        let _ = step.handle_command(&Action::Block { defender_id: "def6".into() }, &mut game, &mut GameRng::new(0));
+        assert_eq!(game.turn_mode, ffb_model::enums::TurnMode::Regular);
+        assert_eq!(game.last_turn_mode, Some(ffb_model::enums::TurnMode::SelectBlockKind));
     }
 
     #[test]
