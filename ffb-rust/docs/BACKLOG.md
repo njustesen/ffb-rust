@@ -12109,6 +12109,18 @@ Gates: view7 on the 10 touched squads 20 games, steps+reports identical, client 
   `AgentPrompt::BlockKind`, answered by every agent with the plain block, zero draws (= ParityRunner's
   INIT_BLOCKING arm). Gate view11 (`D:/ffb_viewgate11`): bb2020 norse, norse_sk, goblin_sk,
   dark_elf_sk, khorne_sk + bb2025 norse_sk, 20 games each, all identical. Next: cross suite view check.
+- **CROSS VIEW CHECK DONE 2026-11-26** (user: compute until 09:00): all 4,012 cross pairs, 3 games,
+  view11 (`D:/ffb_viewcross1`, scratchpad crossview.py -- foreground 8.5-min chunks after a reaper
+  kill, clean pairs' dumps deleted): **4,012/4,012 steps + reports + client view identical**, no fix.
+- **STAR VIEW CHECK (in progress)**, 2 games per job (`starjobs_full`). Fixed, pushed:
+  `35b2d3991` bb2020 Wisdom grant keyed on the bb2025 "Granted by ..." override (bb2020 =
+  getName()); bb2020 StepBalefulHex hypnotises (bb2025 confuses) + its markActionUsed (TTM = pass,
+  no Punt, Kick 'em Blitz / KTM / allowsAdditionalFoul); temporaryPropertiesMap shows
+  NamedProperty.getName() (generated table, scripts/gen_named_property_names.py). `b80ccafa5`
+  StepPro (Old Pro) never marked Pro used. Gates: 168 Grombrindal+Estelle jobs (view14) and 252
+  Helmut Wulf jobs (view15) all identical. Star run on view14 (`D:/ffb_viewstar2`) reached ~355 of
+  4,012 before the stop. **Next:** finish the star suite on view15 in a fresh root (the view14
+  results predate the Pro fix), then the next goal = ask.
 
 **2026-11-24 (7): the P2 worklist of (6), engine side, done for the suites run so far.**
 
