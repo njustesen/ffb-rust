@@ -87,6 +87,12 @@ impl StepPro {
                     roll,
                 ));
             }
+            // Java useReRoll, end of the skill branch (reRollSourceSkill = the ruleset's Pro,
+            // marked whether or not the roll happened): bb2016/bb2020 `actingPlayer.markSkillUsed`
+            // for the acting roller, else `player.markUsed` when tracked; bb2025 only when tracked
+            // (Pro is ONCE_PER_TURN there). Missing, an Old Pro re-roll set usedPro but never
+            // showed Pro in the client's Player.usedSkills (bb2025 star view check, Helmut Wulf).
+            crate::step::util_server_steps::mark_skill_used(game, &player_id, ffb_model::enums::SkillId::Pro);
         }
 
         // Java: if (!successful && getReRolledAction() != OLD_PRO) → ask for reroll
@@ -226,6 +232,24 @@ mod tests {
             step.start(&mut game, &mut rng);
             let state = game.field_model.player_state("p1").expect("player state");
             assert!(state.has_used_pro(), "seed {seed}: used_pro must be true after a Pro roll attempt");
+        }
+    }
+
+    /// Java useReRoll ends its Pro branch by marking the ruleset's Pro: bb2025 Pro is
+    /// ONCE_PER_TURN (tracked), so the acting roller's Pro reaches the client-visible
+    /// Player.usedSkills; bb2020 Pro is REGULAR, so only the activation's set holds it.
+    #[test]
+    fn the_pro_roll_marks_pro_used_per_edition() {
+        use ffb_model::enums::SkillId;
+        for (rules, on_player) in [(Rules::Bb2025, true), (Rules::Bb2020, false)] {
+            let mut step = StepPro::new();
+            step.player_id = Some("p1".into());
+            let mut game = make_game();
+            game.rules = rules;
+            add_player(&mut game, "p1");
+            step.start(&mut game, &mut GameRng::new(0));
+            assert!(game.acting_player.used_skills.contains(&SkillId::Pro), "{rules:?}");
+            assert_eq!(game.player("p1").unwrap().used_skills.contains(&SkillId::Pro), on_player, "{rules:?}");
         }
     }
 
