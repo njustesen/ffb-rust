@@ -2,6 +2,7 @@ pub mod cancel_skill_property;
 pub mod i_skill_property;
 pub mod named_properties;
 pub mod named_property;
+pub mod named_property_names;
 pub mod passing_property;
 
 pub use named_properties::NamedProperties;

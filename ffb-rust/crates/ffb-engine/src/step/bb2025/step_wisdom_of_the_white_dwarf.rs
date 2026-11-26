@@ -129,8 +129,10 @@ impl StepWisdomOfTheWhiteDwarf {
             .and_then(|(_, v)| *v)
             .map(|v| v.to_string());
         // Java: game.getFieldModel().addWisdomSkill(actingPlayer.getPlayerId(), gainedSkill)
+        // Java: addWisdomSkill keys on wisdomSkill.enhancementSourceName() -- per edition
+        let rules = game.rules;
         if let Some(acting_mut) = game.player_mut(&acting_id) {
-            acting_mut.add_prayer_skill(crate::step::util_server_steps::WISDOM_ENHANCEMENT_SOURCE, skill, value);
+            acting_mut.add_prayer_skill(crate::step::util_server_steps::wisdom_enhancement_source(rules), skill, value);
         }
         game.report_list.add(ReportPlayerEvent::new(
             Some(acting_id.clone()),
@@ -271,8 +273,9 @@ impl StepWisdomOfTheWhiteDwarf {
             .map(|v| v.to_string());
 
         // Java: game.getFieldModel().addWisdomSkill(target.getId(), gainedSkill)
+        let rules = game.rules;
         if let Some(target_mut) = game.player_mut(&target_id) {
-            target_mut.add_prayer_skill(crate::step::util_server_steps::WISDOM_ENHANCEMENT_SOURCE, skill, value);
+            target_mut.add_prayer_skill(crate::step::util_server_steps::wisdom_enhancement_source(rules), skill, value);
         }
         game.report_list.add(ReportPlayerEvent::new(
             Some(target_id.clone()),

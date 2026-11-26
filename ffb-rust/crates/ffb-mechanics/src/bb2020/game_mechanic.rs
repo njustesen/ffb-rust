@@ -125,8 +125,13 @@ impl GameMechanicTrait for GameMechanic {
         // granted Break Tackle/Dauntless/Mighty Blow/Sure Feet NEVER EXPIRED: it survived every
         // later turn and silently changed dodge targets (dwarf bb2025 seed 14 i=184 — Java failed
         // the dodge on a 5, Rust passed it three turns after the grant).
+        //
+        // BB2020 differs from BB2025: Java bb2020 maps via `Skill::getName` and the bb2020
+        // WisdomOfTheWhiteDwarf class does NOT override `enhancementSourceName()` (the base
+        // returns getName()), so the grant AND this removal key on the plain skill name. The
+        // client sees that key in `temporarySkillsMap` (bb2020 star view check, Grombrindal).
         let mut set = HashSet::new();
-        set.insert("Granted by Wisdom of the White Dwarf".to_string());
+        set.insert("Wisdom of the White Dwarf".to_string());
         set
     }
 
@@ -222,10 +227,11 @@ mod wisdom_enhancement_key_tests {
     #[test]
     fn end_of_turn_removal_uses_the_enhancement_source_name() {
         let set = GameMechanic.enhancements_to_remove_at_end_of_turn();
-        assert!(set.contains("Granted by Wisdom of the White Dwarf"),
-            "must key on Skill::enhancementSourceName");
-        assert!(!set.contains("Wisdom of the White Dwarf"),
-            "the plain skill name is NOT the tag addWisdomSkill uses");
+        // bb2020: getName() == the bb2020 enhancementSourceName() (no override)
+        assert!(set.contains("Wisdom of the White Dwarf"),
+            "bb2020 keys on the plain skill name");
+        assert!(!set.contains("Granted by Wisdom of the White Dwarf"),
+            "the 'Granted by' tag is the bb2025 override only");
     }
 
     /// Baleful Hex is the other direction: Java's Constant set maps with `Skill::getName`, which

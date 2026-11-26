@@ -421,16 +421,29 @@ impl Player {
     }
 
     /// Java: Player.addTemporaryProperties(source, properties).
+    ///
+    /// A property is given either as its key (the Java field name, as the engine's
+    /// `NamedProperties` constants hold it) or as its Java `getName()` (as a decoded Java model
+    /// change carries it). The client's `temporaryPropertiesMap` holds `getName()` -- what Java
+    /// serialises ("Has To Miss Turn", not "hasToMissTurn") -- and the engine cache holds the key
+    /// `has_skill_property` matches on.
     pub fn add_temporary_properties(&mut self, source: &str, properties: &[&str]) {
+        use crate::model::property::NamedProperties;
+        let resolved: Vec<(String, String)> = properties.iter().map(|p| {
+            let key = if NamedProperties::java_name(p).is_some() { *p }
+                      else { NamedProperties::key_for_java_name(p).unwrap_or(p) };
+            let name = NamedProperties::java_name(key).unwrap_or(p);
+            (key.to_string(), name.to_string())
+        }).collect();
         // the client's `temporaryPropertiesMap` (properties are singletons: a set by identity)
         let names = Self::map_entry(&mut self.temporary_properties_map, source);
-        for prop in properties {
-            if !names.iter().any(|n| n == prop) {
-                names.push((*prop).to_string());
+        for (_, name) in &resolved {
+            if !names.iter().any(|n| n == name) {
+                names.push(name.clone());
             }
         }
-        for prop in properties {
-            self.temporary_properties.push((source.to_string(), (*prop).to_string()));
+        for (key, _) in resolved {
+            self.temporary_properties.push((source.to_string(), key));
         }
     }
 
@@ -1429,6 +1442,26 @@ impl IXmlReadable for Player {
 
 #[cfg(test)]
 mod tests {
+
+    /// Java serialises `temporaryPropertiesMap` with `NamedProperty.getName()` ("Has To Miss
+    /// Turn"); the engine matches on the property key ("hasToMissTurn"). Both input forms --
+    /// the engine's key (Baleful Hex) and a decoded Java change's name -- must land the same way
+    /// (bb2025 star view check: Estelle's Baleful Hex showed "hasToMissTurn" to the client).
+    #[test]
+    fn temporary_properties_show_the_java_name_and_match_on_the_key() {
+        use crate::model::property::NamedProperties;
+        for given in [NamedProperties::HAS_TO_MISS_TURN, "Has To Miss Turn"] {
+            let mut p = Player { id: "p".into(), name: "p".into(), nr: 1, ..Default::default() };
+            p.add_temporary_properties("Baleful Hex", &[given]);
+            assert_eq!(p.temporary_properties_map,
+                vec![("Baleful Hex".to_string(), vec!["Has To Miss Turn".to_string()])], "given {given}");
+            assert!(p.has_skill_property(NamedProperties::HAS_TO_MISS_TURN), "given {given}");
+            p.remove_temporary_properties("Baleful Hex");
+            assert!(!p.has_skill_property(NamedProperties::HAS_TO_MISS_TURN));
+        }
+        assert_eq!(NamedProperties::java_name("dontDropFumbles"), Some("Don't Drop 2+ Fumbles"));
+        assert_eq!(NamedProperties::key_for_java_name("Can Force Interception Reroll"), Some("canCancelInterceptions"));
+    }
 
     /// `Player.canBeThrown` must be resolved against the GAME's edition, because Right Stuff is
     /// exactly the skill whose registered properties differ by edition: bb2016/bb2025 grant

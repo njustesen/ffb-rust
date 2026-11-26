@@ -5,6 +5,19 @@
 pub struct NamedProperties;
 
 impl NamedProperties {
+    /// Java `NamedProperty.getName()` for a property key (the Java field name these constants
+    /// hold) -- the string the client sees, e.g. "Has To Miss Turn" for `hasToMissTurn`.
+    pub fn java_name(key: &str) -> Option<&'static str> {
+        use super::named_property_names::NAMED_PROPERTY_NAMES as T;
+        T.binary_search_by(|(k, _)| (*k).cmp(key)).ok().map(|i| T[i].1)
+    }
+
+    /// The property key for a Java `NamedProperty.getName()` (inverse of `java_name`).
+    pub fn key_for_java_name(name: &str) -> Option<&'static str> {
+        use super::named_property_names::NAMED_PROPERTY_NAMES as T;
+        T.iter().find(|(_, n)| *n == name).map(|(k, _)| *k)
+    }
+
     pub const ADD_BONUS_FOR_ACCURATE_PASS: &'static str = "addBonusForAccuratePass";
     pub const ADD_STRENGTH_ON_BLITZ: &'static str = "addStrengthOnBlitz";
     pub const AFFECTS_EITHER_ARMOUR_OR_INJURY_ON_BLOCK: &'static str = "affectsEitherArmourOrInjuryOnBlock";

@@ -89,12 +89,13 @@ fn cleanup_granted_skills_on_deselect(game: &mut Game) {
         return;
     }
     let Some(acting_id) = game.acting_player.player_id.clone() else { return };
-    // Java: enhancementsToRemoveAtEndOfTurn — bb2025 {WisdomOfTheWhiteDwarf.enhancementSourceName()};
-    // removing a source the player does not carry is a no-op, so no edition gate is needed.
+    // Java: enhancementsToRemoveAtEndOfTurn — bb2025 {WisdomOfTheWhiteDwarf.enhancementSourceName()},
+    // bb2020 {getName()}; bb2016 has none (and no Wisdom grants, so its removal is a no-op).
+    let rules = game.rules;
     if let Some(p) = game.team_home.player_mut(&acting_id)
         .or_else(|| game.team_away.player_mut(&acting_id))
     {
-        p.remove_enhancements(WISDOM_ENHANCEMENT_SOURCE);
+        p.remove_enhancements(wisdom_enhancement_source(rules));
     }
     let granted: Vec<(ffb_model::enums::SkillId, Vec<String>)> = game
         .acting_player
@@ -112,20 +113,26 @@ fn cleanup_granted_skills_on_deselect(game: &mut Game) {
                     p.used_skills.remove(&skill);
                 } else {
                     // Java: removeSkillEnhancements(player, skill.enhancementSourceName())
-                    p.remove_enhancements(enhancement_source_for(skill));
+                    p.remove_enhancements(enhancement_source_for(skill, rules));
                 }
             }
         }
     }
 }
 
-/// The source string the bb2025 wisdom step uses for the granted temporary skill; the deselect
-/// cleanup must remove by the SAME source.
-pub(crate) const WISDOM_ENHANCEMENT_SOURCE: &str = "Granted by Wisdom of the White Dwarf";
+/// Java `wisdomSkill.enhancementSourceName()`: the source key of a Wisdom-granted temporary
+/// skill (`FieldModel.addWisdomSkill`); the deselect cleanup must remove by the SAME source.
+/// Only the bb2025 class overrides it ("Granted by ..."); bb2020 inherits `getName()`.
+pub(crate) fn wisdom_enhancement_source(rules: ffb_model::enums::Rules) -> &'static str {
+    match rules {
+        ffb_model::enums::Rules::Bb2025 => "Granted by Wisdom of the White Dwarf",
+        _ => "Wisdom of the White Dwarf",
+    }
+}
 
-fn enhancement_source_for(skill: ffb_model::enums::SkillId) -> &'static str {
+fn enhancement_source_for(skill: ffb_model::enums::SkillId, rules: ffb_model::enums::Rules) -> &'static str {
     match skill {
-        ffb_model::enums::SkillId::WisdomOfTheWhiteDwarf => WISDOM_ENHANCEMENT_SOURCE,
+        ffb_model::enums::SkillId::WisdomOfTheWhiteDwarf => wisdom_enhancement_source(rules),
         _ => "",
     }
 }
@@ -682,7 +689,7 @@ mod tests {
         game.acting_player.set_player(granter.clone(), PlayerAction::Move);
         // the wisdom step's writes:
         game.team_home.player_mut("granter").unwrap().used_skills.insert(SkillId::WisdomOfTheWhiteDwarf);
-        game.team_home.player_mut("target").unwrap().add_prayer_skill(WISDOM_ENHANCEMENT_SOURCE, SkillId::Dauntless, None);
+        game.team_home.player_mut("target").unwrap().add_prayer_skill(wisdom_enhancement_source(game.rules), SkillId::Dauntless, None);
         game.acting_player.add_granted_skill(SkillId::WisdomOfTheWhiteDwarf, Some(granter.clone()));
         game.acting_player.add_granted_skill(SkillId::WisdomOfTheWhiteDwarf, Some(target.clone()));
         assert!(!game.acting_player.acted());

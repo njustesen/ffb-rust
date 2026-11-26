@@ -206,11 +206,14 @@ impl StepBalefulHex {
             if successful {
                 if let Some(ref target_id) = self.player_id.clone() {
                     if let Some(state) = game.field_model.player_state(target_id) {
-                        // Java: changeConfused(true).changeActive(false)
-                        game.field_model.set_player_state(
-                            target_id,
-                            state.change_confused(true).change_active(false),
-                        );
+                        // Java bb2025: changeConfused(true).changeActive(false);
+                        // Java bb2020: changeHypnotized(true).changeActive(false)
+                        let hexed = if game.rules == ffb_model::enums::Rules::Bb2020 {
+                            state.change_hypnotized(true)
+                        } else {
+                            state.change_confused(true)
+                        };
+                        game.field_model.set_player_state(target_id, hexed.change_active(false));
                     }
                     // Java: fieldModel.addSkillEnhancements(targetPlayer, skill) — Baleful Hex's
                     // TemporaryEnhancements grant the bare hasToMissTurn PROPERTY, which
@@ -263,18 +266,33 @@ impl StepBalefulHex {
             .collect()
     }
 
+    /// Java StepBalefulHex.markActionUsed. The bb2020 and bb2025 classes differ: bb2020 counts a
+    /// Throw Team-Mate as the turn's PASS and has no Punt case; bb2025 has its own ttmUsed and
+    /// marks puntUsed.
     fn mark_action_used(game: &mut Game, player_id: &str) {
+        use ffb_model::model::property::named_properties::NamedProperties;
+        let bb2020 = game.rules == ffb_model::enums::Rules::Bb2020;
         let action = game.acting_player.player_action;
+        let additional_foul = game.player(player_id)
+            .map(|p| p.has_skill_property(NamedProperties::ALLOWS_ADDITIONAL_FOUL))
+            .unwrap_or(false);
         let turn = game.turn_data_mut();
         match action {
-            Some(PlayerAction::Blitz | PlayerAction::BlitzMove) => turn.blitz_used = true,
+            Some(PlayerAction::Blitz | PlayerAction::BlitzMove | PlayerAction::KickEmBlitz) => turn.blitz_used = true,
+            Some(PlayerAction::KickTeamMate | PlayerAction::KickTeamMateMove) => turn.ktm_used = true,
             Some(PlayerAction::Pass | PlayerAction::PassMove) => turn.pass_used = true,
+            Some(PlayerAction::ThrowTeamMate | PlayerAction::ThrowTeamMateMove) => {
+                if bb2020 { turn.pass_used = true } else { turn.ttm_used = true }
+            }
             Some(PlayerAction::HandOver | PlayerAction::HandOverMove) => turn.hand_over_used = true,
-            Some(PlayerAction::Foul | PlayerAction::FoulMove) => turn.foul_used = true,
-            Some(PlayerAction::ThrowTeamMate | PlayerAction::ThrowTeamMateMove) => turn.ttm_used = true,
+            Some(PlayerAction::Foul | PlayerAction::FoulMove) => {
+                if !additional_foul {
+                    turn.foul_used = true;
+                }
+            }
+            Some(PlayerAction::Punt | PlayerAction::PuntMove) if !bb2020 => turn.punt_used = true,
             _ => {}
         }
-        let _ = player_id;
     }
 
     fn mark_skill_used(game: &mut Game, player_id: &str) {
@@ -347,6 +365,26 @@ mod tests {
         step.end_turn = true;
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::GotoLabel);
+    }
+
+    /// Java bb2020 StepBalefulHex:179 hypnotises the target (bb2025 confuses it), and its
+    /// markActionUsed counts a Throw Team-Mate as the turn's pass (bb2025: ttmUsed) -- the
+    /// shared Rust step served bb2020 the bb2025 lines (bb2020 star view check, Estelle).
+    #[test]
+    fn bb2020_hex_hypnotises_and_a_ttm_uses_the_pass() {
+        let (mut game, _) = make_game_bh();
+        game.rules = Rules::Bb2020;
+        game.acting_player.player_action = Some(PlayerAction::ThrowTeamMate);
+        let tid = "victim".to_string();
+        game.team_away.players.push(make_player(&tid, None));
+        game.field_model.set_player_state(&tid, PlayerState::new(PS_STANDING).change_active(true));
+        game.field_model.set_player_coordinate(&tid, FieldCoordinate::new(12, 7));
+        let mut step = StepBalefulHex::new();
+        let out = step.start(&mut game, &mut GameRng::new(seed_for_d6(6)));
+        assert_eq!(out.action, StepAction::NextStep);
+        let ps = game.field_model.player_state(&tid).unwrap();
+        assert!(ps.is_hypnotized() && !ps.is_confused() && !ps.is_active(), "bb2020: hypnotised+inactive");
+        assert!(game.turn_data().pass_used && !game.turn_data().ttm_used, "bb2020: TTM uses the pass");
     }
 
     /// Java StepBalefulHex success: changeConfused(true).changeActive(false) AND
