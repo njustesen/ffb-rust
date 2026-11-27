@@ -2511,10 +2511,13 @@ public class ParityRunner {
                 pr.getTouchdowns(), pr.getCompletions(), pr.getCasualties(), pr.getInterceptions(),
                 pr.getDeflections(), pr.getLandings(), pr.getBlocks(), pr.getFouls(), pr.getRushing(),
                 pr.getPassing(), pr.getPlayerAwards());
-            out.add(String.format("%s%02d:%d,%d,%s,%d/%d/%d/%d,%d,%d,%d,%s", prefix, i, x, y, state,
+            // §Q1.3: number of temporarily granted skills (prayers, Wisdom, cards, ...). Java exposes
+            // only the merged list publicly: with-duplicates size minus the permanent skills.
+            int tempSkills = p.getSkillsIncludingTemporaryOnesWithDuplicates().size() - p.getSkills().length;
+            out.add(String.format("%s%02d:%d,%d,%s,%d/%d/%d/%d,%d,%d,%d,%s,t%d", prefix, i, x, y, state,
                 p.getMovementWithModifiers(), p.getStrengthWithModifiers(),
                 p.getAgilityWithModifiers(), p.getArmourWithModifiers(), activeBit,
-                psId, p.getPassingWithModifiers(), res));
+                psId, p.getPassingWithModifiers(), res, tempSkills));
         }
     }
 

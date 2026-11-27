@@ -8,7 +8,8 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q1.3** (wider state hash). Parked with notes: Q1.2b (punt → throw-in stall), Q1.2c.
+Next item: **Q1.4** (client view in the certification). Parked with notes: Q1.2b (punt → throw-in
+stall), Q1.2c. Night queue: mirror 330 with the Q1.1–Q1.3 verdict + hash (freeze a q1 exe + jar first).
 Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q2.5). Last certified build: cert9 (`docs/cert_manifest.json`); last view build: view15.
 
 ## Ground rules (every item)
@@ -75,7 +76,9 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
   identical incl. non-zero values; smoke 3×20 green.
   Part 4 done: ` o<apothecaries home,away> k<bomb x,y,moving | ->` segments; smoke 3×20 green, goblin
   bb2025 mirror 29/30 (seed 4 = JD-002 JAVA-CRASH, expected).
-  Still to add: granted/temporary skills + properties, inducement set. Original: Add to BOTH `ffb-model/src/util/state_hash.rs` and
+  Part 5 done: player parts end `,t<N>` (temporarily granted skills); Grombrindal star gates bb2020 +
+  bb2025 10/10, 527 steps with t>0 identical. **Code complete**; inducement-set hashing moves to Q2.8
+  (no gate buys inducements before it). Waiting: mirror 330 (night). Original: Add to BOTH `ffb-model/src/util/state_hash.rs` and
   `ParityRunner.java` (same string format): PA; full player state incl. flags (rooted, confused,
   hypnotised, used-Pro, …) and the exact off-pitch state (banned, KO, BH, SI, RIP, missing, …);
   granted/temporary skills and properties; SPP and per-player game-result stats; inducement set and
@@ -201,6 +204,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q1.3 part 5 · (next commit) · temporary-skill count per player in the hash; Grombrindal
+  bb2020/bb2025 10/10 with 527 non-zero steps identical. Q1.3 code complete.
 - 2026-11-27 · Q1.3 part 4 · (next commit) · apothecaries and bomb square/moving in the hash.
 - 2026-11-27 · Q1.3 part 3 · (next commit) · per-player game-result counters in the hash, both engines;
   smoke 3×20 green, non-zero counters identical on a live game.

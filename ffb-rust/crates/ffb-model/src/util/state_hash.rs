@@ -175,7 +175,9 @@ fn collect_player_parts(game: &Game, out: &mut Vec<String>, home: bool) {
                 r.touchdowns, r.completions, r.casualties, r.interceptions, r.deflections,
                 r.landings, r.blocks, r.fouls, r.rushing, r.passing, r.player_awards),
         };
-        out.push(format!("{prefix}{i:02}:{x},{y},{state_str},{}/{}/{}/{},{},{},{},{res}",
+        // §Q1.3: number of temporarily granted skills (`,t<N>` at the end of the part).
+        let temp_skills = player.temporary_skills.len();
+        out.push(format!("{prefix}{i:02}:{x},{y},{state_str},{}/{}/{}/{},{},{},{},{res},t{temp_skills}",
             player.movement_with_modifiers(),
             player.strength_with_modifiers(),
             player.agility_with_modifiers(),
