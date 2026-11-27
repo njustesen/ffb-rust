@@ -33,12 +33,14 @@ cargo fmt --check                                  # Check formatting
 
 ## Crate Architecture
 
-The workspace has six crates with a strict dependency order:
+The workspace has seven crates with a strict dependency order:
 
 ```
 ffb-model → ffb-mechanics → ffb-engine → ffb-client
                                        → ffb-parity
+                                       → ffb-server
 ffb-model → ffb-protocol → ffb-client
+                         → ffb-server
 ```
 
 | Crate | Purpose | Java Source |
@@ -49,6 +51,7 @@ ffb-model → ffb-protocol → ffb-client
 | **ffb-protocol** | Serializable client/server command structs for WebSocket communication | `ffb-common/net/` |
 | **ffb-client** | Client-side state machine and WebSocket handling | `ffb-client-logic` |
 | **ffb-parity** | Parity test harness: runs both Java and Rust headless, diffs JSONL logs | (Rust-only harness) |
+| **ffb-server** | WebSocket server the unmodified Java GUI client plays on (BACKLOG §P) | `ffb-server/net/`, `GameState` |
 
 ## Engine Architecture
 
@@ -70,7 +73,7 @@ The Rust engine uses two output channels instead of Java's direct networking cal
 `GameEvent` variants are defined in `ffb-model/src/events/game_event.rs`.  
 `AgentPrompt` variants are defined in `ffb-model/src/prompts/agent_prompt.rs`.
 
-The `ffb-server` layer (Phase ZT) will subscribe to these and serialize them as protocol commands to the Java GUI client over WebSocket.
+The `ffb-server` crate turns these into Java protocol commands (dialogs and model changes) for the Java GUI client over WebSocket.
 
 **Loop pattern:** Java `pushCurrentStepOnStack() + setNextAction(NEXT_STEP)` → Rust `StepAction::Repeat`. The driver re-calls `start()` on the same step instance (same struct, same mutable fields). `StepAction::Continue` = waiting for user dialog.
 
@@ -107,7 +110,7 @@ Unit tests are colocated with implementations (`#[cfg(test)]` modules). After tr
 cargo test --workspace
 ```
 
-All tests must pass before marking a file `✓` in TRANSLATION_TRACKER.md. Do **not** patch `engine.rs` as a workaround — if tests fail, the translation is incorrect.
+All tests must pass before marking a file `✓` in TRANSLATION_TRACKER.md. If tests fail, the translation is incorrect: fix the port, never the test.
 
 ## The Java engine: `ffb-java/` ONLY
 
@@ -136,4 +139,4 @@ alters behaviour.
 
 ## Parity & coverage
 
-`ffb-parity` runs both engines headless and diffs per-step state hashes (see `docs/PARITY_TIER1.md` for the campaign log). To inspect which game mechanics a parity suite actually exercised — actions, dice rolls, injuries, kickoff events, the full `GameEvent` catalog — follow `docs/COVERAGE_REPORT.md` (aggregation commands + the reusable report template at `docs/coverage_report.html`).
+`ffb-parity` runs both engines headless and diffs per-step state hashes (see `docs/PARITY_PROCESS.md` for the method and `docs/HISTORY.md` for the campaign timeline). To inspect which game mechanics a parity suite actually exercised — actions, dice rolls, injuries, kickoff events, the full `GameEvent` catalog — follow `docs/COVERAGE_REPORT.md` (aggregation commands + the reusable report template at `docs/coverage_report.html`).
