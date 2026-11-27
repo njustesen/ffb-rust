@@ -1743,9 +1743,12 @@ impl Agent for RandomAgent {
             // §Q2.8: under --coverage-bias buy one of each COVERAGE_INDUCEMENTS entry the dialog
             // offers, in list order, while its cost fits the gold left (ParityRunner
             // coverageInducements, same list). Otherwise the empty purchase.
-            Some(AgentPrompt::BuyPrayersAndInducements { team_id, available, budget, .. }) => {
+            Some(AgentPrompt::BuyPrayersAndInducements { team_id, available, prayers, budget }) => {
                 let purchases = if crate::agent::heuristic_agent::coverage_bias() > 0.0 {
-                    coverage_inducements(available, *budget)
+                    // The Java dialog offers prayers next to the other types; this prompt lists
+                    // them apart.
+                    let offered: Vec<(String, i32)> = available.iter().chain(prayers.iter()).cloned().collect();
+                    coverage_inducements(&offered, *budget)
                 } else {
                     vec![]
                 };
@@ -1919,7 +1922,7 @@ fn coverage_spell_target(game: &Game, caster_home: bool) -> Option<FieldCoordina
 pub const COVERAGE_INDUCEMENTS: &[&str] = &[
     "throwARock", "weatherMage", "wizard", "halflingMasterChef", "bribes", "bloodweiserBabes",
     "extraTeamTraining", "wanderingApothecaries", "partTimeCoach", "tempCheerleader", "teamMascot",
-    "biasedRef", "bugmansXXXXXX", "mortuaryAssistant", "plagueDoctor",
+    "biasedRef", "bugmansXXXXXX", "mortuaryAssistant", "plagueDoctor", "prayers",
 ];
 
 /// §Q2.8: one of each [`COVERAGE_INDUCEMENTS`] entry the buy dialog offers (`available` = the

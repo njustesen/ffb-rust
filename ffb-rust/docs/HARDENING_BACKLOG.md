@@ -8,8 +8,9 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q2.8 part 4** (prayers bought in bb2025/bb2020 under the bias + the turn InducementSet in the
-state hash, both engines), then **Q3.3** cards. Gate shape: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`.
+Next item: **Q2.8 part 5** (the bb2025 Prayers step for bought prayers: roll table size + prayer effects,
+repro in Q2.8; move `prayers` to the front of COVERAGE_INDUCEMENTS in both harnesses to gate it), then
+**Q3.3** cards. Gate shape: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`.
 Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
 squads, Q1.2b punt stall (two repros).
 Q2.2/Q2.3 inducement parts wait for Q2.8. Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
@@ -168,8 +169,11 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   exercise in-game use). **Part 1 bb2025 done** (see Log): `FFB_INDUCEMENT_CASH=<gold>` sets
   FREE_INDUCEMENT_CASH in both harnesses (the drafts sit within 50k, so petty cash alone never buys
   anything); under `--coverage-bias` both agents buy one of each COVERAGE_INDUCEMENTS type in list order
-  while gold lasts. **Part 2 bb2020 and part 3 bb2016 done** (see Log). Open: stars / mercenaries /
-  staff (position choices), prayers, cards (Q3.3), the inducement set in the state hash.
+  while gold lasts. **Parts 2 (bb2020), 3 (bb2016) and 4 (state hash + prayers) done** (see Log).
+  Open: **bb2025 Prayers step** — with `prayers` FIRST in COVERAGE_INDUCEMENTS (both harnesses) every
+  bb2025 game diverges at the prayer roll (human vs halfling seed 1: Java `prayerRoll` 6 then three
+  `gains Loner` playerEvents, Rust `prayerRoll` 13); the list keeps `prayers` LAST until it is fixed.
+  Then stars / mercenaries / staff (position choices) and cards (Q3.3).
 - [~] **Q2.9 Remaining fixed answers:** part 1 (see Log): under `--coverage-bias` both agents take the
   other branch of PUNT_TO_CROWD (punt), PICK_UP_CHOICE (pick up) and KICK_SKILL (use Kick), zero draws.
   None of the three fired in 60 biased games (dark_elf vs wood_elf_sk, human vs orc bb2025) — needs a
@@ -262,7 +266,11 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
-- 2026-11-27 · Q2.8 part 3 + Q3.2 bb2016 · (this commit) · bb2016 inducement types (roster-name
+- 2026-11-27 · Q2.8 part 4 · (this commit) · each team's turn InducementSet in the state hash
+  (` i` part, `name:value:uses` sorted, both engines); `prayers` added to the coverage purchase list
+  (last). Gate (FFB_INDUCEMENT_CASH=600000, bias): 4 matchups × 10 × 3 editions = 120/120; smoke
+  20/20 ×3; bb2020 prayer purchases verified with 800k. bb2025 bought prayers diverge → part 5.
+- 2026-11-27 · Q2.8 part 3 + Q3.2 bb2016 · 0092d013d · bb2016 inducement types (roster-name
   discounts, igor without apothecary, riotous position); StepBuyInducements charges what the client
   deducts; chef rolled in startHalf (rollForChefAtStartOfHalf); bb2016 use windows (SPELL at own
   turn start/end) and the Blitz! turn's END_OF_OWN_TURN window; dump-off passing yards not inverted

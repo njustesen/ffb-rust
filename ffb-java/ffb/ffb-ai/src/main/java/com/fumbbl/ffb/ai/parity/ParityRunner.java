@@ -2574,6 +2574,8 @@ public class ParityRunner {
         // §Q1.3: apothecaries left (home,away) and the bomb square + moving flag. Must match state_hash.rs.
         sb.append(" o").append(game.getTurnDataHome().getApothecaries()).append(',').append(game.getTurnDataAway().getApothecaries());
         sb.append(" k").append(bombPart(fm));
+        // §Q2.8: each team's turn InducementSet. Must match state_hash.rs inducement_part.
+        sb.append(" i").append(inducementPart(game.getTurnDataHome().getInducementSet())).append(',').append(inducementPart(game.getTurnDataAway().getInducementSet()));
         sb.append(" ap").append(actingPlayerPart(game));
         sb.append(" w").append(game.getFieldModel().getWeather() != null ? game.getFieldModel().getWeather().getName() : "-");
         sb.append(" tm").append(game.getTurnMode() != null ? game.getTurnMode().getName() : "-");
@@ -2618,6 +2620,8 @@ public class ParityRunner {
         // §Q1.3: apothecaries left (home,away) and the bomb square + moving flag. Must match state_hash.rs.
         sb.append(" o").append(game.getTurnDataHome().getApothecaries()).append(',').append(game.getTurnDataAway().getApothecaries());
         sb.append(" k").append(bombPart(fm));
+        // §Q2.8: each team's turn InducementSet. Must match state_hash.rs inducement_part.
+        sb.append(" i").append(inducementPart(game.getTurnDataHome().getInducementSet())).append(',').append(inducementPart(game.getTurnDataAway().getInducementSet()));
         sb.append(" ap").append(actingPlayerPart(game));
         sb.append(" w").append(game.getFieldModel().getWeather() != null ? game.getFieldModel().getWeather().getName() : "-");
         sb.append(" tm").append(game.getTurnMode() != null ? game.getTurnMode().getName() : "-");
@@ -2743,6 +2747,21 @@ public class ParityRunner {
             case PlayerState.RESERVE:        return "Reserve";
             default:                         return "Reserve";
         }
+    }
+
+    /** §Q2.8: {@code name:value:uses;...} of an InducementSet, sorted by name; {@code -} when empty. */
+    static String inducementPart(com.fumbbl.ffb.model.InducementSet set) {
+        List<String> parts = new ArrayList<>();
+        if (set != null) {
+            for (com.fumbbl.ffb.inducement.Inducement ind : set.getInducements()) {
+                parts.add(ind.getType().getName() + ":" + ind.getValue() + ":" + ind.getUses());
+            }
+        }
+        if (parts.isEmpty()) {
+            return "-";
+        }
+        parts.sort(null);
+        return String.join(";", parts);
     }
 
     static long fnv1a64(byte[] data) {
@@ -5430,7 +5449,7 @@ public class ParityRunner {
     static final String[] COVERAGE_INDUCEMENTS = {
         "throwARock", "weatherMage", "wizard", "halflingMasterChef", "bribes", "bloodweiserBabes",
         "extraTeamTraining", "wanderingApothecaries", "partTimeCoach", "tempCheerleader", "teamMascot",
-        "biasedRef", "bugmansXXXXXX", "mortuaryAssistant", "plagueDoctor",
+        "biasedRef", "bugmansXXXXXX", "mortuaryAssistant", "plagueDoctor", "prayers",
     };
 
     /**

@@ -87,6 +87,13 @@ pub fn state_string(game: &Game) -> String {
         None => s.push('-'),
         Some(c) => s.push_str(&format!("{},{},{}", c.x, c.y, if game.field_model.bomb_moving { "true" } else { "false" })),
     }
+    // §Q2.8: each team's turn InducementSet -- `name:value:uses` sorted by name, `;`-joined, `-`
+    // when empty. Bought inducements (and their uses) changed no compared field. Must stay
+    // byte-identical with `ParityRunner.inducementPart`.
+    s.push_str(" i");
+    s.push_str(&inducement_part(&game.turn_data_home.inducement_set));
+    s.push(',');
+    s.push_str(&inducement_part(&game.turn_data_away.inducement_set));
     // Acting player: WHO is activated and how much movement it has spent, as `h03,2` (the same
     // h/a index the player parts use, since raw ids differ between the engines) or `-` when nobody
     // is activated. The hash carried no activation state at all, so an engine could hold a
@@ -208,6 +215,18 @@ fn acting_player_part(game: &Game) -> String {
     format!("?,{}{}", game.acting_player.current_move, acting_detail(game))
 }
 
+/// §Q2.8: `name:value:uses;...` of an InducementSet, sorted by name; `-` when empty.
+fn inducement_part(set: &crate::model::inducement_set::InducementSet) -> String {
+    let mut parts: Vec<String> = set.get_inducements().iter()
+        .map(|i| format!("{}:{}:{}", i.type_id, i.value, i.uses))
+        .collect();
+    if parts.is_empty() {
+        return "-".to_string();
+    }
+    parts.sort();
+    parts.join(";")
+}
+
 /// §Q1.3: `,<action>,<flags>` — the declared PlayerAction name (or `-`) and ten activation flags as
 /// 0/1: blocked, passed, fouled, moved, fed, goingForIt, standingUp, bloodLust, animosity, jumping.
 /// Must stay byte-identical with `ParityRunner.actingDetail`.
@@ -259,6 +278,22 @@ mod tests {
             vampire_lord: false, roster: None, base_icon_path: None, logo_url: None,
             necromancer: false,
         }
+    }
+
+    /// §Q2.8: the turn InducementSets are in the state string, sorted by name, `-` when empty,
+    /// and a used inducement changes the hash (ParityRunner.inducementPart, same format).
+    #[test]
+    fn the_inducement_sets_are_part_of_the_state() {
+        use crate::inducement::inducement::Inducement;
+        use crate::inducement::usage::Usage;
+        let mut g = Game::new(empty_team("home"), empty_team("away"), Rules::Bb2025);
+        assert!(state_string(&g).contains(" i-,-"));
+        g.turn_data_home.inducement_set.add_inducement(Inducement::new("wizard", 1, vec![Usage::SPELL]));
+        g.turn_data_home.inducement_set.add_inducement(Inducement::new("bribes", 2, vec![Usage::AVOID_BAN]));
+        assert!(state_string(&g).contains(" ibribes:2:0;wizard:1:0,-"));
+        let before = state_hash(&g);
+        g.turn_data_home.inducement_set.use_one_of("wizard");
+        assert_ne!(state_hash(&g), before);
     }
 
     #[test]
