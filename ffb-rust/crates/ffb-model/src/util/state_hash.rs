@@ -155,7 +155,16 @@ fn collect_player_parts(game: &Game, out: &mut Vec<String>, home: bool) {
         // -- and the exact off-pitch state, which the label folds into "Reserve") and the effective
         // PA. Must stay byte-identical with `ParityRunner.addPlayersFromTeam`.
         let ps_id = fm.player_state(&player.id).map(|s| s.id()).unwrap_or(0);
-        out.push(format!("{prefix}{i:02}:{x},{y},{state_str},{}/{}/{}/{},{},{},{}",
+        // §Q1.3: game-result counters td/cmp/cas/int/defl/land/blk/foul/rush/pass/awards; a missing
+        // result reads as zeros (Java creates a zero result on read).
+        let team_result = if home { &game.game_result.home } else { &game.game_result.away };
+        let res = match team_result.player_result(&player.id) {
+            None => "0/0/0/0/0/0/0/0/0/0/0".to_string(),
+            Some(r) => format!("{}/{}/{}/{}/{}/{}/{}/{}/{}/{}/{}",
+                r.touchdowns, r.completions, r.casualties, r.interceptions, r.deflections,
+                r.landings, r.blocks, r.fouls, r.rushing, r.passing, r.player_awards),
+        };
+        out.push(format!("{prefix}{i:02}:{x},{y},{state_str},{}/{}/{}/{},{},{},{},{res}",
             player.movement_with_modifiers(),
             player.strength_with_modifiers(),
             player.agility_with_modifiers(),

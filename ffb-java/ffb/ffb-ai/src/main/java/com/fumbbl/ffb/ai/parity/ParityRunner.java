@@ -2363,8 +2363,8 @@ public class ParityRunner {
         int by = ball != null ? ball.getY() : -1;
         boolean inPlay = fm.isBallInPlay();
         List<String> playerParts = new ArrayList<>();
-        addPlayersFromTeam(game.getTeamHome(), fm, playerParts, "h");
-        addPlayersFromTeam(game.getTeamAway(), fm, playerParts, "a");
+        addPlayersFromTeam(game, game.getTeamHome(), fm, playerParts, "h");
+        addPlayersFromTeam(game, game.getTeamAway(), fm, playerParts, "a");
         playerParts.sort(null);
         StringBuilder sb = new StringBuilder();
         sb.append('h').append(half);
@@ -2403,8 +2403,8 @@ public class ParityRunner {
         int inPlay = fm.isBallInPlay() ? 1 : 0;
 
         List<String> playerParts = new ArrayList<>();
-        addPlayersFromTeam(game.getTeamHome(), fm, playerParts, "h");
-        addPlayersFromTeam(game.getTeamAway(), fm, playerParts, "a");
+        addPlayersFromTeam(game, game.getTeamHome(), fm, playerParts, "h");
+        addPlayersFromTeam(game, game.getTeamAway(), fm, playerParts, "a");
         playerParts.sort(null);
 
         StringBuilder sb = new StringBuilder();
@@ -2465,7 +2465,7 @@ public class ParityRunner {
         return sb.toString();
     }
 
-    private static void addPlayersFromTeam(Team team, FieldModel fm, List<String> out, String prefix) {
+    private static void addPlayersFromTeam(Game game, Team team, FieldModel fm, List<String> out, String prefix) {
         if (team == null) return;
         List<Player<?>> players = new ArrayList<>(java.util.Arrays.asList(team.getPlayers()));
         players.sort(java.util.Comparator.comparingInt(Player::getNr));
@@ -2490,10 +2490,18 @@ public class ParityRunner {
             // ... -- and the exact off-pitch state, which the label folds into "Reserve") and the
             // effective PA. Must stay byte-identical with state_hash.rs::collect_player_parts.
             int psId = (ps != null) ? ps.getId() : 0;
-            out.add(String.format("%s%02d:%d,%d,%s,%d/%d/%d/%d,%d,%d,%d", prefix, i, x, y, state,
+            // §Q1.3: the player's game-result counters (td/cmp/cas/int/defl/land/blk/foul/rush/pass/awards).
+            // TeamResult.getPlayerResult creates a zero result when absent -- harmless, toJsonValue
+            // already does the same for every rostered player. Rust reads a missing result as zeros.
+            com.fumbbl.ffb.model.PlayerResult pr = (game != null) ? game.getGameResult().getPlayerResult(p) : null;
+            String res = (pr == null) ? "0/0/0/0/0/0/0/0/0/0/0" : String.format("%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d",
+                pr.getTouchdowns(), pr.getCompletions(), pr.getCasualties(), pr.getInterceptions(),
+                pr.getDeflections(), pr.getLandings(), pr.getBlocks(), pr.getFouls(), pr.getRushing(),
+                pr.getPassing(), pr.getPlayerAwards());
+            out.add(String.format("%s%02d:%d,%d,%s,%d/%d/%d/%d,%d,%d,%d,%s", prefix, i, x, y, state,
                 p.getMovementWithModifiers(), p.getStrengthWithModifiers(),
                 p.getAgilityWithModifiers(), p.getArmourWithModifiers(), activeBit,
-                psId, p.getPassingWithModifiers()));
+                psId, p.getPassingWithModifiers(), res));
         }
     }
 

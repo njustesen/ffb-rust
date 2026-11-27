@@ -71,8 +71,9 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
   (all state flags + exact off-pitch state + effective PA), both engines identical; smoke 3×20 green.
   Part 2 done: acting player part ends `,<declared action>,<10 flags>` (blocked, passed, fouled, moved,
   fed, goingForIt, standingUp, bloodLust, animosity, jumping); smoke 3×20 green.
-  Still to add: granted/temporary skills + properties, SPP / per-player game-result stats, inducement set
-  + apothecaries, bombs. Original: Add to BOTH `ffb-model/src/util/state_hash.rs` and
+  Part 3 done: player parts end `,td/cmp/cas/int/defl/land/blk/foul/rush/pass/awards` (game result),
+  identical incl. non-zero values; smoke 3×20 green.
+  Still to add: granted/temporary skills + properties, inducement set + apothecaries, bombs. Original: Add to BOTH `ffb-model/src/util/state_hash.rs` and
   `ParityRunner.java` (same string format): PA; full player state incl. flags (rooted, confused,
   hypnotised, used-Pro, …) and the exact off-pitch state (banned, KO, BH, SI, RIP, missing, …);
   granted/temporary skills and properties; SPP and per-player game-result stats; inducement set and
@@ -198,6 +199,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q1.3 part 3 · (next commit) · per-player game-result counters in the hash, both engines;
+  smoke 3×20 green, non-zero counters identical on a live game.
 - 2026-11-27 · Q1.3 part 2 · (next commit) · acting player's declared action + 10 activation flags in
   the hash, both engines; smoke bb2025/bb2020/bb2016 20/20 (classes all).
 - 2026-11-27 · Q1.3 part 1 · (next commit) · state hash player parts + full PlayerState id + PA, Java and
