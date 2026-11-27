@@ -8,8 +8,9 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q3.3** cards (bb2016/bb2020 decks, buy + play), then Q2.8's stars / mercenaries / staff.
-Gate shape: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`.
+Next item: **Q3.5** bb2016 dodge/leap hooks. Q3.3a (card play) waits for another session's
+uncommitted card-model work (see Q3.3a); Q3.3b (card draw) is [!] with a question for the user.
+Then Q3.6, Q2.8's stars / mercenaries / staff. Gate shape for purchases: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`.
 Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
 squads, Q1.2b punt stall (two repros).
 Q2.2/Q2.3 inducement parts wait for Q2.8. Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
@@ -202,6 +203,38 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   step, not an inducement (already live).
 - [ ] **Q3.3 Cards (bb2016/bb2020):** build decks, buy, draw, play, deactivate (`handle_card`,
   `step_buy_cards_and_inducements.rs:249-343`, `PlayCard`). Gate: card play in both editions.
+  Findings 2026-11-27: Java **bb2020 `Cards` is an empty set** (`inducement/bb2020/Cards.java`), so
+  no bb2020 card can be bought or played in Java — bb2020's card paths are vacuous by construction.
+  bb2016 has 24 cards. Split:
+  - [ ] **Q3.3a play/deactivate (bb2016):** a harness switch `FFB_CARDS=<name,...>` (both harnesses)
+    hands both teams those cards as available before kick-off; port the window's playable cards, the
+    Card sequence, StepPlayCard, the 8 handlers and duration deactivation 1:1; cards in the state hash.
+    **Waiting** (2026-11-27): another session has UNCOMMITTED card-model work in
+    `model_change_processor.rs` (`java_card_enhancements`, `java_add_card` = FieldModel.addCard +
+    activation enhancements), `field_model.rs`, `player.rs`, `inducement_set.rs`, `card_factory.rs`
+    (replay JSON). Engine card play needs exactly that; resume once it is committed, and reuse it.
+    Survey of what the engine still lacks (all else exists but is unreachable): `Card.phases` +
+    Gikta's `remains_in_play`; bb2016 `findPlayableCards` in the LIVE
+    `bb2025/inducements/step_init_inducement.rs` (+ `card_id` in handle_command, push
+    `generator::mixed::card`); `AgentPrompt::UseInducement.cards` + one card/target rule in both
+    agents (ParityRunner PLAYER_CHOICE has no CARD/BLOCK arm); activation/deactivation enhancements
+    in `util_server_cards::activate_card`/`deactivate_card` + a real `keep_deactivated_card`;
+    `ReportCardDeactivated` into the report list; until-used deactivation by property source (Lucky
+    Charm, `InjuryResult.java:189`); `step_referee.rs:96` Blatant Foul via `game.is_active`;
+    StepPlayCard CLIENT_SETUP_PLAYER (Illegal Substitution) + choice-mode split; Witch's Brew roll.
+    Java card phases: START_OF_OWN_TURN, END_OF_OWN_TURN, AFTER_KICKOFF_TO_OPPONENT,
+    BEFORE_KICKOFF_SCATTER, AFTER_INDUCEMENTS_PURCHASED, BEFORE_SETUP (per card in bb2016 Cards.java).
+  - [!] **Q3.3b buy/draw:** Java's draw is NOT reproducible. `CardDeck.build` adds `allCards()` in
+    `HashSet<Card>` order and `Card` has no `hashCode`, so the order is JVM identity hashes:
+    three fresh `bb2016.Cards` in one JVM printed three different orders
+    (`scratchpad/cardorder/CardOrder.java`). `drawCard` takes index `die(deckSize) - 1` of that
+    order, so the same die gives a different card run to run; no Rust port can match it.
+    **Question for the user:** gate the buy step by (a) running the oracle JVM with a deterministic
+    identity hash (`-XX:+UnlockExperimentalVMOptions -XX:hashCode=2`, all identity hashes = 1 →
+    one bucket, a fixed (insertion/treeify) order Rust can mirror; changes every identity-hashed collection in the JVM, so a full re-cert
+    follows), (b) logging it as a Java defect (JD-003: deck order = identity hash; Rust draws from
+    the card-list order, behind no flag) and gating only "a card of the bought type was drawn", or
+    (c) leaving buy/draw ungated (unit tests only)?
 - [x] **Q3.4 Solid Defence player selection** — review false positive: bb2025's player-choice flow is
   already ported (`handle_solid_defence_bb2025`, Java's DialogPlayerChoiceParameter + validSolidDefence);
   the "DEVIATION" comments sat in the bb2016/bb2020 path, where Java itself does a free re-setup. Stale
