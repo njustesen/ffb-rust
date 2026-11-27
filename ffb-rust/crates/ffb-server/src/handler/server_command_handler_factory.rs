@@ -653,6 +653,13 @@ impl ServerCommandHandlerFactory {
             _ => None,
         }
         .map(|from| from.map(|c| if side == TeamSide::Away { c.transform() } else { c }));
+        // Java CLIENT_FIELD_COORDINATE: one wire command, six consuming steps (StepHitAndRun,
+        // StepTrickster, StepPlaceBall, StepRaidingParty, StepInitPunt, StepFirst/SecondMove-
+        // FuriousOutburst). The engine Action depends on which of them is waiting (§Q4.2).
+        let field_coordinate = match &client_command {
+            AnyClientCommand::ClientFieldCoordinate(f) => Some(f.field_coordinate),
+            _ => None,
+        };
         let touchback_coordinate = match &client_command {
             AnyClientCommand::ClientTouchback(t) => t.ball_coordinate.map(|c| if side == TeamSide::Away { c.transform() } else { c }),
             _ => None,
@@ -701,6 +708,16 @@ impl ServerCommandHandlerFactory {
         // happens. CLIENT_START_GAME is only waited for by StepInitStartGame, which raises no prompt.
         let prompt = gs.driver.as_ref().and_then(|d| d.current_prompt()).cloned();
         let mut action = action;
+        if let Some(raw) = field_coordinate {
+            match field_coordinate_action(prompt.as_ref(), raw, side) {
+                Some(a) => action = a,
+                None => {
+                    // Java: no waiting step takes CLIENT_FIELD_COORDINATE -> UNHANDLED_COMMAND.
+                    log::debug!("game {game_id}: CLIENT_FIELD_COORDINATE unhandled while waiting for {prompt:?}");
+                    return;
+                }
+            }
+        }
         if let (Some(ffb_model::prompts::AgentPrompt::TeamSetup { .. }), Some(coordinates)) = (&prompt, &end_turn_coordinates) {
             // UtilServerSteps.checkCommandIsFromCurrentPlayer
             let home_playing = gs.get_game().map(|g| g.home_playing).unwrap_or(true);
@@ -945,6 +962,30 @@ impl ServerCommandHandlerFactory {
     }
 }
 
+/// CLIENT_FIELD_COORDINATE -> the Action of the step that is waiting for it. Java's StepHitAndRun,
+/// StepTrickster, StepPlaceBall, StepRaidingParty and the Furious Outburst steps un-mirror the away
+/// coach's square, and their Rust twins take the canonical square; Rust's StepInitPunt (like
+/// Java's) un-mirrors it itself, so it gets the square as sent. `None` (also for a null
+/// coordinate): no waiting step takes the command.
+pub fn field_coordinate_action(
+    prompt: Option<&ffb_model::prompts::AgentPrompt>,
+    raw: Option<ffb_model::types::FieldCoordinate>,
+    side: TeamSide,
+) -> Option<Action> {
+    use ffb_model::prompts::AgentPrompt as P;
+    let raw = raw?;
+    let canonical = if side == TeamSide::Away { raw.transform() } else { raw };
+    match prompt? {
+        P::HitAndRun { .. } => Some(Action::HitAndRun { coord: Some(canonical) }),
+        P::TricksterMove { .. } => Some(Action::TricksterMove { coord: canonical }),
+        P::PlaceBallSquare { .. } => Some(Action::PlaceBallSquare { coord: canonical }),
+        P::RaidingParty { .. } => Some(Action::RaidingPartyTarget { coord: canonical }),
+        P::FuriousOutburstSquare { .. } => Some(Action::FuriousOutburstSquare { coord: canonical }),
+        P::PuntTarget { .. } => Some(Action::Punt { coord: raw }),
+        _ => None,
+    }
+}
+
 /// Java `UtilServerPlayerMove.isValidMove(GameState, FieldCoordinate, boolean)`: the move's
 /// from-square (already home-oriented; `None` = Java's null coordinateFrom / empty
 /// coordinatesTo) must be the acting player's current square.
@@ -1152,6 +1193,10 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
             player_id: t.target_player_id.ok_or_else(|| missing("targetPlayerId"))?,
         }),
 
+        // CLIENT_FIELD_COORDINATE: the handler replaces this with the waiting step's Action
+        // (`field_coordinate_action`); decoded on its own it means nothing.
+        AnyClientCommand::ClientFieldCoordinate(_) => Ok(Action::Acknowledge),
+
         // ── §Q4.2: commands whose engine Action already exists ──────────────────────────────
         // Java StepBlockRoll / StepBlockRollMultiple block-die re-rolls.
         AnyClientCommand::ClientUseBrawler(b) => Ok(Action::UseBrawler { target_id: b.target_id }),
@@ -1304,6 +1349,24 @@ mod tests {
         let r = decode(serde_json::json!({"netCommandId": "clientInterceptorChoice", "interceptorId": "a7",
             "skill": "Yoink!"}), TeamSide::Away);
         assert!(matches!(&r, Ok(Action::InterceptWithSkill { player_id, .. }) if player_id == "a7"), "{r:?}");
+    }
+
+    /// §Q4.2 CLIENT_FIELD_COORDINATE goes to the waiting step: canonical square for Hit and Run
+    /// (and the other steps whose Rust twin takes it canonical), as sent for the punt (StepInitPunt
+    /// un-mirrors it itself), nothing when no step waits for it.
+    #[test]
+    fn field_coordinate_maps_by_the_waiting_prompt() {
+        use ffb_model::prompts::AgentPrompt as P;
+        let raw = Some(coord_of(3, 4));
+        let hit = P::HitAndRun { player_id: "a1".into(), squares: vec![] };
+        assert_eq!(field_coordinate_action(Some(&hit), raw, TeamSide::Away),
+            Some(Action::HitAndRun { coord: Some(coord_of(3, 4).transform()) }));
+        assert_eq!(field_coordinate_action(Some(&hit), raw, TeamSide::Home),
+            Some(Action::HitAndRun { coord: Some(coord_of(3, 4)) }));
+        let punt = P::PuntTarget { player_id: "a1".into(), squares: vec![] };
+        assert_eq!(field_coordinate_action(Some(&punt), raw, TeamSide::Away), Some(Action::Punt { coord: coord_of(3, 4) }));
+        assert_eq!(field_coordinate_action(None, raw, TeamSide::Home), None);
+        assert_eq!(field_coordinate_action(Some(&hit), None, TeamSide::Home), None);
     }
 
     /// §Q4.2 commands whose engine Action already existed: block-die re-rolls, weather, wizard

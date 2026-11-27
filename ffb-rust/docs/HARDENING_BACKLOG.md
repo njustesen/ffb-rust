@@ -283,11 +283,15 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   ~990-1066). Done (see Log). Open with Q2.6: the engine has no path for the Team Mascot / Mascot TRR
   / Pro TRR sources, so those CLIENT_USE_RE_ROLLs are refused (logged) instead of spent as a TRR.
 - [~] **Q4.2 The 33 undecoded ClientCommands** — re-counted 27. **Part 1 done** (see Log): the 13
-  with an existing engine Action. Next (part 2): CLIENT_FIELD_COORDINATE (six consumers: HitAndRun,
-  Trickster, PlaceBall, RaidingParty, InitPunt, Furious Outburst — reshape by the waiting prompt),
-  KickTeamMate, ThrowKeg, PileDriver, UseChainsaw (StepPileDriver), UseFumblerooskie, UseIgors,
-  UseTeamMatesWisdom, Set/UnsetBlockTargetSelection, SelectCardToBuy (bb2020), IllegalProcedure
-  (AbstractStep). CLIENT_JOURNEYMEN and CLIENT_DEBUG_CLIENT_STATE have no Java step consumer.
+  with an existing engine Action. **Part 2 done**: CLIENT_FIELD_COORDINATE mapped by the waiting
+  prompt (`field_coordinate_action`). **Part 3 (engine work, not a decode):** Java's client sends
+  these as a declaration + a second command, Rust folds them into one `ActivatePlayer`:
+  THROW_KEG (bare declaration ends the activation in Rust: the parity bridge), USE_TEAM_MATES_WISDOM,
+  KICK_TEAM_MATE (bb2016 only; numDice; the server forces Bb2025 until Q4.3). Port the two-command
+  shape as for FOUL_MOVE/GAZE_MOVE. Also open: PileDriver, UseChainsaw (StepPileDriver),
+  UseFumblerooskie, UseIgors, Set/UnsetBlockTargetSelection, SelectCardToBuy (bb2020),
+  IllegalProcedure (AbstractStep). CLIENT_JOURNEYMEN and CLIENT_DEBUG_CLIENT_STATE have no Java step
+  consumer.
   Original list: (BuyCard, SelectCardToBuy, PettyCash, Journeymen,
   SelectWeather, WizardSpell, UseBrawler/Chainsaw/Hatred/Igors/Fumblerooskie/TeamMatesWisdom,
   UseProReRollForBlock, UseConsummateReRollForBlock, UseSingleBlockDieReRoll, UseMultiBlockDiceReRoll,
@@ -324,6 +328,11 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q4.2 part 2 · (this commit) · CLIENT_FIELD_COORDINATE decoded by the waiting step:
+  HitAndRun / TricksterMove / PlaceBallSquare / RaidingPartyTarget / FuriousOutburstSquare get the
+  canonical square, Punt the square as sent (StepInitPunt un-mirrors it); no waiting step -> dropped
+  like Java's UNHANDLED_COMMAND. Server tests green, gui_check 3/3 (pairs 6-8).
 
 - 2026-11-27 · Q4.2 part 1 · (this commit) · 13 client commands decoded to their existing engine
   Actions: UseBrawler, UseHatred, UseProReRollForBlock, UseConsummateReRollForBlock,
