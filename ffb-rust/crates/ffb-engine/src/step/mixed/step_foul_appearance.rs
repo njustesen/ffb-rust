@@ -248,6 +248,16 @@ impl StepFoulAppearance {
     fn fail_fa(&mut self, game: &mut Game) -> StepOutcome {
         let player_action = game.acting_player.player_action;
 
+        // Java bb2016 FoulAppearanceBehaviour failure: `actingPlayer.setHasBlocked(true);
+        // turnData.setTurnStarted(true); GOTO_LABEL goToLabelOnFailure` -- nothing else: no PRONE
+        // revert of a stood-up blocker/blitzer, no END_PLAYER_ACTION publish, no target-selection
+        // or defender change (§Q3.9: the bb2020/bb2025 extras below ran for bb2016 too).
+        if game.rules == ffb_model::enums::Rules::Bb2016 {
+            game.acting_player.has_blocked = true;
+            game.turn_data_mut().turn_started = true;
+            return StepOutcome::goto(&self.goto_label_on_failure.clone());
+        }
+
         // Java: if (actingPlayer.isStandingUp() && (BLITZ_MOVE || blockAction || GAZE_MOVE || kickingDowned))
         //         setPlayerState(player, state.changeBase(PRONE).changeActive(false))
         if game.acting_player.standing_up {
@@ -325,13 +335,10 @@ impl StepFoulAppearance {
                 || (game.rules == ffb_model::enums::Rules::Bb2025 && pa.is_blitzing())
         ).unwrap_or(false);
 
-        // Java bb2020/bb2025 handleFailure: game.setDefenderId(null). The bb2016
-        // FoulAppearanceBehaviour failure branch only sets hasBlocked/turnStarted and jumps: the
-        // blitz target stays the client's defender while EndBlocking continues the BLITZ_MOVE
-        // (nurgle bb2016 seed 13 i=37: Java defenderId=home_03, Rust null).
-        if game.rules != ffb_model::enums::Rules::Bb2016 {
-            game.defender_id = None;
-        }
+        // Java bb2020/bb2025 handleFailure: game.setDefenderId(null). (bb2016 returned above: its
+        // blitz target stays the client's defender while EndBlocking continues the BLITZ_MOVE --
+        // nurgle bb2016 seed 13 i=37: Java defenderId=home_03.)
+        game.defender_id = None;
 
         let label = self.goto_label_on_failure.clone();
         let out = StepOutcome::goto(&label);
@@ -466,6 +473,29 @@ mod tests {
         step.roll = 2; // success (>= 2)
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
+    }
+
+    /// §Q3.9 Java bb2016 FoulAppearanceBehaviour failure: only hasBlocked + turnStarted and the
+    /// goto -- a stood-up blocker stays Standing, no END_PLAYER_ACTION, the defender is kept.
+    #[test]
+    fn bb2016_failure_only_sets_has_blocked_and_turn_started() {
+        let mut game = make_game();
+        game.rules = Rules::Bb2016;
+        add_player(&mut game, "atk", vec![]);
+        add_player(&mut game, "def", vec![SkillId::FoulAppearance]);
+        game.field_model.set_player_state("atk",
+            PlayerState::new(ffb_model::enums::PS_STANDING).change_active(true));
+        game.acting_player.player_id = Some("atk".into());
+        game.acting_player.player_action = Some(ffb_model::enums::PlayerAction::Block);
+        game.acting_player.standing_up = true;
+        game.defender_id = Some("def".into());
+        let mut step = StepFoulAppearance::new("fail");
+        let out = step.fail_fa(&mut game);
+        assert_eq!(out.action, StepAction::GotoLabel);
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(_))));
+        assert_eq!(game.field_model.player_state("atk").map(|s| s.base()), Some(ffb_model::enums::PS_STANDING));
+        assert_eq!(game.defender_id.as_deref(), Some("def"));
+        assert!(game.acting_player.has_blocked && game.turn_data().turn_started);
     }
 
     #[test]

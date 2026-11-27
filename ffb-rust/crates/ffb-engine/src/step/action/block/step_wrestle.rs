@@ -134,8 +134,9 @@ impl StepWrestle {
         }
 
         // Java: askDefenderForWrestleUse.
-        // bb2016: hasSkill(defender) && !defenderState.isRooted() (current live state); no
-        //   Juggernaut-cancels-Wrestle check.
+        // bb2016: hasSkill(defender) && !defenderState.isRooted() (current live state), and no
+        //   prompt when `actingPlayerIsBlitzing && cancelsSkill(attacker, skill)` -- silently, no
+        //   report (§Q3.9: Rust had no cancel check for bb2016).
         // bb2020/bb2025: hasSkill(defender) && oldDefenderState.hasTacklezones(); plus
         //   wrestlePrevented = isBlitz && cancelsSkill(attacker, Wrestle) && hasSkill(defender),
         //   reporting CANCEL_WRESTLE when it fires.
@@ -155,9 +156,8 @@ impl StepWrestle {
             };
             let is_blitz = game.acting_player.player_action == Some(PlayerAction::Blitz);
             // Java: cancelsSkill(actingPlayer.getPlayer(), skill) — e.g. Juggernaut cancels Wrestle
-            // via cancelsCanTakeDownPlayersWithHimOnBothDown. bb2016 has no such check.
-            let wrestle_prevented = !is_bb2016
-                && is_blitz
+            // via cancelsCanTakeDownPlayersWithHimOnBothDown (all three editions).
+            let wrestle_prevented = is_blitz
                 && defender_has_skill
                 && game.player(&player_id)
                     .map(|p| UtilCards::has_skill_to_cancel_property(p, NamedProperties::CAN_TAKE_DOWN_PLAYERS_WITH_HIM_ON_BOTH_DOWN))
@@ -186,8 +186,8 @@ impl StepWrestle {
                     });
                 }
             } else {
-                if wrestle_prevented {
-                    // Java: addReport(new ReportSkillUse(actingPlayerId, getSkillCancelling(...), true, CANCEL_WRESTLE))
+                if wrestle_prevented && !is_bb2016 {
+                    // Java bb2020/bb2025: addReport(new ReportSkillUse(actingPlayerId, getSkillCancelling(...), true, CANCEL_WRESTLE))
                     let cancelling = game.player(&player_id)
                         .and_then(|p| UtilCards::get_skill_cancelling_property(p, NamedProperties::CAN_TAKE_DOWN_PLAYERS_WITH_HIM_ON_BOTH_DOWN));
                     if let Some(skill_id) = cancelling {

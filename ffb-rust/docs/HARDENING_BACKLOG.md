@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q3.9** skill-behaviour structure (bb2016 hooks). Q3.3a (card play) waits for another session's
+Next item: **Q3.10**, then Q4.x. Q3.9 code is done; its bb2016 skill sweep joins the night queue. Q3.3a (card play) waits for another session's
 uncommitted card-model work (see Q3.3a); Q3.3b (card draw) is [!] with a question for the user.
 Then Q3.6, Q2.8's stars / mercenaries / staff. Gate shape for purchases: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`.
 Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
@@ -262,9 +262,15 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   maxima/costs were wired by Q2.8 part 1; the other four are now read (see Log). Not gated: both
   harnesses leave ASK_FOR_KICK_AFTER_ROLL / ALLOW_KTM_REROLL at their default (off), and bb2016
   StepKickTeamMate is unreachable (no bb2016 parity roster has Kick Team-Mate) — unit tests only.
-- [ ] **Q3.9 Skill-behaviour structure:** bb2016 must not reuse bb2025 hooks where Java has its own
+- [~] **Q3.9 Skill-behaviour structure:** bb2016 must not reuse bb2025 hooks where Java has its own
   bb2016 behaviour (Stab, Wrestle, Animosity, Shadowing, …: `skill_behaviour/registry.rs:247-310`); port
   the per-edition Java behaviours that differ. Gate: bb2016 skill sweep.
+  **Code done** (see Log): the 11 registry entries are inert for bb2016 (no step dispatches those
+  hooks; the logic is inline per edition). Java bb2016 vs bb2025 compared for all 11: 8 already
+  follow bb2016 Java (Animosity, Blood Lust, Bombardier, Dump-Off, Shadowing, Stab, Take Root,
+  Tentacles); fixed Foul Appearance (failure branch), Wrestle (cancel check), Jump Up (entry
+  marks). nurgle/dark_elf/norse/slann bb2016 mirrors 20/20 each. **Open: the bb2016 skill sweep
+  (night).**
 - [ ] **Q3.10 Re-measure dead steps** with the heuristic agent + coverage bias; update
   `DEAD_STEP_INVENTORY.md`; every still-dead step is either driven live or documented as unreachable in
   Java too.
@@ -310,6 +316,13 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q3.9 (code) · (this commit) · bb2016 Foul Appearance failure = Java bb2016 (only
+  hasBlocked/turnStarted + goto: no PRONE revert, no END_PLAYER_ACTION, defender kept); bb2016
+  Wrestle skips the defender prompt when a blitzer cancels Wrestle (silently); bb2016 Jump Up marks
+  the skill used + hasMoved on entry for any action and rolls only for BLOCK/MULTIPLE_BLOCK. The
+  other 8 reused behaviours already follow bb2016 Java. 4 bb2016 mirrors 80/80, smoke 60/60, tests
+  green. bb2016 skill sweep queued for the night.
 
 - 2026-11-27 · Q3.8 · (this commit) · ALLOW_CONCESSIONS gates `concede_game` (Java
   AbstractStep.handleConcedeGame); ASK_FOR_KICK_AFTER_ROLL swaps bb2025's KICKOFF_SCATTER_ROLL for

@@ -96,9 +96,22 @@ impl StepJumpUp {
 
         let action = game.acting_player.player_action;
 
-        // Java: if (playerAction.isBlockAction() || playerAction == MULTIPLE_BLOCK)
-        let is_block = action.map(|a| a.is_block_action()).unwrap_or(false)
-            || action == Some(PlayerAction::MultipleBlock);
+        // Java bb2016 JumpUpBehaviour: on entry, for EVERY action, `actingPlayer.setHasMoved(true)`
+        // and `markSkillUsed(skill)`; then it rolls only for BLOCK or MULTIPLE_BLOCK (the literal
+        // actions, not isBlockAction). The mixed (bb2020/bb2025) behaviour marks and moves only
+        // inside the block branch (§Q3.9: bb2016 ran the mixed shape).
+        let bb2016 = game.rules == ffb_model::enums::Rules::Bb2016;
+        if bb2016 {
+            game.acting_player.has_moved = true;
+            mark_used(game, &player_id);
+        }
+        let is_block = if bb2016 {
+            action == Some(PlayerAction::Block) || action == Some(PlayerAction::MultipleBlock)
+        } else {
+            // Java: if (playerAction.isBlockAction() || playerAction == MULTIPLE_BLOCK)
+            action.map(|a| a.is_block_action()).unwrap_or(false)
+                || action == Some(PlayerAction::MultipleBlock)
+        };
 
         if !is_block {
             return StepOutcome::next();
@@ -260,6 +273,23 @@ mod tests {
             if GameRng::new(s).d6() == target { return s; }
         }
         panic!("no seed for d6={}", target);
+    }
+
+    /// §Q3.9 Java bb2016 JumpUpBehaviour: a standing-up Jump Up player marks the skill used and
+    /// hasMoved for ANY action (no roll for a move); the mixed (bb2025) hook leaves both alone.
+    #[test]
+    fn bb2016_marks_jump_up_used_for_a_non_block_action() {
+        for (rules, expect) in [(Rules::Bb2016, true), (Rules::Bb2025, false)] {
+            let (mut game, pid) = make_game_block_standing_up(vec![SkillId::JumpUp], 3);
+            game.rules = rules;
+            game.acting_player.player_action = Some(PlayerAction::Move);
+            let outcome = StepJumpUp::new().start(&mut game, &mut GameRng::new(0));
+            assert_eq!(outcome.action, StepAction::NextStep);
+            assert_eq!(game.acting_player.has_moved, expect, "{rules:?}");
+            let used = game.acting_player.used_skills.contains(&SkillId::JumpUp)
+                || game.player(&pid).is_some_and(|p| p.used_skills.contains(&SkillId::JumpUp));
+            assert_eq!(used, expect, "{rules:?}");
+        }
     }
 
     #[test]
