@@ -225,7 +225,10 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
     StepPlayCard CLIENT_SETUP_PLAYER (Illegal Substitution) + choice-mode split; Witch's Brew roll.
     Java card phases: START_OF_OWN_TURN, END_OF_OWN_TURN, AFTER_KICKOFF_TO_OPPONENT,
     BEFORE_KICKOFF_SCATTER, AFTER_INDUCEMENTS_PURCHASED, BEFORE_SETUP (per card in bb2016 Cards.java).
-  - [!] **Q3.3b buy/draw:** Java's draw is NOT reproducible. `CardDeck.build` adds `allCards()` in
+  - [ ] **Q3.3b buy/draw — DECIDED 2026-11-27 (user): option (b), see `docs/JAVA_DEFECTS.md` JD-003.**
+    Port the draw 1:1 over the `bb2016/Cards.java` declaration order; gate the buy step up to the
+    draw (dice, costs, card type, `cardsBought` report), not which card; card play is gated by
+    Q3.3a's fixed hands. Do after Q3.3a (same card-model files). Background: Java's draw is NOT reproducible. `CardDeck.build` adds `allCards()` in
     `HashSet<Card>` order and `Card` has no `hashCode`, so the order is JVM identity hashes:
     three fresh `bb2016.Cards` in one JVM printed three different orders
     (`scratchpad/cardorder/CardOrder.java`). `drawCard` takes index `die(deckSize) - 1` of that

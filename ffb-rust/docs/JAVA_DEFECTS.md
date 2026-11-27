@@ -156,3 +156,29 @@ the seed compares — goblin bb2025 @1.0 seed 67 ends at `i=10`, hash `71be27283
 sides. `ParityRunner.main` keeps a second catch as a backstop so an exception outside the game loop
 still cannot void the seeds queued behind it. Neither engine is patched; the crash still happens in
 stock Java on every run.
+
+---
+
+## JD-003 — the bb2016 card deck order is JVM identity-hash order, so a card draw is unreproducible
+
+| | |
+|---|---|
+| **Where** | `ffb-common/.../inducement/bb2016/Cards.java` (`allCards()` is a `HashSet<Card>`; `Card` has no `hashCode`), `ffb-server/.../CardDeck.java` (`build` adds `allCards()` in that order), `DiceRoller.drawCard` (`draw(rollDice(deckSize) - 1)`) |
+| **Surfaces as** | The same die draws a different card from run to run, and between fresh `Cards` instances in one JVM |
+| **Effect** | Java cannot replay its own card draw from its dice. Not a rules error: the rule is "a random card of the bought type", and Java does draw one — only WHICH card a die value maps to is undefined. |
+| **Found on** | §Q3.3b, 2026-11-27: three fresh `bb2016.Cards` in one JVM printed three different orders (`scratchpad/cardorder/CardOrder.java`) |
+| **Rust flag** | none — there is no Java behaviour to reproduce |
+
+### What Rust does
+
+Ports the draw 1:1 (deck per card type, minus the cards already held, die of the deck's size, index
+`die - 1`) over a fixed order: the order the cards are declared in `bb2016/Cards.java`, the only
+stable order Java's source defines. The decision (user, 2026-11-27) is not to pin the JVM's identity
+hash (`-XX:hashCode=2`): it would change every identity-hashed collection in the oracle and tie Rust
+to HashMap tree-bin internals, to reproduce an order that is not part of the rules.
+
+### What the gates check
+
+The buy step up to the draw: same dice in the same order, same costs, same card type, same
+`cardsBought` report. Which card was drawn is not compared. Card PLAY is gated on fixed hands handed
+to both teams by the harness before kick-off (§Q3.3a), so no random draw decides a play gate.
