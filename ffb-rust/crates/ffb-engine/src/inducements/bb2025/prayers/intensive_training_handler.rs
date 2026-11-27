@@ -32,6 +32,19 @@ impl PrayerHandler for IntensiveTrainingHandler {
         intensive_training_handler::init_effect(prayer_state, game, rng, team_id, &PlayerSelector::new())
     }
 
+    /// Java mixed IntensiveTrainingHandler: the chosen player's skill dialog
+    /// (DialogSelectSkillParameter, INTENSIVE_TRAINING). Without it StepPrayer had no prompt to
+    /// raise and the bb2025 game stalled at a bought prayer roll of 16 (§Q2.8).
+    fn skill_dialog(&self, game: &Game) -> Option<(String, Vec<ffb_model::enums::SkillId>)> {
+        let player_id = intensive_training_handler::chosen_player(game)?;
+        let skills = intensive_training_handler::eligible_skills(game, &player_id);
+        if skills.is_empty() { None } else { Some((player_id, skills)) }
+    }
+
+    fn apply_skill_selection(&self, prayer_state: &mut PrayerState, game: &mut Game, player_id: &str, skill_id: ffb_model::enums::SkillId) {
+        intensive_training_handler::apply_skill_selection(prayer_state, game, player_id, skill_id);
+    }
+
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, game: &mut Game, team_id: &str) {
         intensive_training_handler::remove_effect_internal(game, team_id, &PlayerSelector::new());
     }

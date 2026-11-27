@@ -29,6 +29,13 @@ impl Default for IronManHandler {
 struct IronManPlayerSelector;
 
 impl PlayerSelectorTrait for IronManPlayerSelector {
+    /// Java `IronManPlayerSelector.eligiblePlayers`: the base bb2025 eligibility, armour < 11.
+    fn eligible_players(&self, game: &Game, team_id: &str, added_skills: &[SkillId]) -> Vec<String> {
+        PlayerSelector::new().eligible_players(game, team_id, added_skills).into_iter()
+            .filter(|id| game.player(id).map_or(false, |p| p.armour < 11))
+            .collect()
+    }
+
     fn select_players(&self, game: &Game, team_id: &str, nr_of_players: i32, collections_rng: &mut JavaRandom, added_skills: &[SkillId]) -> Vec<String> {
         let team = if game.team_home.id == team_id {
             &game.team_home
@@ -71,9 +78,33 @@ impl PrayerHandler for IronManHandler {
     fn animation_type(&self) -> AnimationType { AnimationType::PRAYER_IRON_MAN }
     fn get_name(&self) -> &'static str { "IronManHandler" }
 
-    /// Java: initEffect — selects 1 RESERVE player (armour < 11) on the praying team, grants +1 AV.
-    fn init_effect(&self, prayer_state: &mut PrayerState, game: &mut Game, rng: &mut GameRng, team_id: &str) -> bool {
-        iron_man_handler::init_effect(prayer_state, game, rng, team_id, &IronManPlayerSelector)
+    /// Java: the mixed IronManHandler is a `SelectPlayerPrayerHandler` -- the coach chooses among
+    /// the eligible players (bb2025 `IronManPlayerSelector`: armour < 11) in a dialog; +1 AV comes
+    /// with `applySelection`; an empty list reports the prayer wasted (§Q2.8: this ran as a random
+    /// pick, which Java never does).
+    fn init_effect(&self, _prayer_state: &mut PrayerState, game: &mut Game, _rng: &mut GameRng, team_id: &str) -> bool {
+        let players = self.eligible_dialog_players(game, team_id);
+        let wasted = players.is_empty();
+        if wasted {
+            let display = ffb_model::inducement::bb2025::prayer::Prayer::for_enum_name(PRAYER_NAME)
+                .map(|p| p.get_name().to_string());
+            game.report_list.add(ffb_model::report::mixed::report_prayer_wasted::ReportPrayerWasted::new(display, None));
+        } else {
+            crate::inducements::mixed::prayers::select_player_prayer_handler::create_dialog(game, team_id,
+                ffb_model::model::player_choice_mode::PlayerChoiceMode::IRON_MAN, players);
+        }
+        wasted
+    }
+
+    fn dialog_choice_mode(&self) -> Option<&'static str> { Some("IRON_MAN") }
+
+    fn eligible_dialog_players(&self, game: &Game, team_id: &str) -> Vec<String> {
+        crate::inducements::mixed::prayers::select_player_prayer_handler::eligible_players_for_dialog(
+            game, team_id, &[], &IronManPlayerSelector)
+    }
+
+    fn apply_selection(&self, _prayer_state: &mut PrayerState, game: &mut Game, player_id: &str) {
+        crate::inducements::mixed::prayers::select_player_prayer_handler::apply_selection_select_player(game, player_id, PRAYER_NAME);
     }
 
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, game: &mut Game, team_id: &str) {
@@ -130,7 +161,10 @@ mod tests {
         let mut state = PrayerState::new();
         let mut game = make_game();
         add_reserve_player(&mut game, "h1", 8);
-        h.init_effect(&mut state, &mut game, &mut GameRng::new(0), "home");
+        // Java SelectPlayerPrayerHandler: initEffect opens the dialog, applySelection grants.
+        assert!(!h.init_effect(&mut state, &mut game, &mut GameRng::new(0), "home"));
+        assert_eq!(game.player("h1").unwrap().armour_with_modifiers(), 8);
+        h.apply_selection(&mut state, &mut game, "h1");
         assert_eq!(game.player("h1").unwrap().armour_with_modifiers(), 9);
         assert!(game.field_model.has_prayer_enhancement("h1", PRAYER_NAME));
     }
@@ -170,9 +204,9 @@ mod tests {
         let mut game = make_game();
         add_reserve_player(&mut game, "maxed", 11);
         add_reserve_player(&mut game, "eligible", 8);
-        h.init_effect(&mut state, &mut game, &mut GameRng::new(0), "home");
+        // The dialog offers only the armour < 11 player (Java IronManPlayerSelector).
+        assert_eq!(h.eligible_dialog_players(&game, "home"), vec!["eligible".to_string()]);
+        assert!(!h.init_effect(&mut state, &mut game, &mut GameRng::new(0), "home"));
         assert!(!game.field_model.has_prayer_enhancement("maxed", PRAYER_NAME));
-        assert!(game.field_model.has_prayer_enhancement("eligible", PRAYER_NAME));
-        assert_eq!(game.player("eligible").unwrap().armour_with_modifiers(), 9);
     }
 }

@@ -7,6 +7,7 @@ use ffb_model::util::rng::GameRng;
 use crate::inducements::bb2025::prayers::player_selector::PlayerSelector;
 use crate::inducements::mixed::prayers::knuckle_dusters_handler::{self, PRAYER_NAME};
 use crate::inducements::mixed::prayers::prayer_handler::PrayerHandler;
+use crate::inducements::mixed::prayers::select_player_prayer_handler as select_player_base;
 use crate::prayer_state::PrayerState;
 
 pub struct KnuckleDustersHandler;
@@ -24,9 +25,32 @@ impl PrayerHandler for KnuckleDustersHandler {
     fn animation_type(&self) -> AnimationType { AnimationType::PRAYER_KNUCKLE_DUSTERS }
     fn get_name(&self) -> &'static str { "KnuckleDustersHandler" }
 
-    /// Java: initEffect — selects 1 RESERVE player on the praying team, grants MightyBlow.
-    fn init_effect(&self, prayer_state: &mut PrayerState, game: &mut Game, rng: &mut GameRng, team_id: &str) -> bool {
-        knuckle_dusters_handler::init_effect(prayer_state, game, rng, team_id, &PlayerSelector::new())
+    /// Java: the mixed KnuckleDustersHandler is a `SelectPlayerPrayerHandler` -- `DialogPrayerHandler
+    /// .initEffect` reports the prayer wasted when nobody is eligible, otherwise shows the
+    /// player-choice dialog and waits; Mighty Blow comes with `applySelection` (§Q2.8: this ran
+    /// as a random pick, which Java never does).
+    fn init_effect(&self, _prayer_state: &mut PrayerState, game: &mut Game, _rng: &mut GameRng, team_id: &str) -> bool {
+        let players = self.eligible_dialog_players(game, team_id);
+        let wasted = players.is_empty();
+        if wasted {
+            let display = ffb_model::inducement::bb2025::prayer::Prayer::for_enum_name(PRAYER_NAME)
+                .map(|p| p.get_name().to_string());
+            game.report_list.add(ffb_model::report::mixed::report_prayer_wasted::ReportPrayerWasted::new(display, None));
+        } else {
+            select_player_base::create_dialog(game, team_id,
+                ffb_model::model::player_choice_mode::PlayerChoiceMode::KNUCKLE_DUSTERS, players);
+        }
+        wasted
+    }
+
+    fn dialog_choice_mode(&self) -> Option<&'static str> { Some("KNUCKLE_DUSTERS") }
+
+    fn eligible_dialog_players(&self, game: &Game, team_id: &str) -> Vec<String> {
+        select_player_base::eligible_players_for_dialog(game, team_id, &[ffb_model::enums::SkillId::MightyBlow], &PlayerSelector::new())
+    }
+
+    fn apply_selection(&self, _prayer_state: &mut PrayerState, game: &mut Game, player_id: &str) {
+        select_player_base::apply_selection_select_player(game, player_id, PRAYER_NAME);
     }
 
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, game: &mut Game, team_id: &str) {
@@ -83,7 +107,10 @@ mod tests {
         let mut state = PrayerState::new();
         let mut game = make_game();
         add_reserve_player(&mut game, "h1");
-        h.init_effect(&mut state, &mut game, &mut GameRng::new(0), "home");
+        // Java SelectPlayerPrayerHandler: initEffect opens the dialog, applySelection grants.
+        assert!(!h.init_effect(&mut state, &mut game, &mut GameRng::new(0), "home"));
+        assert!(!game.player("h1").unwrap().has_skill(SkillId::MightyBlow));
+        h.apply_selection(&mut state, &mut game, "h1");
         assert!(game.player("h1").unwrap().has_skill(SkillId::MightyBlow));
         assert!(game.field_model.has_prayer_enhancement("h1", PRAYER_NAME));
     }

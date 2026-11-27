@@ -1145,7 +1145,11 @@ pub fn make_team_from_file(roster_name: &str, side: &str, edition: &str) -> Resu
 
     Ok(Team {
         id: format!("{side}_{}", roster_json.id),
-        name: format!("{} {}", side, roster_json.name),
+        // The Java twin's name (gen_java_parity_data.py: `<roster name> Parity<25|20|16> <Side>`):
+        // bb2025's ReportPrayerRoll carries the team NAME (§Q2.8).
+        name: format!("{} Parity{} {}", roster_json.name,
+            match edition { "bb2016" => "16", "bb2020" => "20", _ => "25" },
+            if side == "home" { "Home" } else { "Away" }),
         race: roster_json.name.clone(),
         roster_id: roster_json.id.clone(),
         coach: format!("Coach_{side}"),

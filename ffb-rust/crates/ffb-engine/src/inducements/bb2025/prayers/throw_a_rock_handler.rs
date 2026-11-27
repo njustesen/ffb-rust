@@ -22,8 +22,25 @@ impl PrayerHandler for ThrowARockHandler {
     fn handled_prayer_name(&self) -> &'static str { "THROW_A_ROCK" }
     fn animation_type(&self) -> AnimationType { AnimationType::PRAYER_THROW_A_ROCK }
     fn get_name(&self) -> &'static str { "ThrowARockHandler" }
-    fn init_effect(&self, _prayer_state: &mut PrayerState, _game: &mut Game, _rng: &mut GameRng, _team_id: &str) -> bool {
-        // no-op: InducementSet lookup not ported — headless skips THROW_ROCK inducement registration (prayers not bought without InducementTypeFactory)
+    /// Java: the first InducementTypeFactory type with Usage.THROW_ROCK (`throwARock`): +1 value
+    /// if the praying team's turn InducementSet already has it, else a new Inducement(type, 1).
+    /// (§Q2.8: this was a no-op, so a Throw a Rock prayer granted nothing.)
+    fn init_effect(&self, _prayer_state: &mut PrayerState, game: &mut Game, _rng: &mut GameRng, team_id: &str) -> bool {
+        use ffb_model::inducement::usage::Usage;
+        let Some(rock) = ffb_model::factory::inducement_type_factory::all_types_in(game.rules)
+            .into_iter().find(|t| t.usages.contains(&Usage::THROW_ROCK)) else { return true };
+        let set = if game.team_home.id == team_id {
+            &mut game.turn_data_home.inducement_set
+        } else {
+            &mut game.turn_data_away.inducement_set
+        };
+        match set.get(&rock.id) {
+            Some(mut existing) => {
+                existing.value += 1;
+                set.add_inducement(existing);
+            }
+            None => set.add_inducement(ffb_model::inducement::inducement::Inducement::new(rock.id.clone(), 1, rock.usages.clone())),
+        }
         true
     }
     fn remove_effect_internal(&self, _prayer_state: &mut PrayerState, _game: &mut Game, _team_id: &str) {
