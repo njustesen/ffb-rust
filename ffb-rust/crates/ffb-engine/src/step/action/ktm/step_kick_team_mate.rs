@@ -1,24 +1,32 @@
-/// 1:1 translation of com.fumbbl.ffb.server.step.action.ktm.StepKickTeamMate (COMMON).
+/// 1:1 translation of com.fumbbl.ffb.server.step.action.ktm.StepKickTeamMate (COMMON; only the
+/// bb2016 KickTeamMate sequence uses it).
 ///
-/// Rolls dice for the kick-team-mate action, determines success/failure, and initiates the
-/// scatter sequence on success.
+/// Rolls dice for the kick-team-mate action, determines success/failure, offers the
+/// KICK_TEAM_MATE re-roll when ALLOW_KTM_REROLL is on, and pushes the ScatterPlayer sequence on
+/// success.
 ///
 /// Mandatory init param: GOTO_LABEL_ON_FAILURE.
 /// Expected preceding params: KICKED_PLAYER_ID, KICKED_PLAYER_STATE, KICKED_PLAYER_HAS_BALL,
 /// NR_OF_DICE.
 ///
-/// Stub: AbstractStepWithReRoll is not yet fully translated — reroll is always skipped.
-/// Stub: Scatter-player sequence push is omitted pending StepKind integration.
-use ffb_model::enums::PlayerAction;
+/// §Q3.8: the re-roll (and the option that enables it) and the ScatterPlayer push were stubs;
+/// a successful kick published IS_KICKED_PLAYER but never flew the player anywhere.
+use ffb_model::enums::{PlayerState, ReRollSource};
 use ffb_model::model::game::Game;
 use ffb_model::model::kick_team_mate_range::KickTeamMateRange;
-use ffb_model::enums::PlayerState;
+use ffb_model::model::property::named_properties::NamedProperties;
+use ffb_model::model::re_rolled_action::ReRolledAction;
 use ffb_model::types::FieldCoordinate;
 use ffb_model::util::rng::GameRng;
 use ffb_model::report::bb2016::report_kick_team_mate_roll::ReportKickTeamMateRoll;
 use crate::action::Action;
+use crate::step::abstract_step_with_re_roll::ReRollState;
 use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
+use crate::step::generator::bb2016::scatter_player::{ScatterPlayer, ScatterPlayerParams};
+use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+
+const KICK_TEAM_MATE: &str = "KICK_TEAM_MATE";
 
 pub struct StepKickTeamMate {
     /// Java: fGotoLabelOnFailure — mandatory.
@@ -35,6 +43,8 @@ pub struct StepKickTeamMate {
     pub distance: i32,
     /// Java: fRolls — individual dice values.
     pub rolls: Vec<i32>,
+    /// Java: AbstractStepWithReRoll fields.
+    pub re_roll_state: ReRollState,
 }
 
 impl StepKickTeamMate {
@@ -47,6 +57,7 @@ impl StepKickTeamMate {
             num_dice: 0,
             distance: 0,
             rolls: Vec::new(),
+            re_roll_state: ReRollState::new(),
         }
     }
 }
@@ -58,9 +69,11 @@ impl Step for StepKickTeamMate {
         self.execute_step(game, rng)
     }
 
-    fn handle_command(&mut self, _action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java: AbstractStepWithReRoll.handleCommand processes reroll dialogs.
-        // Random agent always declines → execute_step is called directly.
+    fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
+        // Java AbstractStepWithReRoll CLIENT_USE_RE_ROLL: a declined offer carries no source.
+        if let Action::UseReRoll { use_reroll: false } = action {
+            self.re_roll_state.re_roll_source = None;
+        }
         self.execute_step(game, rng)
     }
 
@@ -82,6 +95,10 @@ impl Step for StepKickTeamMate {
 }
 
 impl StepKickTeamMate {
+    fn re_rolled_ktm(&self) -> bool {
+        self.re_roll_state.re_rolled_action.as_ref().is_some_and(|a| a.name == KICK_TEAM_MATE)
+    }
+
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         // Java: actingPlayer.setHasBlocked(true); game.setConcessionPossible(false); turnData.setBlitzUsed(true)
         game.acting_player.has_blocked = true;
@@ -90,84 +107,111 @@ impl StepKickTeamMate {
         // Java: UtilServerDialog.hideDialog(getGameState())
         crate::util::util_server_dialog::UtilServerDialog::hide_dialog(game);
 
-        let kicker_id = match game.acting_player.player_id.clone() {
-            Some(id) => id,
-            None => return StepOutcome::goto(&self.goto_label_on_failure),
+        let Some(kicker_id) = game.acting_player.player_id.clone() else {
+            return StepOutcome::goto(&self.goto_label_on_failure);
         };
-        let kicked_id = match self.kicked_player_id.clone() {
-            Some(id) => id,
-            None => return StepOutcome::goto(&self.goto_label_on_failure),
-        };
+        let kicker_coord = game.field_model.player_coordinate(&kicker_id);
 
-        let kicker_coord = match game.field_model.player_coordinate(&kicker_id) {
-            Some(c) => c,
-            None => return StepOutcome::goto(&self.goto_label_on_failure),
+        // Java: if (KICK_TEAM_MATE == getReRolledAction()) { if (source == null || !useReRoll(...))
+        //   { successful = fNumDice == 1 || fRolls[0] != fRolls[1]; executeKick(...); doRoll = false } }
+        if self.re_rolled_ktm() {
+            let used = match self.re_roll_state.re_roll_source.clone() {
+                Some(source) => use_reroll(game, &source, &kicker_id, rng),
+                None => false,
+            };
+            if !used {
+                let successful = self.num_dice.max(1) == 1 || self.rolls.get(0) != self.rolls.get(1);
+                return self.execute_kick(game, kicker_coord, successful);
+            }
+        }
+
+        let Some(kicked_id) = self.kicked_player_id.clone() else {
+            return StepOutcome::goto(&self.goto_label_on_failure);
         };
-        let kicked_coord = match game.field_model.player_coordinate(&kicked_id) {
-            Some(c) => c,
-            None => return StepOutcome::goto(&self.goto_label_on_failure),
+        let (Some(kicker_coord), Some(kicked_coord)) = (kicker_coord, game.field_model.player_coordinate(&kicked_id)) else {
+            return StepOutcome::goto(&self.goto_label_on_failure);
         };
 
         // Java: Direction d = kickerCoordinate.getDirection(kickedPlayerCoordinate)
         let direction = kicker_coord.direction_to(kicked_coord);
 
-        // Java: roll fNumDice d6 dice (rollSkill = d6 in range 1-6)
-        let num_dice = self.num_dice.max(1) as usize;
+        // Java: fRolls = new int[fNumDice]; each rollSkill(). (Java throws on 0 dice; Rust has
+        // always rolled at least one, which StepInitKickTeamMate guarantees anyway.)
+        let num_dice = self.num_dice.max(1);
         self.rolls = (0..num_dice).map(|_| rng.d6()).collect();
 
-        // Java: successful = (numDice == 1) || (rolls[0] != rolls[1])
+        // Java: successful = (fNumDice == 1) || (rolls[0] != rolls[1])
         let successful = num_dice == 1 || self.rolls[0] != self.rolls[1];
 
         // Java: fDistance = rolls[0] + (numDice > 1 ? rolls[1] : 0)
         self.distance = self.rolls[0] + if num_dice > 1 { self.rolls[1] } else { 0 };
 
-        // Java: targetCoordinate = kickedPlayerCoordinate.move(d, distance)
+        // Java: targetCoordinate = kickedPlayerCoordinate.move(d, distance); setPassCoordinate
         if let Some(dir) = direction {
-            let target = kicked_coord.step(dir, self.distance);
-            game.pass_coordinate = Some(target);
+            game.pass_coordinate = Some(kicked_coord.step(dir, self.distance));
         }
 
-        // Java: getResult().addReport(new ReportKickTeamMateRoll(kicker.getId(), kickedPlayer.getId(), successful, fRolls, reRolled, fDistance))
-        // reRolled is always false here (reroll stub not yet ported).
+        // Java: reRolled = (getReRolledAction() == KICK_TEAM_MATE) && (getReRollSource() != null)
+        let re_rolled = self.re_rolled_ktm() && self.re_roll_state.re_roll_source.is_some();
         game.report_list.add(ReportKickTeamMateRoll::new(
             kicker_id.clone(),
             kicked_id.clone(),
             successful,
             self.rolls.clone(),
-            false,
+            re_rolled,
             self.distance,
         ));
 
-        self.execute_kick(game, kicked_coord, kicker_coord, successful)
+        // Java: if (ALLOW_KTM_REROLL && getReRolledAction() != KICK_TEAM_MATE) {
+        //   setReRolledAction(KICK_TEAM_MATE);
+        //   if (!askForReRollIfAvailable(..., KICK_TEAM_MATE, 0, false)) act = true;
+        // } else act = true;
+        let allow_ktm_reroll = ffb_model::option::util_game_option::is_option_enabled(
+            game, ffb_model::option::game_option_id::ALLOW_KTM_REROLL);
+        if allow_ktm_reroll && !self.re_rolled_ktm() {
+            self.re_roll_state.re_rolled_action = Some(ReRolledAction::new(KICK_TEAM_MATE));
+            if let Some(prompt) = ask_for_reroll_if_available(game, KICK_TEAM_MATE, 0, false) {
+                self.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
+                return StepOutcome::cont().with_prompt(prompt);
+            }
+        }
+        self.execute_kick(game, Some(kicker_coord), successful)
     }
 
-    fn execute_kick(&self, game: &mut Game, _kicked_coord: FieldCoordinate, _kicker_coord: FieldCoordinate, successful: bool) -> StepOutcome {
-        if successful {
-            // Java: set kicked player state to PICKED_UP base
-            if let Some(ref kicked_id) = self.kicked_player_id {
-                if let Some(state) = self.kicked_player_state {
-                    let picked_up = state.change_base(ffb_model::enums::PS_PICKED_UP);
-                    game.field_model.set_player_state(kicked_id, picked_up);
-                }
-            }
-
-            // Java: pushSequence(ScatterPlayer) — stub: sequence push omitted pending StepKind integration.
-            // Java: publishParameter(IS_KICKED_PLAYER, true)
-            let mut outcome = StepOutcome::next()
-                .publish(StepParameter::IsKickedPlayer(true));
-
-            // Java: if distance >= 9 → KTM_MODIFIER = LONG; else if distance >= 6 → MEDIUM
-            if self.distance >= 9 {
-                outcome = outcome.publish(StepParameter::KtmModifier(KickTeamMateRange::LONG));
-            } else if self.distance >= 6 {
-                outcome = outcome.publish(StepParameter::KtmModifier(KickTeamMateRange::MEDIUM));
-            }
-
-            outcome
-        } else {
+    /// Java `executeKick(kickedPlayer, kickerCoordinate, successful)`.
+    fn execute_kick(&self, game: &mut Game, kicker_coord: Option<FieldCoordinate>, successful: bool) -> StepOutcome {
+        if !successful {
             // Java: getResult().setNextAction(GOTO_LABEL, fGotoLabelOnFailure)
-            StepOutcome::goto(&self.goto_label_on_failure)
+            return StepOutcome::goto(&self.goto_label_on_failure);
         }
+        // Java: hasSwoop = kickedPlayer != null && kickedPlayer.hasSkillProperty(ttmScattersInSingleDirection)
+        let has_swoop = self.kicked_player_id.as_deref()
+            .and_then(|id| game.player(id))
+            .is_some_and(|p| p.has_skill_property(NamedProperties::TTM_SCATTERS_IN_SINGLE_DIRECTION));
+        // Java: game.getFieldModel().setPlayerState(game.getDefender(), fKickedPlayerState.changeBase(PICKED_UP))
+        if let (Some(defender_id), Some(state)) = (game.defender_id.clone(), self.kicked_player_state) {
+            game.field_model.set_player_state(&defender_id, state.change_base(ffb_model::enums::PS_PICKED_UP));
+        }
+        // Java: ScatterPlayer.pushSequence(new SequenceParams(gameState, fKickedPlayerId, fKickedPlayerState,
+        //   fKickedPlayerHasBall, kickerCoordinate, hasSwoop, true))
+        let seq = ScatterPlayer::build_sequence(&ScatterPlayerParams {
+            thrown_player_id: self.kicked_player_id.clone(),
+            thrown_player_state: self.kicked_player_state,
+            thrown_player_has_ball: self.kicked_player_has_ball,
+            thrown_player_coordinate: kicker_coord,
+            throw_scatter: true,
+            has_swoop,
+        });
+        // Java: publishParameter(IS_KICKED_PLAYER, true); KTM_MODIFIER LONG (>= 9) / MEDIUM (>= 6)
+        let mut outcome = StepOutcome::next()
+            .push_seq(seq)
+            .publish(StepParameter::IsKickedPlayer(true));
+        if self.distance >= 9 {
+            outcome = outcome.publish(StepParameter::KtmModifier(KickTeamMateRange::LONG));
+        } else if self.distance >= 6 {
+            outcome = outcome.publish(StepParameter::KtmModifier(KickTeamMateRange::MEDIUM));
+        }
+        outcome
     }
 }
 
@@ -237,9 +281,8 @@ mod tests {
         // Force rolls to produce a double by pre-setting rolls (simulated).
         // We can't force the RNG, but we can test the logic:
         // call execute_kick directly with successful=false.
-        let coord = FieldCoordinate::new(9, 5);
         let kicker = FieldCoordinate::new(8, 5);
-        let out = step.execute_kick(&mut game, coord, kicker, false);
+        let out = step.execute_kick(&mut game, Some(kicker), false);
         assert_eq!(out.action, StepAction::GotoLabel);
         assert_eq!(out.goto_label.as_deref(), Some("fail"));
     }
@@ -261,8 +304,7 @@ mod tests {
         let mut step = make_step(&kicked_id);
         step.distance = 9;
         let kicker = FieldCoordinate::new(8, 5);
-        let coord = FieldCoordinate::new(9, 5);
-        let out = step.execute_kick(&mut game, coord, kicker, true);
+        let out = step.execute_kick(&mut game, Some(kicker), true);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::KtmModifier(KickTeamMateRange::LONG))));
     }
 
@@ -272,8 +314,7 @@ mod tests {
         let mut step = make_step(&kicked_id);
         step.distance = 6;
         let kicker = FieldCoordinate::new(8, 5);
-        let coord = FieldCoordinate::new(9, 5);
-        let out = step.execute_kick(&mut game, coord, kicker, true);
+        let out = step.execute_kick(&mut game, Some(kicker), true);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::KtmModifier(KickTeamMateRange::MEDIUM))));
     }
 
@@ -283,8 +324,7 @@ mod tests {
         let mut step = make_step(&kicked_id);
         step.distance = 3;
         let kicker = FieldCoordinate::new(8, 5);
-        let coord = FieldCoordinate::new(9, 5);
-        let out = step.execute_kick(&mut game, coord, kicker, true);
+        let out = step.execute_kick(&mut game, Some(kicker), true);
         assert!(!out.published.iter().any(|p| matches!(p, StepParameter::KtmModifier(_))));
     }
 
@@ -305,6 +345,40 @@ mod tests {
         step.num_dice = 1;
         step.start(&mut game, &mut GameRng::new(42));
         assert!(game.report_list.has_report(ReportId::KICK_TEAM_MATE_ROLL));
+    }
+
+    /// §Q3.8 Java executeKick: a successful kick pushes the (bb2016) ScatterPlayer sequence from
+    /// the KICKER's square, and the kicked player goes PICKED_UP via `game.getDefender()`.
+    #[test]
+    fn successful_kick_pushes_scatter_player_from_the_kicker() {
+        let (mut game, _, kicked_id) = make_game_with_players();
+        game.defender_id = Some(kicked_id.clone());
+        let step = make_step(&kicked_id);
+        let out = step.execute_kick(&mut game, Some(FieldCoordinate::new(8, 5)), true);
+        let first = out.pushes.first().and_then(|s| s.first()).expect("a ScatterPlayer sequence");
+        assert_eq!(first.step_id, StepId::InitScatterPlayer);
+        assert!(first.params.iter().any(|p| matches!(p,
+            StepParameter::ThrownPlayerCoordinate(Some(c)) if *c == FieldCoordinate::new(8, 5))));
+        assert_eq!(game.field_model.player_state(&kicked_id).map(|s| s.base()), Some(ffb_model::enums::PS_PICKED_UP));
+    }
+
+    /// §Q3.8 Java: with ALLOW_KTM_REROLL (default off) the roll is followed by a KICK_TEAM_MATE
+    /// re-roll offer when one is available; without it the kick resolves at once.
+    #[test]
+    fn allow_ktm_reroll_offers_a_re_roll() {
+        for enabled in [false, true] {
+            let (mut game, kicker_id, kicked_id) = make_game_with_players();
+            // Java isTeamReRollAvailable: the kicker is on the acting team.
+            game.team_home.players.push(ffb_model::model::player::Player { id: kicker_id, ..Default::default() });
+            game.turn_data_home.rerolls = 1;
+            if enabled {
+                game.options.set(ffb_model::option::game_option_id::ALLOW_KTM_REROLL, "true");
+            }
+            let mut step = make_step(&kicked_id);
+            let out = step.start(&mut game, &mut GameRng::new(42));
+            assert_eq!(out.prompt.is_some(), enabled, "enabled={enabled}");
+            assert_eq!(out.action == StepAction::NextStep, !enabled, "enabled={enabled}");
+        }
     }
 
     #[test]

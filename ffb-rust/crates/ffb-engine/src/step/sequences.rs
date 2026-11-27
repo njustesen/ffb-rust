@@ -3,6 +3,21 @@
 use ffb_model::enums::{ApothecaryMode, InducementPhase};
 use super::framework::{StepId, SequenceStep, StepParameter};
 
+/// Java bb2025 `Kickoff.pushSequence`: `isOptionEnabled(ASK_FOR_KICK_AFTER_ROLL)` ?
+/// KICKOFF_SCATTER_ROLL_ASK_AFTER : KICKOFF_SCATTER_ROLL (only the bb2025 generator reads the
+/// option; §Q3.8 it was never read). Applied to the hand-built kickoff sequences below wherever a
+/// bb2025 game pushes one.
+pub fn apply_ask_for_kick_after_roll(seq: &mut [SequenceStep], game: &ffb_model::model::game::Game) {
+    if game.rules == ffb_model::enums::Rules::Bb2025
+        && ffb_model::option::util_game_option::is_option_enabled(
+            game, ffb_model::option::game_option_id::ASK_FOR_KICK_AFTER_ROLL)
+    {
+        for step in seq.iter_mut().filter(|s| s.step_id == StepId::KickoffScatterRoll) {
+            step.step_id = StepId::KickoffScatterRollAskAfter;
+        }
+    }
+}
+
 pub fn start_game_sequence() -> Vec<SequenceStep> {
     start_game_sequence_for(ffb_model::enums::Rules::Bb2025)
 }
@@ -417,6 +432,28 @@ pub fn select_sequence() -> Vec<SequenceStep> {
 
 #[cfg(test)]
 mod tests {
+
+    /// §Q3.8 Java bb2025 Kickoff: ASK_FOR_KICK_AFTER_ROLL swaps the scatter step for its
+    /// ask-after twin; other editions (whose generators never read the option) keep theirs.
+    #[test]
+    fn ask_for_kick_after_roll_swaps_the_bb2025_scatter_step() {
+        use super::*;
+        use ffb_model::enums::Rules;
+        use ffb_model::model::{game::Game, team::Team};
+        for (rules, enabled, expect_ask_after) in [
+            (Rules::Bb2025, false, false), (Rules::Bb2025, true, true), (Rules::Bb2020, true, false),
+        ] {
+            let mut game = Game::new(Team::default(), Team::default(), rules);
+            if enabled {
+                game.options.set(ffb_model::option::game_option_id::ASK_FOR_KICK_AFTER_ROLL, "true");
+            }
+            let mut seq = h2_kickoff_sequence_for(rules);
+            apply_ask_for_kick_after_roll(&mut seq, &game);
+            let has = |id: StepId| seq.iter().any(|s| s.step_id == id);
+            assert_eq!(has(StepId::KickoffScatterRollAskAfter), expect_ask_after, "{rules:?} {enabled}");
+            assert_eq!(has(StepId::KickoffScatterRoll), !expect_ask_after, "{rules:?} {enabled}");
+        }
+    }
 
     /// Java `generator/mixed/Kickoff.java:45-46` places APOTHECARY(HOME) and APOTHECARY(AWAY)
     /// immediately after APPLY_KICKOFF_RESULT. They consume and APPLY the INJURY_RESULT a kickoff

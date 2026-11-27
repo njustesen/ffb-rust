@@ -410,7 +410,8 @@ impl StepBuyInducements {
         // Java: `Kickoff.pushSequence(new Kickoff.SequenceParams(gameState, true))` — the
         // game-opening kickoff with the coin toss, in the certified form (see
         // `sequences::opening_kickoff_sequence_for`).
-        let seq_kickoff = crate::step::sequences::opening_kickoff_sequence_for(game.rules);
+        let mut seq_kickoff = crate::step::sequences::opening_kickoff_sequence_for(game.rules);
+        crate::step::sequences::apply_ask_for_kick_after_roll(&mut seq_kickoff, game);
         let (first_home, second_home) = if new_tv_home > new_tv_away { (true, false) } else { (false, true) };
         let seq_first = Inducement::build_sequence(&InducementParams {
             inducement_phase: InducementPhase::AfterInducementsPurchased,

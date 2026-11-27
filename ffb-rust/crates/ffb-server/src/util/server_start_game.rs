@@ -258,11 +258,17 @@ pub async fn start_game(
     session_manager: &Mutex<SessionManager>,
     db: &DbConnectionManager,
     fumbbl_mode: bool,
-    check_ownership: bool,
     marker_ctx: Option<MarkerContext<'_>>,
 ) -> bool {
     let game_id = game_state.get_id();
 
+    // Java: `UtilGameOption.isOptionEnabled(game, CHECK_OWNERSHIP)` (default true). §Q3.8: this
+    // was a caller-supplied `true`, so a game that switched the option off still checked.
+    let check_ownership = match game_state.get_game() {
+        Some(g) => ffb_model::option::util_game_option::is_option_enabled(
+            g, ffb_model::option::game_option_id::CHECK_OWNERSHIP),
+        None => return false,
+    };
     let (home_coach, away_coach, is_testing, waiting_for_opponent, is_paused, home_team_id, away_team_id) = {
         let game = match game_state.get_game() {
             Some(g) => g,
@@ -556,7 +562,7 @@ mod tests {
         let mut gs = GameState::new(1);
         let (sm, _rx) = setup_session_manager();
         let db = DbConnectionManager::new();
-        let started = start_game(&mut gs, false, &sm, &db, false, true, None).await;
+        let started = start_game(&mut gs, false, &sm, &db, false, None).await;
         assert!(!started);
     }
 
@@ -571,8 +577,23 @@ mod tests {
             let (tx, _rx2) = mpsc::unbounded_channel();
             sm.lock().unwrap().add_session(1, 1, "Impostor".into(), ClientMode::PLAYER, true, vec![], tx);
         }
-        let started = start_game(&mut gs, false, &sm, &db, false, true, None).await;
+        let started = start_game(&mut gs, false, &sm, &db, false, None).await;
         assert!(!started);
+    }
+
+    /// §Q3.8 Java: CHECK_OWNERSHIP switched off skips the check, as `testing` does.
+    #[tokio::test]
+    async fn start_game_skips_ownership_check_when_the_option_is_off() {
+        let mut gs = GameState::new(1);
+        gs.start_game(team("home", "RealHome"), team("away", "RealAway"), Rules::Bb2025, 0);
+        if let Some(game) = gs.get_game_mut() {
+            game.options.set(ffb_model::option::game_option_id::CHECK_OWNERSHIP, "false");
+        }
+        let sm = Mutex::new(SessionManager::new());
+        let db = DbConnectionManager::new();
+        let (tx, _rx) = mpsc::unbounded_channel();
+        sm.lock().unwrap().add_session(1, 1, "Impostor".into(), ClientMode::PLAYER, true, vec![], tx);
+        assert!(start_game(&mut gs, false, &sm, &db, false, None).await);
     }
 
     #[tokio::test]
@@ -587,7 +608,7 @@ mod tests {
         let (tx, mut rx) = mpsc::unbounded_channel();
         sm.lock().unwrap().add_session(1, 1, "Impostor".into(), ClientMode::PLAYER, true, vec![], tx);
 
-        let started = start_game(&mut gs, false, &sm, &db, false, true, None).await;
+        let started = start_game(&mut gs, false, &sm, &db, false, None).await;
         assert!(started);
         let msg = rx.try_recv().expect("expected a ServerCommandGameState broadcast");
         assert!(msg.contains("serverGameState"));
@@ -604,7 +625,7 @@ mod tests {
         let (sm, mut rx) = setup_session_manager();
         let db = DbConnectionManager::new();
 
-        let started = start_game(&mut gs, false, &sm, &db, false, true, None).await;
+        let started = start_game(&mut gs, false, &sm, &db, false, None).await;
         assert!(started);
         assert_eq!(gs.get_game().unwrap().status, GameStatus::Active);
         let _ = rx.try_recv();
@@ -620,7 +641,7 @@ mod tests {
         let (sm, mut rx) = setup_session_manager();
         let db = DbConnectionManager::new();
 
-        let started = start_game(&mut gs, true, &sm, &db, false, true, None).await;
+        let started = start_game(&mut gs, true, &sm, &db, false, None).await;
         assert!(started);
         let _ = rx.try_recv();
     }

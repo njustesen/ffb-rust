@@ -859,7 +859,9 @@ impl DriverGameState {
         // Corruption argue re-roll). Done before the start sequence runs so the inducement is
         // present for the whole game, exactly as in Java.
         crate::step::bb2025::start::step_buy_inducements::grant_special_rule_inducements(&mut gs.game);
-        gs.stack.push_sequence(start_game_sequence_for(rules));
+        let mut start_seq = start_game_sequence_for(rules);
+        crate::step::sequences::apply_ask_for_kick_after_roll(&mut start_seq, &gs.game);
+        gs.stack.push_sequence(start_seq);
         gs.run_until_prompt();
         // `start_game_sequence()` begins with `StepInitStartGame`, which (matching Java's
         // `StepInitStartGame`) only proceeds once BOTH coaches have sent `CLIENT_START_GAME`
@@ -1301,6 +1303,13 @@ impl DriverGameState {
     pub fn concede_game(&mut self, status: ffb_model::model::ConcedeGameStatus, home_command: bool) -> bool {
         use ffb_model::model::ConcedeGameStatus;
         use crate::util::util_server_dialog::UtilServerDialog;
+        // Java AbstractStep.handleConcedeGame: nothing happens unless ALLOW_CONCESSIONS (default
+        // true) is enabled (§Q3.8: the option was never read).
+        if !ffb_model::option::util_game_option::is_option_enabled(
+            &self.game, ffb_model::option::game_option_id::ALLOW_CONCESSIONS)
+        {
+            return false;
+        }
         let game = &mut self.game;
         match status {
             ConcedeGameStatus::REQUESTED => {
@@ -1672,6 +1681,17 @@ mod tests {
     /// first DEFENDER StepApothecary has passed regeneration and reported, the second one (the
     /// enclosing inducement window's) sees that, not a fresh copy. A different result (`new`)
     /// is left alone.
+    /// §Q3.8 Java AbstractStep.handleConcedeGame: with ALLOW_CONCESSIONS off, a confirmed
+    /// concession does nothing.
+    #[test]
+    fn concessions_disabled_ignores_a_confirmed_concession() {
+        let mut gs = new_game(1);
+        gs.game.options.set(ffb_model::option::game_option_id::ALLOW_CONCESSIONS, "false");
+        let home = gs.game.home_playing;
+        assert!(!gs.concede_game(ffb_model::model::ConcedeGameStatus::CONFIRMED, home));
+        assert!(!gs.game.game_result.home.conceded && !gs.game.game_result.away.conceded);
+    }
+
     #[test]
     fn sync_injury_result_updates_holders_of_the_same_result_only() {
         use crate::injury::InjuryResult;

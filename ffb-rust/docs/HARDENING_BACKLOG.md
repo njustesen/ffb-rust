@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q3.8** game options Java reads but Rust ignores. Q3.3a (card play) waits for another session's
+Next item: **Q3.9** skill-behaviour structure (bb2016 hooks). Q3.3a (card play) waits for another session's
 uncommitted card-model work (see Q3.3a); Q3.3b (card draw) is [!] with a question for the user.
 Then Q3.6, Q2.8's stars / mercenaries / staff. Gate shape for purchases: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`.
 Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
@@ -256,8 +256,12 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   (Java null for every parity roster); isValidMove in ffb-server; Swoop's BlitzTurnState change and
   the GUI's CLIENT_SWOOP decode. Stale (already live): stalling pathfinder + rock hit, Swoop hooks.
   Dead twin, comment only: the mechanics `armour_is_broken` (live path sums the modifiers).
-- [ ] **Q3.8 Game options Java reads but Rust ignores:** ASK_FOR_KICK_AFTER_ROLL, ALLOW_KTM_REROLL,
-  ALLOW_CONCESSIONS, CHECK_OWNERSHIP, the 8 INDUCEMENT_*_MAX, INDUCEMENT_IGORS_COST.
+- [x] **Q3.8 Game options Java reads but Rust ignores:** ASK_FOR_KICK_AFTER_ROLL, ALLOW_KTM_REROLL,
+  ALLOW_CONCESSIONS, CHECK_OWNERSHIP, the 8 INDUCEMENT_*_MAX, INDUCEMENT_IGORS_COST. Re-measured
+  (`scratchpad/opt_read.py`: Java `GameOptionId.X` reads vs any Rust mention): the inducement
+  maxima/costs were wired by Q2.8 part 1; the other four are now read (see Log). Not gated: both
+  harnesses leave ASK_FOR_KICK_AFTER_ROLL / ALLOW_KTM_REROLL at their default (off), and bb2016
+  StepKickTeamMate is unreachable (no bb2016 parity roster has Kick Team-Mate) — unit tests only.
 - [ ] **Q3.9 Skill-behaviour structure:** bb2016 must not reuse bb2025 hooks where Java has its own
   bb2016 behaviour (Stab, Wrestle, Animosity, Shadowing, …: `skill_behaviour/registry.rs:247-310`); port
   the per-edition Java behaviours that differ. Gate: bb2016 skill sweep.
@@ -306,6 +310,14 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q3.8 · (this commit) · ALLOW_CONCESSIONS gates `concede_game` (Java
+  AbstractStep.handleConcedeGame); ASK_FOR_KICK_AFTER_ROLL swaps bb2025's KICKOFF_SCATTER_ROLL for
+  the ask-after step in every bb2025 kickoff push (`sequences::apply_ask_for_kick_after_roll`);
+  CHECK_OWNERSHIP read from the game in ffb-server `start_game` (was a hard-coded `true` argument);
+  ALLOW_KTM_REROLL in a full port of bb2016 StepKickTeamMate (KICK_TEAM_MATE re-roll + the
+  ScatterPlayer push from the kicker's square, both stubs before: a successful kick never flew the
+  player). Smoke 60/60, tests green.
 
 - 2026-11-27 · Q3.7 · (this commit) · Riotous Rookies: bb2020/bb2025 `Collections.shuffle` on
   `game.collections_rng` (trait takes the Random; every parity roster has one candidate, so no game

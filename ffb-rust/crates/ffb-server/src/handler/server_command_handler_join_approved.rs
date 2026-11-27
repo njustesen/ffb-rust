@@ -458,7 +458,7 @@ impl ServerCommandHandlerJoinApproved {
                     .unwrap_or(0);
                 gs.start_joined_game(seed);
             }
-            let _ = start_game(gs, false, &self.session_manager, db, false, true, None).await;
+            let _ = start_game(gs, false, &self.session_manager, db, false, None).await;
         }
         if let Some(gs) = taken {
             self.game_cache.lock().unwrap().add_game(gs);

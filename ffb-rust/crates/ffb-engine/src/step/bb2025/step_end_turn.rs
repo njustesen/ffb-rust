@@ -1408,7 +1408,9 @@ impl StepEndTurn {
                     crate::step::generator::mixed::kickoff::Kickoff::build_sequence(
                         &crate::step::generator::mixed::kickoff::KickoffParams { with_coin_choice: false })
                 } else {
-                    h2_kickoff_sequence_for(game.rules)
+                    let mut seq = h2_kickoff_sequence_for(game.rules);
+                    crate::step::sequences::apply_ask_for_kick_after_roll(&mut seq, game);
+                    seq
                 }
             };
             let mut outcome = StepOutcome::next();
