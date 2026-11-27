@@ -73,7 +73,9 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
   fed, goingForIt, standingUp, bloodLust, animosity, jumping); smoke 3×20 green.
   Part 3 done: player parts end `,td/cmp/cas/int/defl/land/blk/foul/rush/pass/awards` (game result),
   identical incl. non-zero values; smoke 3×20 green.
-  Still to add: granted/temporary skills + properties, inducement set + apothecaries, bombs. Original: Add to BOTH `ffb-model/src/util/state_hash.rs` and
+  Part 4 done: ` o<apothecaries home,away> k<bomb x,y,moving | ->` segments; smoke 3×20 green, goblin
+  bb2025 mirror 29/30 (seed 4 = JD-002 JAVA-CRASH, expected).
+  Still to add: granted/temporary skills + properties, inducement set. Original: Add to BOTH `ffb-model/src/util/state_hash.rs` and
   `ParityRunner.java` (same string format): PA; full player state incl. flags (rooted, confused,
   hypnotised, used-Pro, …) and the exact off-pitch state (banned, KO, BH, SI, RIP, missing, …);
   granted/temporary skills and properties; SPP and per-player game-result stats; inducement set and
@@ -199,6 +201,7 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q1.3 part 4 · (next commit) · apothecaries and bomb square/moving in the hash.
 - 2026-11-27 · Q1.3 part 3 · (next commit) · per-player game-result counters in the hash, both engines;
   smoke 3×20 green, non-zero counters identical on a live game.
 - 2026-11-27 · Q1.3 part 2 · (next commit) · acting player's declared action + 10 activation flags in

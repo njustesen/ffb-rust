@@ -76,6 +76,17 @@ pub fn state_string(game: &Game) -> String {
     s.push_str(&game.turn_data_home.rerolls.to_string());
     s.push(',');
     s.push_str(&game.turn_data_away.rerolls.to_string());
+    // §Q1.3: apothecaries left (home,away) and the bomb square + moving flag. Must stay
+    // byte-identical with `ParityRunner.stateString`/`stateHash` + `bombPart`.
+    s.push_str(" o");
+    s.push_str(&game.turn_data_home.apothecaries.to_string());
+    s.push(',');
+    s.push_str(&game.turn_data_away.apothecaries.to_string());
+    s.push_str(" k");
+    match game.field_model.bomb_coordinate {
+        None => s.push('-'),
+        Some(c) => s.push_str(&format!("{},{},{}", c.x, c.y, if game.field_model.bomb_moving { "true" } else { "false" })),
+    }
     // Acting player: WHO is activated and how much movement it has spent, as `h03,2` (the same
     // h/a index the player parts use, since raw ids differ between the engines) or `-` when nobody
     // is activated. The hash carried no activation state at all, so an engine could hold a

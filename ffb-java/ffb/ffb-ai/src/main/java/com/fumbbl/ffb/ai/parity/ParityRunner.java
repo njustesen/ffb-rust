@@ -2374,6 +2374,9 @@ public class ParityRunner {
         sb.append(" b").append(bx).append(',').append(by).append(',').append(inPlay ? "true" : "false");
         sb.append(" f").append(turnFlags(game.getTurnDataHome())).append(',').append(turnFlags(game.getTurnDataAway()));
         sb.append(" r").append(game.getTurnDataHome().getReRolls()).append(',').append(game.getTurnDataAway().getReRolls());
+        // §Q1.3: apothecaries left (home,away) and the bomb square + moving flag. Must match state_hash.rs.
+        sb.append(" o").append(game.getTurnDataHome().getApothecaries()).append(',').append(game.getTurnDataAway().getApothecaries());
+        sb.append(" k").append(bombPart(fm));
         sb.append(" ap").append(actingPlayerPart(game));
         sb.append(" w").append(game.getFieldModel().getWeather() != null ? game.getFieldModel().getWeather().getName() : "-");
         sb.append(" tm").append(game.getTurnMode() != null ? game.getTurnMode().getName() : "-");
@@ -2415,6 +2418,9 @@ public class ParityRunner {
         sb.append(" b").append(bx).append(',').append(by).append(',').append(inPlay == 1 ? "true" : "false");
         sb.append(" f").append(turnFlags(game.getTurnDataHome())).append(',').append(turnFlags(game.getTurnDataAway()));
         sb.append(" r").append(game.getTurnDataHome().getReRolls()).append(',').append(game.getTurnDataAway().getReRolls());
+        // §Q1.3: apothecaries left (home,away) and the bomb square + moving flag. Must match state_hash.rs.
+        sb.append(" o").append(game.getTurnDataHome().getApothecaries()).append(',').append(game.getTurnDataAway().getApothecaries());
+        sb.append(" k").append(bombPart(fm));
         sb.append(" ap").append(actingPlayerPart(game));
         sb.append(" w").append(game.getFieldModel().getWeather() != null ? game.getFieldModel().getWeather().getName() : "-");
         sb.append(" tm").append(game.getTurnMode() != null ? game.getTurnMode().getName() : "-");
@@ -2450,6 +2456,13 @@ public class ParityRunner {
             }
         }
         return "?," + currentMove + actingDetail(actingPlayer);
+    }
+
+    /** §Q1.3: `x,y,moving` of the bomb, `-` when there is none. Must match state_hash.rs::bomb_part. */
+    private static String bombPart(FieldModel fm) {
+        FieldCoordinate bomb = fm.getBombCoordinate();
+        if (bomb == null) return "-";
+        return bomb.getX() + "," + bomb.getY() + "," + (fm.isBombMoving() ? "true" : "false");
     }
 
     /** §Q1.3: `,<action>,<flags>` — the declared PlayerAction name (or `-`) and ten activation flags as
