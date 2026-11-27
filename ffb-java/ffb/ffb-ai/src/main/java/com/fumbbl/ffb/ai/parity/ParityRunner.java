@@ -2146,6 +2146,14 @@ public class ParityRunner {
                 // §Q2.9: punt into the crowd under --coverage-bias (random_agent.rs mirrors it).
                 comm.sendPuntToCrowd(com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS > 0.0f);
                 injectCaptured(dialog, game, gameState);
+                // StepInitPunt never hides the dialog: after a decline it publishes the punt squares
+                // and waits for CLIENT_FIELD_COORDINATE with DialogPuntToCrowdParameter still set, so
+                // this arm re-answered it until DIALOG_LOOP_CLEARED (dark_elf bb2025, mirror q1b:
+                // seeds 49 @0, 74/95 @1.0, 14 @1e6). A client closes the dialog once answered;
+                // clearing it here reaches the INIT_PUNT square pick (sendPuntTarget) at once -- the
+                // state the loop guard reached after 500 identical, draw-free re-answers. The Rust
+                // agent answers AgentPrompt::PuntToCrowd once.
+                game.setDialogParameter(null);
                 break;
             }
 

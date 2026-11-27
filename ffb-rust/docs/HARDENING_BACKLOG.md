@@ -375,6 +375,14 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q2.9a reopened + fixed · (this commit) · the PUNT_TO_CROWD loop does reproduce
+  (mirror q1b dark_elf bb2025: s49 @0, s74/s95 @1.0, s14 @1e6): Java StepInitPunt keeps
+  DialogPuntToCrowdParameter set after the answer (it then waits for the punt square), and the
+  harness's dialog arm out-ranks the INIT_PUNT step arm, so it re-answered until the loop guard.
+  Harness now clears the dialog after answering (as a client closes it; same precedent as
+  SETUP_ERROR). dark_elf bb2025 @1.0 1-100 100/100 with 0 loop clears, s49 @0 and s14 @1e6 green;
+  smoke 3×20/20. goblin bb2025 @1.0 4 reds = JD-002 JAVA-CRASH (known, reported separately).
+
 - 2026-11-27 · Q1.1 mirror q1b red · (this commit) · goblin bb2016 @1.0 s54: the shared StepPass
   recorded an original bombardier in bb2016 games, where Java's bb2016 StepPass never does and the
   bb2016 InitSelecting never resets it; InjuryResult.applyTo then deactivated a home player stunned
