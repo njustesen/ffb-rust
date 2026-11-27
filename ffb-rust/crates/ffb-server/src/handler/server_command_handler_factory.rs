@@ -684,6 +684,34 @@ impl ServerCommandHandlerFactory {
             crate::util::server_game_sync::sync_game(gs, &self.session_manager);
             return;
         }
+        // Java ServerCommunication.handleByGameState never passes CLIENT_DEBUG_CLIENT_STATE to the
+        // game, and no Java step takes CLIENT_JOURNEYMEN (UNHANDLED_COMMAND): both are no-ops.
+        if matches!(client_command, AnyClientCommand::ClientDebugClientState(_) | AnyClientCommand::ClientJourneymen(_)) {
+            log::debug!("game {game_id}: {:?} ignored, as in Java", client_command.get_id());
+            return;
+        }
+        // Java AbstractStep.handleIllegalProcedure (any step): only while `timeoutPossible` --
+        // ReportTimeoutEnforced(coach of the session), timeoutEnforced = true, timeoutPossible =
+        // false, sync. The command stays UNHANDLED either way (§Q4.2).
+        if matches!(client_command, AnyClientCommand::ClientIllegalProcedure(_)) {
+            let coach = self.session_manager.lock().unwrap()
+                .get_coach_for_session(session_id).unwrap_or_default().to_string();
+            let mut gc = self.game_cache.lock().unwrap();
+            let Some(gs) = gc.get_game_state_by_id_mut(game_id) else { return };
+            let enforced = match gs.get_game_mut() {
+                Some(game) if game.timeout_possible => {
+                    game.report_list.add(ffb_model::report::report_timeout_enforced::ReportTimeoutEnforced::new(coach));
+                    game.timeout_enforced = true;
+                    game.timeout_possible = false;
+                    true
+                }
+                _ => false,
+            };
+            if enforced {
+                crate::util::server_game_sync::sync_game(gs, &self.session_manager);
+            }
+            return;
+        }
         let action = match decode_command(client_command, side) {
             Ok(a) => a,
             Err(e) => {
@@ -1247,6 +1275,11 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
             };
             Ok(Action::WizardSpell { spell, coord: w.target_coordinate.ok_or_else(|| missing("targetCoordinate"))? })
         }
+        // Java StepEndBlocking CLIENT_PILE_DRIVER: the knocked-down target (null/empty = decline),
+        // the engine's `SelectPlayer` answer to its Pile Driver dialog.
+        AnyClientCommand::ClientPileDriver(p) => Ok(Action::SelectPlayer { player_id: p.player_id.unwrap_or_default() }),
+        // Java StepPileDriver CLIENT_USE_CHAINSAW: `usingChainsaw`.
+        AnyClientCommand::ClientUseChainsaw(c) => Ok(Action::UseSkill { skill_id: SkillId::Chainsaw, use_skill: c.using_chainsaw }),
         // Java StepPrayer / Wisdom CLIENT_SKILL_SELECTION (sent as clientPrayerSelection): the skill.
         AnyClientCommand::ClientPrayerSelection(s) => {
             let name = s.skill_id.ok_or_else(|| missing("skill"))?;
@@ -1349,6 +1382,17 @@ mod tests {
         let r = decode(serde_json::json!({"netCommandId": "clientInterceptorChoice", "interceptorId": "a7",
             "skill": "Yoink!"}), TeamSide::Away);
         assert!(matches!(&r, Ok(Action::InterceptWithSkill { player_id, .. }) if player_id == "a7"), "{r:?}");
+    }
+
+    /// §Q4.2 Pile Driver target (empty declines) and the Chainsaw choice in StepPileDriver.
+    #[test]
+    fn decode_pile_driver_and_use_chainsaw() {
+        let r = decode(serde_json::json!({"netCommandId": "clientPileDriver", "playerId": "a2"}), TeamSide::Home);
+        assert!(matches!(&r, Ok(Action::SelectPlayer { player_id }) if player_id == "a2"), "{r:?}");
+        let r = decode(serde_json::json!({"netCommandId": "clientPileDriver"}), TeamSide::Home);
+        assert!(matches!(&r, Ok(Action::SelectPlayer { player_id }) if player_id.is_empty()), "{r:?}");
+        let r = decode(serde_json::json!({"netCommandId": "clientUseChainsaw", "usingChainsaw": true}), TeamSide::Home);
+        assert!(matches!(r, Ok(Action::UseSkill { skill_id: SkillId::Chainsaw, use_skill: true })), "{r:?}");
     }
 
     /// §Q4.2 CLIENT_FIELD_COORDINATE goes to the waiting step: canonical square for Hit and Run

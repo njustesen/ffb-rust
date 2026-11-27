@@ -291,10 +291,13 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   these as a declaration + a second command, Rust folds them into one `ActivatePlayer`:
   THROW_KEG (bare declaration ends the activation in Rust: the parity bridge), USE_TEAM_MATES_WISDOM,
   KICK_TEAM_MATE (bb2016 only; numDice; the server forces Bb2025 until Q4.3). Port the two-command
-  shape as for FOUL_MOVE/GAZE_MOVE. Also open: PileDriver, UseChainsaw (StepPileDriver),
-  UseFumblerooskie, UseIgors, Set/UnsetBlockTargetSelection, SelectCardToBuy (bb2020),
-  IllegalProcedure (AbstractStep). CLIENT_JOURNEYMEN and CLIENT_DEBUG_CLIENT_STATE have no Java step
-  consumer.
+  shape as for FOUL_MOVE/GAZE_MOVE. **Waiting:** another session has these declaration forms
+  UNCOMMITTED (FoulMove/GazeMove/ThrowTeamMateMove/KickTeamMateMove in `action/mod.rs` and the
+  three `step_init_selecting.rs`); Keg, Wisdom, Fumblerooskie and Set/UnsetBlockTargetSelection all
+  land in those files — resume once that is committed. **Part 3 done** (see Log): PileDriver,
+  UseChainsaw, IllegalProcedure, and the two Java no-ops (DebugClientState, Journeymen). **With Q4.3
+  (bb2020 on the server):** UseIgors (bb2020 StepApothecaryMultiple only), SelectCardToBuy (bb2020;
+  vacuous — no bb2020 cards in Java).
   Original list: (BuyCard, SelectCardToBuy, PettyCash, Journeymen,
   SelectWeather, WizardSpell, UseBrawler/Chainsaw/Hatred/Igors/Fumblerooskie/TeamMatesWisdom,
   UseProReRollForBlock, UseConsummateReRollForBlock, UseSingleBlockDieReRoll, UseMultiBlockDiceReRoll,
@@ -331,6 +334,12 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q4.2 part 3 · (this commit) · CLIENT_PILE_DRIVER -> `SelectPlayer` (StepEndBlocking's
+  Pile Driver answer, empty declines); CLIENT_USE_CHAINSAW -> `UseSkill(Chainsaw)` (StepPileDriver);
+  CLIENT_ILLEGAL_PROCEDURE ported from AbstractStep (timeoutPossible -> ReportTimeoutEnforced +
+  flags + sync; else nothing); CLIENT_DEBUG_CLIENT_STATE / CLIENT_JOURNEYMEN ignored as Java does.
+  Server tests green, gui_check 3/3 (pairs 9-11).
 
 - 2026-11-27 · Q4.2 part 2 · (this commit) · CLIENT_FIELD_COORDINATE decoded by the waiting step:
   HitAndRun / TricksterMove / PlaceBallSquare / RaidingPartyTarget / FuriousOutburstSquare get the
