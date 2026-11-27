@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q2.5** (Swarming; it turns ~160 cert gates red under Q1.2), then Q1.2a/b, Q1.3.
+Next item: **Q2.9a** (punt-to-crowd loop), then Q1.2a/b, Q1.3.
 Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q2.5). Last certified build: cert9 (`docs/cert_manifest.json`); last view build: view15.
 
 ## Ground rules (every item)
@@ -84,8 +84,15 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 - [ ] **Q2.3 Argue the call: decline branch; bribes: use branch.**
 - [ ] **Q2.4 Kick-off placements:** Quick Snap, Solid Defence, High Kick, Perfect Defence, Charge pick
   real players. Depends on Q3.4 (Solid Defence selection).
-- [ ] **Q2.5 Swarming placement** (remove the engine's hard-coded "place nobody" in
-  `bb2025/kickoff/step_swarming.rs`, ask the agent as Java asks the client).
+- [x] **Q2.5a Swarming dialog loop** (see Log): the harness clears DialogSwarmingPlayers at once
+  instead of looping 500× on a CONFIRM StepSwarming ignores; same state (zero swarmers), no abort.
+  snotling bb2020/bb2025 20/20 each, loops_cleared 0.
+- [ ] **Q2.5b Swarming placement** (remove the engine's hard-coded "place nobody" in
+  `bb2025/kickoff/step_swarming.rs`, ask the agent as Java asks the client; both harnesses place
+  swarmers with seeded draws).
+- [ ] **Q2.9a PUNT_TO_CROWD loop** (dark_elf bb2025, 8 loop clears in cert9): the harness DOES answer
+  `sendPuntToCrowd(false)`, yet the dialog re-fires; find why in Java `StepInitPunt` and fix the harness
+  answer (or Rust, if Rust differs). Seeds: `mirror_cert9/scratch/sw_dark_elf_bb2025_*.log.err`.
 - [ ] **Q2.6 Multiple Block / block dice:** choose by value, use Pro / Consummate / single-die re-rolls.
 - [ ] **Q2.7 MVP via Java's random path** (no first-eligible shortcut) and the post-game sequence.
 - [ ] **Q2.8 Pregame purchases:** buy inducements, star players, mercenaries, cards, prayers within the
@@ -168,6 +175,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q2.5a · (next commit) · harness clears the Swarming dialog at once (was a 500× loop on
+  an ignored CONFIRM); snotling bb2020 + bb2025 20/20, loops_cleared 0.
 - 2026-11-27 · Q1.2 · (next commit) · end_reason/loops_cleared in both logs; aborts fail; cert9 aborts
   classified; snotling bb2025 seeds 1-3 now fail (4 Swarming loop clears each); smoke 3×20 green.
 - 2026-11-27 · Q1.1 · (this commit) · verdict now fails on any per-step hash/post-hash/turn/half/active

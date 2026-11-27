@@ -1238,6 +1238,15 @@ public class ParityRunner {
                 game.setDialogParameter(null);
                 break;
 
+            // §Q2.5: SWARMING (DialogSwarmingPlayersParameter) used to fall to the default arm,
+            // whose RandomStrategy answer is a CONFIRM that StepSwarming ignores, so the dialog
+            // re-fired 500 times until DIALOG_LOOP_CLEARED. Clearing it at once reaches the same
+            // state: the next iteration sees SWARMING with no dialog and the UNHANDLED_STEP default
+            // ends the turn with zero swarmers placed, exactly what Rust's step_swarming does.
+            case SWARMING:
+                game.setDialogParameter(null);
+                break;
+
             // ── Blitz target selection dialog: same handling as the step ─────
             // (the server shows a dialog while StepSelectBlitzTarget waits; falling
             // to RandomStrategy here would be non-seeded nondeterminism)
