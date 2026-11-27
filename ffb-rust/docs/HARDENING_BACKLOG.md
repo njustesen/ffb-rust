@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q1.2b** (stuck CATCH_SCATTER_THROW_IN), then Q1.2c, Q1.3.
+Next item: **Q1.3** (wider state hash). Parked with notes: Q1.2b (punt → throw-in stall), Q1.2c.
 Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q2.5). Last certified build: cert9 (`docs/cert_manifest.json`); last view build: view15.
 
 ## Ground rules (every item)
@@ -58,8 +58,15 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
   `--heur-classes` diverges on seeds 7, 18, 30, 82 (Java activates a FOUL whose step changes nothing,
   Rust a Move; reports differ). Same with the frozen cert9 exe+jar, so it is old. Not a certified config,
   but a real Java/Rust agent-contract difference: root-cause and fix.
-- [ ] **Q1.2b Stuck step: underworld_37844 vs dark_elf bb2025** (cross): Java
-  `STUCK_STEP: CATCH_SCATTER_THROW_IN` (`cross_cert9/scratch/cw_underworld_37844_vs_dark_elf_bb2025.log.err:536`).
+- [~] **Q1.2b Stuck step: underworld_37844 vs dark_elf bb2025** (cross, seed 3, scale 1.0, classes all;
+  reproduces on head). Dark elf Away2 PUNTs: PuntDirection d6 (rng 102) + re-roll offer declined,
+  PuntDistance 6 (103) → TRR accepted → 3 (104), ball out of bounds → THROW_IN. **Java** then rolls one
+  more `rollThrowInDirection` (105) and sits in CATCH_SCATTER_THROW_IN with no dialog (only path:
+  `getReRolledAction() != null` → CONTINUE, line ~389); **Rust** sits in CatchScatterThrowIn at rng 104
+  with no prompt. Final hashes equal (both stuck). Next: trace which Java step rolled 105 (throwInBall's
+  distance roll is not in the JAVA_DIE trace — check `DiceRoller.rollThrowInDistance`), find where the
+  catch step's reRolledAction comes from (a stale ClientCommandUseReRoll?), then decide Java defect
+  (JAVA_DEFECTS.md) vs harness/Rust fix.
 - [ ] **Q1.3 Wider state hash.** Add to BOTH `ffb-model/src/util/state_hash.rs` and
   `ParityRunner.java` (same string format): PA; full player state incl. flags (rooted, confused,
   hypnotised, used-Pro, …) and the exact off-pitch state (banned, KO, BH, SI, RIP, missing, …);
