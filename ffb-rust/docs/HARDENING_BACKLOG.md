@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q1.1**. Last certified build: cert9 (`docs/cert_manifest.json`); last view build: view15.
+Next item: **Q1.2** (Q1.1 code done, its mirror 330 run is queued for the night). Last certified build: cert9 (`docs/cert_manifest.json`); last view build: view15.
 
 ## Ground rules (every item)
 - Java (`ffb-java/ffb/`) is the oracle. Fix Rust only. The harness (`ParityRunner.java`, `ffb-ai`) may be
@@ -30,7 +30,8 @@ Next item: **Q1.1**. Last certified build: cert9 (`docs/cert_manifest.json`); la
 
 ## Q1 — Make "identical" mean identical (validation)
 
-- [ ] **Q1.1 Per-step verdict.** `ffb-parity/src/comparator.rs`: a game fails on the first per-step
+- [~] **Q1.1 Per-step verdict.** Code + tests done (`compare_lines`); smoke gates bb2025/bb2020/bb2016
+  20/20 under the new verdict. Waiting: mirror 330 re-run (night, with Q1.2). `ffb-parity/src/comparator.rs`: a game fails on the first per-step
   `state_hash`/turn/half/active mismatch AND on a step-count mismatch, not only on the final hash.
   Keep the final-hash check. Done: unit tests for converge-after-diverge and extra-step cases; smoke gate
   green; mirror 330 re-run green (night).
@@ -156,3 +157,6 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q1.1 · (this commit) · verdict now fails on any per-step hash/post-hash/turn/half/active
+  difference, a step-count difference or a different start state; 5 unit tests; smoke 3×20 green.
