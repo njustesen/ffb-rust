@@ -517,7 +517,12 @@ impl StepPass {
         // Java: set ball/bomb moving flag
         if is_bomb {
             game.field_model.bomb_moving = true;
-            if game.original_bombardier.is_none() {
+            // Java bb2020/bb2025 StepPass: `if (!isProvided(originalBombardier))
+            // setOriginalBombardier(throwerId)`. The bb2016 StepPass (whose games run this shared
+            // step) only sets the bomb moving: nothing in bb2016 sets or resets the bombardier, so
+            // setting it here left it on for the rest of the game, and InjuryResult.applyTo then
+            // deactivated a later-stunned player of the bombardier's team (goblin bb2016 @1.0 s54).
+            if game.original_bombardier.is_none() && game.rules != ffb_model::enums::Rules::Bb2016 {
                 game.original_bombardier = game.thrower_id.clone();
             }
         } else {
@@ -1480,6 +1485,21 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         // For accurate bomb: bomb_coordinate set to pass_coordinate
         assert_eq!(game.field_model.bomb_coordinate, Some(FieldCoordinate::new(4, 7)));
+    }
+
+    /// Java bb2020/bb2025 StepPass record the original bombardier on a bomb throw; the bb2016
+    /// StepPass does not (nothing in bb2016 would ever reset it).
+    #[test]
+    fn original_bombardier_is_recorded_except_in_bb2016() {
+        for (rules, expected) in [(Rules::Bb2025, Some("t1".to_string())), (Rules::Bb2016, None)] {
+            let mut game = make_game_with_thrower(3);
+            game.rules = rules;
+            game.thrower_action = Some(PlayerAction::ThrowBomb);
+            let mut step = make_step();
+            step.roll = 6;
+            step.start(&mut game, &mut GameRng::new(0));
+            assert_eq!(game.original_bombardier, expected, "{rules:?}");
+        }
     }
 
     #[test]

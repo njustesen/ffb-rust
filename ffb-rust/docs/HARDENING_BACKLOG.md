@@ -375,6 +375,13 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q1.1 mirror q1b red · (this commit) · goblin bb2016 @1.0 s54: the shared StepPass
+  recorded an original bombardier in bb2016 games, where Java's bb2016 StepPass never does and the
+  bb2016 InitSelecting never resets it; InjuryResult.applyTo then deactivated a home player stunned
+  by a later foul (Java keeps him active). Gated to bb2020/bb2025 (dead bb2016 twin aligned). Test
+  added; goblin bb2016 @1.0 1-100 100/100; cargo test 12,817 green; smoke 3×20/20. q1b keeps the
+  old exe: re-gate this cell after the run.
+
 - 2026-11-27 · Q1.1 mirror q1 (first reds) · (this commit) · the per-step verdict found its first
   real bug: a Weather Change kick-off to Sweltering Heat resets EXHAUSTED → RESERVE for EVERY player
   (Java `game.getPlayers()`); Rust (bb2016 and the shared bb2025 step) walked only the players on
