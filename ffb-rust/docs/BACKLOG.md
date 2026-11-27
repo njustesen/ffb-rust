@@ -12112,7 +12112,11 @@ Gates: view7 on the 10 touched squads 20 games, steps+reports identical, client 
 - **CROSS VIEW CHECK DONE 2026-11-26** (user: compute until 09:00): all 4,012 cross pairs, 3 games,
   view11 (`D:/ffb_viewcross1`, scratchpad crossview.py -- foreground 8.5-min chunks after a reaper
   kill, clean pairs' dumps deleted): **4,012/4,012 steps + reports + client view identical**, no fix.
-- **STAR VIEW CHECK (in progress)**, 2 games per job (`starjobs_full`). Fixed, pushed:
+- **STAR VIEW CHECK DONE 2026-11-27: 4,012/4,012 jobs identical** (2 games each; steps + reports +
+  client view) on frozen `D:/ffb_star/bin/ffb-parity-view15.exe` (= `b80ccafa5`), root
+  `D:/ffb_viewstar15`, no fix needed after view15. With the cross (4,012) and mirror suites, the
+  client view check is clean on every suite. Next goal = ask. History of the run:
+  2 games per job (`starjobs_full`). Fixed, pushed:
   `35b2d3991` bb2020 Wisdom grant keyed on the bb2025 "Granted by ..." override (bb2020 =
   getName()); bb2020 StepBalefulHex hypnotises (bb2025 confuses) + its markActionUsed (TTM = pass,
   no Punt, Kick 'em Blitz / KTM / allowsAdditionalFoul); temporaryPropertiesMap shows
