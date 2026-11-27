@@ -109,6 +109,14 @@ impl StepEndFeeding {
                     let seq = EndTurn::build_sequence(&EndTurnParams { check_forgo: false });
                     return StepOutcome::next().push_seq(seq);
                 }
+                TurnMode::Blitz if game.rules == ffb_model::enums::Rules::Bb2016 => {
+                    // Java bb2016 StepEndFeeding pushes `Inducement(END_OF_OWN_TURN, homePlaying)` for
+                    // every non-PASS_BLOCK turn end, the Blitz! kick-off turn included -- the window in
+                    // which the kicking team may cast a bought wizard (§Q3.2, human vs halfling bb2016
+                    // seed 4). Rust's bb2016 blitz turn then continues as before.
+                    let seq_own = inducement_sequence(InducementPhase::EndOfOwnTurn, game.home_playing);
+                    return StepOutcome::next().push_seq(seq_own);
+                }
                 _ => {
                     // Other turn modes: just next
                     return StepOutcome::next();

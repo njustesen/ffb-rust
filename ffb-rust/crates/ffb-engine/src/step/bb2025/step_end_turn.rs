@@ -440,6 +440,9 @@ impl StepEndTurn {
                 use crate::mechanic::bb2025::state_mechanic::StateMechanic;
                 use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
                 self.early_half_events = StateMechanic::new().start_half(game, game.half + 1);
+                // Java mixed startHalf: the bb2016 Master Chef rolls (half < 3).
+                self.early_half_events.extend(
+                    crate::step::bb2025::start::step_master_chef::StepMasterChef::chef_rolls_at_start_of_half(game, rng));
                 self.half_started_early = true;
             }
             use ffb_model::report::bb2016::report_turn_end::ReportTurnEnd as ReportTurnEndBb2016;

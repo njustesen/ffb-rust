@@ -54,6 +54,17 @@ impl StepMasterChef {
     /// Rolls master chef dice for home then away, then applies the cross-theft:
     /// - home rerolls: max(0, home - stolen_by_away) + stolen_by_home
     /// - away rerolls: max(0, away - stolen_by_home) + stolen_by_away
+    /// Java mixed `StateMechanic.startHalf`: `if (half < 3 && mechanic.rollForChefAtStartOfHalf())
+    /// UtilServerGame.handleChefRolls(step, game)` -- bb2016 only (bb2020 rolls at the kick-off
+    /// scatter, bb2025 in this step). Call right after `start_half` (§Q2.8).
+    pub fn chef_rolls_at_start_of_half(game: &mut Game, rng: &mut GameRng) -> Vec<GameEvent> {
+        if game.half < 3 && crate::mechanic::game_mechanic_for(game.rules).roll_for_chef_at_start_of_half() {
+            Self::new().handle_chef_rolls(game, rng)
+        } else {
+            Vec::new()
+        }
+    }
+
     pub fn handle_chef_rolls(&self, game: &mut Game, rng: &mut GameRng) -> Vec<GameEvent> {
         let mut events: Vec<GameEvent> = Vec::new();
         let rerolls_stolen_home = self.roll_master_chef_for_team(game, true, rng, &mut events);

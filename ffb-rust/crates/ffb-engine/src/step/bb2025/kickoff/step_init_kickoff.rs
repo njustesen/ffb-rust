@@ -48,7 +48,7 @@ impl Step for StepInitKickoff {
 }
 
 impl StepInitKickoff {
-    fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+    fn execute_step(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
         let mut events: Vec<GameEvent> = Vec::new();
         if game.turn_mode == TurnMode::StartGame {
             // Java: UtilServerDialog.hideDialog(getGameState())
@@ -56,6 +56,7 @@ impl StepInitKickoff {
             // Java: stateMechanic.startHalf(step, 1) — returns inducement-registration events
             let half_events = StateMechanic::new().start_half(game, 1);
             events.extend(half_events);
+            events.extend(crate::step::bb2025::start::step_master_chef::StepMasterChef::chef_rolls_at_start_of_half(game, rng));
             // Java: ReportStartHalf is added inside stateMechanic.startHalf (see start_half).
             events.push(GameEvent::StartHalf { half: game.half });
             game.set_turn_mode(TurnMode::Setup);

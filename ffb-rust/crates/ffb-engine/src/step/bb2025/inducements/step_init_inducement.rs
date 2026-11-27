@@ -147,20 +147,26 @@ impl StepInitInducement {
     /// collapsed the three-flip turn-handover chain into a double flip).
     fn find_useable_inducements(&self, game: &mut Game, phase: InducementPhase) -> Vec<String> {
         let mut useable: Vec<String> = Vec::new();
-        let turn_data = if self.home_team { &game.turn_data_home } else { &game.turn_data_away };
-        let set = &turn_data.inducement_set;
-        let of_usage = |usage_ok: &dyn Fn(&ffb_model::inducement::inducement::Inducement) -> bool| -> Vec<String> {
-            set.get_inducements().into_iter()
-                .filter(|i| usage_ok(i) && set.has_uses_left(&i.type_id))
-                .map(|i| i.type_id)
-                .collect()
+        let (spells, spells_and_rocks, weather_mages) = {
+            let turn_data = if self.home_team { &game.turn_data_home } else { &game.turn_data_away };
+            let set = &turn_data.inducement_set;
+            let of_usage = |usage_ok: &dyn Fn(&ffb_model::inducement::inducement::Inducement) -> bool| -> Vec<String> {
+                set.get_inducements().into_iter()
+                    .filter(|i| usage_ok(i) && set.has_uses_left(&i.type_id))
+                    .map(|i| i.type_id)
+                    .collect()
+            };
+            (
+                of_usage(&|i| i.has_usage(Usage::SPELL)),
+                of_usage(&|i| i.has_usage(Usage::SPELL) || i.has_usage(Usage::THROW_ROCK)),
+                of_usage(&|i| i.has_usage(Usage::CHANGE_WEATHER)),
+            )
         };
         if matches!(phase, InducementPhase::EndOfOwnTurn | InducementPhase::EndOfOpponentTurn)
             && !self.touchdown_or_end_of_half
         {
             // bb2025 offers SPELL and THROW_ROCK; bb2020's StepInitInducement SPELL only.
-            let bb2025 = game.rules == ffb_model::enums::Rules::Bb2025;
-            useable = of_usage(&|i| i.has_usage(Usage::SPELL) || (bb2025 && i.has_usage(Usage::THROW_ROCK)));
+            useable = if game.rules == ffb_model::enums::Rules::Bb2025 { spells_and_rocks } else { spells.clone() };
             // bb2016's StepInitInducement has no turn-mode change (lastTurnMode stays KICKOFF for
             // the client); the home_playing handover below is Rust's shared turn chain and stays.
             if game.rules != ffb_model::enums::Rules::Bb2016 {
@@ -170,15 +176,26 @@ impl StepInitInducement {
                 game.home_playing = !game.home_playing;
             }
         } else if phase == InducementPhase::StartOfOwnTurn {
-            useable = of_usage(&|i| i.has_usage(Usage::CHANGE_WEATHER));
+            useable = weather_mages;
         }
-        // This step serves all three editions; the use routing is ported for bb2025 and bb2020
-        // (§Q3.2; bb2020 cards are §Q3.3 -- none can be bought yet, so none are playable). bb2016
-        // (its own StepInitInducement) keeps the old no-dialog behaviour until its purchases exist.
+        // This step serves all three editions (bb2020 cards are §Q3.3 -- none can be bought yet,
+        // so none are playable). bb2016's own StepInitInducement.findUseableInducements offers the
+        // SPELL types at END_OF_OWN_TURN (no touchdown) and at START_OF_OWN_TURN -- never at
+        // END_OF_OPPONENT_TURN -- and has no Weather Mage or Throw a Rock (§Q3.2).
         if game.rules == ffb_model::enums::Rules::Bb2016 {
-            useable.clear();
+            useable = if (phase == InducementPhase::EndOfOwnTurn && !self.touchdown_or_end_of_half)
+                || phase == InducementPhase::StartOfOwnTurn
+            {
+                spells
+            } else {
+                Vec::new()
+            };
         }
         useable.sort();
+        if std::env::var_os("FFB_TRACE").is_some() {
+            eprintln!("RUST_INDUCEMENT_WINDOW phase={phase:?} home={} td={} mode={:?} useable={useable:?}",
+                self.home_team, self.touchdown_or_end_of_half, game.turn_mode);
+        }
         useable
     }
 }

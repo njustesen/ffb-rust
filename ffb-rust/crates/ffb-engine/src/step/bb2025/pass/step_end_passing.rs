@@ -298,7 +298,14 @@ impl StepEndPassing {
                     .get_additional_completion_spp_teams()
                     .contains(&thrower_team_id);
                 let start = game.field_model.player_coordinate(&thrower_id);
-                let east_is_forward = if game.turn_mode == TurnMode::DumpOff { !game.home_playing } else { game.home_playing };
+                // bb2020/bb2025 flip the direction during a DUMP_OFF; bb2016's StepEndPassing uses
+                // `isHomePlaying()` as is (§Q2.8: dark_elf vs wood_elf bb2016 seed 9, a dump-off's
+                // passing yards -2 in Java, +2 in Rust).
+                let east_is_forward = if game.turn_mode == TurnMode::DumpOff && game.rules != ffb_model::enums::Rules::Bb2016 {
+                    !game.home_playing
+                } else {
+                    game.home_playing
+                };
                 let rules = game.rules;
                 let pass_accurate = self.pass_accurate;
                 let team_result = if is_home { &mut game.game_result.home } else { &mut game.game_result.away };

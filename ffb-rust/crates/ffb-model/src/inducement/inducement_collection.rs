@@ -24,6 +24,12 @@ pub enum InducementTypeRule {
     RequiresApothecary,
     /// `availability`: the WIZARD_AVAILABLE flag while the max option is unchanged (wizard).
     Wizard,
+    /// bb2016 `useReducedCostId`: the roster NAME is one of these (bribes: Goblin/Snotling, chef: Halfling).
+    ReducedForRosterNames(&'static [&'static str]),
+    /// bb2016 igor `availability`: 0 when the roster has an apothecary.
+    RequiresNoApothecary,
+    /// bb2016 riotousRookies `availability`: 0 unless the roster names a riotous position (not "0").
+    RequiresRiotousPosition,
 }
 
 /// Describes a single inducement type — Java `InducementType`: its name, usages, the game options
@@ -76,6 +82,8 @@ impl InducementTypeEntry {
             }
             InducementTypeRule::ReducedForMasterChefKeyword => team.roster.as_ref()
                 .map_or(false, |r| r.keywords.iter().any(|k| k == "Master Chef")),
+            InducementTypeRule::ReducedForRosterNames(names) => team.roster.as_ref()
+                .map_or(false, |r| names.contains(&r.name.as_str())),
             _ => false,
         }
     }
@@ -118,6 +126,15 @@ impl InducementTypeEntry {
             }
             InducementTypeRule::RequiresApothecary => {
                 if !team.roster.as_ref().map_or(false, |r| r.apothecary) { 0 } else { base() }
+            }
+            InducementTypeRule::RequiresNoApothecary => {
+                if team.roster.as_ref().map_or(false, |r| r.apothecary) { 0 } else { base() }
+            }
+            InducementTypeRule::RequiresRiotousPosition => {
+                let provided = team.roster.as_ref()
+                    .and_then(|r| r.riotous_position_id.as_deref())
+                    .map_or(false, |id| !id.is_empty() && id != "0");
+                if !provided { 0 } else { base() }
             }
             InducementTypeRule::Wizard => {
                 let changed = self.actual_max_id(team).and_then(GameOptionEnum::for_name)

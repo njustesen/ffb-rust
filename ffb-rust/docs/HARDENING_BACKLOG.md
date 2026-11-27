@@ -8,8 +8,8 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q2.8 part 3** (bb2016 BUY_INDUCEMENTS purchases with the option-driven types, then Q3.2
-for bb2016 — its own StepInitInducement; same gate shape: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`).
+Next item: **Q2.8 part 4** (prayers bought in bb2025/bb2020 under the bias + the turn InducementSet in the
+state hash, both engines), then **Q3.3** cards. Gate shape: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`.
 Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
 squads, Q1.2b punt stall (two repros).
 Q2.2/Q2.3 inducement parts wait for Q2.8. Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
@@ -168,8 +168,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   exercise in-game use). **Part 1 bb2025 done** (see Log): `FFB_INDUCEMENT_CASH=<gold>` sets
   FREE_INDUCEMENT_CASH in both harnesses (the drafts sit within 50k, so petty cash alone never buys
   anything); under `--coverage-bias` both agents buy one of each COVERAGE_INDUCEMENTS type in list order
-  while gold lasts. **Part 2 bb2020 done** (see Log). Open: bb2016 (BUY_INDUCEMENTS) purchases,
-  stars / mercenaries / staff, prayers, cards (Q3.3), the inducement set in the state hash.
+  while gold lasts. **Part 2 bb2020 and part 3 bb2016 done** (see Log). Open: stars / mercenaries /
+  staff (position choices), prayers, cards (Q3.3), the inducement set in the state hash.
 - [~] **Q2.9 Remaining fixed answers:** part 1 (see Log): under `--coverage-bias` both agents take the
   other branch of PUNT_TO_CROWD (punt), PICK_UP_CHOICE (pick up) and KICK_SKILL (use Kick), zero draws.
   None of the three fired in 60 biased games (dark_elf vs wood_elf_sk, human vs orc bb2025) — needs a
@@ -188,13 +188,15 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   switch the options on in both harnesses. Gate met: human bb2025/bb2020/bb2016 seeds 1-30, 30/30 steps +
   reports with overtime, and again with golden goal (bb2025: 10 games reach half 3, 8 end on a
   golden-goal touchdown); standing smoke gates 20/20.
-- [~] **Q3.2 In-game inducement use:** route Wizard, Throw a Rock, Weather Mage, Master Chef, Fan Factor
+- [x] **Q3.2 In-game inducement use:** route Wizard, Throw a Rock, Weather Mage, Master Chef, Fan Factor
   in `step_init_inducement.rs` (bb2025, bb2020, bb2016 card play). Gate: each inducement fires.
   **bb2025 done** (see Log): StepInitInducement routes SPELL / CHANGE_WEATHER / THROW_ROCK, both agents
   use under the bias (Fireball on the min-(x,y) opponent, weather by first constant name); Master Chef
   in Q2.8 part 1. Throw a Rock is routed but not buyable in bb2025 (Java availability = INDUCEMENT_DUMMY
   = 0; it comes from a prayer). bb2020 done with Q2.8 part 2 (SPELL only at end of turn, as Java).
-  Open: bb2016 (after its Q2.8 purchases), Fan Factor, cards (Q3.3).
+  bb2016 done with Q2.8 part 3 (SPELL at END_OF_OWN_TURN / START_OF_OWN_TURN, the Blitz! turn's
+  END_OF_OWN_TURN window, chef rolled in startHalf). Cards move to Q3.3; Fan Factor is the end-game
+  step, not an inducement (already live).
 - [ ] **Q3.3 Cards (bb2016/bb2020):** build decks, buy, draw, play, deactivate (`handle_card`,
   `step_buy_cards_and_inducements.rs:249-343`, `PlayCard`). Gate: card play in both editions.
 - [x] **Q3.4 Solid Defence player selection** — review false positive: bb2025's player-choice flow is
@@ -260,7 +262,13 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
-- 2026-11-27 · Q2.8 part 2 + Q3.2 bb2020 · (this commit) · bb2020 inducement types with Java's
+- 2026-11-27 · Q2.8 part 3 + Q3.2 bb2016 · (this commit) · bb2016 inducement types (roster-name
+  discounts, igor without apothecary, riotous position); StepBuyInducements charges what the client
+  deducts; chef rolled in startHalf (rollForChefAtStartOfHalf); bb2016 use windows (SPELL at own
+  turn start/end) and the Blitz! turn's END_OF_OWN_TURN window; dump-off passing yards not inverted
+  in bb2016. Gate (FFB_INDUCEMENT_CASH=600000, bias): bb2016 8 matchups × 10 = 80/80, bb2020/bb2025
+  spot 40/40; smoke 20/20 ×3; 10,731 tests.
+- 2026-11-27 · Q2.8 part 2 + Q3.2 bb2020 · 8b744cdcc · bb2020 inducement types with Java's
   option ids; StepBuyCardsAndInducements prices/applies like handleBuyInducements; Master Chef rolled
   at the end of the bb2020 kick-off scatter (StepKickoffScatterRoll:183); bb2020 use routing (SPELL
   only); bb2020/bb2016 Fireball injures directly (no SteadyFooting); crowd-push injury types named so

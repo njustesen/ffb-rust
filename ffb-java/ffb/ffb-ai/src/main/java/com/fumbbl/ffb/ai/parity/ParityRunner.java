@@ -1349,6 +1349,32 @@ public class ParityRunner {
             // §Q2.8: under --coverage-bias the coach buys one of each COVERAGE_INDUCEMENTS entry, in
             // list order, while its cost fits the remaining gold and availability > 0 (random_agent.rs
             // mirrors it). Without the bias: RandomStrategy's empty purchase (default arm).
+            // §Q2.8 bb2016 StepBuyInducements: the client sends the gold it has LEFT
+            // (fGoldUsed = fInducementGold - command.getAvailableGold()), so the coverage purchase
+            // reports its gold minus the cost of what it bought. random_agent.rs, same rule.
+            case BUY_INDUCEMENTS:
+                if (com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS > 0.0f
+                        && dialog instanceof com.fumbbl.ffb.dialog.DialogBuyInducementsParameter) {
+                    com.fumbbl.ffb.dialog.DialogBuyInducementsParameter bi =
+                        (com.fumbbl.ffb.dialog.DialogBuyInducementsParameter) dialog;
+                    Team buyer = game.getTeamById(bi.getTeamId());
+                    com.fumbbl.ffb.model.InducementSet set = coverageInducements(game, buyer, bi.getAvailableGold());
+                    int cost = 0;
+                    for (com.fumbbl.ffb.inducement.Inducement ind : set.getInducements()) {
+                        cost += ind.getValue() * com.fumbbl.ffb.option.UtilGameOption.getIntOption(game,
+                            ind.getType().getActualCostId(buyer));
+                    }
+                    comm.clearCaptured();
+                    comm.sendBuyInducements(bi.getTeamId(), bi.getAvailableGold() - cost, set,
+                        new String[0], new String[0], new com.fumbbl.ffb.model.skill.Skill[0], new String[0]);
+                    injectCaptured(dialog, game, gameState);
+                } else {
+                    comm.clearCaptured();
+                    RandomStrategy.respondToDialog(dialog, game, comm);
+                    injectCaptured(dialog, game, gameState);
+                }
+                break;
+
             case BUY_CARDS_AND_INDUCEMENTS:
                 if (com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS > 0.0f
                         && dialog instanceof com.fumbbl.ffb.dialog.DialogBuyCardsAndInducementsParameter) {

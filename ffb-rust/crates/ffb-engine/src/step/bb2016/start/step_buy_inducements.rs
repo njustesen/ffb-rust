@@ -18,7 +18,7 @@
 /// headless: BuyInducements action lacks star_player_position_ids / mercenary_position_ids —
 ///   add_star_players / add_mercenaries are implemented but require extended action fields to call.
 use std::collections::HashMap;
-use ffb_model::data::loader::{find_position, BB2016_INDUCEMENTS};
+use ffb_model::data::loader::find_position;
 use ffb_model::enums::{InducementPhase, PlayerType, PlayerState, PS_RESERVE};
 use ffb_model::events::GameEvent;
 use ffb_model::inducement::usage::Usage;
@@ -35,10 +35,20 @@ use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::generator::common::inducement::{Inducement, InducementParams};
 use crate::step::generator::common::riotous_rookies::RiotousRookies;
-use crate::step::game::start::util_inducement_catalog::{apply_purchases, available_list};
 use crate::step::game::start::util_inducement_sequence::UtilInducementSequence;
 
 const MINIMUM_PETTY_CASH_FOR_INDUCEMENTS: i32 = 50_000;
+
+/// §Q2.8: what the bb2016 buy dialog offers -- the InducementTypeFactory types with a cost option,
+/// availability > 0 and not `card`, priced by `getActualCostId(team)`.
+fn offered_inducements(game: &Game, team: &ffb_model::model::team::Team) -> Vec<(String, i32)> {
+    ffb_model::factory::inducement_type_factory::all_types_in(game.rules)
+        .into_iter()
+        .filter(|t| t.id != "card" && t.availability(team, &game.options) > 0)
+        .filter_map(|t| t.actual_cost_id(team)
+            .map(|cost_id| (t.id.clone(), ffb_model::option::util_game_option::get_int_option(game, cost_id))))
+        .collect()
+}
 
 /// Java: `StepBuyInducements` (bb2016/start).
 pub struct StepBuyInducements {
@@ -121,14 +131,14 @@ impl StepBuyInducements {
             !self.inducements_selected_home
         };
         if home_first {
-            let available = available_list(&BB2016_INDUCEMENTS.inducements, &game.team_home);
+            let available = offered_inducements(game, &game.team_home);
             return StepOutcome::cont().with_prompt(AgentPrompt::BuyInducements {
                 team_id: game.team_home.id.clone(),
                 available,
                 budget: self.inducement_gold_home,
             });
         }
-        let available = available_list(&BB2016_INDUCEMENTS.inducements, &game.team_away);
+        let available = offered_inducements(game, &game.team_away);
         StepOutcome::cont().with_prompt(AgentPrompt::BuyInducements {
             team_id: game.team_away.id.clone(),
             available,
@@ -376,28 +386,39 @@ impl Step for StepBuyInducements {
         //   are out of scope for this pass — see module docs).
         let mut events = Vec::new();
         if let Action::BuyInducements { home, purchases } = action {
-            let team_id = if *home { game.team_home.id.clone() } else { game.team_away.id.clone() };
-            let (spent, applied) = if *home {
-                apply_purchases(
-                    &BB2016_INDUCEMENTS.inducements,
-                    &mut game.team_home,
-                    &mut game.turn_data_home.inducement_set,
-                    purchases,
-                    self.inducement_gold_home - self.gold_used_home,
-                )
+            // Java: `turnData.getInducementSet().add(command.getInducementSet())` and
+            // `fGoldUsed = fInducementGold - command.getAvailableGold()` -- the client sends the gold
+            // it has left, i.e. its gold minus the cost (`getActualCostId(team)` options) of what it
+            // bought, which is what is charged here (§Q2.8).
+            let types = ffb_model::factory::inducement_type_factory::all_types_in(game.rules);
+            let mut set = ffb_model::model::inducement_set::InducementSet::new();
+            for purchase in purchases {
+                if let Some(t) = types.iter().find(|t| t.id == purchase.id) {
+                    set.add_inducement(ffb_model::inducement::inducement::Inducement::new(
+                        t.id.clone(), purchase.count as i32, t.usages.clone()));
+                }
+            }
+            let team = if *home { &game.team_home } else { &game.team_away };
+            let team_id = team.id.clone();
+            let cost: i32 = set.get_inducements().iter()
+                .filter_map(|i| types.iter().find(|t| t.id == i.type_id)
+                    .and_then(|t| t.actual_cost_id(team))
+                    .map(|cost_id| i.get_value() * ffb_model::option::util_game_option::get_int_option(game, cost_id)))
+                .sum();
+            let mut bought: Vec<GameEvent> = set.get_inducements().iter()
+                .map(|i| GameEvent::BuyInducement {
+                    team_id: team_id.clone(), inducement_id: i.type_id.clone(), count: i.get_value() as u32 })
+                .collect();
+            bought.sort_by(|a, b| format!("{a:?}").cmp(&format!("{b:?}")));
+            events.extend(bought);
+            if *home {
+                game.turn_data_home.inducement_set.add(&set);
+                self.gold_used_home = cost;
+                self.inducements_selected_home = true;
             } else {
-                apply_purchases(
-                    &BB2016_INDUCEMENTS.inducements,
-                    &mut game.team_away,
-                    &mut game.turn_data_away.inducement_set,
-                    purchases,
-                    self.inducement_gold_away - self.gold_used_away,
-                )
-            };
-            if *home { self.gold_used_home += spent; self.inducements_selected_home = true; }
-            else { self.gold_used_away += spent; self.inducements_selected_away = true; }
-            for (id, count) in applied {
-                events.push(GameEvent::BuyInducement { team_id: team_id.clone(), inducement_id: id, count });
+                game.turn_data_away.inducement_set.add(&set);
+                self.gold_used_away = cost;
+                self.inducements_selected_away = true;
             }
         }
         let mut out = self.execute_step(game);
@@ -561,11 +582,12 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         match out.prompt {
             Some(AgentPrompt::BuyInducements { available, .. }) => {
-                assert!(available.iter().any(|(id, _)| id == "bribes"));
-                // igor requires Sylvanian Spotlight — not present on this team.
-                assert!(!available.iter().any(|(id, _)| id == "igor"));
-                // starPlayer is roster-gated — out of scope, never listed.
-                assert!(!available.iter().any(|(id, _)| id == "starPlayer"));
+                // Java costs come from the options: bribes INDUCEMENT_BRIBES_COST (100k).
+                assert!(available.iter().any(|(id, cost)| id == "bribes" && *cost == 100_000));
+                // Java bb2016 igor: available unless the roster HAS an apothecary (no roster here).
+                assert!(available.iter().any(|(id, _)| id == "igor"));
+                // starPlayers has no cost option -- a position choice, never listed.
+                assert!(!available.iter().any(|(id, _)| id == "starPlayers"));
             }
             other => panic!("expected BuyInducements prompt, got {other:?}"),
         }
@@ -590,12 +612,13 @@ mod tests {
             &mut GameRng::new(0),
         );
         assert!(step.inducements_selected_home);
-        assert_eq!(game.team_home.bribes, 1);
+        // Java: `turnData.getInducementSet().add(command set)`.
+        assert_eq!(game.turn_data_home.inducement_set.value(Usage::AVOID_BAN), 1);
         assert_eq!(step.gold_used_home, 100_000);
     }
 
     #[test]
-    fn handle_buy_inducements_deducts_treasury() {
+    fn handle_buy_inducements_leaves_the_treasury_alone() {
         use ffb_model::option::game_option_id::INDUCEMENTS;
         use crate::action::InducementPurchase;
         let mut game = make_game();
@@ -611,7 +634,8 @@ mod tests {
             &mut game,
             &mut GameRng::new(0),
         );
-        assert_eq!(game.team_home.treasury, 400_000);
+        // Java's StepBuyInducements never touches the treasury (leaveStep books the rest gold).
+        assert_eq!(game.team_home.treasury, 500_000);
     }
 
     #[test]
@@ -634,7 +658,7 @@ mod tests {
     }
 
     #[test]
-    fn handle_buy_inducements_clamps_over_budget_purchase() {
+    fn handle_buy_inducements_charges_every_unit_as_sent() {
         use ffb_model::option::game_option_id::INDUCEMENTS;
         use crate::action::InducementPurchase;
         let mut game = make_game();
@@ -649,9 +673,10 @@ mod tests {
             &mut game,
             &mut GameRng::new(0),
         );
-        // Only 1 bribe (100,000) fits in a 150,000 budget.
-        assert_eq!(game.team_home.bribes, 1);
-        assert_eq!(step.gold_used_home, 100_000);
+        // Java: fGoldUsed = gold - the client's remaining gold, i.e. the full cost of what it
+        // sent (the client keeps within budget).
+        assert_eq!(game.turn_data_home.inducement_set.value(Usage::AVOID_BAN), 3);
+        assert_eq!(step.gold_used_home, 300_000);
     }
 
     #[test]
@@ -675,14 +700,14 @@ mod tests {
         let out = step.handle_command(
             &Action::BuyInducements {
                 home: false,
-                purchases: vec![InducementPurchase { id: "cheerleaders".into(), count: 2 }],
+                purchases: vec![InducementPurchase { id: "wizard".into(), count: 1 }],
             },
             &mut game,
             &mut GameRng::new(0),
         );
         assert!(matches!(out.action, StepAction::NextStep));
-        assert_eq!(game.team_home.bribes, 1);
-        assert_eq!(game.team_away.cheerleaders, 2);
+        assert_eq!(game.turn_data_home.inducement_set.value(Usage::AVOID_BAN), 1);
+        assert_eq!(game.turn_data_away.inducement_set.get("wizard").map(|i| i.get_value()), Some(1));
     }
 
     // ── add_star_players tests ────────────────────────────────────────────────
