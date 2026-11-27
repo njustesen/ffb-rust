@@ -2473,9 +2473,14 @@ public class ParityRunner {
             // be activated at all — several re-activation/lost-deactivation bugs stayed invisible
             // for whole games (thrown players re-acting, bomb catchers retired for the half).
             int activeBit = (ps != null && ps.isActive()) ? 1 : 0;
-            out.add(String.format("%s%02d:%d,%d,%s,%d/%d/%d/%d,%d", prefix, i, x, y, state,
+            // §Q1.3: the full PlayerState id (every flag -- rooted, confused, hypnotised, used Pro,
+            // ... -- and the exact off-pitch state, which the label folds into "Reserve") and the
+            // effective PA. Must stay byte-identical with state_hash.rs::collect_player_parts.
+            int psId = (ps != null) ? ps.getId() : 0;
+            out.add(String.format("%s%02d:%d,%d,%s,%d/%d/%d/%d,%d,%d,%d", prefix, i, x, y, state,
                 p.getMovementWithModifiers(), p.getStrengthWithModifiers(),
-                p.getAgilityWithModifiers(), p.getArmourWithModifiers(), activeBit));
+                p.getAgilityWithModifiers(), p.getArmourWithModifiers(), activeBit,
+                psId, p.getPassingWithModifiers()));
         }
     }
 

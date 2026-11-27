@@ -67,7 +67,10 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
   distance roll is not in the JAVA_DIE trace — check `DiceRoller.rollThrowInDistance`), find where the
   catch step's reRolledAction comes from (a stale ClientCommandUseReRoll?), then decide Java defect
   (JAVA_DEFECTS.md) vs harness/Rust fix.
-- [ ] **Q1.3 Wider state hash.** Add to BOTH `ffb-model/src/util/state_hash.rs` and
+- [~] **Q1.3 Wider state hash.** Part 1 done (see Log): every player part now ends `,<PlayerState id>,<PA>`
+  (all state flags + exact off-pitch state + effective PA), both engines identical; smoke 3×20 green.
+  Still to add: granted/temporary skills + properties, SPP / per-player game-result stats, inducement set
+  + apothecaries, bombs, acting player's declared action + has-blocked/passed/fouled flags. Original: Add to BOTH `ffb-model/src/util/state_hash.rs` and
   `ParityRunner.java` (same string format): PA; full player state incl. flags (rooted, confused,
   hypnotised, used-Pro, …) and the exact off-pitch state (banned, KO, BH, SI, RIP, missing, …);
   granted/temporary skills and properties; SPP and per-player game-result stats; inducement set and
@@ -193,6 +196,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q1.3 part 1 · (next commit) · state hash player parts + full PlayerState id + PA, Java and
+  Rust byte-identical (checked on a live step); smoke bb2025/bb2020/bb2016 20/20 with classes all.
 - 2026-11-27 · Q1.2a · (next commit) · out-of-range TTM target → both agents deselect; bb2016
   StepInitThrowTeamMate deselect branch ported; ogre ×3 editions 100/100. Q2.9a closed (no repro on head).
 - 2026-11-27 · Q2.5a · (next commit) · harness clears the Swarming dialog at once (was a 500× loop on

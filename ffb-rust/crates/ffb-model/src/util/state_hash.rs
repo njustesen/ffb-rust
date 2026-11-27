@@ -151,12 +151,18 @@ fn collect_player_parts(game: &Game, out: &mut Vec<String>, home: bool) {
         // whole games (a thrown player re-acting, a bomb catcher retired for the half). Must stay
         // byte-identical with `ParityRunner.addPlayersFromTeam`.
         let active_bit = fm.player_state(&player.id).map(|s| s.is_active() as u8).unwrap_or(0);
-        out.push(format!("{prefix}{i:02}:{x},{y},{state_str},{}/{}/{}/{},{}",
+        // §Q1.3: the full PlayerState id (every flag -- rooted, confused, hypnotised, used Pro, ...
+        // -- and the exact off-pitch state, which the label folds into "Reserve") and the effective
+        // PA. Must stay byte-identical with `ParityRunner.addPlayersFromTeam`.
+        let ps_id = fm.player_state(&player.id).map(|s| s.id()).unwrap_or(0);
+        out.push(format!("{prefix}{i:02}:{x},{y},{state_str},{}/{}/{}/{},{},{},{}",
             player.movement_with_modifiers(),
             player.strength_with_modifiers(),
             player.agility_with_modifiers(),
             player.armour_with_modifiers(),
-            active_bit));
+            active_bit,
+            ps_id,
+            player.passing_with_modifiers()));
     }
 }
 
