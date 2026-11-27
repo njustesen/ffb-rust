@@ -8,7 +8,8 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q3.10**, then Q4.x. Q3.9 code is done; its bb2016 skill sweep joins the night queue. Q3.3a (card play) waits for another session's
+Next item: **Q4.2** undecoded ClientCommands (Q3.10 needs suite runs: night). Q3.9 code is done; its
+bb2016 skill sweep joins the night queue. Q3.3a (card play) waits for another session's
 uncommitted card-model work (see Q3.3a); Q3.3b (card draw) is [!] with a question for the user.
 Then Q3.6, Q2.8's stars / mercenaries / staff. Gate shape for purchases: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`.
 Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
@@ -277,9 +278,10 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Q4 — Server and protocol (GUI tier)
 
-- [ ] **Q4.1 Lossy decodes:** `ClientUseApothecaries` keeps `injuryDescriptions`, `ClientUseReRoll`
+- [x] **Q4.1 Lossy decodes:** `ClientUseApothecaries` keeps `injuryDescriptions`, `ClientUseReRoll`
   keeps the source, `ClientInterceptorChoice` keeps the interceptor (`server_command_handler_factory.rs`
-  ~990-1066).
+  ~990-1066). Done (see Log). Open with Q2.6: the engine has no path for the Team Mascot / Mascot TRR
+  / Pro TRR sources, so those CLIENT_USE_RE_ROLLs are refused (logged) instead of spent as a TRR.
 - [ ] **Q4.2 The 33 undecoded ClientCommands** (BuyCard, SelectCardToBuy, PettyCash, Journeymen,
   SelectWeather, WizardSpell, UseBrawler/Chainsaw/Hatred/Igors/Fumblerooskie/TeamMatesWisdom,
   UseProReRollForBlock, UseConsummateReRollForBlock, UseSingleBlockDieReRoll, UseMultiBlockDiceReRoll,
@@ -316,6 +318,12 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q4.1 · (this commit) · CLIENT_INTERCEPTOR_CHOICE decodes to the chosen interceptor
+  (`SelectPlayer`, or `InterceptWithSkill` with a Yoink!) instead of a yes/no that took the first
+  candidate; CLIENT_USE_RE_ROLL keeps its source (Team ReRoll -> TRR, a skill -> `UseSkillReRoll`,
+  none -> decline, engine-unsupported sources refused). CLIENT_USE_APOTHECARIES was already 1:1
+  (Java never reads `injuryDescriptions`). gui_check 3/3, server tests green.
 
 - 2026-11-27 · Q3.9 (code) · (this commit) · bb2016 Foul Appearance failure = Java bb2016 (only
   hasBlocked/turnStarted + goto: no PRONE revert, no END_PLAYER_ACTION, defender kept); bb2016

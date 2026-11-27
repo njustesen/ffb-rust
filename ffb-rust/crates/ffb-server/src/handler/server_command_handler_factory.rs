@@ -1017,11 +1017,33 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
             target_id: f.defender_id.ok_or_else(|| missing("defenderId"))?,
         }),
 
-        AnyClientCommand::ClientInterceptorChoice(i) => Ok(Action::Intercept { attempt: i.interceptor_id.is_some() }),
+        // Java StepIntercept CLIENT_INTERCEPTOR_CHOICE: `interceptorId` (null = no interception) and
+        // `interceptionSkill`. §Q4.1: this decoded to a bare yes/no, and the step then took the
+        // FIRST candidate -- a GUI coach's choice of interceptor (and a Yoink!) was lost.
+        AnyClientCommand::ClientInterceptorChoice(i) => match (i.interceptor_id, i.interception_skill_id) {
+            (Some(player_id), Some(skill)) => Ok(Action::InterceptWithSkill {
+                player_id,
+                skill_id: parse_skill_id(&skill).ok_or(DecodeError::UnknownSkill(skill))?,
+            }),
+            (player_id, _) => Ok(Action::SelectPlayer { player_id: player_id.unwrap_or_default() }),
+        },
         AnyClientCommand::ClientCoinChoice(c) => Ok(Action::CoinChoice { heads: c.choice_heads }),
         AnyClientCommand::ClientReceiveChoice(r) => Ok(Action::ReceiveChoice { receive: r.choice_receive }),
 
-        AnyClientCommand::ClientUseReRoll(r) => Ok(Action::UseReRoll { use_reroll: r.re_roll_source.is_some() }),
+        // Java AbstractStepWithReRoll CLIENT_USE_RE_ROLL: `reRollSource` (null = decline). The
+        // steps record "TRR" when they offer, so a team re-roll is `UseReRoll`; a skill source
+        // goes through `UseSkillReRoll` (the driver hands the skill to `use_reroll`, as for
+        // CLIENT_USE_SKILL). §Q4.1: every source decoded to a plain team re-roll. Sources the
+        // engine has no path for yet (Team Mascot / Mascot TRR / Pro TRR ...) are refused rather
+        // than spent as a team re-roll.
+        AnyClientCommand::ClientUseReRoll(r) => match r.re_roll_source {
+            None => Ok(Action::UseReRoll { use_reroll: false }),
+            Some(name) if name == "Team ReRoll" || name == "TRR" => Ok(Action::UseReRoll { use_reroll: true }),
+            Some(name) => match parse_skill_id(&name) {
+                Some(skill_id) => Ok(Action::UseSkillReRoll { skill_id }),
+                None => Err(DecodeError::NotImplemented(format!("re-roll source {name}"))),
+            },
+        },
         AnyClientCommand::ClientUseSkill(s) => {
             let name = s.skill_name.ok_or_else(|| missing("skill"))?;
             let skill_id = parse_skill_id(&name).ok_or_else(|| DecodeError::UnknownSkill(name.clone()))?;
@@ -1095,7 +1117,9 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
             positions: p.position,
         }),
 
-        // Java StepApothecaryMultiple CLIENT_USE_APOTHECARIES: no apothecary for any of them.
+        // Java StepApothecaryMultiple CLIENT_USE_APOTHECARIES (bb2020 and bb2025): every casualty
+        // still WAIT_FOR_APOTHECARY_USE becomes DO_NOT_USE_APOTHECARY -- `injuryDescriptions` is
+        // never read, so nothing is lost here (§Q4.1 review note was a false positive).
         AnyClientCommand::ClientUseApothecaries(_) => Ok(Action::Acknowledge),
         // Java StepBlockRollMultiple CLIENT_BLOCK_OR_RE_ROLL_CHOICE_FOR_TARGET.
         AnyClientCommand::ClientBlockOrReRollChoiceForTarget(c) => Ok(Action::BlockOrReRollChoiceForTarget {
@@ -1212,6 +1236,35 @@ mod tests {
     }
 
     fn coord_of(x: i32, y: i32) -> FieldCoordinate { FieldCoordinate::new(x, y) }
+
+    /// §Q4.1 CLIENT_INTERCEPTOR_CHOICE keeps the chosen interceptor (and a Yoink! skill); no
+    /// interceptor declines.
+    #[test]
+    fn decode_interceptor_choice_keeps_the_interceptor() {
+        let r = decode(serde_json::json!({"netCommandId": "clientInterceptorChoice", "interceptorId": "a7"}), TeamSide::Away);
+        assert!(matches!(&r, Ok(Action::SelectPlayer { player_id }) if player_id == "a7"), "{r:?}");
+        let r = decode(serde_json::json!({"netCommandId": "clientInterceptorChoice"}), TeamSide::Away);
+        assert!(matches!(&r, Ok(Action::SelectPlayer { player_id }) if player_id.is_empty()), "{r:?}");
+        let r = decode(serde_json::json!({"netCommandId": "clientInterceptorChoice", "interceptorId": "a7",
+            "skill": "Yoink!"}), TeamSide::Away);
+        assert!(matches!(&r, Ok(Action::InterceptWithSkill { player_id, .. }) if player_id == "a7"), "{r:?}");
+    }
+
+    /// §Q4.1 CLIENT_USE_RE_ROLL keeps the source: team re-roll, a skill, or a decline.
+    #[test]
+    fn decode_use_re_roll_keeps_the_source() {
+        let r = decode(serde_json::json!({"netCommandId": "clientUseReRoll", "reRolledAction": "dodge",
+            "reRollSource": "Team ReRoll"}), TeamSide::Home);
+        assert!(matches!(r, Ok(Action::UseReRoll { use_reroll: true })), "{r:?}");
+        let r = decode(serde_json::json!({"netCommandId": "clientUseReRoll", "reRolledAction": "dodge"}), TeamSide::Home);
+        assert!(matches!(r, Ok(Action::UseReRoll { use_reroll: false })), "{r:?}");
+        let r = decode(serde_json::json!({"netCommandId": "clientUseReRoll", "reRolledAction": "dodge",
+            "reRollSource": "Dodge"}), TeamSide::Home);
+        assert!(matches!(r, Ok(Action::UseSkillReRoll { skill_id: SkillId::Dodge })), "{r:?}");
+        let r = decode(serde_json::json!({"netCommandId": "clientUseReRoll", "reRolledAction": "dodge",
+            "reRollSource": "Mascot TRR"}), TeamSide::Home);
+        assert!(r.is_err(), "{r:?}");
+    }
 
     /// §Q3.7 Java UtilServerPlayerMove.isValidMove: only a move from the acting player's own
     /// square is valid; no from-square (null / empty path) or another square is dropped.
