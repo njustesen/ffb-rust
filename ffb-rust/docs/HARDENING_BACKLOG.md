@@ -8,7 +8,8 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q2.4** (kick-off placements: choose players under --coverage-bias and re-place them).
+Next item: **Q2.6** (block dice choice / Pro / single-die re-rolls). Q2.4 needs the re-placement
+design written under it (next pass).
 Q2.2/Q2.3 inducement parts wait for Q2.8. Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
 that change games; run the Q1 night queue first (mirror 330 + view suites on a frozen exe). Parked with notes: Q1.2b (punt → throw-in
 stall), Q1.2c. Night queue: mirror 330 with the Q1.1–Q1.3 verdict + hash (freeze a q1 exe + jar first).
@@ -132,8 +133,15 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 - [x] **Q2.3 Argue the call: decline branch** (see Log): under `--coverage-bias` both agents decline
   (Java no-arg ClientCommandArgueTheCall, Rust empty list); goblin bb2025 30/30 with 74 declines,
   orc-skaven bb2020 + goblin-dwarf bb2016 20/20. Bribes' use branch needs bought bribes → Q2.8.
-- [ ] **Q2.4 Kick-off placements:** Quick Snap, Solid Defence, High Kick, Perfect Defence, Charge pick
-  real players. Depends on Q3.4 (Solid Defence selection).
+- [~] **Q2.4 Kick-off placements:** Quick Snap, Solid Defence, High Kick, Perfect Defence, Charge pick
+  real players. Tried (reverted): selecting one Solid Defence player (min x,y) under the bias boxes it;
+  if it stood on the line of scrimmage the setup is then illegal, Java clears INVALID_SOLID_DEFENCE and
+  spins to max_iterations, Rust stalls (6/60 biased human-orc bb2025 games). **Design needed:** both
+  harnesses must re-place every selected player before END_TURN — remember each selected player's
+  original square at choice time (Java: a ParityRunner field; Rust: the agent cannot see it, so the
+  KickoffEventPlacement prompt should carry the selected players + their squares) and send
+  ClientCommandSetupPlayer / the Rust setup action back onto that square. Same pattern then serves
+  Quick Snap / High Kick / Perfect Defence moves.
 - [x] **Q2.5a Swarming dialog loop** (see Log): the harness clears DialogSwarmingPlayers at once
   instead of looping 500× on a CONFIRM StepSwarming ignores; same state (zero swarmers), no abort.
   snotling bb2020/bb2025 20/20 each, loops_cleared 0.
@@ -229,6 +237,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q2.4 · (next commit) · attempt reverted; Solid Defence selection needs both harnesses
+  to re-place the boxed player (design noted). Biased human-orc bb2025 60/60 without it.
 - 2026-11-27 · Q3.4 · (next commit) · no code gap: bb2025 Solid Defence choice already 1:1; stale
   DEVIATION comments in the bb2016/bb2020 path corrected.
 - 2026-11-27 · Q2.3 · (next commit) · argue-the-call decline under coverage bias (74 declines, goblin
