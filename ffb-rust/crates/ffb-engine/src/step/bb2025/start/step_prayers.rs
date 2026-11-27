@@ -123,7 +123,7 @@ impl StepPrayers {
                 &home_id,
                 prayers_total_home,
                 available_prayer_rolls.clone(),
-                rng,
+                &mut game.collections_rng.lock(),
             );
             // Java: addPrayerSequences(sequence, game.getTeamAway(), prayersTotalAway, new ArrayList<>(availablePrayerRolls))
             add_prayer_sequence_entries(
@@ -131,7 +131,7 @@ impl StepPrayers {
                 &away_id,
                 prayers_total_away,
                 available_prayer_rolls.clone(),
-                rng,
+                &mut game.collections_rng.lock(),
             );
 
             let out = StepOutcome::next().push_seq(seq);
@@ -157,12 +157,14 @@ fn add_prayer_sequence_entries(
     team_id: &str,
     prayer_amount: i32,
     mut available_rolls: Vec<i32>,
-    rng: &mut GameRng,
+    collections_rng: &mut ffb_model::util::java_random::JavaRandom,
 ) {
     for _ in 0..prayer_amount {
         if available_rolls.is_empty() { break; }
-        // Java: Collections.shuffle(availablePrayerRolls) — use GameRng to shuffle.
-        fisher_yates_shuffle(&mut available_rolls, rng);
+        // Java: Collections.shuffle(availablePrayerRolls) -- java.util.Collections' own shared
+        // Random, NOT the game dice (§Q2.8: bought prayers drew game dice in Rust; human vs
+        // halfling bb2025 seed 1 rolled prayer 13 where Java rolled 6).
+        ffb_model::util::java_random::collections_shuffle(&mut available_rolls, collections_rng);
         // Java: int roll = availablePrayerRolls.remove(0)
         let roll = available_rolls.remove(0);
         // Java: sequence.add(StepId.PRAYER, StepParameter.from(PRAYER_ROLL, roll), StepParameter.from(TEAM_ID, team.getId()))
@@ -170,16 +172,6 @@ fn add_prayer_sequence_entries(
             StepParameter::PrayerRoll(roll),
             StepParameter::TeamId(team_id.to_owned()),
         ]));
-    }
-}
-
-/// Fisher-Yates shuffle using `GameRng::die` for index selection.
-/// Mirrors Java `Collections.shuffle` driven by the game RNG.
-fn fisher_yates_shuffle(v: &mut Vec<i32>, rng: &mut GameRng) {
-    let n = v.len();
-    for i in (1..n).rev() {
-        let j = rng.die((i + 1) as u32) as usize - 1;
-        v.swap(i, j);
     }
 }
 

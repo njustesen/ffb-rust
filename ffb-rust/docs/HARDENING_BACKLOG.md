@@ -170,9 +170,13 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   FREE_INDUCEMENT_CASH in both harnesses (the drafts sit within 50k, so petty cash alone never buys
   anything); under `--coverage-bias` both agents buy one of each COVERAGE_INDUCEMENTS type in list order
   while gold lasts. **Parts 2 (bb2020), 3 (bb2016) and 4 (state hash + prayers) done** (see Log).
-  Open: **bb2025 Prayers step** — with `prayers` FIRST in COVERAGE_INDUCEMENTS (both harnesses) every
-  bb2025 game diverges at the prayer roll (human vs halfling seed 1: Java `prayerRoll` 6 then three
-  `gains Loner` playerEvents, Rust `prayerRoll` 13); the list keeps `prayers` LAST until it is fixed.
+  **Part 5 in progress** (see Log): the roll and the handler dispatch now match. Open, with `prayers`
+  moved FIRST in COVERAGE_INDUCEMENTS (both harnesses) and FFB_INDUCEMENT_CASH=600000, human vs
+  halfling bb2025 seeds 1-5: (a) `prayerRoll.teamName` payload — Rust parity team names (`home Human`)
+  differ from the Java team XML names (`Human Parity25 Home`); (b) seed 3 stalls in Rust on a prayer
+  that grants Arm Bar (a bb2025 handler that Java runs as a player-choice dialog?); (c) seeds 4/5
+  diverge later (in-game prayer effects). Audit every bb2025 handler against Java (random vs
+  select-player, as Blessed Statue was wrong). The list keeps `prayers` LAST until then.
   Then stars / mercenaries / staff (position choices) and cards (Q3.3).
 - [~] **Q2.9 Remaining fixed answers:** part 1 (see Log): under `--coverage-bias` both agents take the
   other branch of PUNT_TO_CROWD (punt), PICK_UP_CHOICE (pick up) and KICK_SKILL (use Kick), zero draws.
@@ -266,7 +270,12 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
-- 2026-11-27 · Q2.8 part 4 · (this commit) · each team's turn InducementSet in the state hash
+- 2026-11-27 · Q2.8 part 5a · (this commit) · bb2025 prayers: StepPrayers shuffles the rolls with
+  java.util.Collections' Random (it drew game dice); a bb2025 PrayerHandlerFactory; the bb2020 Rust
+  StepPrayer now serves bb2025 too (factories + ReportPrayerRoll by edition; the bb2025 twin was a
+  stub); bb2025 Blessed Statue handles BLESSED_STATUE_OF_NUFFLE as a select-player dialog (it handled
+  a non-existent BLESSING_OF_NUFFLE at random). Gates green with prayers last; reds listed in Q2.8.
+- 2026-11-27 · Q2.8 part 4 · bd794fc9d · each team's turn InducementSet in the state hash
   (` i` part, `name:value:uses` sorted, both engines); `prayers` added to the coverage purchase list
   (last). Gate (FFB_INDUCEMENT_CASH=600000, bias): 4 matchups × 10 × 3 editions = 120/120; smoke
   20/20 ×3; bb2020 prayer purchases verified with 800k. bb2025 bought prayers diverge → part 5.

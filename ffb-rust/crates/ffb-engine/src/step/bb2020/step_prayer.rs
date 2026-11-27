@@ -96,21 +96,40 @@ impl StepPrayer {
         // returns FALSE for an unset option -- it does not consult the factory -- so the league
         // table was silently off and only rolls 1..=8 were considered, picking a different prayer
         // and consuming the Collections stream differently from Java.
-        let use_league = game.options
-            .get_option_with_default(ffb_model::option::game_option_id::GameOptionId::INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE)
-            .get_value_as_string() == "true";
-        let mut factory = PrayerFactory::new();
-        factory.initialize(use_league);
-        let handler = factory
-            .for_roll(self.roll)
-            .and_then(|prayer| prayer_handler_factory::for_prayer(&format!("{prayer:?}")));
+        // §Q2.8: Java bb2025 `StepPrayer` is this class with the bb2025 PrayerFactory (rolls 1..=16)
+        // and handlers, and a bb2025 ReportPrayerRoll(teamName, roll, homeTeam). The bb2025 Rust
+        // twin was a stub, so a bought prayer applied nothing; both editions run here now.
+        let handler = if game.rules == ffb_model::enums::Rules::Bb2025 {
+            let mut factory = ffb_model::factory::bb2025::prayer_factory::PrayerFactory::new();
+            factory.initialize();
+            factory
+                .for_roll(self.roll)
+                .and_then(|prayer| crate::inducements::bb2025::prayers::prayer_handler_factory::for_prayer(&format!("{prayer:?}")))
+        } else {
+            let use_league = game.options
+                .get_option_with_default(ffb_model::option::game_option_id::GameOptionId::INDUCEMENT_PRAYERS_USE_LEAGUE_TABLE)
+                .get_value_as_string() == "true";
+            let mut factory = PrayerFactory::new();
+            factory.initialize(use_league);
+            factory
+                .for_roll(self.roll)
+                .and_then(|prayer| prayer_handler_factory::for_prayer(&format!("{prayer:?}")))
+        };
 
         let team_id = self.team_id.clone().unwrap_or_default();
 
         if self.first_run {
             self.first_run = false;
-            // Java: getResult().addReport(new ReportPrayerRoll(roll))
-            game.report_list.add(ReportPrayerRoll::new(self.roll));
+            if game.rules == ffb_model::enums::Rules::Bb2025 {
+                // Java bb2025: addReport(new ReportPrayerRoll(team.getName(), roll, isHomeTeam))
+                let team_name = game.team_by_id(&team_id).map(|t| t.name.clone()).unwrap_or_default();
+                let home_team = game.team_home.id == team_id;
+                game.report_list.add(ffb_model::report::bb2025::report_prayer_roll::ReportPrayerRoll::new(
+                    team_name, self.roll, home_team));
+            } else {
+                // Java bb2020: getResult().addReport(new ReportPrayerRoll(roll))
+                game.report_list.add(ReportPrayerRoll::new(self.roll));
+            }
             // Coverage: `GameEvent::PrayerRoll` had no construction site in the engine. Prayers
             // demonstrably fire — an IRON_MAN prayer is what exposed the missing stat-limit clamp —
             // yet the counter read 0. This is the twin the driver actually routes to for BB2020

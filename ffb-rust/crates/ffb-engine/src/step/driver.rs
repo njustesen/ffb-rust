@@ -231,7 +231,9 @@ pub fn make_step(id: StepId) -> Box<dyn Step> {
         StepId::BuyInducements         => Box::new(step_buy_inducements::StepBuyInducements::new()),
         StepId::MasterChef             => Box::new(StepMasterChef::new()),
         StepId::Prayers                => Box::new(step_prayers::StepPrayers::new()),
-        StepId::Prayer                 => Box::new(StepPrayer::new(0, "")),
+        // §Q2.8: Java's bb2020 and bb2025 StepPrayer differ only in factories and the report; the
+        // bb2020 Rust step handles both (the bb2025 twin was a no-handler stub).
+        StepId::Prayer                 => Box::new(crate::step::bb2020::StepPrayer::default()),
         // ── TTM ──────────────────────────────────────────────────────────────
         StepId::AlwaysHungry           => Box::new(step_always_hungry::StepAlwaysHungry::new(String::new(), String::new())),
         StepId::DispatchScatterPlayer  => Box::new(step_dispatch_scatter_player::StepDispatchScatterPlayer::new()),

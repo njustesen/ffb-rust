@@ -12,6 +12,7 @@ pub mod moles_under_the_pitch_handler;
 pub mod opponent_player_selector;
 pub mod perfect_passing_handler;
 pub mod player_selector;
+pub mod prayer_handler_factory;
 pub mod stiletto_handler;
 pub mod throw_a_rock_handler;
 pub mod treacherous_trapdoor_handler;
