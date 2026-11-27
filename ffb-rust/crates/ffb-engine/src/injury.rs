@@ -1433,6 +1433,16 @@ mod tests {
         assert!(!can_apo_ko_into_stun(Some("InjuryTypeTrapDoorFallForSpp")));
     }
 
+    /// The crowd-push types must carry the name `can_apo_ko_into_stun` keys on (§Q2.8: an
+    /// apothecary revived a crowd-pushed KO as Stunned; Java `CrowdPush.canApoKoIntoStun()` = false).
+    #[test]
+    fn crowd_push_types_name_themselves_for_the_apothecary_check() {
+        use crate::injury::injuryType::injury_type_crowd_push::InjuryTypeCrowdPush;
+        use crate::injury::injuryType::injury_type_crowd_push_for_spp::InjuryTypeCrowdPushForSpp;
+        assert!(!can_apo_ko_into_stun(Some(InjuryTypeCrowdPush::new().java_class_name())));
+        assert!(!can_apo_ko_into_stun(Some(InjuryTypeCrowdPushForSpp::new().java_class_name())));
+    }
+
     #[test]
     fn can_apo_ko_into_stun_false_for_fumbled_ktm() {
         // Java: `KTMFumbleInjury.canApoKoIntoStun()` returns false, unlike its sibling

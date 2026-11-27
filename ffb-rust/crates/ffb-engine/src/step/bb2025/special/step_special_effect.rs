@@ -177,17 +177,32 @@ impl StepSpecialEffect {
                     game, rng, "InjuryTypeFireball",
                     None, &player_id, coord, None, None, ApothecaryMode::SpecialEffect,
                 );
-                // Java: `new SteadyFootingContext(injuryResult, Collections.singletonList(dropPlayerCommand))`
-                // — bug fix: the deferred `DropPlayerCommand` was previously dropped entirely,
-                // so nothing would run the actual player-drop/injury-application logic when
-                // Steady Footing resolves.
-                let commands: Vec<std::sync::Arc<dyn crate::step::framework::DeferredCommand>> = vec![
-                    std::sync::Arc::new(DropPlayerCommand::new(
-                        player_id.clone(), ApothecaryMode::SpecialEffect, true,
-                    )),
-                ];
-                let ctx = SteadyFootingContext::from_injury_result_with_commands(ir, commands);
-                outcome = outcome.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
+                // Java bb2020 / bb2016 StepSpecialEffect publish DIRECTLY (no SteadyFooting; their
+                // SpecialEffect sequences have no SteadyFooting step to consume a context):
+                //   publishParameter(INJURY_RESULT, handleInjury(new InjuryTypeFireball(), ...));
+                //   publishParameters(UtilServerInjury.dropPlayer(this, player, SPECIAL_EFFECT[, true]));
+                // (§Q3.2: a bought wizard's fireball in bb2020 -- the injury came one player late.)
+                if matches!(game.rules, ffb_model::enums::Rules::Bb2020 | ffb_model::enums::Rules::Bb2016) {
+                    let eject = game.rules == ffb_model::enums::Rules::Bb2020;
+                    outcome = outcome.publish(StepParameter::InjuryResult(Box::new(ir)));
+                    for p in crate::step::util_server_injury::drop_player_rng(
+                        game, rng, &player_id, eject, ApothecaryMode::SpecialEffect,
+                    ) {
+                        outcome = outcome.publish(p);
+                    }
+                } else {
+                    // Java bb2025: `new SteadyFootingContext(injuryResult,
+                    // Collections.singletonList(dropPlayerCommand))` -- bug fix: the deferred
+                    // `DropPlayerCommand` was previously dropped entirely, so nothing would run the
+                    // actual player-drop/injury-application logic when Steady Footing resolves.
+                    let commands: Vec<std::sync::Arc<dyn crate::step::framework::DeferredCommand>> = vec![
+                        std::sync::Arc::new(DropPlayerCommand::new(
+                            player_id.clone(), ApothecaryMode::SpecialEffect, true,
+                        )),
+                    ];
+                    let ctx = SteadyFootingContext::from_injury_result_with_commands(ir, commands);
+                    outcome = outcome.publish(StepParameter::SteadyFootingContext(Box::new(ctx)));
+                }
             }
             SpecialEffect::BOMB => {
                 // Java reads PassState.getOriginalBombardier() — whose Rust home is

@@ -123,7 +123,7 @@ impl StepInitInducement {
             // Java: getStepStack().push(new StepWeatherMage(gameState)); leaveStep(false)
             let seq = vec![crate::step::framework::SequenceStep::new(StepId::WeatherMage)];
             self.leave_step(phase, false).push_seq(seq)
-        } else if usages.contains(&Usage::THROW_ROCK) {
+        } else if usages.contains(&Usage::THROW_ROCK) && game.rules == ffb_model::enums::Rules::Bb2025 {
             // Java: ThrowARock.pushSequence(new ThrowARock.SequenceParams(gameState, fHomeTeam)); leaveStep(false)
             let seq = crate::step::generator::bb2025::throw_a_rock::ThrowARock::build_sequence(
                 &crate::step::generator::bb2025::throw_a_rock::ThrowARockParams { home_team: self.home_team });
@@ -158,7 +158,9 @@ impl StepInitInducement {
         if matches!(phase, InducementPhase::EndOfOwnTurn | InducementPhase::EndOfOpponentTurn)
             && !self.touchdown_or_end_of_half
         {
-            useable = of_usage(&|i| i.has_usage(Usage::SPELL) || i.has_usage(Usage::THROW_ROCK));
+            // bb2025 offers SPELL and THROW_ROCK; bb2020's StepInitInducement SPELL only.
+            let bb2025 = game.rules == ffb_model::enums::Rules::Bb2025;
+            useable = of_usage(&|i| i.has_usage(Usage::SPELL) || (bb2025 && i.has_usage(Usage::THROW_ROCK)));
             // bb2016's StepInitInducement has no turn-mode change (lastTurnMode stays KICKOFF for
             // the client); the home_playing handover below is Rust's shared turn chain and stays.
             if game.rules != ffb_model::enums::Rules::Bb2016 {
@@ -170,10 +172,10 @@ impl StepInitInducement {
         } else if phase == InducementPhase::StartOfOwnTurn {
             useable = of_usage(&|i| i.has_usage(Usage::CHANGE_WEATHER));
         }
-        // This step serves all three editions; the use routing is ported for bb2025 (§Q3.2).
-        // bb2020 / bb2016 (their own StepInitInducement classes, cards: §Q3.3) keep the old
-        // no-dialog behaviour until their purchases exist (§Q2.8).
-        if game.rules != ffb_model::enums::Rules::Bb2025 {
+        // This step serves all three editions; the use routing is ported for bb2025 and bb2020
+        // (§Q3.2; bb2020 cards are §Q3.3 -- none can be bought yet, so none are playable). bb2016
+        // (its own StepInitInducement) keeps the old no-dialog behaviour until its purchases exist.
+        if game.rules == ffb_model::enums::Rules::Bb2016 {
             useable.clear();
         }
         useable.sort();

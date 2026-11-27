@@ -285,6 +285,18 @@ impl StepKickoffScatterRoll {
         if let Some(b) = bounds {
             outcome = outcome.publish(StepParameter::KickoffBounds(b));
         }
+        // Java bb2020 StepKickoffScatterRoll:183-187: on the first kick-off of a half (half < 3,
+        // both turn counters 0) `UtilServerGame.handleChefRolls`. bb2025 rolls them in its own
+        // MASTER_CHEF step instead (§Q2.8: a bought chef, human vs halfling bb2020).
+        if game.rules == ffb_model::enums::Rules::Bb2020
+            && game.half < 3
+            && game.turn_data_home.turn_nr == 0
+            && game.turn_data_away.turn_nr == 0
+        {
+            let events = crate::step::bb2025::start::step_master_chef::StepMasterChef::new()
+                .handle_chef_rolls(game, rng);
+            outcome = outcome.with_events(events);
+        }
         outcome
     }
 }

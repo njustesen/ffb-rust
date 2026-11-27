@@ -50,6 +50,23 @@ pub fn for_name_in(rules: crate::enums::Rules, name: &str) -> Option<InducementT
     }
 }
 
+/// Java `game.getFactory(INDUCEMENT_TYPE).allTypes()` for a game of `rules`: the base collection
+/// plus the edition's sub-types, sorted by name. Empty for `Rules::Common`.
+pub fn all_types_in(rules: crate::enums::Rules) -> Vec<InducementTypeEntry> {
+    use crate::enums::Rules;
+    let mut types: Vec<InducementTypeEntry> = match rules {
+        Rules::Bb2016 => crate::inducement::bb2016::inducement_collection::InducementCollection::new()
+            .get_all_types().into_iter().cloned().collect(),
+        Rules::Bb2020 => crate::inducement::bb2020::inducement_collection::InducementCollection::new()
+            .get_all_types().into_iter().cloned().collect(),
+        Rules::Bb2025 => crate::inducement::bb2025::inducement_collection::InducementCollection::new()
+            .get_all_types().into_iter().cloned().collect(),
+        Rules::Common => Vec::new(),
+    };
+    types.sort_by(|a, b| a.id.cmp(&b.id));
+    types
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

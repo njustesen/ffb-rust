@@ -51,10 +51,7 @@ use crate::step::game::start::util_minimum_inducement_cost::minimum_inducement_c
 /// Java `game.getFactory(INDUCEMENT_TYPE).allTypes()` for BB2025: the base collection plus the
 /// bb2025 sub-types, sorted by name.
 fn bb2025_inducement_types() -> Vec<ffb_model::inducement::inducement_collection::InducementTypeEntry> {
-    let mut types: Vec<_> = ffb_model::inducement::bb2025::inducement_collection::InducementCollection::new()
-        .get_all_types().into_iter().cloned().collect();
-    types.sort_by(|a, b| a.id.cmp(&b.id));
-    types
+    ffb_model::factory::inducement_type_factory::all_types_in(ffb_model::enums::Rules::Bb2025)
 }
 
 /// Java: `StepBuyInducements.MAX_UNDERDOG_ALLOWANCE` — the most treasury an underdog may add to

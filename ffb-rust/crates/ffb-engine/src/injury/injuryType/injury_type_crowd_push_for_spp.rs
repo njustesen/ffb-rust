@@ -12,6 +12,8 @@ impl Default for InjuryTypeCrowdPushForSpp { fn default() -> Self { Self::new() 
 
 impl InjuryTypeServer for InjuryTypeCrowdPushForSpp {
     fn java_type_name(&self) -> &'static str { "crowdpushForSpp" }
+    /// `can_apo_ko_into_stun` keys off this name (Java `CrowdPushForSpp.canApoKoIntoStun() == false`).
+    fn java_class_name(&self) -> &'static str { "InjuryTypeCrowdPushForSpp" }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
         coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>, _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {
         crowd_handle_injury(&mut self.ctx, game, rng, attacker_id, defender_id, coord, apo_mode);

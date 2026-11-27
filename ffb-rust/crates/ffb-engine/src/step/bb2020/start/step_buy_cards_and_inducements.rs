@@ -31,7 +31,7 @@
 /// BriberyAndCorruption: adds 1 briberyAndCorruption inducement if team has the special rule.
 /// rerollOnesOnKOs: adds 1 bugmansXXXXXX inducement if any team player has canReRollOnesOnKORecovery.
 use std::collections::HashMap;
-use ffb_model::data::loader::{find_position, BB2020_INDUCEMENTS};
+use ffb_model::data::loader::find_position;
 use ffb_model::enums::{InducementPhase, PlayerType, PlayerState, PS_RESERVE};
 use ffb_model::events::GameEvent;
 use ffb_model::inducement::usage::Usage;
@@ -58,7 +58,6 @@ use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::generator::sequence::SequenceStep;
 use crate::step::generator::common::inducement::InducementParams;
 use crate::step::generator::common::{Inducement, RiotousRookies};
-use crate::step::game::start::util_inducement_catalog::{apply_purchases, available_list};
 use crate::step::game::start::util_minimum_inducement_cost::minimum_inducement_cost;
 
 /// Phase enum mirroring the private inner `Phase` in Java.
@@ -206,7 +205,14 @@ impl StepBuyCardsAndInducements {
             None => return StepOutcome::cont(),
         };
         let team = if home { &game.team_home } else { &game.team_away };
-        let available = available_list(&BB2020_INDUCEMENTS.inducements, team);
+        // §Q2.8: the bb2020 InducementTypeFactory types with a cost option, availability > 0 and
+        // not `card`, priced by `getActualCostId(team)` (as `inducementCosts` charges them).
+        let available: Vec<(String, i32)> = ffb_model::factory::inducement_type_factory::all_types_in(game.rules)
+            .into_iter()
+            .filter(|t| t.id != "card" && t.availability(team, &game.options) > 0)
+            .filter_map(|t| t.actual_cost_id(team)
+                .map(|cost_id| (t.id.clone(), ffb_model::option::util_game_option::get_int_option(game, cost_id))))
+            .collect();
         StepOutcome::cont().with_prompt(AgentPrompt::BuyInducements {
             team_id: team.id.clone(),
             available,
@@ -219,20 +225,36 @@ impl StepBuyCardsAndInducements {
     /// handled via separate action fields not modeled here — see module docs). Returns a
     /// `GameEvent::BuyInducement` per inducement id actually purchased.
     fn apply_purchase(&mut self, game: &mut Game, home: bool, purchases: &[crate::action::InducementPurchase]) -> Vec<GameEvent> {
-        let catalog = &BB2020_INDUCEMENTS.inducements;
-        let (team_id, spent, applied) = if home {
-            let budget = self.available_inducement_gold_home.unwrap_or(0) - self.used_inducement_gold_home;
-            let (spent, applied) = apply_purchases(catalog, &mut game.team_home, &mut game.turn_data_home.inducement_set, purchases, budget);
-            (game.team_home.id.clone(), spent, applied)
+        // Java `handleBuyInducements`: `turnData.getInducementSet().add(command set)`, then
+        // `usedInducementGold = star + merc + inducementCosts(team, set) + staff` (assigned).
+        let types = ffb_model::factory::inducement_type_factory::all_types_in(game.rules);
+        let mut set = ffb_model::model::inducement_set::InducementSet::new();
+        for purchase in purchases {
+            if let Some(t) = types.iter().find(|t| t.id == purchase.id) {
+                set.add_inducement(ffb_model::inducement::inducement::Inducement::new(
+                    t.id.clone(), purchase.count as i32, t.usages.clone()));
+            }
+        }
+        let team = if home { &game.team_home } else { &game.team_away };
+        let team_id = team.id.clone();
+        let inducement_cost: i32 = set.get_inducements().iter()
+            .filter_map(|i| types.iter().find(|t| t.id == i.type_id)
+                .and_then(|t| t.actual_cost_id(team))
+                .map(|cost_id| i.get_value() * ffb_model::option::util_game_option::get_int_option(game, cost_id)))
+            .sum();
+        let mut events: Vec<GameEvent> = set.get_inducements().iter()
+            .map(|i| GameEvent::BuyInducement {
+                team_id: team_id.clone(), inducement_id: i.type_id.clone(), count: i.get_value() as u32 })
+            .collect();
+        events.sort_by(|a, b| format!("{a:?}").cmp(&format!("{b:?}")));
+        if home {
+            game.turn_data_home.inducement_set.add(&set);
+            self.used_inducement_gold_home = inducement_cost;
         } else {
-            let budget = self.available_inducement_gold_away.unwrap_or(0) - self.used_inducement_gold_away;
-            let (spent, applied) = apply_purchases(catalog, &mut game.team_away, &mut game.turn_data_away.inducement_set, purchases, budget);
-            (game.team_away.id.clone(), spent, applied)
-        };
-        if home { self.used_inducement_gold_home += spent; } else { self.used_inducement_gold_away += spent; }
-        applied.into_iter()
-            .map(|(id, count)| GameEvent::BuyInducement { team_id: team_id.clone(), inducement_id: id, count })
-            .collect()
+            game.turn_data_away.inducement_set.add(&set);
+            self.used_inducement_gold_away = inducement_cost;
+        }
+        events
     }
 
     /// Java: `init(Game game)` — determine who has petty cash and set initial phase.
@@ -1035,18 +1057,20 @@ mod tests {
         let out = answer(&mut step, &mut game, true,
             vec![InducementPurchase { id: "bribes".into(), count: 1 }]);
         assert_eq!(out.action, StepAction::NextStep);
-        assert_eq!(game.team_home.bribes, 1);
+        // Java `turnData.getInducementSet().add(set)`: the bribe lives in the turn's InducementSet.
+        assert_eq!(game.turn_data_home.inducement_set.value(Usage::AVOID_BAN), 1);
     }
 
+    /// Java `handleBuyInducements` charges `inducementCosts` and never touches the treasury.
     #[test]
-    fn purchase_deducts_treasury_and_tracks_used_gold() {
+    fn purchase_tracks_used_gold_and_leaves_the_treasury_alone() {
         let mut game = make_game_with_petty_cash(200_000, 0);
         game.team_home.treasury = 500_000;
         let mut step = StepBuyCardsAndInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
         answer(&mut step, &mut game, false, vec![]);
         answer(&mut step, &mut game, true, vec![InducementPurchase { id: "bribes".into(), count: 1 }]);
-        assert_eq!(game.team_home.treasury, 400_000);
+        assert_eq!(game.team_home.treasury, 500_000);
         assert_eq!(step.used_inducement_gold_home, 100_000);
     }
 
@@ -1060,16 +1084,17 @@ mod tests {
         assert_eq!(game.turn_data_home.inducement_set.get("weatherMage").map(|i| i.get_value()), Some(1));
     }
 
+    /// Java applies the command's set as sent and charges every unit (the client keeps within
+    /// budget; Java throws otherwise): 2 bribes = 2 × INDUCEMENT_BRIBES_COST.
     #[test]
-    fn purchase_clamps_over_budget_purchase() {
-        let mut game = make_game_with_petty_cash(150_000, 0);
+    fn purchase_charges_every_unit_as_sent() {
+        let mut game = make_game_with_petty_cash(250_000, 0);
         let mut step = StepBuyCardsAndInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
         answer(&mut step, &mut game, false, vec![]);
-        // 300,000 requested; only 1 bribe (100,000) fits in a 150,000 budget.
-        answer(&mut step, &mut game, true, vec![InducementPurchase { id: "bribes".into(), count: 3 }]);
-        assert_eq!(game.team_home.bribes, 1);
-        assert_eq!(step.used_inducement_gold_home, 100_000);
+        answer(&mut step, &mut game, true, vec![InducementPurchase { id: "bribes".into(), count: 2 }]);
+        assert_eq!(game.turn_data_home.inducement_set.value(Usage::AVOID_BAN), 2);
+        assert_eq!(step.used_inducement_gold_home, 200_000);
     }
     #[test]
     fn leave_step_pushes_kickoff_and_inducement_sequences_after_both_submit() {

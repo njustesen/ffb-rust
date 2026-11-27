@@ -12,6 +12,10 @@ impl Default for InjuryTypeCrowdPush { fn default() -> Self { Self::new() } }
 
 impl InjuryTypeServer for InjuryTypeCrowdPush {
     fn java_type_name(&self) -> &'static str { "crowdpush" }
+    /// `can_apo_ko_into_stun` keys off this name (Java `CrowdPush.canApoKoIntoStun() == false`):
+    /// without it an apothecary revived a crowd-pushed KO as Stunned instead of Reserve (§Q2.8,
+    /// a bought Wandering Apothecary, underworld vs orc bb2020 seed 1).
+    fn java_class_name(&self) -> &'static str { "InjuryTypeCrowdPush" }
     fn handle_injury(&mut self, game: &Game, rng: &mut GameRng, attacker_id: Option<&str>, defender_id: &str,
         coord: FieldCoordinate, _from_coord: Option<FieldCoordinate>, _old_ctx: Option<&InjuryContext>, apo_mode: ApothecaryMode) {
         crowd_handle_injury(&mut self.ctx, game, rng, attacker_id, defender_id, coord, apo_mode);

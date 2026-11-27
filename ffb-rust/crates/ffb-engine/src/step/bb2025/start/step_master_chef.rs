@@ -54,7 +54,7 @@ impl StepMasterChef {
     /// Rolls master chef dice for home then away, then applies the cross-theft:
     /// - home rerolls: max(0, home - stolen_by_away) + stolen_by_home
     /// - away rerolls: max(0, away - stolen_by_home) + stolen_by_away
-    fn handle_chef_rolls(&self, game: &mut Game, rng: &mut GameRng) -> Vec<GameEvent> {
+    pub fn handle_chef_rolls(&self, game: &mut Game, rng: &mut GameRng) -> Vec<GameEvent> {
         let mut events: Vec<GameEvent> = Vec::new();
         let rerolls_stolen_home = self.roll_master_chef_for_team(game, true, rng, &mut events);
         let rerolls_stolen_away = self.roll_master_chef_for_team(game, false, rng, &mut events);

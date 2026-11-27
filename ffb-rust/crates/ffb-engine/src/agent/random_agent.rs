@@ -1730,8 +1730,16 @@ impl Agent for RandomAgent {
                 Action::Block { defender_id: defender_id.clone() },
             Some(AgentPrompt::BuyCards { team_id, .. }) =>
                 Action::BuyCard { home: *team_id == gs.game.team_home.id, card_type: None },
-            Some(AgentPrompt::BuyInducements { team_id, .. }) =>
-                Action::BuyInducements { home: *team_id == gs.game.team_home.id, purchases: vec![] },
+            // §Q2.8 (bb2020 BUY_CARDS_AND_INDUCEMENTS, bb2016 BUY_INDUCEMENTS): the same coverage
+            // purchase rule as the bb2025 dialog under --coverage-bias; otherwise nothing.
+            Some(AgentPrompt::BuyInducements { team_id, available, budget }) => {
+                let purchases = if crate::agent::heuristic_agent::coverage_bias() > 0.0 {
+                    coverage_inducements(available, *budget)
+                } else {
+                    vec![]
+                };
+                Action::BuyInducements { home: *team_id == gs.game.team_home.id, purchases }
+            }
             // §Q2.8: under --coverage-bias buy one of each COVERAGE_INDUCEMENTS entry the dialog
             // offers, in list order, while its cost fits the gold left (ParityRunner
             // coverageInducements, same list). Otherwise the empty purchase.

@@ -1349,6 +1349,24 @@ public class ParityRunner {
             // §Q2.8: under --coverage-bias the coach buys one of each COVERAGE_INDUCEMENTS entry, in
             // list order, while its cost fits the remaining gold and availability > 0 (random_agent.rs
             // mirrors it). Without the bias: RandomStrategy's empty purchase (default arm).
+            case BUY_CARDS_AND_INDUCEMENTS:
+                if (com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS > 0.0f
+                        && dialog instanceof com.fumbbl.ffb.dialog.DialogBuyCardsAndInducementsParameter) {
+                    com.fumbbl.ffb.dialog.DialogBuyCardsAndInducementsParameter bc =
+                        (com.fumbbl.ffb.dialog.DialogBuyCardsAndInducementsParameter) dialog;
+                    com.fumbbl.ffb.model.InducementSet set = coverageInducements(game,
+                        game.getTeamById(bc.getTeamId()), bc.getAvailableGold());
+                    comm.clearCaptured();
+                    comm.sendBuyInducements(bc.getTeamId(), bc.getAvailableGold(), set,
+                        new String[0], new String[0], new com.fumbbl.ffb.model.skill.Skill[0], new String[0]);
+                    injectCaptured(dialog, game, gameState);
+                } else {
+                    comm.clearCaptured();
+                    RandomStrategy.respondToDialog(dialog, game, comm);
+                    injectCaptured(dialog, game, gameState);
+                }
+                break;
+
             case BUY_PRAYERS_AND_INDUCEMENTS:
                 if (com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS > 0.0f
                         && dialog instanceof com.fumbbl.ffb.dialog.DialogBuyPrayersAndInducementsParameter) {
