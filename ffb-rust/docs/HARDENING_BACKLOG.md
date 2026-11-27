@@ -8,7 +8,10 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q2.10** rest (Team inducement set for USE_PREDEFINED_INDUCEMENTS; dead-twin edition diffs), **Q4.4** rest (part 1 done: enhancements) (Q4.2 rest waits for the other session's
+Next item (weekend compute granted until Mon 11-30 07:00, shared with the user's training: 2 workers,
+0x7FF): **Q1.7 cert10** on one frozen pair -- mirror 330 is effectively done on q1b/q1c (329 + JD-002);
+run cross 4,012, star 4,012 and the skill sweep on a fresh frozen pair, fix every red 1:1, then one
+final mirror on that same pair. Day items after that: **Q2.10** rest (Team inducement set for USE_PREDEFINED_INDUCEMENTS; dead-twin edition diffs), **Q4.4** rest (part 1 done: enhancements) (Q4.2 rest waits for the other session's
 declaration work; Q4.3 is [!]; Q3.10 needs suite runs: night). Q3.9 code is done; its
 bb2016 skill sweep joins the night queue. Q3.3a (card play) waits for another session's
 uncommitted card-model work (see Q3.3a); Q3.3b (card draw) is [!] with a question for the user.
@@ -42,8 +45,11 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
 
 ## Q1 — Make "identical" mean identical (validation)
 
-- [~] **Q1.1 Per-step verdict.** Code + tests done (`compare_lines`); smoke gates bb2025/bb2020/bb2016
-  20/20 under the new verdict. Waiting: mirror 330 re-run (night, with Q1.2). `ffb-parity/src/comparator.rs`: a game fails on the first per-step
+- [x] **Q1.1 Per-step verdict.** (501b5ed46, see Log) Mirror 330 on the strict verdict + wider hash:
+  329/330 green + goblin bb2025 @1.0 = 4 JD-002 JAVA-CRASH (known, reported separately). It found 3
+  real bugs (heat-exhausted reset, bb2016 bombardier, PUNT_TO_CROWD harness loop), all fixed and their
+  cells re-gated 100/100 on frozen q1c. Code + tests done (`compare_lines`); smoke gates bb2025/bb2020/bb2016
+  20/20 under the new verdict. `ffb-parity/src/comparator.rs`: a game fails on the first per-step
   `state_hash`/turn/half/active mismatch AND on a step-count mismatch, not only on the final hash.
   Keep the final-hash check. Done: unit tests for converge-after-diverge and extra-step cases; smoke gate
   green; mirror 330 re-run green (night).
@@ -77,7 +83,7 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
   catch step's reRolledAction comes from (a stale ClientCommandUseReRoll?), then decide Java defect
   (JAVA_DEFECTS.md) vs harness/Rust fix. Second repro: dark_elf vs wood_elf_sk bb2025 seed 20 with
   `--coverage-bias 1` (STUCK_STEP CATCH_SCATTER_THROW_IN; green without the bias).
-- [~] **Q1.3 Wider state hash.** Part 1 done (see Log): every player part now ends `,<PlayerState id>,<PA>`
+- [x] **Q1.3 Wider state hash.** (mirror 330 green with it, see Q1.1.) Part 1 done (see Log): every player part now ends `,<PlayerState id>,<PA>`
   (all state flags + exact off-pitch state + effective PA), both engines identical; smoke 3×20 green.
   Part 2 done: acting player part ends `,<declared action>,<10 flags>` (blocked, passed, fouled, moved,
   fed, goingForIt, standingUp, bloodLust, animosity, jumping); smoke 3×20 green.
@@ -374,6 +380,11 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-28 · Q1.1 + Q1.3 · (this commit) · mirror 330 on frozen q1b (strict per-step verdict, wider
+  hash, aborts red): 325 green; 4 reds fixed this night (heat-exhausted reset 9397c84a4, bb2016
+  bombardier 89840c492, PUNT_TO_CROWD harness 501b5ed46) and re-gated 100/100 on frozen q1c; goblin
+  bb2025 @1.0 = 4 JD-002 JAVA-CRASH (stock Java). Q1.1 and Q1.3 done.
 
 - 2026-11-27 · Q2.9a reopened + fixed · (this commit) · the PUNT_TO_CROWD loop does reproduce
   (mirror q1b dark_elf bb2025: s49 @0, s74/s95 @1.0, s14 @1e6): Java StepInitPunt keeps
