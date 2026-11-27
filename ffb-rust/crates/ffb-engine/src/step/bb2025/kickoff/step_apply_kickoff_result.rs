@@ -831,8 +831,9 @@ impl StepApplyKickoffResult {
                     // client-only: DialogInvalidSolidDefenceParameter — headless allows overcount
                     // Java validSolidDefence: showDialog(new DialogInvalidSolidDefenceParameter(
                     //   actingTeam.getId(), movedPlayers.size(), nrOfPlayersAllowed), false) when too many moved.
-                    // DEVIATION: Rust's Solid Defence has no player-selection phase, so Java's
-                    // "moved minus selected" amount is the plain moved count here.
+                    // bb2016/bb2020 Solid Defence is a free re-setup with no player selection (Java's
+                    // selection dialog is bb2025-only, ported in `handle_solid_defence_bb2025`), so the
+                    // amount is the plain moved count.
                     if moved_players > self.nr_of_players_allowed {
                         crate::util::util_server_dialog::UtilServerDialog::show_dialog(
                             game,
@@ -869,8 +870,8 @@ impl StepApplyKickoffResult {
             // Java bb2025: `nrOfPlayersAllowed = Math.min(roll + 3, eligiblePlayers.size())`, the
             // eligible set being on-pitch players with NO adjacent opposing tackle-zone player
             // (amazon_vs_goblin bb2025 seed 3: Java 5, Rust 6). BB2020 keeps the bare roll + 3.
-            // NOTE: bb2025's Solid Defence is a player-CHOICE dialog over that set; Rust still runs
-            // the bb2020 free re-setup flow (BACKLOG §J open item) — only the reported limit is ported.
+            // (bb2025 never reaches this branch: `handle_solid_defence` hands it to
+            // `handle_solid_defence_bb2025`, the 1:1 player-choice flow.)
             if game.rules == Rules::Bb2025 {
                 let other = if game.home_playing { &game.team_away } else { &game.team_home };
                 let eligible = self.players_at_coordinates.values()
@@ -885,9 +886,8 @@ impl StepApplyKickoffResult {
                 self.nr_of_players_allowed,
             ));
             // client-only: setAnimation(KICKOFF_SOLID_DEFENSE)
-            // DEVIATION: Java bb2025 shows DialogPlayerChoiceParameter(actingTeam, SOLID_DEFENCE,
-            // eligiblePlayers, null, nrOfPlayersAllowed) here; Rust runs the free re-setup flow with
-            // no player-selection phase, so that dialog is not shown.
+            // bb2016/bb2020: free re-setup, no selection dialog (Java shows
+            // DialogPlayerChoiceParameter(SOLID_DEFENCE) in bb2025 only -- see handle_solid_defence_bb2025).
             StepOutcome::cont().with_event(GameEvent::SolidDefenceRoll {
                 team_id: acting_team_id,
                 roll,

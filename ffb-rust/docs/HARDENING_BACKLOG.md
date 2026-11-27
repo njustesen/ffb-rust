@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q3.4** (Solid Defence selection), then Q2.4 (kick-off placements, which depends on it).
+Next item: **Q2.4** (kick-off placements: choose players under --coverage-bias and re-place them).
 Q2.2/Q2.3 inducement parts wait for Q2.8. Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
 that change games; run the Q1 night queue first (mirror 330 + view suites on a frozen exe). Parked with notes: Q1.2b (punt → throw-in
 stall), Q1.2c. Night queue: mirror 330 with the Q1.1–Q1.3 verdict + hash (freeze a q1 exe + jar first).
@@ -166,7 +166,10 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   in `step_init_inducement.rs` (bb2025, bb2020, bb2016 card play). Gate: each inducement fires.
 - [ ] **Q3.3 Cards (bb2016/bb2020):** build decks, buy, draw, play, deactivate (`handle_card`,
   `step_buy_cards_and_inducements.rs:249-343`, `PlayCard`). Gate: card play in both editions.
-- [ ] **Q3.4 Solid Defence player selection** (`step_apply_kickoff_result.rs:834,888`).
+- [x] **Q3.4 Solid Defence player selection** — review false positive: bb2025's player-choice flow is
+  already ported (`handle_solid_defence_bb2025`, Java's DialogPlayerChoiceParameter + validSolidDefence);
+  the "DEVIATION" comments sat in the bb2016/bb2020 path, where Java itself does a free re-setup. Stale
+  comments corrected (see Log).
 - [ ] **Q3.5 bb2016 dodge/leap hooks:** Break Tackle and Arm Bar on dodge (`step_move_dodge.rs:91`),
   Diving Tackle on Leap (`step_jump.rs:41`).
 - [ ] **Q3.6 bb2020 `is_wisdom_available`** (`ffb-mechanics/src/bb2020/game_mechanic.rs:152`) and the
@@ -226,6 +229,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q3.4 · (next commit) · no code gap: bb2025 Solid Defence choice already 1:1; stale
+  DEVIATION comments in the bb2016/bb2020 path corrected.
 - 2026-11-27 · Q2.3 · (next commit) · argue-the-call decline under coverage bias (74 declines, goblin
   bb2025 30/30). Q2.2 single-regen already sampled; inducement parts → Q2.8.
 - 2026-11-27 · Q2.1 · (next commit) · apothecary accept under coverage bias; fixed missing
