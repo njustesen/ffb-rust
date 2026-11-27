@@ -134,7 +134,8 @@ impl StepModifierTrait for GrabStepModifier {
             // is not among them -- so Java always USES Grab. Rust left `grabbing` None, which
             // silently DECLINES it. Same defect the Stand Firm and Side Step behaviours had.
             //
-            // Auto-ACCEPT to mirror the harness, then fall through to the grab branch below.
+            // With an acting player the Grab dialog is shown below (`show_dialog(SkillUse Grab)`,
+            // parked for StepPushback to prompt); only the no-acting-player case auto-accepts.
             // NOTE: no team roster in any edition currently carries Grab (it appears only in
             // `data/skills/` and `data/star_players/`), so this cannot move the parity matrix --
             // it is corrected because it is wrong against the Java, not for a score.

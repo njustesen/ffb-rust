@@ -54,7 +54,8 @@ use crate::step::framework::{StepAction, StepId, StepParameter};
 /// Java: `rollApothecary(InjuryResult)` — rolls a new casualty for apothecary use.
 ///
 /// If BH or KO: auto-cures (emits `ReportApothecaryChoice`).
-/// If CAS: rolls new casualty, headless auto-picks the better outcome, emits both reports.
+/// If CAS: rolls new casualty, emits both reports and asks the coach to pick
+/// (`AgentPrompt::ApothecaryChoice`, Java's DialogApothecaryChoice).
 fn roll_apothecary_for_injury(result: &mut Box<InjuryResult>, rng: &mut GameRng, game: &mut Game) -> Option<ffb_model::prompts::AgentPrompt> {
     let ctx = result.injury_context();
     let defender_id = ctx.defender_id.clone().unwrap_or_default();

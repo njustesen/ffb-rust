@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q4.4** rest (part 1 done: enhancements), then **Q2.10** inline decisions (Q4.2 rest waits for the other session's
+Next item: **Q2.10** rest (Team inducement set for USE_PREDEFINED_INDUCEMENTS; dead-twin edition diffs), **Q4.4** rest (part 1 done: enhancements) (Q4.2 rest waits for the other session's
 declaration work; Q4.3 is [!]; Q3.10 needs suite runs: night). Q3.9 code is done; its
 bb2016 skill sweep joins the night queue. Q3.3a (card play) waits for another session's
 uncommitted card-model work (see Q3.3a); Q3.3b (card draw) is [!] with a question for the user.
@@ -190,9 +190,20 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   Diving Catch, player-choice dialogs (High Kick, Arm Bar…), Piling On / Pile Driver decline, select
   skill by value, touchback choice, concession (needs Q3.8). List each dialog kind in the heuristic's
   scorer or document why it stays fixed.
-- [ ] **Q2.10 Engine-side inline decisions** ("headless auto-…", 81 sites in 38 files): each one either
+- [~] **Q2.10 Engine-side inline decisions** ("headless auto-…", 81 sites in 38 files): each one either
   becomes a prompt (as Java asks the client) or is documented as Java's own server-side behaviour.
   Includes Grab always used, bb2016 bribes skip argue, `USE_PREDEFINED_INDUCEMENTS`.
+  **Audited 2026-11-27** (35 comment sites + the 3 extras, liveness from `driver.rs` dispatch):
+  25 sit in DEAD twins (bb2016 Mvp/Bribes/Intercept/Apothecary, bb2020 Mvp/KickoffResultRoll/Jump/
+  ApothecaryMultiple/BlockRollMultiple/Apothecary/KickoffScatterRoll: the live step is the shared
+  bb2025 struct, which asks); stale comments fixed (bb2025 StepPass, ApothecaryMultiple,
+  GettingEven, Grab -- all already ask); "bb2016 bribes skip argue" is resolved (the shared
+  StepBribes asks both). **Fixed** (see Log): bb2025 StepMoveDodge Dodge-skill answer, bb2020
+  AssignTouchdowns dialog, bb2016 TTM Pass skill re-roll. **Open:** `USE_PREDEFINED_INDUCEMENTS`
+  (bb2016 applies then still shows the buy dialog; bb2020/bb2025 apply server-side) needs Java's
+  `Team.getInducementSet()` modelled on the Rust `Team` (option off by default). Follow-up: compare
+  the dead-twin pairs that live through the shared step (bb2016 Pass/Mvp/Intercept/Apothecary,
+  bb2020 Pass/Mvp/Jump) for edition differences, as StepBribes's `execute_step_bb2016` does.
 
 ## Q3 — Port what is missing from the engine (1:1 from Java)
 
@@ -358,6 +369,15 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q2.10 part 1 · (this commit) · audit of the inline decisions (see Q2.10); three live
+  gaps fixed 1:1: bb2025 StepMoveDodge takes CLIENT_USE_SKILL(canRerollDodge) as Java (the Dodge
+  skill becomes the source; the Diving Tackle offer had pre-set TRR, so a GUI coach picking Dodge
+  spent a team re-roll); bb2020 StepAssignTouchdowns shows DialogPlayerChoice(ASSIGN_TOUCHDOWN) and
+  waits with a prompt (it waited with neither: a post-concession stall); bb2016 TTM offers the
+  unused Pass skill re-roll (DialogSkillUse) before the team re-roll, PassBehaviour's answer sets
+  the source, and the team ask passes fumble=false as Java. Tests: one per fix; cargo test 12,811
+  green; smoke 3×20/20; goblin bb2016 20/20.
 
 - 2026-11-27 · Q4.4 part 1 · (this commit) · model-change diff: a player's changed enhancement
   source becomes the Java change that reproduces it (removeSkillEnhancements; addSkillEnhancements,

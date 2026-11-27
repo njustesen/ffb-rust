@@ -158,7 +158,22 @@ impl Step for StepMoveDodge {
                 }
                 self.execute_step(game, rng)
             }
-            // client-only: CLIENT_USE_SKILL → canRerollDodge — headless auto-declines.
+            // Java: CLIENT_USE_SKILL with a canRerollDodge skill (the coach picks the Dodge skill
+            // in the re-roll dialog, e.g. the Diving Tackle what-if) → `setReRolledAction(DODGE);
+            // setReRollSource(skill.getRerollSource(DODGE))` -- isSkillUsed is not read --,
+            // EXECUTE_STEP. Rust fell to `_` and kept the "TRR" the offer had recorded, so a GUI
+            // coach choosing Dodge spent a team re-roll.
+            Action::UseSkill { skill_id, .. }
+                if skill_id.properties_for(game.rules).contains(
+                    &ffb_model::model::property::named_properties::NamedProperties::CAN_REROLL_DODGE) =>
+            {
+                use ffb_model::model::re_rolled_action::ReRolledAction;
+                self.re_roll_state.re_rolled_action = Some(ReRolledAction::new("DODGE"));
+                self.re_roll_state.re_roll_source = skill_id.reroll_sources_for(game.rules).iter()
+                    .find(|(action, _)| *action == "DODGE")
+                    .map(|(_, priority)| ReRollSource::with_priority(format!("{:?}", skill_id), *priority));
+                self.execute_step(game, rng)
+            }
             // Java: CLIENT_PLAYER_CHOICE (ARM_BAR mode) → armBarPlayerId = command.getPlayerId();
             // armBarChoice = true; EXECUTE_STEP. The agent's generic PlayerChoice decline sends
             // SelectPlayer with an empty id (no arm-bar player chosen).
@@ -1251,6 +1266,53 @@ mod tests {
             "Tackle cancels the Dodge re-roll and the bank is empty: Java shows no dialog, got {:?}",
             out.prompt);
         assert_eq!(out.action, StepAction::GotoLabel, "the failed dodge goes to the failure label");
+    }
+
+    /// Java `StepMoveDodge.handleCommand`: CLIENT_USE_SKILL with a canRerollDodge skill sets the
+    /// Dodge skill as the re-roll source. Answering the Diving Tackle what-if dialog with the Dodge
+    /// skill must spend the skill, not a team re-roll.
+    #[test]
+    fn dodge_skill_answer_to_the_diving_tackle_offer_spends_the_skill() {
+        use ffb_model::enums::{PlayerAction, PS_STANDING, PlayerState as PSt, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+        let mut dodger = Player {
+            id: "dodger".into(), name: "d".into(), nr: 1, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 5, strength: 2, agility: 3, passing: 4, armour: 7,
+            ..Default::default()
+        };
+        dodger.starting_skills.push(SkillWithValue { skill_id: SkillId::Dodge, value: None });
+        game.team_home.players.push(dodger);
+        let mut diver = Player {
+            id: "diver".into(), name: "t".into(), nr: 2, position_id: "pos".into(),
+            player_type: PlayerType::Regular, gender: PlayerGender::Male,
+            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+            ..Default::default()
+        };
+        diver.starting_skills.push(SkillWithValue { skill_id: SkillId::DivingTackle, value: None });
+        game.team_away.players.push(diver);
+        game.field_model.set_player_coordinate("dodger", FieldCoordinate::new(5, 5));
+        game.field_model.set_player_state("dodger", PSt::new(PS_STANDING));
+        game.field_model.set_player_coordinate("diver", FieldCoordinate::new(5, 6));
+        game.field_model.set_player_state("diver", PSt::new(PS_STANDING));
+        game.home_playing = true;
+        game.set_turn_mode(TurnMode::Regular);
+        game.turn_data_home.rerolls = 2;
+        game.acting_player.set_player("dodger".into(), PlayerAction::Move);
+        game.acting_player.dodging = true;
+        let mut step = StepMoveDodge::new("fail".into());
+        step.coordinate_from = Some(FieldCoordinate::new(5, 5));
+        step.coordinate_to = Some(FieldCoordinate::new(6, 4));
+        step.dodge_roll = 3; // AG3+ passes; with Diving Tackle's -2 it fails
+        let mut rng = GameRng::new(0);
+        let out = step.execute_step(&mut game, &mut rng);
+        assert!(out.prompt.is_some(), "the Diving Tackle what-if offers a re-roll");
+        assert!(step.dt_reroll_asked);
+        step.handle_command(&Action::UseSkill { skill_id: SkillId::Dodge, use_skill: true }, &mut game, &mut rng);
+        assert_eq!(game.turn_data_home.rerolls, 2, "the Dodge skill is spent, not a team re-roll");
+        assert!(game.team_home.player("dodger").unwrap().used_skills.contains(&SkillId::Dodge)
+            || game.acting_player.used_skills.contains(&SkillId::Dodge), "the Dodge skill is marked used");
     }
 
     fn bt_dodge_fixture() -> (Game, StepMoveDodge) {

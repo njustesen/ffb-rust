@@ -12,8 +12,8 @@
 /// - When touchdowns <= 0 → NEXT_STEP, zero the other team's player touchdowns.
 /// - While touchdowns remain → show ASSIGN_TOUCHDOWN dialog → Continue.
 ///
-/// client-only: DialogPlayerChoiceParameter(ASSIGN_TOUCHDOWN) + UtilServerDialog.showDialog —
-///   headless auto-assigns touchdown to first eligible player.
+/// The ASSIGN_TOUCHDOWN dialog is shown (DialogPlayerChoiceParameter) and the step waits with a
+/// `PlayerChoice` prompt; the coach's choice arrives as `SelectPlayer`.
 /// PlayerNote("is awarded a touchdown") GameEvent wired.
 use ffb_model::events::GameEvent;
 use ffb_model::model::game::Game;
@@ -145,8 +145,27 @@ impl StepAssignTouchdowns {
 
         // Java: DialogPlayerChoiceParameter(winningTeamId, ASSIGN_TOUCHDOWN, playerIds, null, 1, 1)
         // UtilServerDialog.showDialog(getGameState(), dialogParameter, false) → wait for player choice.
-        // client-only: show ASSIGN_TOUCHDOWN dialog — headless auto-assigns without coach input
-        let mut out = StepOutcome::cont();
+        // Rust waited with neither the dialog nor a prompt, so nobody was ever asked (a GUI game
+        // after a concession stalled here).
+        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+            game,
+            ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(
+                ffb_model::dialog::dialog_player_choice_parameter::DialogPlayerChoiceParameter {
+                    team_id: Some(winning_team_id),
+                    player_choice_mode: Some(ffb_model::model::player_choice_mode::PlayerChoiceMode::ASSIGN_TOUCHDOWN.get_name().to_string()),
+                    player_ids: players.clone(),
+                    descriptions: Vec::new(),
+                    max_selects: 1,
+                    min_selects: 1,
+                },
+            ),
+            false,
+        );
+        let mut out = StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::PlayerChoice {
+            eligible_players: players,
+            reason: "ASSIGN_TOUCHDOWN".into(),
+            descriptions: Vec::new(),
+        });
         for ev in pending_events { out = out.with_event(ev); }
         out
     }
@@ -302,6 +321,32 @@ mod tests {
         step.player_id = Some("p1".into());
         step.start(&mut game, &mut GameRng::new(0));
         assert!(game.report_list.has_report(ReportId::PLAYER_EVENT));
+    }
+
+    /// Java: touchdowns left → showDialog(PlayerChoice ASSIGN_TOUCHDOWN, eligible players, 1, 1)
+    /// and wait; the coach's choice awards one and the step moves on.
+    #[test]
+    fn remaining_touchdown_asks_the_winning_coach() {
+        let mut game = make_game();
+        let team_id = game.team_home.id.clone();
+        game.team_home.players.push(make_bare_player("p1"));
+        game.team_home.players.push(make_bare_player("p2"));
+        let mut step = StepAssignTouchdowns::new();
+        step.winning_team_id = Some(team_id);
+        step.touchdowns = 1;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue);
+        match &out.prompt {
+            Some(ffb_model::prompts::AgentPrompt::PlayerChoice { eligible_players, reason, .. }) => {
+                assert_eq!(eligible_players, &vec!["p1".to_string(), "p2".to_string()]);
+                assert_eq!(reason, "ASSIGN_TOUCHDOWN");
+            }
+            other => panic!("expected the ASSIGN_TOUCHDOWN prompt, got {other:?}"),
+        }
+        assert!(game.dialog_parameter.is_some(), "the Java dialog is set for the GUI client");
+        let out = step.handle_command(&Action::SelectPlayer { player_id: "p2".into() }, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(game.game_result.home.player_results.get("p2").map(|r| r.touchdowns), Some(1));
     }
 
     #[test]

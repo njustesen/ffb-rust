@@ -29,8 +29,8 @@ use crate::step::abstract_step_with_re_roll::find_skill_reroll_source;
 ///            `CatchScatterThrowInMode`, `PassResultParam`.
 ///
 /// client-only: re-roll dialog — headless uses auto-reroll via AbstractStepWithReRoll.
-/// client-only: Safe Pass (dontDropFumbles) dialog — headless auto-skips.
-/// client-only: usingModifyingSkill dialog (canAddStrengthToPass) — headless auto-declines skill use.
+/// The Safe Pass (dontDropFumbles) and modifying-skill (canAddStrengthToPass) dialogs are asked
+/// as in Java (SkillUse prompts in `execute_step`).
 pub struct StepPass {
     /// Java: goToLabelOnEnd (init param, mandatory)
     pub goto_label_on_end: String,

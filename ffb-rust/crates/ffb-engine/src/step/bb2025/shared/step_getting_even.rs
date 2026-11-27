@@ -12,8 +12,8 @@ use crate::step::util_server_re_roll::{ask_for_reroll_if_available_for, use_rero
 const RE_ROLLED_ACTION_GETTING_EVEN: &str = "Getting Even";
 
 /// 1:1 translation of com.fumbbl.ffb.server.step.bb2025.shared.StepGettingEven.
-/// Opposing team may use their apothecary after a casualty (Getting Even apothecary rule).
-/// client-only: opposing apo dialog (DialogUseApothecaryParameter for opposing team) — headless auto-skips.
+/// Java's step has no apothecary dialog of its own; its only question is the re-roll
+/// (`askForReRoll`), mirrored below.
 pub struct StepGettingEven {
     /// Java: playerId
     pub player_id: Option<String>,

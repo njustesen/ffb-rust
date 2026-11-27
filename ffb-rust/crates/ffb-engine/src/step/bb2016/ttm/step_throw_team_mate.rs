@@ -20,6 +20,7 @@ use crate::action::Action;
 use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::generator::bb2016::scatter_player::{ScatterPlayer, ScatterPlayerParams};
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available, use_reroll};
+use crate::step::abstract_step_with_re_roll::find_skill_reroll_source;
 
 /// Java: `StepThrowTeamMate` inner `StepState` — fields promoted to struct level.
 pub struct StepThrowTeamMate {
@@ -173,11 +174,38 @@ impl StepThrowTeamMate {
             } else {
                 // Java: if (getReRolledAction() != ReRolledActions.THROW_TEAM_MATE) → try reroll
                 if self.re_rolled_action.is_none() {
-                    // Java: check unused passing reroll source (skill-based)
-                    // client-only: DialogSkillUseParameter for skill re-roll source — headless auto-uses skill re-roll
-                    // Fall through to team reroll check.
-                    if let Some(prompt) = ask_for_reroll_if_available(game, "THROW_TEAM_MATE", self.minimum_roll, true) {
-                        self.re_rolled_action = Some("THROW_TEAM_MATE".into());
+                    // Java ThrowTeamMateBehaviour (bb2016): setReRolledAction(THROW_TEAM_MATE);
+                    // `unusedPassingReroll = UtilCards.getUnusedRerollSource(actingPlayer, PASS)`;
+                    // when present showDialog(DialogSkillUseParameter(thrower, its skill,
+                    // minimumRoll)) and wait (PassBehaviour's TTM modifier takes the answer), else
+                    // askForReRollIfAvailable(..., THROW_TEAM_MATE, minimumRoll, false) or fail.
+                    // Rust skipped the Pass skill and asked for a team re-roll (with fumble=true).
+                    self.re_rolled_action = Some("THROW_TEAM_MATE".into());
+                    let pass_skill = find_skill_reroll_source(game, "PASS").and_then(|src| {
+                        game.player(&thrower_id).and_then(|p| p.all_skill_ids().find(|id| format!("{:?}", id) == src.name))
+                    });
+                    if let Some(skill) = pass_skill {
+                        crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                            game,
+                            ffb_model::dialog::dialog_parameter_factory::DialogParameter::SkillUse(
+                                ffb_model::dialog::dialog_skill_use_parameter::DialogSkillUseParameter {
+                                    player_id: Some(thrower_id.clone()),
+                                    skill: Some(skill),
+                                    minimum_roll: self.minimum_roll,
+                                    ..Default::default()
+                                },
+                            ),
+                            false,
+                        );
+                        return StepOutcome::cont()
+                            .with_prompt(ffb_model::prompts::AgentPrompt::SkillUse {
+                                player_id: thrower_id.clone(),
+                                skill_id: skill as u16,
+                                skill_name: format!("{:?}", skill),
+                            })
+                            .with_event(roll_event);
+                    }
+                    if let Some(prompt) = ask_for_reroll_if_available(game, "THROW_TEAM_MATE", self.minimum_roll, false) {
                         self.re_roll_source = Some("TRR".into());
                         return StepOutcome::cont().with_prompt(prompt).with_event(roll_event);
                     }
@@ -219,6 +247,12 @@ impl Step for StepThrowTeamMate {
             // (often flipping the fumble to a spurious success + 3× scatter). The parity harness
             // ALWAYS declines team re-rolls (ParityRunner sendUseReRoll(action, null)), so a fumbled
             // bb2016 TTM must stay fumbled: renegades seed6 i=130 (home_04 Troll TTM accuracy 1).
+            // Java PassBehaviour (bb2016) StepThrowTeamMate modifier: CLIENT_USE_SKILL(Pass) →
+            // setReRolledAction(THROW_TEAM_MATE); setReRollSource(isSkillUsed ? PASS : null).
+            Action::UseSkill { skill_id: ffb_model::enums::SkillId::Pass, use_skill } => {
+                self.re_rolled_action = Some("THROW_TEAM_MATE".into());
+                self.re_roll_source = use_skill.then(|| format!("{:?}", ffb_model::enums::SkillId::Pass));
+            }
             Action::UseSkill { use_skill: false, .. } => {
                 self.re_roll_source = None;
             }
@@ -330,6 +364,39 @@ mod tests {
             matches!(out.action, StepAction::NextStep | StepAction::GotoLabel | StepAction::Continue),
             "throw should produce a valid outcome"
         );
+    }
+
+    /// Java ThrowTeamMateBehaviour (bb2016): a fumbled throw by a thrower with an unused Pass skill
+    /// re-roll shows DialogSkillUseParameter(thrower, Pass, minimumRoll) before any team re-roll;
+    /// PassBehaviour's answer sets the Pass source, and the re-roll then spends the skill.
+    #[test]
+    fn fumble_offers_the_pass_skill_re_roll_first() {
+        use ffb_model::enums::{SkillId, TurnMode};
+        use ffb_model::model::skill_def::SkillWithValue;
+        let seed = (0..500u64).find(|s| GameRng::new(*s).d6() == 1).expect("a seed rolling 1");
+        let mut game = make_game();
+        game.home_playing = true;
+        game.set_turn_mode(TurnMode::Regular);
+        game.turn_data_home.rerolls = 2;
+        add_player(&mut game, true, "thrower", FieldCoordinate::new(10, 7));
+        game.team_home.player_mut("thrower").unwrap().starting_skills.push(SkillWithValue { skill_id: SkillId::Pass, value: None });
+        game.acting_player.player_id = Some("thrower".into());
+        game.pass_coordinate = Some(FieldCoordinate::new(10, 5));
+        let mut step = StepThrowTeamMate::new();
+        step.goto_label_on_failure = "fail".into();
+        step.thrown_player_id = Some("tp1".into());
+        step.thrown_player_state = Some(PlayerState::new(PS_STANDING));
+        let mut rng = GameRng::new(seed);
+        let out = step.start(&mut game, &mut rng);
+        assert_eq!(out.action, StepAction::Continue);
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::SkillUse { ref skill_name, .. }) if skill_name == "Pass"),
+            "the Pass skill re-roll is offered, got {:?}", out.prompt);
+        assert!(game.dialog_parameter.is_some());
+        step.handle_command(&Action::UseSkill { skill_id: SkillId::Pass, use_skill: true }, &mut game, &mut rng);
+        assert_eq!(game.turn_data_home.rerolls, 2, "no team re-roll spent");
+        let thrower = game.team_home.player("thrower").unwrap();
+        assert!(thrower.used_skills.contains(&SkillId::Pass) || game.acting_player.used_skills.contains(&SkillId::Pass),
+            "the Pass skill is spent");
     }
 
     #[test]
