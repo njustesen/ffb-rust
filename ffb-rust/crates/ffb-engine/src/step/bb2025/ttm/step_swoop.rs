@@ -157,24 +157,9 @@ impl Step for StepSwoop {
                 }
                 return self.execute_swoop_bb2025(game, rng);
             }
-            Action::Pass { coord } => {
-                // Java: CLIENT_SWOOP -> coordinateTo = swoopCommand.getTargetCoordinate()
-                // Java: if !checkCommandIsFromHomePlayer: coordinateTo = coordinateTo.transform()
-                let is_home_player = self.thrown_player_id.as_deref()
-                    .map(|id| game.team_home.player(id).is_some())
-                    .unwrap_or(game.home_playing);
-                self.coordinate_to = Some(if is_home_player { *coord } else { coord.transform() });
-                // Java: executeSwoop() = executeStepHooks(this, state)
-                // no-op: executeSwoop SkillBehaviour hooks skipped in headless (registry not ported)
-                return StepOutcome::next();
-            }
-            Action::UseReRoll { .. } => {
-                // Java: CLIENT_USE_RE_ROLL -> state.reRollSource = command.reRollSource
-                //                             state.reRolledAction = command.reRolledAction
-                //                             executeSwoop()
-                // no-op: Swoop re-roll; executeSwoop SkillBehaviour hooks skipped in headless
-                return StepOutcome::next();
-            }
+            // §Q3.7: the old `Action::Pass` arm (a no-op NEXT_STEP that skipped the hook) and the
+            // non-bb2025 re-roll arm are gone: CLIENT_SWOOP is `Action::Swoop` (above), and Java's
+            // bb2016/bb2020 StepSwoop (mixed/ttm) has no CLIENT_USE_RE_ROLL arm at all.
             _ => {}
         }
         self.execute_step(game, rng)
@@ -377,7 +362,11 @@ impl StepSwoop {
                 // `UtilServerSteps.changePlayerAction`, so no move-square/dice refresh.
                 crate::step::util_server_steps::change_acting_player(
                     game, &player_id, PlayerAction::Swoop, false);
-                // no-op: blitzTurnState.changeActingPlayer() — BlitzTurnState not ported (headless no-op)
+                // Java: `if (gameState.getBlitzTurnState() != null) blitzTurnState.changeActingPlayer()`
+                // (§Q3.7: was a no-op; the mixed twin already did this).
+                if let Some(ref mut bts) = game.blitz_turn_state {
+                    bts.change_acting_player();
+                }
                 if self.thrown_player_has_ball {
                     game.field_model.ball_coordinate = Some(pass_coord);
                 }
@@ -415,8 +404,10 @@ impl StepSwoop {
                 });
         }
 
-        // coordinateTo is known -> executeSwoop hook handles the rest
-        // no-op: executeStepHooks SkillBehaviour hooks skipped in headless (registry not ported)
+        // Java executeStep sets no next action once coordinateTo is known: the hook runs from the
+        // CLIENT_SWOOP / CLIENT_USE_RE_ROLL arms (execute_swoop_bb2025 / execute_swoop), not here.
+        // Only an unrelated command reaches this point; Rust advances where Java would keep
+        // waiting (no agent sends one, and a bare cont() reads as a driver stall).
         StepOutcome::next()
     }
 }

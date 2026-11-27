@@ -640,6 +640,19 @@ impl ServerCommandHandlerFactory {
             }
             _ => None,
         };
+        // Java UtilServerPlayerMove.isValidMove (every step that takes CLIENT_MOVE /
+        // CLIENT_BLITZ_MOVE checks it): a null `coordinateFrom` or empty `coordinatesTo` is
+        // invalid, and `coordinateFrom` (transformed for the away coach) must be the acting
+        // player's square, else "Client move out of sync, Command dropped". `Action::Move` has no
+        // from-square, so the check runs here, where the game is at hand (§Q3.7).
+        let move_from: Option<Option<ffb_model::types::FieldCoordinate>> = match &client_command {
+            AnyClientCommand::ClientMove(c) =>
+                Some(c.coordinate_from.filter(|_| !c.coordinates_to.is_empty())),
+            AnyClientCommand::ClientBlitzMove(c) =>
+                Some(c.coordinate_from.filter(|_| !c.coordinates_to.is_empty())),
+            _ => None,
+        }
+        .map(|from| from.map(|c| if side == TeamSide::Away { c.transform() } else { c }));
         let touchback_coordinate = match &client_command {
             AnyClientCommand::ClientTouchback(t) => t.ball_coordinate.map(|c| if side == TeamSide::Away { c.transform() } else { c }),
             _ => None,
@@ -677,6 +690,13 @@ impl ServerCommandHandlerFactory {
             log::warn!("session {} sent command but game {} not found", session_id, game_id);
             return;
         };
+        if let Some(from) = move_from {
+            let valid = gs.get_game().is_some_and(|game| is_valid_move(game, from));
+            if !valid {
+                log::debug!("game {game_id}: {side:?} !Client move out of sync, Command dropped");
+                return;
+            }
+        }
         // Java: a step returns UNHANDLED_COMMAND for a command it does not wait for and nothing
         // happens. CLIENT_START_GAME is only waited for by StepInitStartGame, which raises no prompt.
         let prompt = gs.driver.as_ref().and_then(|d| d.current_prompt()).cloned();
@@ -925,6 +945,16 @@ impl ServerCommandHandlerFactory {
     }
 }
 
+/// Java `UtilServerPlayerMove.isValidMove(GameState, FieldCoordinate, boolean)`: the move's
+/// from-square (already home-oriented; `None` = Java's null coordinateFrom / empty
+/// coordinatesTo) must be the acting player's current square.
+pub fn is_valid_move(game: &ffb_model::model::game::Game, coordinate_from: Option<ffb_model::types::FieldCoordinate>) -> bool {
+    let Some(from) = coordinate_from else { return false };
+    game.acting_player.player_id.as_deref()
+        .and_then(|id| game.field_model.player_coordinate(id))
+        .is_some_and(|at| at == from)
+}
+
 // ── ClientCommand → Action decoder ───────────────────────────────────────────
 
 /// Decodes a Java-wire `AnyClientCommand` into an engine `Action`.
@@ -1027,7 +1057,10 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
             player_id: t.thrown_player_id.ok_or_else(|| missing("thrownPlayerId"))?,
             coord: t.target_coordinate.ok_or_else(|| missing("targetCoordinate"))?,
         }),
-        AnyClientCommand::ClientSwoop(s) => Ok(Action::Pass {
+        // StepSwoop takes CLIENT_SWOOP as `Action::Swoop` (it un-mirrors the away coach's square
+        // itself, as Java does). §Q3.7: this decoded to `Action::Pass`, which StepSwoop answered
+        // with NEXT_STEP and no hook -- a GUI swoop never rolled its direction.
+        AnyClientCommand::ClientSwoop(s) => Ok(Action::Swoop {
             coord: s.target_coordinate.ok_or_else(|| missing("targetCoordinate"))?,
         }),
 
@@ -1168,6 +1201,31 @@ fn to_camel_case(s: &str) -> String {
 mod tests {
     use super::*;
     use ffb_model::types::FieldCoordinate;
+
+    /// §Q3.7: CLIENT_SWOOP is StepSwoop's `Action::Swoop`, coordinates as sent (StepSwoop
+    /// un-mirrors the away coach's square itself, as Java does).
+    #[test]
+    fn decode_swoop_is_a_swoop_action() {
+        let r = decode(serde_json::json!({"netCommandId": "clientSwoop", "actingPlayerId": "p",
+            "targetCoordinate": [4, 6]}), TeamSide::Away);
+        assert!(matches!(r, Ok(Action::Swoop { coord }) if coord == coord_of(4, 6)), "{r:?}");
+    }
+
+    fn coord_of(x: i32, y: i32) -> FieldCoordinate { FieldCoordinate::new(x, y) }
+
+    /// §Q3.7 Java UtilServerPlayerMove.isValidMove: only a move from the acting player's own
+    /// square is valid; no from-square (null / empty path) or another square is dropped.
+    #[test]
+    fn is_valid_move_requires_the_acting_players_square() {
+        use ffb_model::model::{game::Game, team::Team};
+        let mut game = Game::new(Team::default(), Team::default(), ffb_model::enums::Rules::Bb2025);
+        game.field_model.set_player_coordinate("p1", FieldCoordinate::new(5, 5));
+        assert!(!is_valid_move(&game, Some(FieldCoordinate::new(5, 5))), "no acting player");
+        game.acting_player.player_id = Some("p1".into());
+        assert!(is_valid_move(&game, Some(FieldCoordinate::new(5, 5))));
+        assert!(!is_valid_move(&game, Some(FieldCoordinate::new(6, 5))), "out of sync");
+        assert!(!is_valid_move(&game, None), "null coordinateFrom / empty coordinatesTo");
+    }
     use crate::model::received_command::ReceivedCommand;
 
     fn coord(x: i32, y: i32) -> FieldCoordinate { FieldCoordinate { x, y } }

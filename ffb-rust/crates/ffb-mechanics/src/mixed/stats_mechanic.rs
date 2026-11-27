@@ -22,7 +22,10 @@ impl StatsMechanicTrait for StatsMechanic {
     fn stat_suffix(&self) -> String { "+".to_string() }
 
     fn armour_is_broken(&self, armour: i32, roll: &[i32; 2], context: &InjuryContext, _game: &Game) -> bool {
-        // TODO: context.armor_modifier_total(game) not yet available — using 0
+        // Java adds `context.getArmorModifierTotal(game)`; this crate's InjuryContext carries no
+        // armour modifiers, and nothing calls this method. The live armour break is
+        // ffb-engine `injury::do_armor_roll` -> `armor_broken_for_rules` (modifiers summed; Claws'
+        // reduceArmour is a variable modifier there, see armor_modifier_factory `claws_*` tests).
         let reduced = self.reduce_armour(context, armour, 8);
         reduced <= (roll[0] + roll[1])
     }

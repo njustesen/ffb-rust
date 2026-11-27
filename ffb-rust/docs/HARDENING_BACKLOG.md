@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q3.7** approximations. Q3.3a (card play) waits for another session's
+Next item: **Q3.8** game options Java reads but Rust ignores. Q3.3a (card play) waits for another session's
 uncommitted card-model work (see Q3.3a); Q3.3b (card draw) is [!] with a question for the user.
 Then Q3.6, Q2.8's stars / mercenaries / staff. Gate shape for purchases: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`.
 Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
@@ -248,10 +248,14 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   `ffb_model::constant::grant_able_skills` (Java `Constant.getGrantAbleSkills`). The engine's live
   check was already 1:1 (`legal_actions::is_wisdom_available`); the mechanic copies are only read by
   the dead ffb-client crate, and a test now pins mechanic == legal_actions for both editions.
-- [ ] **Q3.7 Approximations:** Riotous Rookies shuffle (`bb2025/game_mechanic.rs:80`), bb2016
+- [x] **Q3.7 Approximations:** Riotous Rookies shuffle (`bb2025/game_mechanic.rs:80`), bb2016
   `armour_is_broken` modifier total (`bb2016/stats_mechanic.rs:25`), `isValidMove` path validation
   (`step_init_moving.rs:79`), stalling rock-hit branch (`stalling_extension.rs:32,105`), Swoop hooks and
-  blitz acting-player change (`step_swoop.rs:168,347`).
+  blitz acting-player change (`step_swoop.rs:168,347`). Done (see Log): Riotous Rookies shuffles on
+  the Collections Random (bb2020/bb2025) and bb2016 looks the position up by `riotousPositionId`
+  (Java null for every parity roster); isValidMove in ffb-server; Swoop's BlitzTurnState change and
+  the GUI's CLIENT_SWOOP decode. Stale (already live): stalling pathfinder + rock hit, Swoop hooks.
+  Dead twin, comment only: the mechanics `armour_is_broken` (live path sums the modifiers).
 - [ ] **Q3.8 Game options Java reads but Rust ignores:** ASK_FOR_KICK_AFTER_ROLL, ALLOW_KTM_REROLL,
   ALLOW_CONCESSIONS, CHECK_OWNERSHIP, the 8 INDUCEMENT_*_MAX, INDUCEMENT_IGORS_COST.
 - [ ] **Q3.9 Skill-behaviour structure:** bb2016 must not reuse bb2025 hooks where Java has its own
@@ -302,6 +306,15 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q3.7 · (this commit) · Riotous Rookies: bb2020/bb2025 `Collections.shuffle` on
+  `game.collections_rng` (trait takes the Random; every parity roster has one candidate, so no game
+  changes), bb2016 by `riotousPositionId` (Java null -> no rookies; Rust used to create them).
+  ffb-server: `is_valid_move` drops an out-of-sync CLIENT_MOVE/BLITZ_MOVE like Java;
+  CLIENT_SWOOP decodes to `Action::Swoop` (was `Action::Pass` -> StepSwoop NEXT_STEP with no
+  direction roll for a GUI swoop). StepSwoop calls `blitzTurnState.changeActingPlayer()`; its dead
+  Pass/re-roll arms removed. Stalling + mechanics-armour notes were stale. Smoke 60/60, goblin
+  bb2020/bb2025 mirrors 40/40, tests green.
 
 - 2026-11-27 · Q3.6 · (this commit) · `ffb_model::constant` (Java Constant.getGrantAbleSkills);
   bb2020 GameMechanic.isWisdomAvailable ported (was `false`), bb2025's gains the grantable-skill

@@ -22,7 +22,9 @@ use crate::step::framework::{StepAction, StepId, StepParameter};
 ///
 /// Command dispatch (Move/Block/Foul/Pass/HandOff/ThrowTeamMate/KickTeamMate/Gaze/EndTurn) ported.
 /// CLIENT_USE_FUMBLEROOSKIE / CLIENT_USE_SKILL (canAddBlockDie) not yet ported.
-/// no-op: UtilServerPlayerMove.isValidMove path validation not ported; agent-submitted paths are trusted.
+/// UtilServerPlayerMove.isValidMove (the move's from-square must be the acting player's square)
+/// runs in ffb-server where the wire command still carries `coordinateFrom`
+/// (`server_command_handler_factory::is_valid_move`); `Action::Move` holds only the path.
 /// setDodging/setGoingForIt, setTurnStarted, concessionPossible, per-action TurnData flags are wired.
 pub struct StepInitMoving {
     /// Java: fGotoLabelOnEnd
@@ -76,7 +78,7 @@ impl Step for StepInitMoving {
 
         match action {
             // Java: CLIENT_MOVE / CLIENT_BLITZ_MOVE — agent provides the path to move through
-            // UtilServerPlayerMove.isValidMove + fetchMoveStack not ported; trust agent path
+            // isValidMove is checked by ffb-server before this action exists (see the struct doc)
             Action::Move { path } if !path.is_empty() => {
                 // The deferred blood-lust discard. Java's
                 // `BloodLustBehaviour.handleExecuteStepHook` FAILURE branch is

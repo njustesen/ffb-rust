@@ -60,21 +60,13 @@ impl GameMechanicTrait for GameMechanic {
 
     fn touchdown_ends_game(&self, game: &Game) -> bool { game.half == 3 }
 
-    fn riotous_rookies_position(&self, roster: &Roster) -> Option<RosterPosition> {
-        use ffb_model::enums::PlayerType;
-        // Java: roster.getRiotousPosition() looks up by riotousPositionId (XML field).
-        // The JSON rosters don't carry that id; fall back to the same quantity filter
-        // used by BB2020/BB2025 (quantity==12 or 16, non-Irregular) which gives the
-        // correct result for all standard BB2016 rosters.
-        let mut candidates: Vec<&RosterPosition> = roster.positions.iter()
-            .filter(|pos| pos.quantity == 12 || pos.quantity == 16)
-            .filter(|pos| pos.player_type != PlayerType::Irregular)
-            .collect();
-        if candidates.is_empty() {
-            None
-        } else {
-            Some(candidates.remove(0).clone())
-        }
+    fn riotous_rookies_position(&self, roster: &Roster, _shuffle_rng: &mut ffb_model::util::java_random::JavaRandom) -> Option<RosterPosition> {
+        // Java: `roster.getRiotousPosition()` = `fRosterPositionById.get(riotousPositionId)`: null
+        // when the roster names no riotous position (no parity roster does, so Java's bb2016
+        // Riotous Rookies creates nobody). §Q3.7: Rust fell back to the bb2020/bb2025 quantity
+        // filter and created rookies Java never does.
+        let id = roster.riotous_position_id.as_deref()?;
+        roster.positions.iter().find(|pos| pos.id == id).cloned()
     }
 
     fn is_legal_concession(&self, game: &Game, team: &Team) -> bool {
@@ -203,38 +195,21 @@ mod tests {
     fn riotous_position_returns_none_for_empty_roster() {
         use ffb_model::enums::PlayerType;
         let roster = make_roster(vec![]);
-        assert!(GameMechanic.riotous_rookies_position(&roster).is_none());
+        assert!(GameMechanic.riotous_rookies_position(&roster, &mut ffb_model::util::java_random::JavaRandom::new(0)).is_none());
     }
 
+    /// Java `roster.getRiotousPosition()`: the position named by `riotousPositionId`, whatever its
+    /// quantity or type; no id (every parity roster) means no position.
     #[test]
-    fn riotous_position_returns_first_quantity_16_position() {
+    fn riotous_position_is_looked_up_by_riotous_position_id() {
         use ffb_model::enums::PlayerType;
-        let roster = make_roster(vec![(4, PlayerType::Regular), (16, PlayerType::Regular)]);
-        let pos = GameMechanic.riotous_rookies_position(&roster).unwrap();
-        assert_eq!(pos.quantity, 16);
-    }
-
-    #[test]
-    fn riotous_position_returns_quantity_12_position() {
-        use ffb_model::enums::PlayerType;
-        let roster = make_roster(vec![(12, PlayerType::Regular), (4, PlayerType::Regular)]);
-        let pos = GameMechanic.riotous_rookies_position(&roster).unwrap();
-        assert_eq!(pos.quantity, 12);
-    }
-
-    #[test]
-    fn riotous_position_skips_irregular_positions() {
-        use ffb_model::enums::PlayerType;
-        let roster = make_roster(vec![(16, PlayerType::Irregular), (12, PlayerType::Regular)]);
-        let pos = GameMechanic.riotous_rookies_position(&roster).unwrap();
-        assert_eq!(pos.quantity, 12);
-        assert_ne!(pos.player_type, PlayerType::Irregular);
-    }
-
-    #[test]
-    fn riotous_position_all_irregular_returns_none() {
-        use ffb_model::enums::PlayerType;
-        let roster = make_roster(vec![(16, PlayerType::Irregular), (12, PlayerType::Irregular)]);
-        assert!(GameMechanic.riotous_rookies_position(&roster).is_none());
+        let mut roster = make_roster(vec![(16, PlayerType::Regular), (4, PlayerType::Irregular)]);
+        assert!(GameMechanic.riotous_rookies_position(&roster, &mut ffb_model::util::java_random::JavaRandom::new(0)).is_none(),
+            "no riotousPositionId: Java returns null even with a 16-quantity position");
+        roster.riotous_position_id = Some("pos1".into());
+        let pos = GameMechanic.riotous_rookies_position(&roster, &mut ffb_model::util::java_random::JavaRandom::new(0)).unwrap();
+        assert_eq!(pos.id, "pos1");
+        roster.riotous_position_id = Some("nope".into());
+        assert!(GameMechanic.riotous_rookies_position(&roster, &mut ffb_model::util::java_random::JavaRandom::new(0)).is_none());
     }
 }

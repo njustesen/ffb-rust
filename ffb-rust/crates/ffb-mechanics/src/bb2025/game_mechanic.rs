@@ -74,19 +74,19 @@ impl GameMechanicTrait for GameMechanic {
         game.half == 3 && game.options.is_enabled("overtimeGoldenGoal")
     }
 
-    fn riotous_rookies_position(&self, roster: &Roster) -> Option<RosterPosition> {
+    /// Java: the 12/16-quantity non-IRREGULAR positions, `Collections.shuffle`d, the first one
+    /// (§Q3.7: Rust took the first unshuffled, and drew nothing from the shared Random).
+    fn riotous_rookies_position(&self, roster: &Roster, shuffle_rng: &mut ffb_model::util::java_random::JavaRandom) -> Option<RosterPosition> {
         use ffb_model::enums::PlayerType;
-        // Java shuffles; Rust returns the first matching position (no RNG here).
-        // TODO: shuffle with an RNG source for full parity.
         let mut candidates: Vec<&RosterPosition> = roster.positions.iter()
             .filter(|pos| pos.quantity == 12 || pos.quantity == 16)
             .filter(|pos| pos.player_type != PlayerType::Irregular)
             .collect();
         if candidates.is_empty() {
-            None
-        } else {
-            Some(candidates.remove(0).clone())
+            return None;
         }
+        ffb_model::util::java_random::collections_shuffle(&mut candidates, shuffle_rng);
+        Some(candidates[0].clone())
     }
 
     fn is_legal_concession(&self, game: &Game, team: &Team) -> bool {
@@ -186,6 +186,35 @@ mod tests {
     use ffb_model::enums::Weather;
     use ffb_model::model::Team;
     use crate::game_mechanic::GameMechanic as GameTrait;
+    use ffb_model::util::java_random::JavaRandom;
+
+    fn roster_of(quantities: &[i32]) -> Roster {
+        Roster {
+            positions: quantities.iter().enumerate().map(|(i, q)| RosterPosition {
+                id: format!("pos{i}"), quantity: *q, ..Default::default()
+            }).collect(),
+            ..Default::default()
+        }
+    }
+
+    /// §Q3.7 Java `Collections.shuffle(rosterPositions); get(0)` on the shared Random: two
+    /// candidates draw one `nextInt(2)` (swap index 1 with it), one candidate draws nothing.
+    #[test]
+    fn riotous_rookies_position_shuffles_on_the_collections_random() {
+        for seed in 0..8i64 {
+            let mut rng = JavaRandom::new(seed);
+            let pos = GameMechanic.riotous_rookies_position(&roster_of(&[12, 4, 16]), &mut rng).unwrap();
+            let mut expected_rng = JavaRandom::new(seed);
+            let j = expected_rng.next_int(2);
+            let expected = if j == 0 { "pos2" } else { "pos0" };
+            assert_eq!(pos.id, expected, "seed {seed}");
+            assert_eq!(rng.next_int(1000), expected_rng.next_int(1000), "seed {seed}: one draw only");
+        }
+        let mut rng = JavaRandom::new(5);
+        let pos = GameMechanic.riotous_rookies_position(&roster_of(&[16, 4]), &mut rng).unwrap();
+        assert_eq!(pos.id, "pos0");
+        assert_eq!(rng.next_int(1000), JavaRandom::new(5).next_int(1000), "a single candidate draws nothing");
+    }
 
     fn bare_team(id: &str) -> Team {
         Team {

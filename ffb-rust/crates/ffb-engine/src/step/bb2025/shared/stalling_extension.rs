@@ -27,9 +27,8 @@ impl StallingExtension {
     ///  3. No opponent with a tacklezone is adjacent (clear path).
     ///  4. They have an open path to the enemy end-zone (pathfinder check).
     ///
-    /// The pathfinder (PathFinderWithPassBlockSupport) and the skill property checks are not
-    /// yet translated, so this implementation is a conservative stub: it always returns false
-    /// (no false positives). TODO: port pathfinder and skill-property lookups.
+    /// All four checks are ported (the pathfinder is ffb-model's PathFinderWithPassBlockSupport;
+    /// see guard 4). §Q3.7: the "conservative stub" note that stood here was stale.
     pub fn is_considered_stalling(&self, game: &Game, player_id: &str) -> bool {
         // Guard 1: must have the ball.
         if !UtilPlayer::has_ball(game, player_id) {
@@ -100,9 +99,9 @@ impl StallingExtension {
     /// stalling player is hit by a rock (injury applied). Always marks the team
     /// result as stalled (reduces winnings by 1).
     ///
-    /// The injury machinery (UtilServerInjury, InjuryTypeThrowARockStalling,
-    /// SteadyFootingContext, DropPlayerCommand, Animation) is not yet translated,
-    /// so the rock-hit branch is a TODO stub that never executes (conservative).
+    /// The rock-hit branch is ported (x die, InjuryTypeThrowARockStalling, SteadyFootingContext
+    /// with a DropPlayerCommand; the animation is client-only). §Q3.7: the "TODO stub" note that
+    /// stood here was stale.
     pub fn handle_staller(
         &self,
         game: &mut Game,

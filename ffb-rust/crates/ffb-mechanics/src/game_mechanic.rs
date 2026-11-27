@@ -16,7 +16,9 @@ pub trait GameMechanic: Mechanic {
     fn is_block_action_allowed(&self, turn_mode: TurnMode) -> bool;
     fn zapped_player_stats(&self) -> Box<dyn PlayerStats>;
     fn touchdown_ends_game(&self, game: &Game) -> bool;
-    fn riotous_rookies_position(&self, roster: &Roster) -> Option<RosterPosition>;
+    /// `shuffle_rng`: java.util.Collections' shared Random (`game.collections_rng`), which the
+    /// bb2020/bb2025 `Collections.shuffle(rosterPositions)` draws from.
+    fn riotous_rookies_position(&self, roster: &Roster, shuffle_rng: &mut ffb_model::util::java_random::JavaRandom) -> Option<RosterPosition>;
     fn is_legal_concession(&self, game: &Game, team: &Team) -> bool;
     fn fan_modification_name(&self) -> String;
     fn fan_modification(&self, team_result: &TeamResult) -> i32;

@@ -72,7 +72,8 @@ impl StepRiotousRookies {
             for _ in 0..value {
                 let (roll, rookies) = Self::roll_rookies_count(rng);
                 // Java: RosterPosition position = mechanic.riotousRookiesPosition(team.getRoster());
-                let position = roster.as_ref().and_then(|r| mechanic.riotous_rookies_position(r));
+                let position = roster.as_ref().and_then(|r|
+                    mechanic.riotous_rookies_position(r, &mut game.collections_rng.lock()));
                 // Java: `if (position != null) { ...create players + addReport... }` —
                 // when the roster has no eligible position, no players are created and
                 // no report is added, but rookieCounter still advances.

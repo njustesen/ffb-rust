@@ -69,18 +69,19 @@ impl GameMechanicTrait for GameMechanic {
         game.half == 3 && game.options.is_enabled("overtimeGoldenGoal")
     }
 
-    fn riotous_rookies_position(&self, roster: &Roster) -> Option<RosterPosition> {
+    /// Java: the 12/16-quantity non-IRREGULAR positions, `Collections.shuffle`d, the first one
+    /// (§Q3.7: Rust took the first unshuffled, and drew nothing from the shared Random).
+    fn riotous_rookies_position(&self, roster: &Roster, shuffle_rng: &mut ffb_model::util::java_random::JavaRandom) -> Option<RosterPosition> {
         use ffb_model::enums::PlayerType;
-        // Java shuffles; Rust returns the first matching position (no RNG here).
         let mut candidates: Vec<&RosterPosition> = roster.positions.iter()
             .filter(|pos| pos.quantity == 12 || pos.quantity == 16)
             .filter(|pos| pos.player_type != PlayerType::Irregular)
             .collect();
         if candidates.is_empty() {
-            None
-        } else {
-            Some(candidates.remove(0).clone())
+            return None;
         }
+        ffb_model::util::java_random::collections_shuffle(&mut candidates, shuffle_rng);
+        Some(candidates[0].clone())
     }
 
     fn is_legal_concession(&self, game: &Game, team: &Team) -> bool {
