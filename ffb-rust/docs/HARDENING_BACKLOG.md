@@ -282,7 +282,13 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   keeps the source, `ClientInterceptorChoice` keeps the interceptor (`server_command_handler_factory.rs`
   ~990-1066). Done (see Log). Open with Q2.6: the engine has no path for the Team Mascot / Mascot TRR
   / Pro TRR sources, so those CLIENT_USE_RE_ROLLs are refused (logged) instead of spent as a TRR.
-- [ ] **Q4.2 The 33 undecoded ClientCommands** (BuyCard, SelectCardToBuy, PettyCash, Journeymen,
+- [~] **Q4.2 The 33 undecoded ClientCommands** — re-counted 27. **Part 1 done** (see Log): the 13
+  with an existing engine Action. Next (part 2): CLIENT_FIELD_COORDINATE (six consumers: HitAndRun,
+  Trickster, PlaceBall, RaidingParty, InitPunt, Furious Outburst — reshape by the waiting prompt),
+  KickTeamMate, ThrowKeg, PileDriver, UseChainsaw (StepPileDriver), UseFumblerooskie, UseIgors,
+  UseTeamMatesWisdom, Set/UnsetBlockTargetSelection, SelectCardToBuy (bb2020), IllegalProcedure
+  (AbstractStep). CLIENT_JOURNEYMEN and CLIENT_DEBUG_CLIENT_STATE have no Java step consumer.
+  Original list: (BuyCard, SelectCardToBuy, PettyCash, Journeymen,
   SelectWeather, WizardSpell, UseBrawler/Chainsaw/Hatred/Igors/Fumblerooskie/TeamMatesWisdom,
   UseProReRollForBlock, UseConsummateReRollForBlock, UseSingleBlockDieReRoll, UseMultiBlockDiceReRoll,
   UseReRollForTarget, SynchronousMultiBlock, Set/UnsetBlockTargetSelection, SkillSelection,
@@ -318,6 +324,12 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q4.2 part 1 · (this commit) · 13 client commands decoded to their existing engine
+  Actions: UseBrawler, UseHatred, UseProReRollForBlock, UseConsummateReRollForBlock,
+  UseSingleBlockDieReRoll (Java source name), UseMultiBlockDiceReRoll, UseReRollForTarget,
+  SynchronousMultiBlock, PettyCash, BuyCard, SelectWeather (`Weather.valueOf` constant),
+  WizardSpell, PrayerSelection (SelectSkill). gui_check 3/3 (pairs 3-5), server tests green.
 
 - 2026-11-27 · Q4.1 · (this commit) · CLIENT_INTERCEPTOR_CHOICE decodes to the chosen interceptor
   (`SelectPlayer`, or `InterceptWithSkill` with a Yoink!) instead of a yes/no that took the first

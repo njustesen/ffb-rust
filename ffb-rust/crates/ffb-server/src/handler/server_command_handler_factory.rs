@@ -1152,6 +1152,62 @@ pub fn decode_command(cmd: AnyClientCommand, side: TeamSide) -> Result<Action, D
             player_id: t.target_player_id.ok_or_else(|| missing("targetPlayerId"))?,
         }),
 
+        // ── §Q4.2: commands whose engine Action already exists ──────────────────────────────
+        // Java StepBlockRoll / StepBlockRollMultiple block-die re-rolls.
+        AnyClientCommand::ClientUseBrawler(b) => Ok(Action::UseBrawler { target_id: b.target_id }),
+        AnyClientCommand::ClientUseHatred(_) => Ok(Action::UseHatred),
+        AnyClientCommand::ClientUseProReRollForBlock(p) => Ok(Action::UseProReRollForBlock {
+            die_index: usize::try_from(p.pro_index).map_err(|_| missing("proIndex"))?,
+        }),
+        AnyClientCommand::ClientUseConsummateReRollForBlock(p) => Ok(Action::UseConsummateReRollForBlock {
+            die_index: usize::try_from(p.pro_index).map_err(|_| missing("proIndex"))?,
+        }),
+        AnyClientCommand::ClientUseSingleBlockDieReRoll(s) => Ok(Action::UseSingleBlockDieReRoll {
+            re_roll_source: s.re_roll_source.map(|r| r.name).ok_or_else(|| missing("reRollSource"))?,
+            die_index: usize::try_from(s.die_index).map_err(|_| missing("dieIndex"))?,
+        }),
+        AnyClientCommand::ClientUseMultiBlockDiceReRoll(m) => Ok(Action::UseMultiBlockDiceReRoll {
+            dice_indexes: m.dice_indexes.iter().map(|i| usize::try_from(*i).map_err(|_| missing("diceIndexes")))
+                .collect::<Result<_, _>>()?,
+        }),
+        AnyClientCommand::ClientUseReRollForTarget(r) => Ok(Action::UseReRollForTarget {
+            re_rolled_action: r.re_rolled_action,
+            re_roll_source: r.re_roll_source,
+            target_id: r.target_id,
+        }),
+        // Java StepInitSelecting CLIENT_SYNCHRONOUS_MULTI_BLOCK: the chosen block targets.
+        AnyClientCommand::ClientSynchronousMultiBlock(m) => Ok(Action::MultiBlock { targets: m.selected_block_targets }),
+        // Java bb2016 StepPettyCash / StepBuyCards: keyed on the sending coach.
+        AnyClientCommand::ClientPettyCash(p) => Ok(Action::PettyCash { home: side == TeamSide::Home, amount: p.petty_cash }),
+        AnyClientCommand::ClientBuyCard(b) => Ok(Action::BuyCard { home: side == TeamSide::Home, card_type: b.card_type_name }),
+        // Java StepWeatherMage: `Weather.valueOf(weatherName)` (the enum constant name); the step
+        // takes the modifier from the dialog it showed.
+        AnyClientCommand::ClientSelectWeather(w) => {
+            let name = w.weather_name.ok_or_else(|| missing("weatherName"))?;
+            let weather = ffb_model::enums::Weather::all().iter().copied()
+                .find(|x| ffb_engine::step::bb2025::inducements::step_weather_mage::java_weather_constant(*x) == name)
+                .ok_or_else(|| DecodeError::NotImplemented(format!("weather {name}")))?;
+            Ok(Action::SelectWeather { weather })
+        }
+        // Java StepWizard CLIENT_WIZARD_SPELL: the spell and its target (StepWizard un-mirrors the
+        // away coach's square itself).
+        AnyClientCommand::ClientWizardSpell(w) => {
+            use ffb_engine::action::WizardSpellChoice;
+            use ffb_model::model::SpecialEffect;
+            let spell = match w.wizard_spell {
+                Some(SpecialEffect::LIGHTNING) => WizardSpellChoice::Lightning,
+                Some(SpecialEffect::FIREBALL) => WizardSpellChoice::Fireball,
+                Some(SpecialEffect::ZAP) => WizardSpellChoice::Zap,
+                other => return Err(DecodeError::NotImplemented(format!("wizard spell {other:?}"))),
+            };
+            Ok(Action::WizardSpell { spell, coord: w.target_coordinate.ok_or_else(|| missing("targetCoordinate"))? })
+        }
+        // Java StepPrayer / Wisdom CLIENT_SKILL_SELECTION (sent as clientPrayerSelection): the skill.
+        AnyClientCommand::ClientPrayerSelection(s) => {
+            let name = s.skill_id.ok_or_else(|| missing("skill"))?;
+            Ok(Action::SelectSkill { skill_id: parse_skill_id(&name).ok_or(DecodeError::UnknownSkill(name))? })
+        }
+
         other => Err(DecodeError::NotImplemented(format!("{:?}", other.get_id()))),
     }
 }
@@ -1248,6 +1304,22 @@ mod tests {
         let r = decode(serde_json::json!({"netCommandId": "clientInterceptorChoice", "interceptorId": "a7",
             "skill": "Yoink!"}), TeamSide::Away);
         assert!(matches!(&r, Ok(Action::InterceptWithSkill { player_id, .. }) if player_id == "a7"), "{r:?}");
+    }
+
+    /// §Q4.2 commands whose engine Action already existed: block-die re-rolls, weather, wizard
+    /// spell, petty cash, skill selection.
+    #[test]
+    fn decode_q42_direct_commands() {
+        let r = decode(serde_json::json!({"netCommandId": "clientUseBrawler", "playerId": "a3"}), TeamSide::Home);
+        assert!(matches!(&r, Ok(Action::UseBrawler { target_id: Some(t) }) if t == "a3"), "{r:?}");
+        let r = decode(serde_json::json!({"netCommandId": "clientUseProReRollForBlock", "proIndex": 1}), TeamSide::Home);
+        assert!(matches!(r, Ok(Action::UseProReRollForBlock { die_index: 1 })), "{r:?}");
+        let r = decode(serde_json::json!({"netCommandId": "clientUseMultiBlockDiceReRoll", "blockDiceIndexes": [0, 2]}), TeamSide::Home);
+        assert!(matches!(&r, Ok(Action::UseMultiBlockDiceReRoll { dice_indexes }) if dice_indexes == &vec![0, 2]), "{r:?}");
+        let r = decode(serde_json::json!({"netCommandId": "clientSelectWeather", "name": "VERY_SUNNY", "modifier": 1}), TeamSide::Away);
+        assert!(matches!(r, Ok(Action::SelectWeather { weather: ffb_model::enums::Weather::VerySunny })), "{r:?}");
+        let r = decode(serde_json::json!({"netCommandId": "clientPettyCash", "pettyCash": 50000}), TeamSide::Away);
+        assert!(matches!(r, Ok(Action::PettyCash { home: false, amount: 50000 })), "{r:?}");
     }
 
     /// §Q4.1 CLIENT_USE_RE_ROLL keeps the source: team re-roll, a skill, or a decline.
