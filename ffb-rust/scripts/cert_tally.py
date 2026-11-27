@@ -18,6 +18,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 GREEN = re.compile(r"PARITY: (\d+)/\1 games match.*REPORTS: \1/\1 games identical, 0 differ, 0 skipped\.")
 SKILL_GREEN = re.compile(r"parity=(\d+)/\1 reports=(\d+)/\2 rc=0")
+VIEW_GREEN = re.compile(r"^OK .*CLIENT VIEW: (\d+) steps, \1 identical")
 
 
 def tally(label, files, marker, green_re, expect):
@@ -48,7 +49,14 @@ def main():
         ok &= tally(label, files, "PARITY:", GREEN, expect)
     skill = os.path.join("D:/ffb_sksweep", name, "results.txt")
     ok &= tally("skill", [skill] if os.path.exists(skill) else [], "parity=", SKILL_GREEN, 121)
-    print("ALL FOUR SUITES GREEN" if ok else "NOT ALL GREEN")
+    # §Q1.4: the client view is part of the certification. scripts/view_suite.py writes one
+    # `OK`/`BAD` line per job to <root>/summary.txt; roots D:/ffb_view_<name>_<suite>
+    # (mirror = one root per heur scale: _mirror0, _mirror1.0, _mirror1e6, 110 jobs each).
+    for label, suffixes, expect in (("view-m", ("mirror0", "mirror1.0", "mirror1e6"), 330),
+                                    ("view-c", ("cross",), 4012), ("view-s", ("star",), 4012)):
+        files = [os.path.join("D:/", "ffb_view_%s_%s" % (name, s), "summary.txt") for s in suffixes]
+        ok &= tally(label, [f for f in files if os.path.exists(f)], " ", VIEW_GREEN, expect)
+    print("ALL SUITES GREEN (incl. client view)" if ok else "NOT ALL GREEN")
 
 
 if __name__ == "__main__":

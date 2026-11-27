@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q1.4** (client view in the certification). Parked with notes: Q1.2b (punt → throw-in
+Next item: **Q1.5** (enforce coverage). Parked with notes: Q1.2b (punt → throw-in
 stall), Q1.2c. Night queue: mirror 330 with the Q1.1–Q1.3 verdict + hash (freeze a q1 exe + jar first).
 Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q2.5). Last certified build: cert9 (`docs/cert_manifest.json`); last view build: view15.
 
@@ -85,7 +85,10 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
   apothecaries left; bombs; acting player's declared action + has-blocked/passed/fouled/moved flags;
   TTM/KTM-used. Done: a cross-engine test that hashes the same fixture JSON in both engines; smoke gate
   green; mirror 330 green.
-- [ ] **Q1.4 Client view in the certification.** Move the scratchpad view runner into
+- [x] **Q1.4 Client view in the certification.** (see Log) `scripts/view_suite.py` (resumable, chunked,
+  `--scale`, `--jar`), post-game view dump in both harnesses, `cert_tally.py` counts
+  `D:/ffb_view_<cert>_{mirror0,mirror1.0,mirror1e6,cross,star}/summary.txt`. 3 jobs (bb2025/bb2020/bb2016)
+  end-to-end OK. Left for later: order-sensitive comparison of scalar lists (Q1.4b). Original: Move the scratchpad view runner into
   `scripts/` (job lists → `FFB_CLIENT_VIEW_DIR` dumps → `client_view_check.py`), add a dump after game end
   (SPP, MVP, winnings, fan factor), compare ordered lists in order where Java's order is meaningful, and
   make `cert_tally.py` require `CLIENT VIEW n steps, n identical`. Done: one suite cell end-to-end.
@@ -204,6 +207,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q1.4 · (next commit) · view_suite.py in the repo, post-game view dumps, cert_tally counts
+  the view suites; human-orc bb2025, dwarf-elf bb2020, skaven-undead bb2016 all identical incl. end view.
 - 2026-11-27 · Q1.3 part 5 · (next commit) · temporary-skill count per player in the hash; Grombrindal
   bb2020/bb2025 10/10 with 527 non-zero steps identical. Q1.3 code complete.
 - 2026-11-27 · Q1.3 part 4 · (next commit) · apothecaries and bomb square/moving in the hash.

@@ -831,6 +831,17 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
         }
     }
 
+    // §Q1.4: the client view AFTER the game (SPP, MVP, winnings, fan factor) -- the per-step dumps
+    // stop before the last activation. Same `i` as the game_end line; ParityRunner writes its twin.
+    if let Some(dir) = std::env::var_os("FFB_CLIENT_VIEW_DIR") {
+        use std::io::Write;
+        let view = engine.game.to_json_value().unwrap_or_else(|e| serde_json::json!({ "error": e }));
+        let path = std::path::Path::new(&dir).join(format!("seed_{seed}_rust_view.jsonl"));
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+            let _ = writeln!(f, "{}", serde_json::json!({ "i": step_index, "game": view }));
+        }
+    }
+
     // Fill post_hashes retroactively
     let end_hash = state_hash(&engine.game);
     if std::env::var_os("FFB_TRACE").is_some() {

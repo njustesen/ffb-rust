@@ -476,6 +476,19 @@ public class ParityRunner {
             + " half=" + game.getHalf() + " turnHome=" + game.getTurnDataHome().getTurnNr()
             + " turnAway=" + game.getTurnDataAway().getTurnNr());
 
+        // §Q1.4: the client view AFTER the game (SPP, MVP, winnings, fan factor) -- the per-step dumps
+        // stop before the last activation. Same `i` as the game_end line; Rust writes its twin.
+        String endViewDir = System.getenv("FFB_CLIENT_VIEW_DIR");
+        if (endViewDir != null) {
+            java.io.File file = new java.io.File(endViewDir, "seed_" + currentSeed + "_java_view.jsonl");
+            try (java.io.Writer w = new java.io.OutputStreamWriter(
+                new java.io.FileOutputStream(file, true), java.nio.charset.StandardCharsets.UTF_8)) {
+                w.write("{\"i\":" + stepIndex + ",\"game\":" + game.toJsonValue().toString() + "}\n");
+            } catch (java.io.IOException e) {
+                System.err.println("CLIENT_VIEW write failed: " + e.getMessage());
+            }
+        }
+
         // Finalize: fill post_hashes and flush all pending steps
         String endHash = stateHash(game);
         for (int i = 0; i < pending.size(); i++) {
