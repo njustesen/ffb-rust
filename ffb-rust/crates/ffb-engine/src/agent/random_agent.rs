@@ -1221,9 +1221,15 @@ impl Agent for RandomAgent {
                 Action::BlockChoice { die_index, target_id }
             }
             // Pick-up choice (bb2025 Trickster): ParityRunner's PICK_UP_CHOICE arm declines, 0 rng.
-            Some(AgentPrompt::PickUpChoice { .. }) => Action::PickUpChoice { pick_up: false },
+            // §Q2.9: under `--coverage-bias` both harnesses take the other branch (pick up / punt into
+            // the crowd), zero draws either way.
+            Some(AgentPrompt::PickUpChoice { .. }) => Action::PickUpChoice {
+                pick_up: crate::agent::heuristic_agent::coverage_bias() > 0.0,
+            },
             // Punt to crowd: ParityRunner's PUNT_TO_CROWD case always declines, 0 rng.
-            Some(AgentPrompt::PuntToCrowd { .. }) => Action::PuntToCrowd { punt_to_crowd: false },
+            Some(AgentPrompt::PuntToCrowd { .. }) => Action::PuntToCrowd {
+                punt_to_crowd: crate::agent::heuristic_agent::coverage_bias() > 0.0,
+            },
             // Overtime kick-off result choice (OVERTIME_KICK_OFF_RESULTS = blitzOrSolidDefence only;
             // the default option rolls). ParityRunner has no arm for it; take Solid Defence, 0 rng.
             Some(AgentPrompt::KickOffResult { .. }) =>
@@ -1681,8 +1687,11 @@ impl Agent for RandomAgent {
             // Inducement / pre-game: always decline / acknowledge with no RNG consumed.
             // bb2016 cards: ParityRunner BUY_CARDS arm sends CLIENT_BUY_CARD(null) for the team.
             // Kick: ParityRunner KICK_SKILL arm declines (CLIENT_USE_SKILL false), zero RNG.
-            Some(AgentPrompt::KickSkill { .. }) =>
-                Action::UseSkill { skill_id: ffb_model::enums::SkillId::Kick, use_skill: false },
+            // §Q2.9: under `--coverage-bias` both harnesses USE Kick (halve the kick distance).
+            Some(AgentPrompt::KickSkill { .. }) => Action::UseSkill {
+                skill_id: ffb_model::enums::SkillId::Kick,
+                use_skill: crate::agent::heuristic_agent::coverage_bias() > 0.0,
+            },
             // BACKLOG §M 2b(e): the Gored by the Bull blitz-block choice -- the zero-draw rule
             // ParityRunner's blitz arm applies in every agent mode.
             Some(AgentPrompt::BlitzBlockSkill { defender_id, skill_id, .. }) =>

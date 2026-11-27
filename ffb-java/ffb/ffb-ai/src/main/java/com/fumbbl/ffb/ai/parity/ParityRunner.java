@@ -1904,7 +1904,9 @@ public class ParityRunner {
             // -- Rust's StepTrickster mirrors the decline branch (BACKLOG section K item 6).
             case PICK_UP_CHOICE: {
                 try {
-                    MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandPickUpChoice(false));
+                    // §Q2.9: pick up under --coverage-bias (random_agent.rs mirrors it).
+                    MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandPickUpChoice(
+                        com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS > 0.0f));
                 } catch (RuntimeException e) {
                     game.setDialogParameter(null);
                 }
@@ -1924,7 +1926,8 @@ public class ParityRunner {
                 // the first time now that PUNT is a handled acting action. DECLINE
                 // deterministically, zero draws; the Rust InitPunt auto-declines identically.
                 comm.clearCaptured();
-                comm.sendPuntToCrowd(false);
+                // §Q2.9: punt into the crowd under --coverage-bias (random_agent.rs mirrors it).
+                comm.sendPuntToCrowd(com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS > 0.0f);
                 injectCaptured(dialog, game, gameState);
                 break;
             }
@@ -1943,7 +1946,10 @@ public class ParityRunner {
                 game.setDialogParameter(null);
                 if (kick != null) {
                     MatchRunner.injectForTeam(gameState,
-                        new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(kick, false, kicker.getId(), null, false),
+                        // §Q2.9: use Kick under --coverage-bias (random_agent.rs mirrors it).
+                        new com.fumbbl.ffb.net.commands.ClientCommandUseSkill(kick,
+                            com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS > 0.0f,
+                            kicker.getId(), null, false),
                         game.getTeamHome().hasPlayer(kicker));
                 }
                 break;

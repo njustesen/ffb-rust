@@ -8,7 +8,8 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q2.9** (remaining fixed answers). Open parts: Q2.4 re-placement design, Q2.6 re-rolls.
+Next item: **Q3.1** (overtime). Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
+squads, Q1.2b punt stall (two repros).
 Q2.2/Q2.3 inducement parts wait for Q2.8. Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
 that change games; run the Q1 night queue first (mirror 330 + view suites on a frozen exe). Parked with notes: Q1.2b (punt → throw-in
 stall), Q1.2c. Night queue: mirror 330 with the Q1.1–Q1.3 verdict + hash (freeze a q1 exe + jar first).
@@ -69,7 +70,8 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
   with no prompt. Final hashes equal (both stuck). Next: trace which Java step rolled 105 (throwInBall's
   distance roll is not in the JAVA_DIE trace — check `DiceRoller.rollThrowInDistance`), find where the
   catch step's reRolledAction comes from (a stale ClientCommandUseReRoll?), then decide Java defect
-  (JAVA_DEFECTS.md) vs harness/Rust fix.
+  (JAVA_DEFECTS.md) vs harness/Rust fix. Second repro: dark_elf vs wood_elf_sk bb2025 seed 20 with
+  `--coverage-bias 1` (STUCK_STEP CATCH_SCATTER_THROW_IN; green without the bias).
 - [~] **Q1.3 Wider state hash.** Part 1 done (see Log): every player part now ends `,<PlayerState id>,<PA>`
   (all state flags + exact off-pitch state + effective PA), both engines identical; smoke 3×20 green.
   Part 2 done: acting player part ends `,<declared action>,<10 flags>` (blocked, passed, fouled, moved,
@@ -161,7 +163,11 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   getPlayerIds()). Biased bb2025/bb2020/bb2016 20/20 each; default smoke 20/20.
 - [ ] **Q2.8 Pregame purchases:** buy inducements, star players, mercenaries, cards, prayers within the
   petty cash / treasury; enable Underdog prayers. Depends on Q3.2–Q3.3.
-- [ ] **Q2.9 Remaining fixed answers:** Blood Lust choices, Trickster pick-up, punt to crowd, Kick,
+- [~] **Q2.9 Remaining fixed answers:** part 1 (see Log): under `--coverage-bias` both agents take the
+  other branch of PUNT_TO_CROWD (punt), PICK_UP_CHOICE (pick up) and KICK_SKILL (use Kick), zero draws.
+  None of the three fired in 60 biased games (dark_elf vs wood_elf_sk, human vs orc bb2025) — needs a
+  squad/star that reaches them (Punt on a boundary, Trickster, Kick kicker) before it counts as covered.
+  Original: Blood Lust choices, Trickster pick-up, punt to crowd, Kick,
   Diving Catch, player-choice dialogs (High Kick, Arm Bar…), Piling On / Pile Driver decline, select
   skill by value, touchback choice, concession (needs Q3.8). List each dialog kind in the heuristic's
   scorer or document why it stays fixed.
@@ -242,6 +248,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q2.9 part 1 · (next commit) · punt-to-crowd / pick-up / Kick flipped under coverage bias;
+  not yet reached in 60 biased games; second Q1.2b repro recorded.
 - 2026-11-27 · Q2.7 · (next commit) · full MVP nominations under coverage bias; StepMvp now keeps all
   nominees (Java getPlayerIds); 3×20 biased + default smoke green.
 - 2026-11-27 · Q2.6 part 1 · (next commit) · multi-block last-die choice under coverage bias; undead_sk
