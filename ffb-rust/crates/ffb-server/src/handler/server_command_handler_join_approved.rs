@@ -412,7 +412,14 @@ impl ServerCommandHandlerJoinApproved {
                 let mut gc = self.game_cache.lock().unwrap();
                 gc.get_game_state_by_id_mut(game_id).and_then(|gs| gs.get_game_mut()).map(|game| {
                     ffb_engine::util::util_server_start_game::UtilServerStartGame::add_default_game_options(game);
-                    game.rules = ffb_model::enums::Rules::Bb2025;
+                    // Java `initializeRules()`: `Rules.valueOf(rulesVersion option)` (§Q4.3: was a
+                    // hard-coded BB2025). Java's standalone `addDefaultGameOptions` -- just above --
+                    // sets rulesVersion to BB2025 unconditionally (its BB2020 line is overwritten, the
+                    // BB2016 one commented out), so a standalone game is BB2025 in both servers.
+                    match game.options.rules_version() {
+                        Ok(rules) => game.rules = rules,
+                        Err(e) => log::error!("game {game_id}: {e}; keeping {:?}", game.rules),
+                    }
                     game.clone()
                 })
             };

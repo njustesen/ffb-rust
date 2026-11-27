@@ -8,7 +8,8 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q4.2** undecoded ClientCommands (Q3.10 needs suite runs: night). Q3.9 code is done; its
+Next item: **Q4.4** missing dialogs and ModelChange kinds (Q4.2 rest waits for the other session's
+declaration work; Q4.3 is [!]; Q3.10 needs suite runs: night). Q3.9 code is done; its
 bb2016 skill sweep joins the night queue. Q3.3a (card play) waits for another session's
 uncommitted card-model work (see Q3.3a); Q3.3b (card draw) is [!] with a question for the user.
 Then Q3.6, Q2.8's stars / mercenaries / staff. Gate shape for purchases: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`.
@@ -303,7 +304,14 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   UseProReRollForBlock, UseConsummateReRollForBlock, UseSingleBlockDieReRoll, UseMultiBlockDiceReRoll,
   UseReRollForTarget, SynchronousMultiBlock, Set/UnsetBlockTargetSelection, SkillSelection,
   IllegalProcedure, KickTeamMate, ThrowKeg, PileDriver, FieldCoordinate, …).
-- [ ] **Q4.3 Per-edition games on the server** (drop the forced `Bb2025` in `join_approved.rs:415`).
+- [!] **Q4.3 Per-edition games on the server** (drop the forced `Bb2025` in `join_approved.rs:415`).
+  1:1 part done (see Log): the ruleset now comes from the `rulesVersion` option (Java
+  `initializeRules`). But Java's standalone `UtilServerStartGame.addDefaultGameOptions` hard-codes
+  `rulesVersion = BB2025` too (BB2020 line overwritten, BB2016 commented out), so Java's own
+  standalone server cannot host a BB2020/BB2016 game either. **Question for the user:** should the
+  Rust server get a ruleset setting Java's standalone server lacks (e.g. `rulesVersion` in the
+  server ini, or per game at creation), so the GUI can play BB2020/BB2016? If yes, UseIgors and
+  SelectCardToBuy (Q4.2) and the bb2016 KICK_TEAM_MATE decode follow.
 - [ ] **Q4.4 Missing dialogs and ModelChange kinds** (31 never produced: cards, prayers/enhancements,
   hatred, chomp, acting-player dodging/jumping/leaping/strength, blitz state, …; dialogs
   BlockRollPartialReRoll, BuyInducements, Journeymen, PilingOn, TeamSetup, UseIgors,
@@ -334,6 +342,11 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q4.3 (1:1 part) · (this commit) · join_approved reads the ruleset from the
+  `rulesVersion` option (Java `initializeRules`) instead of forcing BB2025; behaviour unchanged
+  (Java's standalone defaults hard-code BB2025 too). Per-edition GUI games are [!] (needs a setting
+  Java lacks). Server tests green.
 
 - 2026-11-27 · Q4.2 part 3 · (this commit) · CLIENT_PILE_DRIVER -> `SelectPlayer` (StepEndBlocking's
   Pile Driver answer, empty declines); CLIENT_USE_CHAINSAW -> `UseSkill(Chainsaw)` (StepPileDriver);
