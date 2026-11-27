@@ -43,6 +43,16 @@ pub struct StepApothecary {
     /// Set while the bb2025 failed-Regeneration re-roll offer (DialogReRollProperties) is up:
     /// the casualty player whose regeneration may be re-rolled with a team re-roll.
     regen_reroll_pending: Option<String>,
+    /// §Q2.1: the (old, new) results of a shown DialogApothecaryChoiceParameter. Java answers that
+    /// dialog with CLIENT_APOTHECARY_CHOICE(playerState, seriousInjury) -> handleApothecaryChoice;
+    /// Rust's agents answer with `Action::UseApothecary` (true = take the new result).
+    apothecary_choice_pending: Option<ApothecaryChoicePending>,
+}
+
+#[derive(Clone, Copy)]
+struct ApothecaryChoicePending {
+    old: (Option<PlayerState>, Option<SeriousInjuryKind>),
+    new: (Option<PlayerState>, Option<SeriousInjuryKind>),
 }
 
 impl StepApothecary {
@@ -56,6 +66,7 @@ impl StepApothecary {
             attacker_poisoned: false,
             apothecary_type: None,
             regen_reroll_pending: None,
+            apothecary_choice_pending: None,
         }
     }
 
@@ -550,6 +561,10 @@ impl StepApothecary {
                 let (player_state_old, serious_injury_old) = self.injury_result.as_ref()
                     .map(|ir| (ir.injury_context.injury, ir.injury_context.serious_injury))
                     .unwrap_or((None, None));
+                self.apothecary_choice_pending = Some(ApothecaryChoicePending {
+                    old: (player_state_old, serious_injury_old),
+                    new: (new_state, new_serious_injury),
+                });
                 crate::util::util_server_dialog::UtilServerDialog::show_dialog(
                     game,
                     ffb_model::dialog::dialog_parameter_factory::DialogParameter::ApothecaryChoice(
@@ -585,7 +600,13 @@ impl StepApothecary {
             } else {
                 ir.injury_context.set_injury(PlayerState::new(PS_RESERVE));
             }
-            // Java: addReport(new ReportApothecaryChoice(defenderId, playerState, null))
+            // Java: addReport(new ReportApothecaryChoice(defenderId, playerState, null)). It was only
+            // an event here, so every apothecary use was one report short of Java (§Q2.1 found it:
+            // no gate had ever accepted an apothecary).
+            if let Some(state) = ir.injury_context.injury {
+                game.report_list.add(ffb_model::report::report_apothecary_choice::ReportApothecaryChoice::new(
+                    player_id.clone(), state, None));
+            }
             // healed=true: apo cured the player (BH→RESERVE or KO→STUNNED)
             events.push(GameEvent::ApothecaryChoice {
                 player_id,
@@ -779,6 +800,13 @@ impl Step for StepApothecary {
                     .and_then(|ir| ir.injury_context.defender_id.as_deref())
                     .unwrap_or("");
                 if self.injury_result.is_some() && player_id == defender_id {
+                    // §Q2.1: answering the apothecary CHOICE dialog. Java CLIENT_APOTHECARY_CHOICE
+                    // -> handleApothecaryChoice(chosen state, chosen serious injury) -> EXECUTE_STEP.
+                    if let Some(choice) = self.apothecary_choice_pending.take() {
+                        let (state, si) = if *use_apothecary { choice.new } else { choice.old };
+                        self.handle_apothecary_choice(state.unwrap_or_default(), si);
+                        return self.execute_step(game, rng);
+                    }
                     let new_status = if *use_apothecary {
                         ApothecaryStatus::UseApothecary
                     } else {

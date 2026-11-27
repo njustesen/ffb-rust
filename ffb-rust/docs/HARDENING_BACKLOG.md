@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q2.1** (apothecary accept). Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
+Next item: **Q2.2** (regeneration / Igor / Mortuary Assistant accept). Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
 that change games; run the Q1 night queue first (mirror 330 + view suites on a frozen exe). Parked with notes: Q1.2b (punt → throw-in
 stall), Q1.2c. Night queue: mirror 330 with the Q1.1–Q1.3 verdict + hash (freeze a q1 exe + jar first).
 Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q2.5). Last certified build: cert9 (`docs/cert_manifest.json`); last view build: view15.
@@ -118,8 +118,12 @@ All behind `--coverage-bias` (default off keeps cert behaviour); Rust `heuristic
 same draws on both sides. Each item: a 20-seed gate per edition where the mechanic exists, then a
 coverage suite (`--coverage-bias`, mirror 330) at night.
 
-- [ ] **Q2.1 Apothecary accept** (and the apothecary result choice both ways). Gate: apothecary roll
-  path fires in all 3 editions.
+- [x] **Q2.1 Apothecary accept** (see Log). Under `--coverage-bias` > 0 both agents use the apothecary
+  and take the new result at the choice (zero draws). It exposed two Rust bugs, both fixed 1:1: the
+  no-choice branch never added Java's ReportApothecaryChoice, and that report serialised playerState as
+  null; and the choice dialog's answer went through "use / do not use" instead of Java's
+  handleApothecaryChoice(old|new). Gates with `--coverage-bias 1`: bb2025 human, bb2020 orc-skaven,
+  bb2016 dwarf-elf 20/20 steps + reports; apothecary rolls present in all three.
 - [ ] **Q2.2 Regeneration re-roll / Igor / Mortuary Assistant accept.**
 - [ ] **Q2.3 Argue the call: decline branch; bribes: use branch.**
 - [ ] **Q2.4 Kick-off placements:** Quick Snap, Solid Defence, High Kick, Perfect Defence, Charge pick
@@ -216,6 +220,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q2.1 · (next commit) · apothecary accept under coverage bias; fixed missing
+  ReportApothecaryChoice, its null playerState, and the choice-dialog answer path; 3×20 biased gates green.
 - 2026-11-27 · Q1.6 · (next commit) · determinism_check.py; 4 matchups × 100 seeds byte-identical over
   two processes.
 - 2026-11-27 · Q1.5 · (next commit) · suite-level coverage: per-gate JSON, --coverage-merge, coverage.txt

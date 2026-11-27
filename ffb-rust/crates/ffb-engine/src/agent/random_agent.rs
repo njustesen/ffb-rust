@@ -1089,8 +1089,13 @@ impl Agent for RandomAgent {
             // Apothecary: AGENT_CONTRACT §7 — DECLINE, deterministically, 0 rng. Java
             // APOTHECARY_CHOICE = sendApothecaryChoice(..., playerStateOld) i.e. keep the original
             // result (decline the apothecary). Was random-sampled via pick_bool (spurious draw).
+            // §Q2.1: under `--coverage-bias` (> 0) both harnesses take the NEW result instead, so the
+            // apothecary-choice branch is exercised; zero draws either way (ParityRunner mirrors it).
             Some(AgentPrompt::ApothecaryChoice { player_id, .. }) =>
-                Action::UseApothecary { player_id: player_id.clone(), use_apothecary: false },
+                Action::UseApothecary {
+                    player_id: player_id.clone(),
+                    use_apothecary: crate::agent::heuristic_agent::coverage_bias() > 0.0,
+                },
             // Java harness `ParityRunner.handleDialog` case USE_APOTHECARY:
             //     comm.sendUseApothecary(apo.getPlayerId(), false, apoType, apo.getSeriousInjury());
             // i.e. it DECLINES, naming the injured player. Answering `Acknowledge` instead left
@@ -1098,8 +1103,13 @@ impl Agent for RandomAgent {
             // switch has no arm for - so the step fell through and the injury was never applied:
             // an Animal Savagery lash-out that KO'd its victim in Java left it STANDING in Rust
             // (underworld bb2020 seed 2: Java KOs `h02` at i=56, Rust never does).
+            // §Q2.1: under `--coverage-bias` (> 0) both harnesses USE the apothecary (Java: the first
+            // offered ApothecaryType), so the whole apothecary roll path runs; zero draws either way.
             Some(AgentPrompt::UseApothecary { player_id, .. }) =>
-                Action::UseApothecary { player_id: player_id.clone(), use_apothecary: false },
+                Action::UseApothecary {
+                    player_id: player_id.clone(),
+                    use_apothecary: crate::agent::heuristic_agent::coverage_bias() > 0.0,
+                },
             // Block target asked for mid-sequence: `StepInitBlocking` reached with no
             // `blockDefenderId`. This only happens on the sequence `StepEndBlocking` re-pushes after
             // a failed Blood Lust, and the HARNESS never answers it: `INIT_BLOCKING` has no case in

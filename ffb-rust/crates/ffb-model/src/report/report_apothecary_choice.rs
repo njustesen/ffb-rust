@@ -35,7 +35,9 @@ impl ReportApothecaryChoice {
         serde_json::json!({
             "reportId": self.get_id().get_name(),
             "playerId": self.player_id,
-            "playerState": serde_json::Value::Null,
+            // Java IJsonOption.PLAYER_STATE writes PlayerState.getId(); the null here was never
+            // compared because no gate had accepted an apothecary before §Q2.1.
+            "playerState": self.player_state.id(),
             "seriousInjury": self.serious_injury,
         })
     }
@@ -43,7 +45,7 @@ impl ReportApothecaryChoice {
     pub fn from_json(json: &serde_json::Value) -> Self {
         Self {
             player_id: json["playerId"].as_str().unwrap_or("").to_string(),
-            player_state: PlayerState::new(0),
+            player_state: PlayerState::new(json["playerState"].as_u64().unwrap_or(0) as u32),
             serious_injury: json["seriousInjury"].as_str().map(str::to_string),
         }
     }

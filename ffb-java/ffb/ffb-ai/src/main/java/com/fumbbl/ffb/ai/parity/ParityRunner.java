@@ -1823,8 +1823,12 @@ public class ParityRunner {
                     com.fumbbl.ffb.dialog.DialogApothecaryChoiceParameter ac =
                         (com.fumbbl.ffb.dialog.DialogApothecaryChoiceParameter) dialog;
                     comm.clearCaptured();
-                    comm.sendApothecaryChoice(ac.getPlayerId(), ac.getPlayerStateOld(),
-                        ac.getSeriousInjuryOld(), ac.getPlayerStateOld());
+                    // §Q2.1: under --coverage-bias take the NEW result (random_agent.rs mirrors it).
+                    boolean takeNew = com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS > 0.0f;
+                    comm.sendApothecaryChoice(ac.getPlayerId(),
+                        takeNew ? ac.getPlayerStateNew() : ac.getPlayerStateOld(),
+                        takeNew ? ac.getSeriousInjuryNew() : ac.getSeriousInjuryOld(),
+                        ac.getPlayerStateOld());
                     injectCaptured(dialog, game, gameState);
                 } else {
                     game.setDialogParameter(null);
@@ -1841,7 +1845,7 @@ public class ParityRunner {
                     com.fumbbl.ffb.ApothecaryType apoType = (types != null && !types.isEmpty())
                         ? types.get(0) : com.fumbbl.ffb.ApothecaryType.TEAM;
                     comm.clearCaptured();
-                    comm.sendUseApothecary(apo.getPlayerId(), false, apoType, apo.getSeriousInjury());
+                    comm.sendUseApothecary(apo.getPlayerId(), com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS > 0.0f, apoType, apo.getSeriousInjury()); // §Q2.1: use it under --coverage-bias
                     injectCaptured(dialog, game, gameState);
                 } else {
                     game.setDialogParameter(null);
