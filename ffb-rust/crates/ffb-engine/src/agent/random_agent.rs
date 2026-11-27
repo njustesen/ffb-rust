@@ -1193,8 +1193,15 @@ impl Agent for RandomAgent {
             // Argue the call: AGENT_CONTRACT §7 — ALWAYS argue, deterministically, 0 rng. Java
             // ARGUE_THE_CALL always sends ClientCommandArgueTheCall(firstPlayer). Was random-sampled
             // via pick_bool (spurious draw + wrong choice).
-            Some(AgentPrompt::ArgueTheCall { player_ids, .. }) =>
-                Action::ArgueTheCall { player_ids: player_ids.first().cloned().into_iter().collect() },
+            // §Q2.3: under `--coverage-bias` (> 0) both harnesses DECLINE (no player), so the
+            // don't-argue branch is exercised too; default runs keep arguing. Zero draws either way.
+            Some(AgentPrompt::ArgueTheCall { player_ids, .. }) => Action::ArgueTheCall {
+                player_ids: if crate::agent::heuristic_agent::coverage_bias() > 0.0 {
+                    Vec::new()
+                } else {
+                    player_ids.first().cloned().into_iter().collect()
+                },
+            },
             // Multi-block casualties' apothecary question: ParityRunner declines (the parity
             // contract never uses an apothecary) -- CLIENT_USE_APOTHECARIES. 0 rng.
             Some(AgentPrompt::UseApothecaries { .. }) => Action::Acknowledge,

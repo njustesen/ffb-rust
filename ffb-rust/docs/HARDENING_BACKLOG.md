@@ -8,7 +8,8 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q2.2** (regeneration / Igor / Mortuary Assistant accept). Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
+Next item: **Q3.4** (Solid Defence selection), then Q2.4 (kick-off placements, which depends on it).
+Q2.2/Q2.3 inducement parts wait for Q2.8. Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
 that change games; run the Q1 night queue first (mirror 330 + view suites on a frozen exe). Parked with notes: Q1.2b (punt → throw-in
 stall), Q1.2c. Night queue: mirror 330 with the Q1.1–Q1.3 verdict + hash (freeze a q1 exe + jar first).
 Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q2.5). Last certified build: cert9 (`docs/cert_manifest.json`); last view build: view15.
@@ -124,8 +125,13 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   null; and the choice dialog's answer went through "use / do not use" instead of Java's
   handleApothecaryChoice(old|new). Gates with `--coverage-bias 1`: bb2025 human, bb2020 orc-skaven,
   bb2016 dwarf-elf 20/20 steps + reports; apothecary rolls present in all three.
-- [ ] **Q2.2 Regeneration re-roll / Igor / Mortuary Assistant accept.**
-- [ ] **Q2.3 Argue the call: decline branch; bribes: use branch.**
+- [~] **Q2.2 Regeneration re-roll / Igor / Mortuary Assistant accept.** The single failed-Regeneration
+  TRR offer is already a heuristic re-roll decision (sampled, both branches live). Igor, Mortuary
+  Assistant and RE_ROLL_REGENERATION_MULTIPLE all need a bought inducement → **do with Q2.8**
+  (accept rule: first offered player under `--coverage-bias`, both agents).
+- [x] **Q2.3 Argue the call: decline branch** (see Log): under `--coverage-bias` both agents decline
+  (Java no-arg ClientCommandArgueTheCall, Rust empty list); goblin bb2025 30/30 with 74 declines,
+  orc-skaven bb2020 + goblin-dwarf bb2016 20/20. Bribes' use branch needs bought bribes → Q2.8.
 - [ ] **Q2.4 Kick-off placements:** Quick Snap, Solid Defence, High Kick, Perfect Defence, Charge pick
   real players. Depends on Q3.4 (Solid Defence selection).
 - [x] **Q2.5a Swarming dialog loop** (see Log): the harness clears DialogSwarmingPlayers at once
@@ -220,6 +226,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q2.3 · (next commit) · argue-the-call decline under coverage bias (74 declines, goblin
+  bb2025 30/30). Q2.2 single-regen already sampled; inducement parts → Q2.8.
 - 2026-11-27 · Q2.1 · (next commit) · apothecary accept under coverage bias; fixed missing
   ReportApothecaryChoice, its null playerState, and the choice-dialog answer path; 3×20 biased gates green.
 - 2026-11-27 · Q1.6 · (next commit) · determinism_check.py; 4 matchups × 100 seeds byte-identical over

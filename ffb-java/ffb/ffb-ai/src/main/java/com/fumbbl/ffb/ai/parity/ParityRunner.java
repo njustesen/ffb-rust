@@ -1864,7 +1864,9 @@ public class ParityRunner {
                         (com.fumbbl.ffb.dialog.DialogArgueTheCallParameter) dialog;
                     String[] playerIds = argueParam.getPlayerIds();
                     String teamId = getDialogTeamId(dialog);
-                    String firstPlayer = (playerIds != null && playerIds.length > 0) ? playerIds[0] : null;
+                    // §Q2.3: under --coverage-bias decline (no player); random_agent.rs mirrors it.
+                    boolean declineArgue = com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS > 0.0f;
+                    String firstPlayer = (!declineArgue && playerIds != null && playerIds.length > 0) ? playerIds[0] : null;
                     if (DEBUG) System.err.println("JAVA_ARGUE_DIALOG team=" + teamId
                         + " ids=" + java.util.Arrays.toString(playerIds));
                     com.fumbbl.ffb.net.commands.ClientCommandArgueTheCall argueCmd =
