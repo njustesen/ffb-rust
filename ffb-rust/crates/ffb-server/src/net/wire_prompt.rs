@@ -307,6 +307,7 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
             Some(WireDialog::HitAndRun { player_id: player_id.clone(), squares: squares.clone() }),
         // The BB2016/BB2020 swoop-target ask has no Java dialog counterpart to wire yet.
         AgentPrompt::SwoopTarget { .. } => None,
+        AgentPrompt::SwarmingPlacement { .. } => None,
         // Blastin's target wait is a turn-mode wait with no Java dialog to wire.
         AgentPrompt::BlastinTarget { .. } => None,
         AgentPrompt::TricksterMove { player_id, squares } =>

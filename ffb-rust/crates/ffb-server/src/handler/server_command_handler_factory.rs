@@ -757,6 +757,14 @@ impl ServerCommandHandlerFactory {
             }
             action = Action::ConfirmSetup;
         }
+        // Java bb2025 StepSwarming CLIENT_END_TURN: `setPlayerCoordinates(command.getPlayerCoordinates())`
+        // then end the swarm (the engine's ConfirmSetup). §Q2.5b.
+        if let (Some(ffb_model::prompts::AgentPrompt::SwarmingPlacement { .. }), Some(coordinates)) = (&prompt, &end_turn_coordinates) {
+            if let Some(game) = gs.get_game_mut() {
+                ffb_engine::util::util_server_setup::UtilServerSetup::set_player_coordinates(game, coordinates);
+            }
+            action = Action::ConfirmSetup;
+        }
         // Java bb2025 StepApplyKickoffResult CLIENT_END_TURN in SOLID_DEFENCE:
         // `setPlayerCoordinates(endTurnCommand.getPlayerCoordinates())` before the setup check.
         if let (Some(ffb_model::prompts::AgentPrompt::KickoffEventPlacement { mode, .. }), Some(coordinates)) = (&prompt, &end_turn_coordinates) {

@@ -1206,6 +1206,60 @@ public class ParityRunner {
         }
     }
 
+    /**
+     * §Q2.5b Swarming placement, 1:1 with random_agent.rs `swarming_placement_action`, no draws:
+     * while fewer than {@code amount} of the swarming team's players stand ACTIVE on the pitch
+     * (StepSwarming deactivated the eleven already there), place the lowest-numbered LINEMAN still
+     * in RESERVE on the first free square of the team's own half off the LoS and outside the wide
+     * zones (x 1..11 home / 24..14 away, y 4..10), deepest column first, then by row.
+     */
+    private void placeSwarmers(Game game, GameState gameState, int amount) {
+        boolean home = game.isHomePlaying();
+        com.fumbbl.ffb.model.Team team = home ? game.getTeamHome() : game.getTeamAway();
+        com.fumbbl.ffb.model.FieldModel fm = game.getFieldModel();
+        for (int guard = 0; guard < 32; guard++) {
+            int placed = 0;
+            for (Player<?> p : team.getPlayers()) {
+                FieldCoordinate c = fm.getPlayerCoordinate(p);
+                PlayerState s = fm.getPlayerState(p);
+                if (c != null && com.fumbbl.ffb.FieldCoordinateBounds.FIELD.isInBounds(c) && s != null && s.isActive()) {
+                    placed++;
+                }
+            }
+            if (placed >= amount) {
+                return;
+            }
+            Player<?> next = null;
+            for (Player<?> p : team.getPlayers()) {
+                PlayerState s = fm.getPlayerState(p);
+                if (s != null && s.getBase() == PlayerState.RESERVE
+                    && p.getPosition().getKeywords().contains(com.fumbbl.ffb.model.Keyword.LINEMAN)
+                    && (next == null || p.getNr() < next.getNr())) {
+                    next = p;
+                }
+            }
+            if (next == null) {
+                return;
+            }
+            FieldCoordinate square = null;
+            for (int i = 0; i < 11 && square == null; i++) {
+                int x = home ? 1 + i : 24 - i;
+                for (int y = 4; y <= 10; y++) {
+                    FieldCoordinate c = new FieldCoordinate(x, y);
+                    if (fm.getPlayer(c) == null) {
+                        square = c;
+                        break;
+                    }
+                }
+            }
+            if (square == null) {
+                return;
+            }
+            // setupPlayer takes the coach's view: the away coach's square mirrored.
+            UtilServerSetup.setupPlayer(gameState, next.getId(), home ? square : square.transform());
+        }
+    }
+
     /** Trickster square: sorted MoveSquares, one actionRng draw, sent as the (flipped) current team. */
     private void sendTricksterTarget(Game game, GameState gameState) {
         FieldModel fm = game.getFieldModel();
@@ -1267,6 +1321,13 @@ public class ParityRunner {
             // state: the next iteration sees SWARMING with no dialog and the UNHANDLED_STEP default
             // ends the turn with zero swarmers placed, exactly what Rust's step_swarming does.
             case SWARMING:
+                // §Q2.5b: bb2025 StepSwarming waits for CLIENT_SETUP_PLAYER(s) + CLIENT_END_TURN.
+                // Place swarmers by random_agent.rs's `swarming_placement_action` rule (no draws);
+                // the UNHANDLED_STEP default then ends the turn. bb2016/bb2020 place nobody (as Rust).
+                if (isBb2025(game)) {
+                    placeSwarmers(game, gameState,
+                        ((com.fumbbl.ffb.dialog.DialogSwarmingPlayersParameter) dialog).getAmount());
+                }
                 game.setDialogParameter(null);
                 break;
 

@@ -258,6 +258,13 @@ pub enum AgentPrompt {
         team_id: String,
         players: Vec<PlayerId>,
     },
+    /// Java bb2025 StepSwarming's wait (TurnMode SWARMING, DialogSwarmingPlayersParameter): the
+    /// swarming team places up to `amount` extra LINEMAN reserves (`Action::PlacePlayer`, one per
+    /// prompt) and ends with `Action::ConfirmSetup` (CLIENT_END_TURN). §Q2.5b.
+    SwarmingPlacement {
+        team_id: String,
+        amount: i32,
+    },
     SetupError {
         team_id: String,
         error: String,

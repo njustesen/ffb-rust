@@ -1791,6 +1791,11 @@ impl Agent for RandomAgent {
             }
             // Safe Pair of Hands square (BACKLOG §M): StepPlaceBall's MoveSquares, coordinate-
             // sorted, ONE actionRng draw — ParityRunner.sendPlaceBallSquare is the Java mirror.
+            // §Q2.5b Swarming (bb2025 StepSwarming): place the next swarmer or end. ZERO draws;
+            // ParityRunner.placeSwarmers applies the same rule (`swarming_placement_action`).
+            Some(AgentPrompt::SwarmingPlacement { team_id, amount }) => {
+                swarming_placement_action(&gs.game, team_id, *amount)
+            }
             Some(AgentPrompt::PlaceBallSquare { squares, .. }) => {
                 if squares.is_empty() {
                     return Action::Acknowledge;
@@ -1919,6 +1924,46 @@ fn coverage_spell_target(game: &Game, caster_home: bool) -> Option<FieldCoordina
 }
 
 /// §Q2.8 coverage purchase order — ParityRunner.COVERAGE_INDUCEMENTS, same list and order.
+/// §Q2.5b: the agents' Swarming placement (bb2025 StepSwarming), drawing nothing. While fewer than
+/// `amount` of the team's players stand ACTIVE on the pitch (StepSwarming deactivated the eleven
+/// already there, so the active ones are the swarmers placed so far), place the lowest-numbered
+/// LINEMAN still in RESERVE on the first free square of the team's own half that is off the line
+/// of scrimmage and outside the wide zones (x 1..=11 home / 14..=24 away, y 4..=10), deepest column
+/// first, then by row; otherwise end (ConfirmSetup = CLIENT_END_TURN). The swarmers add to the
+/// eleven without touching the wide zones or the LoS, so `checkSetup(.., rolledAmount)` holds.
+/// ParityRunner.placeSwarmers is the same rule.
+pub fn swarming_placement_action(game: &Game, team_id: &str, amount: i32) -> Action {
+    use ffb_model::types::{FieldCoordinate, FieldCoordinateBounds};
+    let home = game.team_home.id == team_id;
+    let team = if home { &game.team_home } else { &game.team_away };
+    let placed = team.players.iter().filter(|p| {
+        game.field_model.player_coordinate(&p.id).is_some_and(|c| FieldCoordinateBounds::FIELD.is_in_bounds(c))
+            && game.field_model.player_state(&p.id).is_some_and(|s| s.is_active())
+    }).count() as i32;
+    if placed >= amount {
+        return Action::ConfirmSetup;
+    }
+    let mut reserves: Vec<&ffb_model::model::player::Player> = team.players.iter()
+        .filter(|p| p.is_lineman
+            && game.field_model.player_state(&p.id).is_some_and(|s| s.base() == ffb_model::enums::PS_RESERVE))
+        .collect();
+    reserves.sort_by_key(|p| p.nr);
+    let Some(player) = reserves.first() else { return Action::ConfirmSetup };
+    let columns: Vec<i32> = if home { (1..=11).collect() } else { (14..=24).rev().collect() };
+    for x in columns {
+        for y in 4..=10 {
+            let c = FieldCoordinate::new(x, y);
+            if game.field_model.player_at(c).is_none() {
+                // CLIENT_SETUP_PLAYER carries the coach's view: the away coach's square mirrored
+                // (UtilServerSetup.setupPlayer transforms it back).
+                let coord = if home { c } else { c.transform() };
+                return Action::PlacePlayer { player_id: player.id.clone(), coord };
+            }
+        }
+    }
+    Action::ConfirmSetup
+}
+
 pub const COVERAGE_INDUCEMENTS: &[&str] = &[
     "prayers", "throwARock", "weatherMage", "wizard", "halflingMasterChef", "bribes", "bloodweiserBabes",
     "extraTeamTraining", "wanderingApothecaries", "partTimeCoach", "tempCheerleader", "teamMascot",
@@ -2117,6 +2162,40 @@ mod tests {
     /// `HitAndRun` above — always read the target step's `handle_command` first).
     #[test]
     fn punt_target_is_mirrored_for_the_away_coach_only() {
+        punt_target_is_mirrored_for_the_away_coach_only_body();
+    }
+
+    // (body split so the Swarming test below sits next to the other coordinate-contract tests)
+
+    /// §Q2.5b the shared Swarming rule (ParityRunner.placeSwarmers): the lowest-numbered LINEMAN
+    /// reserve on the deepest free non-wide, non-LoS square (mirrored for the away coach), until
+    /// `amount` players stand active on the pitch; then end.
+    #[test]
+    fn swarming_placement_places_linemen_deepest_first_then_ends() {
+        use ffb_model::enums::{PlayerState, PS_RESERVE, PS_STANDING, Rules};
+        use ffb_model::model::{game::Game, player::Player};
+        use ffb_model::types::FieldCoordinate;
+        let mut home = crate::step::framework::test_team("home", 0);
+        for (id, nr, lineman) in [("h7", 7, true), ("h3", 3, true), ("h1", 1, false)] {
+            home.players.push(Player { id: id.into(), nr, is_lineman: lineman, ..Default::default() });
+        }
+        let mut away = crate::step::framework::test_team("away", 0);
+        away.players.push(Player { id: "a4".into(), nr: 4, is_lineman: true, ..Default::default() });
+        let mut game = Game::new(home, away, Rules::Bb2025);
+        for id in ["h7", "h3", "h1", "a4"] {
+            game.field_model.set_player_state(id, PlayerState::new(PS_RESERVE));
+        }
+        game.field_model.set_player_coordinate("x", FieldCoordinate::new(1, 4));
+        assert_eq!(swarming_placement_action(&game, "home", 1),
+            Action::PlacePlayer { player_id: "h3".into(), coord: FieldCoordinate::new(1, 5) });
+        game.field_model.set_player_coordinate("h3", FieldCoordinate::new(1, 5));
+        game.field_model.set_player_state("h3", PlayerState::new(PS_STANDING).change_active(true));
+        assert_eq!(swarming_placement_action(&game, "home", 1), Action::ConfirmSetup);
+        assert_eq!(swarming_placement_action(&game, "away", 1),
+            Action::PlacePlayer { player_id: "a4".into(), coord: FieldCoordinate::new(24, 4).transform() });
+    }
+
+    fn punt_target_is_mirrored_for_the_away_coach_only_body() {
         let squares = vec![FieldCoordinate::new(13, 4), FieldCoordinate::new(12, 6)];
         let mut picks = vec![];
         for side in ["home_03", "away_03"] {

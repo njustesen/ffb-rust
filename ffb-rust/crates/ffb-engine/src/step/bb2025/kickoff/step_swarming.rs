@@ -77,8 +77,10 @@ impl Step for StepSwarming {
                 self.end_turn = true;
             }
             Action::PlacePlayer { player_id, coord } => {
+                // Java CLIENT_SETUP_PLAYER: place and keep waiting (no executeStep). §Q2.5b: the
+                // wait now re-asks, as the setup step does (a bare cont() reads as a stall).
                 UtilServerSetup::setup_player(game, player_id, *coord);
-                return StepOutcome::cont();
+                return StepOutcome::cont().with_prompt(self.placement_prompt());
             }
             _ => {}
         }
@@ -126,17 +128,21 @@ impl StepSwarming {
                         ),
                         false,
                     );
-                    // For now: reject and continue.
-                    return StepOutcome::cont();
+                    return StepOutcome::cont().with_prompt(self.placement_prompt());
                 }
 
-                let setup_valid = SetupMechanic::new().check_setup(game, game.home_playing);
-                // client-only: show setup error dialog when !setup_valid
+                // Java bb2025: `mechanic.checkSetup(gameState, isHomePlaying, rolledAmount)` with the
+                // EDITION's SetupMechanic (§Q2.5b: this called the mixed one without the swarmers,
+                // which rejects a team over eleven).
+                let setup_valid = crate::mechanic::setup_mechanic_for(game.rules)
+                    .check_setup_with_swarmers(game, game.home_playing, self.rolled_amount);
                 if setup_valid {
+                    // Java leave(): pop the step, NEXT_STEP.
                     self.leave(game, placed);
+                    return StepOutcome::next();
                 }
             }
-            return StepOutcome::cont();
+            return StepOutcome::cont().with_prompt(self.placement_prompt());
         }
 
         // First entry.
@@ -255,19 +261,25 @@ impl StepSwarming {
         );
 
         // Java pushes itself back on the stack and shows DialogSwarmingPlayersParameter, then
-        // waits for the coach to place swarmers and end the turn. **ParityRunner has no SWARMING
-        // case**, so it falls to the UNHANDLED_STEP default, which injects
-        // `ClientCommandEndTurn(game.getTurnMode(), null)` with NO sampler draw -- i.e. the
-        // reference engine ALWAYS places zero swarmers and leaves immediately. Returning
-        // `cont()` with no prompt here instead stalled the driver outright: it had no question to
-        // ask and no step to run (snotling produced ZERO steps).
-        //
-        // Mirror the harness contract exactly: spend the d3, place nobody, and leave. This is
-        // state- and draw-identical to Java under the parity contract. `handle_command` keeps the
-        // PlacePlayer/EndTurn path intact for a real client.
+        // waits for the coach to place swarmers (CLIENT_SETUP_PLAYER) and end the turn
+        // (CLIENT_END_TURN). §Q2.5b: bb2025 now waits the same way, asking the agent
+        // (`AgentPrompt::SwarmingPlacement`); ParityRunner.placeSwarmers answers with the same rule.
+        // bb2016/bb2020 keep the old contract -- spend the d3, place nobody, leave -- because their
+        // Java twin is the SwarmingBehaviour hook (not ported as a wait here) and the harness
+        // places nobody there.
         self.end_turn = false;
+        if game.rules == ffb_model::enums::Rules::Bb2025 {
+            return StepOutcome::cont().with_prompt(self.placement_prompt());
+        }
         self.leave(game, 0);
         StepOutcome::next()
+    }
+
+    fn placement_prompt(&self) -> ffb_model::prompts::AgentPrompt {
+        ffb_model::prompts::AgentPrompt::SwarmingPlacement {
+            team_id: self.team_id.clone().unwrap_or_default(),
+            amount: self.rolled_amount,
+        }
     }
 
     fn leave(&mut self, game: &mut Game, placed_swarming_players: i32) {
@@ -380,12 +392,35 @@ mod tests {
         assert!(!game.report_list.has_report(ReportId::SWARMING_PLAYERS_ROLL));
     }
 
-    /// Java deactivates the on-pitch players and PRONEs the non-swarming reserves while the coach
-    /// places swarmers, then `leave()` undoes both. ParityRunner has no SWARMING case, so it
-    /// injects EndTurn immediately via UNHANDLED_STEP and zero swarmers are ever placed -- the
-    /// step therefore completes the whole swarming turn inside one `start()`, and the deactivation
-    /// is transient and unobservable afterwards. What MUST hold on return is the post-`leave`
-    /// state: the d3 was spent, and the turn mode is back to Kickoff.
+    /// §Q2.5b Java bb2025 StepSwarming: the d3 is spent, the step WAITS in TurnMode SWARMING for
+    /// placements (`AgentPrompt::SwarmingPlacement`), and CLIENT_END_TURN (ConfirmSetup) with a
+    /// legal placement leaves: back to Kickoff, `kickingSwarmers` = the swarmers placed.
+    #[test]
+    fn swarming_waits_for_placements_and_leaves_on_end_turn() {
+        use ffb_model::types::FieldCoordinate;
+        let mut game = make_swarming_game();
+        let mut step = StepSwarming::new();
+        step.handle_receiving_team = false;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert!((1..=3).contains(&step.rolled_amount), "a d3 must be spent");
+        assert_eq!(game.turn_mode, TurnMode::Swarming);
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::SwarmingPlacement { .. })));
+        let reserve = game.team_home.players.iter()
+            .find(|p| game.field_model.player_state(&p.id).map(|s| s.base()) == Some(ffb_model::enums::PS_RESERVE))
+            .map(|p| p.id.clone())
+            .expect("a reserve lineman");
+        let out = step.handle_command(
+            // On the LoS: this one-player team must put all its players there (MIN_PLAYERS_ON_LOS).
+            &Action::PlacePlayer { player_id: reserve, coord: FieldCoordinate::new(12, 7) }, &mut game, &mut GameRng::new(0));
+        assert!(matches!(out.prompt, Some(ffb_model::prompts::AgentPrompt::SwarmingPlacement { .. })), "keeps waiting");
+        let out = step.handle_command(&Action::ConfirmSetup, &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(game.turn_mode, TurnMode::Kickoff);
+        assert_eq!(game.kicking_swarmers, 1);
+    }
+
+    /// bb2016/bb2020 keep the old contract (the SwarmingBehaviour hook is not a wait here and the
+    /// harness places nobody): spend the d3 and leave inside `start()`.
     #[test]
     fn swarming_trigger_spends_a_d3_and_leaves_the_swarming_turn() {
         use ffb_model::types::FieldCoordinate;
@@ -401,6 +436,11 @@ mod tests {
         game.team_home.players.push(on_pitch);
         game.field_model.set_player_coordinate("p2", FieldCoordinate::new(5, 5));
         game.field_model.set_player_state("p2", PlayerState::new(ffb_model::enums::PS_STANDING));
+        // bb2020's twin is the skill-based SwarmingBehaviour: give the team the skill.
+        game.rules = ffb_model::enums::Rules::Bb2020;
+        for p in &mut game.team_home.players {
+            p.starting_skills.push(ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::Swarming, value: None });
+        }
 
         let mut step = StepSwarming::new();
         step.handle_receiving_team = false;

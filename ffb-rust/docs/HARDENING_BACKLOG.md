@@ -151,9 +151,14 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 - [x] **Q2.5a Swarming dialog loop** (see Log): the harness clears DialogSwarmingPlayers at once
   instead of looping 500× on a CONFIRM StepSwarming ignores; same state (zero swarmers), no abort.
   snotling bb2020/bb2025 20/20 each, loops_cleared 0.
-- [ ] **Q2.5b Swarming placement** (remove the engine's hard-coded "place nobody" in
+- [~] **Q2.5b Swarming placement** (remove the engine's hard-coded "place nobody" in
   `bb2025/kickoff/step_swarming.rs`, ask the agent as Java asks the client; both harnesses place
-  swarmers with seeded draws).
+  swarmers with seeded draws). **bb2025 done** (see Log): StepSwarming waits like Java
+  (`AgentPrompt::SwarmingPlacement`); both harnesses place by one zero-draw rule; the bb2025
+  setup check splits LINEMAN swarmers. Open: bb2016/bb2020 (Java's SwarmingBehaviour hook, still
+  place-nobody in both harnesses); the snotling cells of mirror/cross must be re-run (night).
+  Finding: bb2025 StepSetup / ApplyKickoffResult / BlitzTurn call the MIXED SetupMechanic where
+  Java uses the bb2025 one (same verdict without swarmers; check when swarmers can be on the pitch).
 - [x] **Q2.9a PUNT_TO_CROWD loop** — does not reproduce on head: dark_elf bb2025 scales 0 and 1.0
   seeds 1-100 and 1e6 seed 14 all `loops_cleared 0`, 100/100 (fixed between cert9 and head). Original: (dark_elf bb2025, 8 loop clears in cert9): the harness DOES answer
   `sendPuntToCrowd(false)`, yet the dialog re-fires; find why in Java `StepInitPunt` and fix the harness
@@ -321,8 +326,10 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   ignored command now fails the game, except Java's own two (a re-sent CLIENT_START_GAME, anything
   after GAME FINISHED: `java_ignored_commands`); today's 12 gui_check games had 0 others. Open: all
   three editions (blocked on Q4.3 [!]), all teams (setups), the scripted human path.
-- [ ] **Q4.6 Optional server features** (ask before starting): persistence/resume, turn timer, DB login,
-  FUMBBL mode, spectators/replays check.
+- [!] **Q4.6 Optional server features** (ask before starting): persistence/resume, turn timer, DB login,
+  FUMBBL mode, spectators/replays check. **Question for the user:** which of these do you want the
+  Rust server to have (the Java server has all of them; the standalone GUI games work without)? The
+  turn timer would also make CLIENT_ILLEGAL_PROCEDURE live (Q4.2 part 3 ported it, inert without it).
 
 ## Q5 — Rules-level replay parity (§N)
 
@@ -345,6 +352,15 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q2.5b (bb2025) · (this commit) · bb2025 StepSwarming waits for placements like Java
+  (prompt `SwarmingPlacement`, PlacePlayer re-asks, ConfirmSetup = CLIENT_END_TURN) and checks with
+  the edition mechanic + `rolledAmount`; the bb2025 setup check counts LINEMAN players as swarmers
+  (was everyone regular: 13 on the field always failed); `leave` now returns NEXT_STEP. Agents:
+  `swarming_placement_action` (lowest-nr LINEMAN reserve -> deepest free non-wide non-LoS square,
+  mirrored for the away coach, zero draws) = ParityRunner.placeSwarmers. Server: CLIENT_END_TURN in
+  the swarm sets coordinates + ConfirmSetup. snotling bb2025 mirror + snotling-human 20/20 (steps +
+  reports), snotling bb2020 20/20, smoke 60/60, tests green.
 
 - 2026-11-27 · Q4.5 part 1 · (this commit) · `scripts/gui_check.py` fails a game on a mid-game command
   the engine ignored; the two kinds Java ignores too (re-sent CLIENT_START_GAME, commands after GAME

@@ -83,6 +83,9 @@ impl Agent for UniformAgent {
         match gs.current_prompt() {
             // Mirrors random_agent: answer the mid-sequence block-target ask by deselecting.
             Some(AgentPrompt::BlockTarget { .. }) => Action::EndPlayerAction,
+            // §Q2.5b: the shared zero-draw Swarming placement.
+            Some(AgentPrompt::SwarmingPlacement { team_id, amount }) =>
+                crate::agent::random_agent::swarming_placement_action(&gs.game, team_id, *amount),
             // BACKLOG §M 2b(e): the Gored by the Bull blitz-block choice -- the plain block.
             Some(AgentPrompt::BlitzBlockSkill { defender_id, .. }) =>
                 Action::Block { defender_id: defender_id.clone() },

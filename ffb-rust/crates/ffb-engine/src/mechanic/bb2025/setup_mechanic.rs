@@ -58,19 +58,19 @@ impl SetupMechanicTrait for SetupMechanic {
         };
 
         // Collect player data without borrowing game mutably mid-loop.
-        // Java: `player.getPosition().getKeywords().contains(Keyword.LINEMAN)` for swarmer check.
-        // no-op: Swarming position keyword lookup requires roster access not ported — headless treats all players as non-swarmers
-        // Currently treats all on-field players as regular (no swarmer separation).
-        let player_data: Vec<(String, bool, bool)> = {
+        // Java: `player.getPosition().getKeywords().contains(Keyword.LINEMAN)` splits the field
+        // count into swarmers and regulars (`Player::is_lineman` carries that keyword). §Q2.5b: this
+        // counted everyone as regular, so a swarming team over eleven always failed the check.
+        let player_data: Vec<(String, bool, bool, bool)> = {
             let team = if home_team { &game.team_home } else { &game.team_away };
             team.players.iter().map(|p| {
                 let is_keen = p.has_skill_property(NamedProperties::CAN_JOIN_TEAM_IF_LESS_THAN_ELEVEN);
                 let needs_field = p.has_skill_property(NamedProperties::NEEDS_TO_BE_SET_UP);
-                (p.id.clone(), is_keen, needs_field)
+                (p.id.clone(), is_keen, needs_field, p.is_lineman)
             }).collect()
         };
 
-        for (player_id, is_keen, needs_to_be_set_up) in &player_data {
+        for (player_id, is_keen, needs_to_be_set_up, is_lineman) in &player_data {
             let state = game.field_model.player_state(player_id);
             let coord = game.field_model.player_coordinate(player_id);
 
@@ -85,9 +85,11 @@ impl SetupMechanicTrait for SetupMechanic {
             let in_away_half = FieldCoordinateBounds::HALF_AWAY.is_in_bounds(coord);
 
             if (home_team && in_home_half) || (!home_team && in_away_half) {
-                // no-op: Keyword.LINEMAN check — roster keyword access not ported; all on-field players counted as regular
-                players_on_field += 1;
-                let _ = swarmers_on_field;
+                if *is_lineman {
+                    swarmers_on_field += 1;
+                } else {
+                    players_on_field += 1;
+                }
             }
 
             let in_upper_home = FieldCoordinateBounds::UPPER_WIDE_ZONE_HOME.is_in_bounds(coord);
@@ -342,6 +344,25 @@ mod tests {
     fn check_setup_empty_team_is_valid() {
         let mut game = make_game();
         assert!(mechanic().check_setup(&mut game, true));
+    }
+
+    /// §Q2.5b Java: LINEMAN-keyword players count as swarmers, so up to `additionalSwarmers` of
+    /// them may stand on the field beyond the cap; without the allowance (or as regulars) they may not.
+    #[test]
+    fn linemen_beyond_the_cap_pass_only_with_the_swarming_allowance() {
+        let mut game = make_game();
+        game.options.set(game_option_id::MAX_PLAYERS_ON_FIELD, "2");
+        game.options.set(game_option_id::MAX_PLAYERS_IN_WIDE_ZONE, "2");
+        game.options.set(game_option_id::MIN_PLAYERS_ON_LOS, "0");
+        for (i, y) in [5, 6, 7].iter().enumerate() {
+            let id = format!("h{i}");
+            add_player(&mut game, "home", &id, FieldCoordinate::new(5, *y));
+            game.team_home.players.last_mut().unwrap().is_lineman = true;
+        }
+        assert!(!mechanic().check_setup_with_swarmers(&mut game, true, 0), "3 on field, cap 2");
+        assert!(mechanic().check_setup_with_swarmers(&mut game, true, 1), "the third is a swarmer");
+        for p in &mut game.team_home.players { p.is_lineman = false; }
+        assert!(!mechanic().check_setup_with_swarmers(&mut game, true, 1), "regulars cap at 2");
     }
 
     #[test]
