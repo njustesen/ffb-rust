@@ -68,6 +68,11 @@ impl Step for StepMvp {
         // are complete, then the away team's, so the pending side identifies the sender.
         let nominated = match action {
             Action::SelectPlayer { player_id } if !player_id.is_empty() => Some(vec![player_id.clone()]),
+            // Java: fXxxPlayersNominated = playerChoiceCommand.getPlayerIds() -- the WHOLE list
+            // (the dialog asks for min = max = min(MVP_NOMINATIONS, eligible)); the random MVP roll
+            // then picks among them. Taking only `player_id` dropped every nominee but the first.
+            Action::PlayerChoice { player_ids, mode, .. } if mode == "MVP" && !player_ids.is_empty() =>
+                Some(player_ids.clone()),
             Action::PlayerChoice { player_id: Some(pid), mode, .. } if mode == "MVP" => Some(vec![pid.clone()]),
             _ => None,
         };

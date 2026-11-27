@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q2.7** (MVP via Java's random path). Open parts: Q2.4 re-placement design, Q2.6 re-rolls.
+Next item: **Q2.9** (remaining fixed answers). Open parts: Q2.4 re-placement design, Q2.6 re-rolls.
 Q2.2/Q2.3 inducement parts wait for Q2.8. Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
 that change games; run the Q1 night queue first (mirror 330 + view suites on a frozen exe). Parked with notes: Q1.2b (punt → throw-in
 stall), Q1.2c. Night queue: mirror 330 with the Q1.1–Q1.3 verdict + hash (freeze a q1 exe + jar first).
@@ -155,7 +155,10 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   pick the LAST die (bb2025 Properties dialogs; Rust reads the shown dialog's block_rolls) — undead_sk
   bb2025 30/30 with 10 multi-block choices. Open: use Pro / Consummate / single-die re-rolls in the
   multi-block dialogs; bb2020 multi-block dialogs are still auto-decided by the Rust engine (Q2.10).
-- [ ] **Q2.7 MVP via Java's random path** (no first-eligible shortcut) and the post-game sequence.
+- [x] **Q2.7 MVP via Java's random path** (see Log): under `--coverage-bias` both agents nominate the
+  dialog's full maxSelects (MVP_NOMINATIONS = 6 in the parity options) so randomPlayerId picks among
+  them; fixed Rust bb2025 StepMvp, which kept only the first nominee of CLIENT_PLAYER_CHOICE (Java takes
+  getPlayerIds()). Biased bb2025/bb2020/bb2016 20/20 each; default smoke 20/20.
 - [ ] **Q2.8 Pregame purchases:** buy inducements, star players, mercenaries, cards, prayers within the
   petty cash / treasury; enable Underdog prayers. Depends on Q3.2–Q3.3.
 - [ ] **Q2.9 Remaining fixed answers:** Blood Lust choices, Trickster pick-up, punt to crowd, Kick,
@@ -239,6 +242,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q2.7 · (next commit) · full MVP nominations under coverage bias; StepMvp now keeps all
+  nominees (Java getPlayerIds); 3×20 biased + default smoke green.
 - 2026-11-27 · Q2.6 part 1 · (next commit) · multi-block last-die choice under coverage bias; undead_sk
   bb2025 30/30, 10 choices.
 - 2026-11-27 · Q2.4 · (next commit) · attempt reverted; Solid Defence selection needs both harnesses

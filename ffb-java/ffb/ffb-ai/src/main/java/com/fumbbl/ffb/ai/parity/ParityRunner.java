@@ -1960,8 +1960,19 @@ public class ParityRunner {
                     String[] pids = pcp.getPlayerIds();
                     if (mode == PlayerChoiceMode.MVP && pids != null && pids.length > 0) {
                         // Must pick at least one player for MVP — pick the first available player object.
-                        Player<?> mvpPlayer = game.getPlayerById(pids[0]);
-                        selection = (mvpPlayer != null) ? new Player[]{ mvpPlayer } : new Player[0];
+                        // §Q2.7: under --coverage-bias nominate the dialog's full maxSelects (first N in
+                        // list order) so the randomPlayerId MVP roll has a real choice; random_agent.rs
+                        // mirrors it.
+                        int n = 1;
+                        if (com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS > 0.0f) {
+                            n = Math.min(Math.max(1, pcp.getMaxSelects()), pids.length);
+                        }
+                        java.util.List<Player<?>> picks = new java.util.ArrayList<>();
+                        for (int k = 0; k < n; k++) {
+                            Player<?> p = game.getPlayerById(pids[k]);
+                            if (p != null) picks.add(p);
+                        }
+                        selection = picks.toArray(new Player[0]);
                     } else if ((mode == PlayerChoiceMode.ANIMAL_SAVAGERY
                             || mode == PlayerChoiceMode.BLACK_INK) && pids != null && pids.length > 0) {
                         // Animal Savagery is MANDATORY (min=1, max=1): a confused player with ≥2

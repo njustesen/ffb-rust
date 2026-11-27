@@ -1315,10 +1315,22 @@ impl Agent for RandomAgent {
             Some(AgentPrompt::PlayerChoice { eligible_players, reason, .. })
                 if reason == "MVP" =>
             {
+                // §Q2.7: under `--coverage-bias` nominate the dialog's full `max_selects` (the first N
+                // eligible, list order) so Java's randomPlayerId MVP roll has a real choice;
+                // ParityRunner's MVP arm mirrors it. Default: the first player only.
+                let n = if crate::agent::heuristic_agent::coverage_bias() > 0.0 {
+                    match &gs.game.dialog_parameter {
+                        Some(ffb_model::dialog::dialog_parameter_factory::DialogParameter::PlayerChoice(p)) =>
+                            (p.max_selects.max(1) as usize).min(eligible_players.len()),
+                        _ => 1,
+                    }
+                } else {
+                    1
+                };
                 match eligible_players.first() {
                     Some(pid) => Action::PlayerChoice {
                         player_id: Some(pid.clone()),
-                        player_ids: vec![pid.clone()],
+                        player_ids: eligible_players.iter().take(n).cloned().collect(),
                         mode: "MVP".into(),
                     },
                     None => Action::SelectPlayer { player_id: String::new() },
