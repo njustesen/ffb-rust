@@ -201,9 +201,18 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   StepBribes asks both). **Fixed** (see Log): bb2025 StepMoveDodge Dodge-skill answer, bb2020
   AssignTouchdowns dialog, bb2016 TTM Pass skill re-roll. **Open:** `USE_PREDEFINED_INDUCEMENTS`
   (bb2016 applies then still shows the buy dialog; bb2020/bb2025 apply server-side) needs Java's
-  `Team.getInducementSet()` modelled on the Rust `Team` (option off by default). Follow-up: compare
-  the dead-twin pairs that live through the shared step (bb2016 Pass/Mvp/Intercept/Apothecary,
-  bb2020 Pass/Mvp/Jump) for edition differences, as StepBribes's `execute_step_bb2016` does.
+  `Team.getInducementSet()` modelled on the Rust `Team` (option off by default) and
+  `InducementSet.add(other)`: **waits** for the other session's uncommitted `inducement_set.rs`
+  (as Q3.3a); no suite or GUI setup turns the option on. Dead-twin edition diffs **audited**
+  (bb2016 Pass/Mvp/Intercept/Apothecary, bb2020 Pass/Mvp/Jump vs the shared steps): Pass and
+  Intercept match; Mvp fixed (see Log). **Open (bb2020 StepJump, port as one unit):** no
+  hasJumped / Leap markUsed (Java :188/:207; canStillJump allows one jump), Jumped published in
+  bb2020 cancels Shadowing (bb2025-only publish), the Diving Tackle what-if re-roll offer is
+  bb2025-only (bb2020 :337 goes straight to the DT choice), DT candidates (bb2020 :318
+  `findAdjacentOpposingPlayersWithProperty(..., true)`, no leaving-TZ-only filter), the repeated
+  ReportJumpRoll after the DT answer (:274). **Open (bb2016 Apothecary):** Igor offer after a failed
+  Regeneration (Java :245, needs bought Igors, Q2.8), ReportInducement + curePoison on Igor use;
+  Getting Even runs ungated in `finish_tail` (latent: no bb2016/bb2020 keywords).
 
 ## Q3 — Port what is missing from the engine (1:1 from Java)
 
@@ -369,6 +378,11 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q2.10 part 2 · (this commit) · shared StepMvp per edition: bb2016 eligibility is
+  Java's (killed / recovering injury / Nurgle's Rot only -- stars, mercenaries and MISSING stay
+  eligible; Rust used the bb2025 filter), bb2020 illegal concession gives the other team no extra
+  MVP. Tests: 2 new; khemri_fumbbl+Bryce vs human bb2016 10/10; smoke 3×20/20.
 
 - 2026-11-27 · Q2.10 part 1 · (this commit) · audit of the inline decisions (see Q2.10); three live
   gaps fixed 1:1: bb2025 StepMoveDodge takes CLIENT_USE_SKILL(canRerollDodge) as Java (the Dodge

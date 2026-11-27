@@ -98,13 +98,16 @@ impl StepMvp {
                 self.nr_of_home_mvps += 1;
                 self.nr_of_away_mvps += 1;
             }
+            // Java bb2016/bb2025: an illegal concession zeroes the conceding team's MVPs and gives
+            // the other team one more; bb2020 StepMvp only zeroes.
+            let extra = if game.rules == ffb_model::enums::Rules::Bb2020 { 0 } else { 1 };
             if game.game_result.home.conceded && !game.conceded_legally {
                 self.nr_of_home_mvps = 0;
-                self.nr_of_away_mvps += 1;
+                self.nr_of_away_mvps += extra;
             }
             if game.game_result.away.conceded && !game.conceded_legally {
                 self.nr_of_away_mvps = 0;
-                self.nr_of_home_mvps += 1;
+                self.nr_of_home_mvps += extra;
             }
         }
 
@@ -261,6 +264,17 @@ fn show_mvp_dialog(game: &mut Game, team_id: String, players_for_mvp: &[String],
 
 fn find_eligible_player_ids(game: &Game, home: bool) -> Vec<String> {
     let team = if home { &game.team_home } else { &game.team_away };
+    // Java bb2016 StepMvp.findPlayerIdsForMvp: skips killed players, players with a recovering
+    // injury and Nurgle's Rot victims -- stars, mercenaries and MISSING players stay eligible.
+    if game.rules == ffb_model::enums::Rules::Bb2016 {
+        return team.players.iter()
+            .filter(|p| !game.field_model.player_state(&p.id).map(|s| s.is_killed()).unwrap_or(false))
+            .filter(|p| p.recovering_injury.is_none()
+                && game.game_result.team_result(home).player_result(&p.id).and_then(|r| r.send_to_box_reason)
+                    != Some(ffb_model::enums::SendToBoxReason::NurglesRot))
+            .map(|p| p.id.clone())
+            .collect();
+    }
     team.players.iter()
         .filter(|p| {
             !matches!(p.player_type, PlayerType::Star | PlayerType::Mercenary | PlayerType::InfamousStaff)
@@ -426,6 +440,34 @@ mod tests {
         step.start(&mut game, &mut GameRng::new(0));
         let home_mvps = game.game_result.home.player_results.values().filter(|pr| pr.mvp).count();
         assert_eq!(home_mvps, 0, "star/mercenary not eligible for MVP");
+    }
+
+    /// Java bb2016 StepMvp.findPlayerIdsForMvp has no player-type filter: a star or mercenary
+    /// is eligible; a Nurgle's Rot victim is not.
+    #[test]
+    fn bb2016_star_is_eligible_and_nurgles_rot_is_not() {
+        let mut home = test_team("home", 0);
+        let away = test_team("away", 0);
+        home.players.push(make_player("s1", PlayerType::Star));
+        home.players.push(make_player("r1", PlayerType::Regular));
+        let mut game = Game::new(home, away, Rules::Bb2016);
+        game.game_result.home.player_results.insert("r1".into(), PlayerResult {
+            send_to_box_reason: Some(ffb_model::enums::SendToBoxReason::NurglesRot),
+            ..Default::default()
+        });
+        assert_eq!(find_eligible_player_ids(&game, true), vec!["s1".to_string()]);
+    }
+
+    /// Java bb2020 StepMvp: an illegal concession only zeroes the conceding team's MVPs.
+    #[test]
+    fn bb2020_illegal_concession_gives_no_extra_mvp() {
+        let mut game = make_game_with_players();
+        game.rules = Rules::Bb2020;
+        game.game_result.home.conceded = true;
+        game.conceded_legally = false;
+        let mut step = StepMvp::new();
+        step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!((step.nr_of_home_mvps, step.nr_of_away_mvps), (0, 1));
     }
 
     /// nr_of_mvps initialised to 1 each on first call (zero guard).
