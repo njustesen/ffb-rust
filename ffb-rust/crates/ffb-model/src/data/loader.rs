@@ -253,6 +253,9 @@ pub fn roster_json_to_roster(rj: &RosterJson, rules: Rules) -> Roster {
         positions,
         special_rules: rj.special_rules.clone(),
         necromancer: rj.necromancer,
+        // Java `Roster.fApothecary` / `fUndead` (the inducement types read `hasApothecary()`).
+        apothecary: rj.apothecary,
+        undead: rj.undead,
         keywords: rj.keywords.clone(),
         raised_position_id: rj.raised_position_id.clone(), ..Default::default()
     }

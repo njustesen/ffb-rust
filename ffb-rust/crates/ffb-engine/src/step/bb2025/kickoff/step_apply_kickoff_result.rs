@@ -437,8 +437,26 @@ impl StepApplyKickoffResult {
     // ── CheeringFans ──────────────────────────────────────────────────────────
 
     fn handle_cheering_fans(&self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        let roll_home = rng.d6();
-        let roll_away = rng.d6();
+        // Java bb2025 `handleCheeringFans`: a natural 1 is re-rolled at once (before the other
+        // team's die) when the team holds a REROLL_CHEERING_FANS inducement (Team Mascot); the team
+        // is listed in the report's `rerolled`. bb2020 has no such re-roll. (§Q2.8: a bought mascot,
+        // halfling bb2025 seed 2 -- Java's third d6.)
+        let bb2025 = game.rules == Rules::Bb2025;
+        let mut rerolled: Vec<String> = Vec::new();
+        let mut roll_home = rng.d6();
+        if bb2025 && roll_home == 1
+            && game.turn_data_home.inducement_set.for_usage(Usage::REROLL_CHEERING_FANS).is_some()
+        {
+            rerolled.push(game.team_home.id.clone());
+            roll_home = rng.d6();
+        }
+        let mut roll_away = rng.d6();
+        if bb2025 && roll_away == 1
+            && game.turn_data_away.inducement_set.for_usage(Usage::REROLL_CHEERING_FANS).is_some()
+        {
+            rerolled.push(game.team_away.id.clone());
+            roll_away = rng.d6();
+        }
 
         let total_home = roll_home + game.team_home.cheerleaders
             + game.turn_data_home.inducement_set.value(Usage::ADD_CHEERLEADER);
@@ -518,7 +536,7 @@ impl StepApplyKickoffResult {
             game.away_additional_assists += 1;
             winner_ids.push(game.team_away.id.clone());
         }
-        game.report_list.add(ReportCheeringFansBb2025::new(winner_ids, roll_home, roll_away, vec![]));
+        game.report_list.add(ReportCheeringFansBb2025::new(winner_ids, roll_home, roll_away, rerolled));
 
         StepOutcome::next().with_event(GameEvent::CheeringFans { home_roll: roll_home, away_roll: roll_away })
     }

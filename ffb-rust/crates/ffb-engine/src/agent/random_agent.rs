@@ -1703,8 +1703,17 @@ impl Agent for RandomAgent {
                 Action::BuyCard { home: *team_id == gs.game.team_home.id, card_type: None },
             Some(AgentPrompt::BuyInducements { team_id, .. }) =>
                 Action::BuyInducements { home: *team_id == gs.game.team_home.id, purchases: vec![] },
-            Some(AgentPrompt::BuyPrayersAndInducements { team_id, .. }) =>
-                Action::BuyInducements { home: *team_id == gs.game.team_home.id, purchases: vec![] },
+            // §Q2.8: under --coverage-bias buy one of each COVERAGE_INDUCEMENTS entry the dialog
+            // offers, in list order, while its cost fits the gold left (ParityRunner
+            // coverageInducements, same list). Otherwise the empty purchase.
+            Some(AgentPrompt::BuyPrayersAndInducements { team_id, available, budget, .. }) => {
+                let purchases = if crate::agent::heuristic_agent::coverage_bias() > 0.0 {
+                    coverage_inducements(available, *budget)
+                } else {
+                    vec![]
+                };
+                Action::BuyInducements { home: *team_id == gs.game.team_home.id, purchases }
+            }
             // Java ParityRunner PETTY_CASH case: `new ClientCommandPettyCash(0)` for the dialog's
             // team. No RNG consumed. (Raised by the bb2016 StepPettyCash for a team with at least
             // 50k treasury.)
@@ -1859,6 +1868,33 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         | PlayerAction::ViciousVines | PlayerAction::Chomp
         | PlayerAction::Incorporeal | PlayerAction::Forgo => PlayerActionChoice::Move,
     }
+}
+
+/// §Q2.8 coverage purchase order — ParityRunner.COVERAGE_INDUCEMENTS, same list and order.
+pub const COVERAGE_INDUCEMENTS: &[&str] = &[
+    "throwARock", "weatherMage", "wizard", "halflingMasterChef", "bribes", "bloodweiserBabes",
+    "extraTeamTraining", "wanderingApothecaries", "partTimeCoach", "tempCheerleader", "teamMascot",
+    "biasedRef", "bugmansXXXXXX", "mortuaryAssistant", "plagueDoctor",
+];
+
+/// §Q2.8: one of each [`COVERAGE_INDUCEMENTS`] entry the buy dialog offers (`available` = the
+/// team's buyable (id, cost) list), in list order, while its cost fits the gold left.
+fn coverage_inducements(available: &[(String, i32)], budget: i32) -> Vec<crate::action::InducementPurchase> {
+    let mut left = budget;
+    let mut out = Vec::new();
+    for name in COVERAGE_INDUCEMENTS {
+        if let Some((_, cost)) = available.iter().find(|(id, _)| id == name) {
+            if *cost <= left {
+                left -= cost;
+                out.push(crate::action::InducementPurchase { id: name.to_string(), count: 1 });
+            }
+        }
+    }
+    if std::env::var_os("FFB_TRACE").is_some() {
+        eprintln!("RUST_BUY budget={budget} left={left} types={:?} offered={available:?}",
+            out.iter().map(|p| &p.id).collect::<Vec<_>>());
+    }
+    out
 }
 
 /// §Q2.6: index of the LAST die rolled for `target` in the shown multi-block dialog (attacker's

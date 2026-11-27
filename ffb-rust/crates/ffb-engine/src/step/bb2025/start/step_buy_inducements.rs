@@ -3,16 +3,11 @@
 /// Handles pre-game inducement (and Prayers of Nuffle) purchase dialogs for both coaches, then
 /// pushes the post-purchase Kickoff/Inducement/RiotousRookies/Prayers sequences.
 ///
-/// Simplified vs Java: the true Java class resolves inducement cost via a ported
-/// `InducementTypeFactory` (game-option-driven costs, and an "overdog buys first, underdog's
-/// remaining petty cash depends on how much the overdog already spent" economy) and adds star
-/// players / mercenaries / infamous staff directly from roster data. This translation instead
-/// uses the data-driven catalog in `data/inducements/bb2025_inducements.json` (fixed costs per
-/// `util_inducement_catalog`) and an underdog-shops-first budget model (mirroring the sibling
-/// `bb2020::start::StepBuyCardsAndInducements` translation). `roster_star` / `roster_staff`
-/// catalog entries are filtered out of the buyable catalog entirely — star player / infamous
-/// staff purchasing needs roster data plumbed through beyond the catalog and is left for a
-/// follow-up phase.
+/// Costs, maxima and availability come from the bb2025 `InducementTypeFactory` types (§Q2.8):
+/// `getActualCostId(team)` options, `availability(team, options)` with the per-type overrides
+/// (`InducementTypeEntry`). `handleTeamInducements` adds the bought set to the turn's
+/// InducementSet and charges `inducementCosts`, as Java does. Not modelled yet: star players,
+/// mercenaries and infamous staff (position choices; the agents never buy them).
 ///
 /// Java phase machine: INIT → determine underdog, set phase HOME or AWAY, compute that side's
 /// budget → show dialog → on response, swap to the other team (computing its budget) or, once
@@ -29,7 +24,6 @@
 /// budgets are computed up front, but this translation still resolves the dialogs sequentially
 /// (home then away) rather than truly simultaneously — the driver only supports one pending
 /// prompt at a time. This is a known, narrower-path simplification.
-use ffb_model::data::loader::BB2025_INDUCEMENTS;
 use ffb_model::enums::InducementPhase;
 use ffb_model::events::GameEvent;
 use ffb_model::inducement::inducement::Inducement as InducementModel;
@@ -52,8 +46,16 @@ use crate::step::framework::{Step, StepOutcome, StepId, StepParameter};
 use crate::step::generator::common::inducement::{Inducement, InducementParams};
 use crate::step::generator::common::riotous_rookies::RiotousRookies;
 use crate::step::generator::sequence::SequenceStep;
-use crate::step::game::start::util_inducement_catalog::{apply_purchases, available_list};
 use crate::step::game::start::util_minimum_inducement_cost::minimum_inducement_cost;
+
+/// Java `game.getFactory(INDUCEMENT_TYPE).allTypes()` for BB2025: the base collection plus the
+/// bb2025 sub-types, sorted by name.
+fn bb2025_inducement_types() -> Vec<ffb_model::inducement::inducement_collection::InducementTypeEntry> {
+    let mut types: Vec<_> = ffb_model::inducement::bb2025::inducement_collection::InducementCollection::new()
+        .get_all_types().into_iter().cloned().collect();
+    types.sort_by(|a, b| a.id.cmp(&b.id));
+    types
+}
 
 /// Java: `StepBuyInducements.MAX_UNDERDOG_ALLOWANCE` — the most treasury an underdog may add to
 /// its petty cash.
@@ -298,8 +300,14 @@ impl StepBuyInducements {
             None => return StepOutcome::cont(),
         };
         let team = if home { &game.team_home } else { &game.team_away };
-        let catalog = &BB2025_INDUCEMENTS.inducements;
-        let full = available_list(catalog, team);
+        // §Q2.8: the types the Java dialog lets the coach buy -- every type of the bb2025
+        // InducementTypeFactory with a cost option (`getActualCostId(team)`), availability > 0 and
+        // not `card`, priced by that option (as `inducementCosts` charges it). Stars, mercenaries and
+        // infamous staff are position choices, not modelled here.
+        let full: Vec<(String, i32)> = bb2025_inducement_types().into_iter()
+            .filter(|t| t.id != "card" && t.availability(team, &game.options) > 0)
+            .filter_map(|t| t.actual_cost_id(team).map(|cost_id| (t.id.clone(), get_int_option(game, cost_id))))
+            .collect();
         let (prayers, available): (Vec<_>, Vec<_>) = full.into_iter().partition(|(id, _)| id == "prayers");
         StepOutcome::cont().with_prompt(AgentPrompt::BuyPrayersAndInducements {
             team_id: team.id.clone(),
@@ -339,48 +347,52 @@ impl StepBuyInducements {
     /// `GameEvent::BuyInducement` per inducement id actually purchased (including "prayers"),
     /// so coverage tooling can see that a purchase happened.
     fn apply_purchase(&mut self, game: &mut Game, home: bool, purchases: &[InducementPurchase]) -> Vec<GameEvent> {
-        let (prayer_purchases, other_purchases): (Vec<_>, Vec<_>) =
-            purchases.iter().cloned().partition(|p| p.id == "prayers");
-        let catalog = &BB2025_INDUCEMENTS.inducements;
-        let prayers_def = catalog.iter().find(|d| d.id == "prayers");
-
-        let team_id = if home { game.team_home.id.clone() } else { game.team_away.id.clone() };
-        let (team, turn_inducement_set, gold_used, gold_available, prayers_bought) = if home {
-            (&mut game.team_home, &mut game.turn_data_home.inducement_set,
-             &mut self.used_inducement_gold_home, self.available_inducement_gold_home,
-             &mut self.prayers_bought_home)
+        // Java `handleTeamInducements`: the command's InducementSet (one Inducement per type, the
+        // last one for a repeated type, as `addInducement` keys by type).
+        let types = bb2025_inducement_types();
+        let mut inducement_set = ffb_model::model::inducement_set::InducementSet::new();
+        for purchase in purchases {
+            if let Some(t) = types.iter().find(|t| t.id == purchase.id) {
+                inducement_set.add_inducement(InducementModel::new(t.id.clone(), purchase.count as i32, t.usages.clone()));
+            }
+        }
+        let team = if home { &game.team_home } else { &game.team_away };
+        let team_id = team.id.clone();
+        // Java `inducementCosts(team, set)`: value × the `getActualCostId(team)` option, for every
+        // inducement whose type has a cost id (prayers included -- they are removed only after).
+        let inducement_cost: i32 = inducement_set.get_inducements().iter()
+            .filter_map(|i| types.iter().find(|t| t.id == i.type_id)
+                .and_then(|t| t.actual_cost_id(team))
+                .map(|cost_id| i.get_value() * get_int_option(game, cost_id)))
+            .sum();
+        // Java: the GAME_MODIFICATION type (prayers) leaves the set; its value is the prayers bought.
+        if let Some(prayers) = inducement_set.get("prayers") {
+            inducement_set.remove_inducement("prayers");
+            if home { self.prayers_bought_home = prayers.get_value(); } else { self.prayers_bought_away = prayers.get_value(); }
+        }
+        let mut events: Vec<GameEvent> = inducement_set.get_inducements().iter()
+            .map(|i| GameEvent::BuyInducement {
+                team_id: team_id.clone(), inducement_id: i.type_id.clone(), count: i.get_value() as u32,
+            })
+            .collect();
+        events.sort_by(|a, b| format!("{a:?}").cmp(&format!("{b:?}")));
+        let prayers_bought = if home { self.prayers_bought_home } else { self.prayers_bought_away };
+        if prayers_bought > 0 {
+            events.push(GameEvent::BuyInducement {
+                team_id: team_id.clone(), inducement_id: "prayers".to_string(), count: prayers_bought as u32,
+            });
+        }
+        // Java: `turnData.getInducementSet().add(inducementSet)`; no stars, staff or mercenaries.
+        if home {
+            game.turn_data_home.inducement_set.add(&inducement_set);
+            self.used_inducement_gold_home = inducement_cost;
         } else {
-            (&mut game.team_away, &mut game.turn_data_away.inducement_set,
-             &mut self.used_inducement_gold_away, self.available_inducement_gold_away,
-             &mut self.prayers_bought_away)
-        };
-
-        let mut budget = gold_available.unwrap_or(0) - *gold_used;
-        let mut events = Vec::new();
-
-        if let (Some(def), Some(purchase)) = (prayers_def, prayer_purchases.first()) {
-            let room = (def.max_count - *prayers_bought).max(0);
-            let mut qty = (purchase.count as i32).min(room);
-            if def.cost > 0 {
-                qty = qty.min(budget / def.cost);
-            }
-            if qty > 0 {
-                let cost = def.cost * qty;
-                *prayers_bought += qty;
-                budget -= cost;
-                *gold_used += cost;
-                team.treasury = (team.treasury - cost).max(0);
-                events.push(GameEvent::BuyInducement {
-                    team_id: team_id.clone(), inducement_id: "prayers".to_string(), count: qty as u32,
-                });
-            }
+            game.turn_data_away.inducement_set.add(&inducement_set);
+            self.used_inducement_gold_away = inducement_cost;
         }
-
-        let (spent, applied) = apply_purchases(catalog, team, turn_inducement_set, &other_purchases, budget);
-        *gold_used += spent;
-        for (id, count) in applied {
-            events.push(GameEvent::BuyInducement { team_id: team_id.clone(), inducement_id: id, count });
-        }
+        // Java throws when a team spends more than its available gold; the agents never do.
+        let available = if home { self.available_inducement_gold_home } else { self.available_inducement_gold_away };
+        debug_assert!(inducement_cost <= available.unwrap_or(0), "{team_id} overspent inducement gold");
         events
     }
 
@@ -607,13 +619,18 @@ mod tests {
         use ffb_model::option::game_option_id::INDUCEMENTS;
         let mut game = make_game_with_petty_cash(200_000, 0);
         game.options.set(INDUCEMENTS, "true");
+        // Prayers are buyable only with INDUCEMENT_PRAYERS_MAX > 0 (factory default 0).
+        game.options.set(ffb_model::option::game_option_id::INDUCEMENT_PRAYERS_MAX, "3");
         let mut step = StepBuyInducements::new();
         let out = step.start(&mut game, &mut GameRng::new(0));
         match out.prompt {
             Some(AgentPrompt::BuyPrayersAndInducements { available, prayers, .. }) => {
                 assert!(prayers.iter().any(|(id, _)| id == "prayers"));
                 assert!(!available.iter().any(|(id, _)| id == "prayers"));
-                assert!(available.iter().any(|(id, _)| id == "bribes"));
+                // Java costs come from the options: bribes INDUCEMENT_BRIBES_COST (100k).
+                assert!(available.iter().any(|(id, cost)| id == "bribes" && *cost == 100_000));
+                // INDUCEMENT_DUMMY-limited types (availability 0) are not offered.
+                assert!(!available.iter().any(|(id, _)| id == "throwARock"));
             }
             other => panic!("expected BuyPrayersAndInducements prompt, got {other:?}"),
         }
@@ -677,18 +694,21 @@ mod tests {
         let out = answer(&mut step, &mut game, true,
             vec![InducementPurchase { id: "bribes".into(), count: 1 }]);
         assert_eq!(out.action, StepAction::NextStep);
-        assert_eq!(game.team_home.bribes, 1);
+        // Java `turnData.getInducementSet().add(set)`: the bribe lives in the turn's InducementSet.
+        assert_eq!(game.turn_data_home.inducement_set.value(Usage::AVOID_BAN), 1);
     }
 
+    /// Java `handleTeamInducements` charges `value × getActualCostId(team)` and never touches the
+    /// team's treasury (leaveStep records `treasurySpentOnInducements` instead).
     #[test]
-    fn purchase_deducts_treasury_and_tracks_used_gold() {
+    fn purchase_tracks_used_gold_and_leaves_the_treasury_alone() {
         let mut game = make_game_with_petty_cash(200_000, 0);
         game.team_home.treasury = 500_000;
         let mut step = StepBuyInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
         answer(&mut step, &mut game, false, vec![]);
         answer(&mut step, &mut game, true, vec![InducementPurchase { id: "bribes".into(), count: 1 }]);
-        assert_eq!(game.team_home.treasury, 400_000);
+        assert_eq!(game.team_home.treasury, 500_000);
         assert_eq!(step.used_inducement_gold_home, 100_000);
     }
 
@@ -701,18 +721,20 @@ mod tests {
         answer(&mut step, &mut game, true, vec![InducementPurchase { id: "prayers".into(), count: 2 }]);
         assert_eq!(step.prayers_bought_home, 2);
         assert!(game.turn_data_home.inducement_set.get("prayers").is_none());
-        assert_eq!(step.used_inducement_gold_home, 200_000);
+        // 2 × INDUCEMENT_PRAYERS_COST (factory default 50k): charged before the prayers leave the set.
+        assert_eq!(step.used_inducement_gold_home, 100_000);
     }
 
+    /// Java takes the command's prayer count as sent (`prayersBought = prayers.getValue()`); the
+    /// client enforces the maximum.
     #[test]
-    fn prayers_purchase_clamped_to_max_count() {
+    fn prayers_purchase_value_is_taken_as_sent() {
         let mut game = make_game_with_petty_cash(1_000_000, 0);
         let mut step = StepBuyInducements::new();
         step.start(&mut game, &mut GameRng::new(0));
         answer(&mut step, &mut game, false, vec![]);
-        answer(&mut step, &mut game, true, vec![InducementPurchase { id: "prayers".into(), count: 10 }]);
-        // prayers max_count is 3.
-        assert_eq!(step.prayers_bought_home, 3);
+        answer(&mut step, &mut game, true, vec![InducementPurchase { id: "prayers".into(), count: 4 }]);
+        assert_eq!(step.prayers_bought_home, 4);
     }
 
     #[test]

@@ -95,6 +95,16 @@ public class HeadlessGameSetup {
             goldenGoal.setValue(true);
             gameState.getGame().getOptions().addOption(goldenGoal);
         }
+        // §Q2.8 FFB_INDUCEMENT_CASH=<gold>: FREE_INDUCEMENT_CASH for both teams (parallel inducement
+        // phase even on equal CTV); the Rust parity runner reads the same variable.
+        String inducementCash = System.getenv("FFB_INDUCEMENT_CASH");
+        if (inducementCash != null) {
+            GameOptionFactory icFactory = new GameOptionFactory();
+            com.fumbbl.ffb.option.GameOptionInt cash =
+                (com.fumbbl.ffb.option.GameOptionInt) icFactory.createGameOption(GameOptionId.FREE_INDUCEMENT_CASH);
+            cash.setValue(Integer.parseInt(inducementCash.trim()));
+            gameState.getGame().getOptions().addOption(cash);
+        }
 
         // 2. Initialize rule-dependent members and rules
         Game game = gameState.getGame();

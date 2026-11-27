@@ -8,7 +8,9 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q3.2** (in-game inducement use). Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
+Next item: **Q3.2** (in-game inducement use: StepInitInducement routing to Wizard / Weather Mage /
+Throw a Rock + both agents use under bias; bb2025 purchases now exist via Q2.8 part 1 —
+`FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`). Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
 squads, Q1.2b punt stall (two repros).
 Q2.2/Q2.3 inducement parts wait for Q2.8. Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
 that change games; run the Q1 night queue first (mirror 330 + view suites on a frozen exe). Parked with notes: Q1.2b (punt → throw-in
@@ -161,8 +163,13 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   dialog's full maxSelects (MVP_NOMINATIONS = 6 in the parity options) so randomPlayerId picks among
   them; fixed Rust bb2025 StepMvp, which kept only the first nominee of CLIENT_PLAYER_CHOICE (Java takes
   getPlayerIds()). Biased bb2025/bb2020/bb2016 20/20 each; default smoke 20/20.
-- [ ] **Q2.8 Pregame purchases:** buy inducements, star players, mercenaries, cards, prayers within the
-  petty cash / treasury; enable Underdog prayers. Depends on Q3.2–Q3.3.
+- [~] **Q2.8 Pregame purchases:** buy inducements, star players, mercenaries, cards, prayers within the
+  petty cash / treasury; enable Underdog prayers. Worked together with Q3.2 (purchases are needed to
+  exercise in-game use). **Part 1 bb2025 done** (see Log): `FFB_INDUCEMENT_CASH=<gold>` sets
+  FREE_INDUCEMENT_CASH in both harnesses (the drafts sit within 50k, so petty cash alone never buys
+  anything); under `--coverage-bias` both agents buy one of each COVERAGE_INDUCEMENTS type in list order
+  while gold lasts. Open: bb2020 (BUY_CARDS_AND_INDUCEMENTS) and bb2016 (BUY_INDUCEMENTS) purchases,
+  stars / mercenaries / staff, prayers, the inducement set in the state hash.
 - [~] **Q2.9 Remaining fixed answers:** part 1 (see Log): under `--coverage-bias` both agents take the
   other branch of PUNT_TO_CROWD (punt), PICK_UP_CHOICE (pick up) and KICK_SKILL (use Kick), zero draws.
   None of the three fired in 60 biased games (dark_elf vs wood_elf_sk, human vs orc bb2025) — needs a
@@ -248,7 +255,14 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
-- 2026-11-27 · Q3.1 · (this commit) · overtime ported: StepEndTurn starts half 3 on a drawn half 2 with
+- 2026-11-27 · Q2.8 part 1 · (this commit) · bb2025 purchases 1:1: InducementTypeEntry carries Java's
+  cost/max option ids + per-type overrides (reduced costs, availability rules); StepBuyInducements
+  prices/applies like handleTeamInducements (no treasury write, set into the turn's InducementSet);
+  missing ReportInducement for extra training / wandering apos; MASTER_CHEF added to the bb2025 kickoff
+  tails (never ran); Team Mascot cheering-fans re-roll; roster apothecary/undead carried into Roster;
+  parity teams keep their roster. Gate (FFB_INDUCEMENT_CASH=600000, bias): human-halfling 10/10,
+  human-orc, undead-nurgle, goblin-snotling, necromantic-khemri, underworld-orc 10/10; smoke 20/20 ×3.
+- 2026-11-27 · Q3.1 · 6c1bb428d · overtime ported: StepEndTurn starts half 3 on a drawn half 2 with
   OVERTIME (coin + receive choice first), `touchdownEndsGame` per edition; a touchdown now takes the ball
   off the pitch (all editions, hidden by the next kickoff until a sudden-death TD); bb2016 routed to its
   own StepPenaltyShootout (was the mixed one); harness confirms the mixed shootout for both coaches.

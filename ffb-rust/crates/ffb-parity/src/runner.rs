@@ -606,6 +606,12 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     if std::env::var_os("FFB_GOLDEN_GOAL").is_some() {
         options.push(("overtimeGoldenGoal", "true"));
     }
+    // §Q2.8: `FFB_INDUCEMENT_CASH=<gold>` sets FREE_INDUCEMENT_CASH in both engines, so even teams of
+    // equal CTV get a (parallel) inducement phase -- the parity drafts sit within 50k of each other.
+    let inducement_cash = std::env::var("FFB_INDUCEMENT_CASH").ok();
+    if let Some(cash) = inducement_cash.as_deref() {
+        options.push(("freeInducementCash", cash));
+    }
     let mut engine = GameState::new_full_pregame(home, away, rules, seed, &options);
     // ONE shared agent for both teams, mirroring ParityRunner's single-object shape.
     // `new_parity` seeds both decision and action RNGs to match Java's decisionRng and actionRng
@@ -969,6 +975,13 @@ pub(crate) fn make_team(roster_name: &str, side: &str, edition: &str) -> Team {
     }
     match make_team_from_file(roster_name, side, edition) {
         Ok(mut team) => {
+            // Java `Team.updateRoster` keeps `fRoster`; the inducement types read it (§Q2.8:
+            // wanderingApothecaries needs `roster.hasApothecary()`, the Master Chef discount the
+            // roster keyword). Assigned directly: positions and players stay as drafted.
+            if team.roster.is_none() {
+                team.roster = ffb_model::data::loader::find_roster(&team.roster_id, edition_to_rules(edition))
+                    .map(Box::new);
+            }
             // Star tier (BACKLOG §L): one hired star on top of the squad, see `stars.rs`.
             if let Some(star) = crate::stars::star_for(side) {
                 crate::stars::apply_star(&mut team, side, edition, roster_name, &star)

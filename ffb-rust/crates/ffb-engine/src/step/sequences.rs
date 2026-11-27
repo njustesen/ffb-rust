@@ -106,8 +106,19 @@ fn kickoff_tail(rules: ffb_model::enums::Rules) -> Vec<SequenceStep> {
     }
     if rules == Rules::Bb2025 {
         reorder_swarming_before_kickoff(&mut seq);
+        insert_master_chef_before_kickoff(&mut seq);
     }
     seq
+}
+
+/// Java `generator/bb2025/Kickoff.java:35-38` — SWARMING, SWARMING, **MASTER_CHEF**, KICKOFF. The
+/// flattened bb2025 tails never carried the step, so a bought Halfling Master Chef was never rolled
+/// (§Q2.8, human vs halfling with inducement cash: Java `masterChefRoll` at the opening kickoff).
+/// With no chef bought, StepMasterChef rolls no dice and reports nothing.
+fn insert_master_chef_before_kickoff(seq: &mut Vec<SequenceStep>) {
+    if let Some(at) = seq.iter().position(|s| s.step_id == StepId::Kickoff) {
+        seq.insert(at, SequenceStep::new(StepId::MasterChef));
+    }
 }
 
 /// Give a flattened kickoff sequence the labels Java's `generator/mixed/Kickoff.pushSequence`
@@ -236,6 +247,7 @@ pub fn h2_kickoff_sequence_for(rules: ffb_model::enums::Rules) -> Vec<SequenceSt
     }
     if rules == ffb_model::enums::Rules::Bb2025 {
         reorder_swarming_before_kickoff(&mut seq);
+        insert_master_chef_before_kickoff(&mut seq);
     }
     seq
 }

@@ -157,6 +157,8 @@ pub trait StateMechanic: Send + Sync {
             if let Some(w) = wandering {
                 game.turn_data_home.apothecaries += w.value;
                 game.turn_data_home.wandering_apothecaries = w.value;
+                game.report_list.add(ffb_model::report::report_inducement::ReportInducement::new(
+                    team_id.clone(), w.type_id.clone(), w.value));
                 // Java: pStep.getResult().addReport(new ReportInducement(team.getId(), entry.getKey(), ...))
                 events.push(GameEvent::Inducement {
                     team_id: team_id.clone(),
@@ -187,6 +189,8 @@ pub trait StateMechanic: Send + Sync {
             if let Some(w) = wandering {
                 game.turn_data_away.apothecaries += w.value;
                 game.turn_data_away.wandering_apothecaries = w.value;
+                game.report_list.add(ffb_model::report::report_inducement::ReportInducement::new(
+                    team_id.clone(), w.type_id.clone(), w.value));
                 events.push(GameEvent::Inducement {
                     team_id: team_id.clone(),
                     inducement_type: w.type_id.clone(),
@@ -225,6 +229,9 @@ pub trait StateMechanic: Send + Sync {
                 .filter(|ind| ind.value > 0);
             if let Some(e) = extra {
                 game.turn_data_home.rerolls += e.value;
+                // Java: `addReport(new ReportInducement(team.getId(), type, extraTraining.getValue()))`.
+                game.report_list.add(ffb_model::report::report_inducement::ReportInducement::new(
+                    team_id.clone(), e.type_id.clone(), e.value));
                 // Java: pStep.getResult().addReport(new ReportInducement(team.getId(), entry.getKey(), ...))
                 events.push(GameEvent::Inducement {
                     team_id,
@@ -242,6 +249,8 @@ pub trait StateMechanic: Send + Sync {
                 .filter(|ind| ind.value > 0);
             if let Some(e) = extra {
                 game.turn_data_away.rerolls += e.value;
+                game.report_list.add(ffb_model::report::report_inducement::ReportInducement::new(
+                    team_id.clone(), e.type_id.clone(), e.value));
                 events.push(GameEvent::Inducement {
                     team_id,
                     inducement_type: e.type_id.clone(),

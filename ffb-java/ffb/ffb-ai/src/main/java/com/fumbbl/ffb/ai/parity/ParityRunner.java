@@ -1268,6 +1268,27 @@ public class ParityRunner {
                 MatchRunner.injectForTeam(gameState, new com.fumbbl.ffb.net.commands.ClientCommandConfirm(), false);
                 break;
 
+            // §Q2.8: under --coverage-bias the coach buys one of each COVERAGE_INDUCEMENTS entry, in
+            // list order, while its cost fits the remaining gold and availability > 0 (random_agent.rs
+            // mirrors it). Without the bias: RandomStrategy's empty purchase (default arm).
+            case BUY_PRAYERS_AND_INDUCEMENTS:
+                if (com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS > 0.0f
+                        && dialog instanceof com.fumbbl.ffb.dialog.DialogBuyPrayersAndInducementsParameter) {
+                    com.fumbbl.ffb.dialog.DialogBuyPrayersAndInducementsParameter bp =
+                        (com.fumbbl.ffb.dialog.DialogBuyPrayersAndInducementsParameter) dialog;
+                    com.fumbbl.ffb.model.InducementSet set = coverageInducements(game,
+                        game.getTeamById(bp.getTeamId()), bp.getAvailableGold());
+                    comm.clearCaptured();
+                    comm.sendBuyInducements(bp.getTeamId(), bp.getAvailableGold(), set,
+                        new String[0], new String[0], new com.fumbbl.ffb.model.skill.Skill[0], new String[0]);
+                    injectCaptured(dialog, game, gameState);
+                } else {
+                    comm.clearCaptured();
+                    RandomStrategy.respondToDialog(dialog, game, comm);
+                    injectCaptured(dialog, game, gameState);
+                }
+                break;
+
             // ── Blitz target selection dialog: same handling as the step ─────
             // (the server shows a dialog while StepSelectBlitzTarget waits; falling
             // to RandomStrategy here would be non-seeded nondeterminism)
@@ -5279,6 +5300,47 @@ public class ParityRunner {
     // ── Captured-command injection helper ─────────────────────────────────────
 
     /** Inject the command captured by comm into the game state, routing by team if known. */
+    /**
+     * §Q2.8 coverage purchase order (Rust: random_agent.rs COVERAGE_INDUCEMENTS, same list). Stars,
+     * mercenaries, staff, prayers and Riotous Rookies are left out: they need position choices or a
+     * shuffle the harnesses do not share yet.
+     */
+    static final String[] COVERAGE_INDUCEMENTS = {
+        "throwARock", "weatherMage", "wizard", "halflingMasterChef", "bribes", "bloodweiserBabes",
+        "extraTeamTraining", "wanderingApothecaries", "partTimeCoach", "tempCheerleader", "teamMascot",
+        "biasedRef", "bugmansXXXXXX", "mortuaryAssistant", "plagueDoctor",
+    };
+
+    /**
+     * One of each {@link #COVERAGE_INDUCEMENTS} type the team may buy (availability > 0, a cost
+     * option) whose cost ({@code getActualCostId(team)}, as StepBuyInducements.inducementCosts reads
+     * it) fits the gold left, in list order.
+     */
+    private static com.fumbbl.ffb.model.InducementSet coverageInducements(Game game, Team team, int gold) {
+        com.fumbbl.ffb.factory.InducementTypeFactory factory =
+            game.getFactory(com.fumbbl.ffb.FactoryType.Factory.INDUCEMENT_TYPE);
+        com.fumbbl.ffb.model.InducementSet set = new com.fumbbl.ffb.model.InducementSet();
+        int left = gold;
+        StringBuilder trace = new StringBuilder();
+        for (String name : COVERAGE_INDUCEMENTS) {
+            com.fumbbl.ffb.inducement.InducementType type = factory.forName(name);
+            if (type == null || type.getActualCostId(team) == null
+                    || type.availability(team, game.getOptions()) <= 0) {
+                trace.append(' ').append(name).append(":n/a");
+                continue;
+            }
+            int cost = com.fumbbl.ffb.option.UtilGameOption.getIntOption(game, type.getActualCostId(team));
+            trace.append(' ').append(name).append(':').append(cost);
+            if (cost <= left) {
+                set.addInducement(new com.fumbbl.ffb.inducement.Inducement(type, 1));
+                left -= cost;
+                trace.append('*');
+            }
+        }
+        if (DEBUG) System.err.println("JAVA_BUY team=" + team.getId() + " gold=" + gold + " left=" + left + trace);
+        return set;
+    }
+
     private void injectCaptured(IDialogParameter dialog, Game game, GameState gameState) {
         com.fumbbl.ffb.net.commands.ClientCommand captured = comm.getCapturedCommand();
         if (captured != null) {
