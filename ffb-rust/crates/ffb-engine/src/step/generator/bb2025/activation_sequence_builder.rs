@@ -113,7 +113,7 @@ impl ActivationSequenceBuilder {
         // dodge, chainsaw) publish a SteadyFootingContext in every edition, and those steps are
         // its only consumer -- drop them and BB2020 players stop falling. Do not "simplify" this
         // by making StepSteadyFooting a no-op under BB2020 in `make_step_for`; that would hit the
-        // move-sequence copies too. See docs/PARITY_BB2020_CAMPAIGN.md (ITER116, ITER119).
+        // move-sequence copies too. See docs/HISTORY.md (formerly PARITY_BB2020_CAMPAIGN.md) (ITER116, ITER119).
         if self.rules != ffb_model::enums::Rules::Bb2020 {
             sequence.add(StepId::SteadyFooting, vec![]);
         }

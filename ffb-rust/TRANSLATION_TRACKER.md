@@ -321,7 +321,7 @@ isn't wired into the bb2020 pass generator (matches the `StepSafeThrow` preceden
 per-instance step fields mean a re-pushed `INTERCEPT` can't transparently resume the
 previously-chosen interceptor the way Java's shared `PassState` does.
 
-**This closes all 9 batching-order items in `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`** (1-7: Phases
+**This closes all 9 batching-order items in `docs/HISTORY.md (formerly PHASE_AAF_SKILL_HOOK_AUDIT.md)`** (1-7: Phases
 AAG-AAJ; 8 + Shadowing/UnchannelledFury: AAK; AnimalSavagery: AAL; Tentacles: AAM; CloudBurster:
 AAN).
 
@@ -400,7 +400,7 @@ engine becomes the natural next major workstream. Full writeup: `SESSION.md` Cur
 
 **Phase AAJ (closed skill-hook-audit batching item 7: Diving Tackle, this session):**
 Ported Diving Tackle end-to-end for all three rule editions — the single largest itemized gap
-left in `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`'s batching order (confirmed by direct research this
+left in `docs/HISTORY.md (formerly PHASE_AAF_SKILL_HOOK_AUDIT.md)`'s batching order (confirmed by direct research this
 session: none of the eligibility lookup, dodge-modifier math, or dialog round-trip existed in
 Rust before this phase, only stub files with descriptive comments). Following the established
 Wrestle/Stab/DumpOff/Dauntless "logic lives directly in the step" convention: (1) added
@@ -462,7 +462,7 @@ item was already done); expect 3-6 more phases (audit items 5-9) to close the re
 
 **Phase AAG (closed skill-hook-audit batching items 1-3: DumpOff bug fix, StepPushback skill
 family, StepCatchScatterThrowIn Catch family, this session):**
-Closed the first 3 (of 9) batching-order items from `docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`. (1)
+Closed the first 3 (of 9) batching-order items from `docs/HISTORY.md (formerly PHASE_AAF_SKILL_HOOK_AUDIT.md)`. (1)
 Fixed `bb2025/dump_off_behaviour.rs`'s `applies_to` bug (`StepId::BlockRoll` → `StepId::DumpOff`);
 confirmed Bombardier/DumpOff/Stab/Wrestle's real logic already lives directly in their step files,
 no further work needed. (2) Ported real `StepModifierTrait` impls for **Grab, SideStep, StandFirm**
@@ -503,7 +503,7 @@ other skill routed through it, registered or not, currently has no effect on gam
 its tracker `✓` mark. Verified concretely with Dodge (zero effect on BB2020/BB2025 games before this
 session — the step computed its geometric dodge-choice heuristic but never ran the hook that decides/
 reports the outcome). A full audit of all 127 skill-behaviour files
-(`docs/PHASE_AAF_SKILL_HOOK_AUDIT.md`) found ~20 genuine remaining gaps (fewer than the raw 77
+(`docs/HISTORY.md (formerly PHASE_AAF_SKILL_HOOK_AUDIT.md)`) found ~20 genuine remaining gaps (fewer than the raw 77
 `TODO(hook-infra)` count suggests — many are dead duplicates or have real logic already inline in
 their step file), grouped by target step with a recommended batching order for follow-up phases. (3)
 **Wired the Dodge family for real** as the reference implementation: `step/mixed/step_block_dodge.rs`
@@ -520,7 +520,7 @@ Tests: 17,387 → 17,417 (+30: +13 factory, +17 dodge-family), 0 failures. No pa
 for the skill-hook gap) is roughly ~94–96% of in-scope logic, ~81% counting the permanently-skipped
 Swing GUI — expect ~5–8 more similarly-scoped phases (per the audit doc's batching order) to close the
 remaining ~20 gaps and reach ~99–100%. Full writeup: `SESSION.md` Current Status;
-`docs/PHASE_AAF_SKILL_HOOK_AUDIT.md` for the follow-up worklist.
+`docs/HISTORY.md (formerly PHASE_AAF_SKILL_HOOK_AUDIT.md)` for the follow-up worklist.
 
 **Phase AAD (32/32 server handlers reachable + behavioral-approximation fixes, this session):**
 Three-step follow-up to Phase ZV, closing the remaining non-file-level gaps rather than starting

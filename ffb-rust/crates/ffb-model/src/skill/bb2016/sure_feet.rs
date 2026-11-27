@@ -25,7 +25,7 @@ impl std::ops::Deref for SureFeet {
 }
 
 #[cfg(test)]
-// Mirrors ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/skill tests.
+// Mirrors ffb-java/ffb/ffb-server/src/test/java/com/fumbbl/ffb/server/skill tests.
 mod tests {
     use super::*;
 

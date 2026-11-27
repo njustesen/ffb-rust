@@ -41,7 +41,7 @@ they need the scoring-agent tier, which is a user decision. Do not start it; not
 
 ## Non-negotiable rules
 
-- **Java is the truth.** Never edit `ffb-java/ffb-common` or `ffb-java/ffb-server` engine code.
+- **Java is the truth.** Never edit `ffb-java/ffb/ffb-common` or `ffb-java/ffb/ffb-server` engine code.
   Co-editable: Rust `crates/*`, `random_agent.rs`, harness `ParityRunner.java` (jar rebuild).
 - **Every Rust change is a 1:1 port** of the corresponding Java class/method. Read the Java
   first, port the Java. No hacks, no parity-only special cases, no constants tuned to pass a seed.

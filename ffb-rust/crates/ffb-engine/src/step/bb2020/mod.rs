@@ -17,7 +17,7 @@
 //!
 //! 1. **Do not cite a file here as evidence of what BB2020 does at runtime.** It is a translation
 //!    of the BB2020 Java class, but the engine is probably running the bb2025 twin instead. This
-//!    has already produced one wrong rationale — see docs/PARITY_BB2020_CAMPAIGN.md, ITER117.
+//!    has already produced one wrong rationale — see docs/HISTORY.md (formerly PARITY_BB2020_CAMPAIGN.md), ITER117.
 //! 2. **Fixing a BB2020 bug here usually changes nothing.** Edition-gate the shared bb2025 file
 //!    instead; that is the campaign's standing pattern. Note the dead twin drifts silently, so
 //!    keep it in sync by hand when you touch its live counterpart (ITER95 did this for all four

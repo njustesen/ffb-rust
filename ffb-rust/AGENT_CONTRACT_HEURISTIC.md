@@ -10,7 +10,7 @@ which RNG stream is consumed when; this one is about that **plus** the arithmeti
 implementations must agree on every scored weight, not merely on the number of draws.
 
 Any change to either implementation MUST be reflected here and mirrored on the other side **in the
-same change set**. Campaign log: `docs/PARITY_HEURISTIC_CAMPAIGN.md`. Design and measurement
+same change set**. Campaign log: `docs/HISTORY.md (formerly PARITY_HEURISTIC_CAMPAIGN.md)`. Design and measurement
 history of the policy itself: `docs/HEURISTIC_AGENT.md`.
 
 > **Status:** the Rust side satisfies this contract as of ITER2. The Java side does not exist yet;
@@ -262,7 +262,7 @@ dialog loops the server on Sent-Off ejections.
 
 The heuristic replaced `RandomAgent`'s pick loop wholesale, but the loop it sits in is
 `ParityRunner`'s, and three of that loop's rules are part of the contract. Each was rediscovered the
-hard way during the amazon campaign (`docs/PARITY_AMAZON_CAMPAIGN.md`, ITER19–29).
+hard way during the amazon campaign (`docs/HISTORY.md (formerly PARITY_AMAZON_CAMPAIGN.md)`, ITER19–29).
 
 **Phase 1 / phase 2.** At `INIT_SELECTING` with no acting player (phase 1) the harness picks a
 player and injects `CLIENT_ACTING_PLAYER`. On the NEXT iteration, with the acting player set

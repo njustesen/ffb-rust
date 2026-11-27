@@ -23,7 +23,7 @@ impl std::ops::Deref for Animosity {
 }
 
 #[cfg(test)]
-// Mirrors ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/skill tests.
+// Mirrors ffb-java/ffb/ffb-server/src/test/java/com/fumbbl/ffb/server/skill tests.
 // Java test targets bb2025 (category TRAIT); bb2016/Animosity.java is EXTRAORDINARY.
 mod tests {
     use super::*;

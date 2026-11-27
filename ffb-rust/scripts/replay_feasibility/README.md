@@ -6,7 +6,7 @@ against the repo. Run with `python -I`. Inputs and outputs live under `D:/ffb_re
 | Script | What it measures |
 |---|---|
 | `replay_facts.py OUT.json` | Option ids/values, skills, model-change and report kinds across the downloaded replays |
-| `id_compat.py facts.json` | Replay report/model-change/option ids unknown to our Java (`ffb-java/ffb-common`) |
+| `id_compat.py facts.json` | Replay report/model-change/option ids unknown to our Java (`ffb-java/ffb/ffb-common`) |
 | `date_base.py` | Which upstream (christerk/ffb) revision our engine files match (uses `gh api`) |
 | `dice_exp_run.py` | Runs 6 Java bot games with `-Dffb.parityDebug(Deep)` + `--reports` on a private jar copy |
 | `dice_exp_analyze.py DIR [--ordered]` | Die values found in same-window reports: unordered (upper bound) or naive flat order |

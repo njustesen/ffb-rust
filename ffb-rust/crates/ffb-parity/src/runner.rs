@@ -528,7 +528,7 @@ mod reuse_tests {
 #[derive(Clone, Copy, Debug)]
 pub enum AgentSpec {
     /// `multimove`: 0/1 = the historical one-square-per-activation behaviour. Greater than 1 is
-    /// the spike from `docs/PARITY_HEURISTIC_CAMPAIGN.md` -- submit a planned path of up to N
+    /// the spike from `docs/HISTORY.md (formerly PARITY_HEURISTIC_CAMPAIGN.md)` -- submit a planned path of up to N
     /// squares in ONE Move, mirrored by `ParityRunner --multimove N`, to test whether the two
     /// engines consume a multi-square move stack identically before the heuristic agent's scorer
     /// is ported to Java.

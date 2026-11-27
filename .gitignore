@@ -45,6 +45,53 @@ ffb-rust/target-probe/
 # Rendered decision-replay frames (46MB, regenerate with scripts/render_decisions.py)
 seed1_sampled_frames/
 
+# Extra build dirs (cargo --target-dir copies used for side builds).
+target-*/
+target_*/
+ffb-rust/target-*/
+ffb-rust/target_*/
+
+# Parity gate and sweep outputs: per-run roots, cert/job scratch, logs. Regenerable.
+/parity/
+ffb-rust/parity_*/
+ffb-rust/parity/
+**/scratch*/
+*_cert*/
+starjobs_*/
+crossjobs*/
+ffb-rust/sweepjobs/
+ffb-rust/gatelogs/
+ffb-rust/reg[0-9]*/
+ffb-rust/rj_*/
+ffb-rust/scripts/sweep_census/out_*/
+/progress.html
+/T3_COVERAGE.md
+/t3_coverage.html
+.wip-snapshots/
+.pytest_cache/
+
+# Dated outputs that scripts/post_sweep.sh, run_team_matrix.py, run_cross_matrix.py,
+# squad_report.py and harvest_coverage.sh write into docs/. Results are summarised in
+# docs/HISTORY.md and the milestone docs; the dumps themselves stay local.
+ffb-rust/docs/SWEEP_*.txt
+ffb-rust/docs/sweep_*.json
+ffb-rust/docs/REPORT_PARITY_*.txt
+ffb-rust/docs/CROSS_SWEEP_*.txt
+ffb-rust/docs/cross_sweep_*.json
+ffb-rust/docs/COVERAGE_GAPS_*.md
+ffb-rust/docs/coverage_gaps_*.txt
+ffb-rust/docs/oracle_check_*.txt
+ffb-rust/docs/report_census*.json
+ffb-rust/docs/EVENT_COVERAGE*.md
+ffb-rust/docs/EVENT_CENSUS_*.md
+ffb-rust/docs/TEAM_MATRIX_*.md
+ffb-rust/docs/CROSS_MATRIX_*.md
+ffb-rust/docs/squad_report.json
+ffb-rust/docs/squad_page.html
+
+# Behaviour-cloning work in progress (data, runs, checkpoints): local only for now.
+ffb-rust/ml/game_bc/
+
 # Agent worktrees (Claude Code `isolation: worktree`). 76 of these were once committed by
 # accident as gitlinks, and 135 stale checkouts held 444 GB. They are scratch, never content.
 .claude/worktrees/

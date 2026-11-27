@@ -3,7 +3,7 @@
 //! # Why this exists
 //!
 //! `HeuristicAgent` has to make byte-identical decisions in two languages so the parity matrix can
-//! run it on both engines (`docs/PARITY_HEURISTIC_CAMPAIGN.md`). Almost all of its arithmetic is
+//! run it on both engines (`docs/HISTORY.md (formerly PARITY_HEURISTIC_CAMPAIGN.md)`). Almost all of its arithmetic is
 //! already portable for free: IEEE-754 requires `+ - * /` on `binary32` to be **correctly
 //! rounded**, Java 17+ is unconditionally strict-FP (JEP 306), and Rust does not contract to FMA.
 //! Given identical inputs, both languages must produce the identical bit pattern.

@@ -517,7 +517,7 @@ contradict. Measured live at `f9e1e45d6`, not inferred:
 
 **`vampire` is the only genuine engine red.** Nine gates measured
 bb2020 100/98/100, bb2025 99/95/100, **bb2016 0/100** — the frontier is the bb2016 re-pick
-sampler (`docs/PARITY_VAMPIRE_CAMPAIGN.md` §Frontier).
+sampler (`docs/HISTORY.md (formerly PARITY_VAMPIRE_CAMPAIGN.md)` §Frontier).
 
 ### 11.3 One deviation carried by every bb2016 cell
 

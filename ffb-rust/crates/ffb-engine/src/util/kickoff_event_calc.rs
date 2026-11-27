@@ -38,7 +38,7 @@ impl Default for KickoffEventCalc {
     }
 }
 
-// Tests mirror ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/util/KickoffEventCalcTest.java 1:1
+// Tests mirror ffb-java/ffb/ffb-server/src/test/java/com/fumbbl/ffb/server/util/KickoffEventCalcTest.java 1:1
 #[cfg(test)]
 mod tests {
     use super::*;

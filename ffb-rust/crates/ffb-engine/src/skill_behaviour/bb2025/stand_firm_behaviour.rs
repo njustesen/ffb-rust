@@ -144,7 +144,7 @@ impl StepModifierTrait for StandFirmStepModifier {
         // NOTE (deferred, no Rust plumbing yet): Java bb2025 additionally publishes
         // BALL_KNOCKED_LOSE=false and CATCH_SCATTER_THROW_IN_MODE=null and reports a strip-ball
         // prevention event in the accepted branch; no StepParameter variants exist for the first
-        // two. Recorded in docs/PARITY_DWARF_CAMPAIGN.md.
+        // two. Recorded in docs/HISTORY.md (formerly PARITY_DWARF_CAMPAIGN.md).
         if !state.standing_firm.contains_key(&defender_id) {
             // Java: UtilServerDialog.showDialog(step.getGameState(),
             //   new DialogSkillUseParameter(state.defender.getId(), skill, 0), true)

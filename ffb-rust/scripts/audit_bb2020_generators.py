@@ -6,7 +6,7 @@ Why this exists
 ---------------
 Closing the BB2020 structural gap means routing `make_step_for` / the shared generators AT the
 BB2020 generator files instead of running the BB2025 ones (see
-`docs/PARITY_BB2020_STRUCTURAL_GAP.md`). Those Rust files are currently DEAD CODE -- nothing
+`docs/HISTORY.md (formerly PARITY_BB2020_STRUCTURAL_GAP.md)`). Those Rust files are currently DEAD CODE -- nothing
 instantiates them (ITER117) -- so before delegating to one you have to know it has not drifted from
 the Java it claims to mirror. This script is that check.
 

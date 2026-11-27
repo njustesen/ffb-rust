@@ -174,7 +174,7 @@ alone makes GFI and touchdowns - and therefore the whole scoring/Punt family - s
 unreachable. See BACKLOG.
 
 > **Superseded 2026-08-29.** That paragraph describes the RANDOM agent, and was true when written.
-> The heuristic-agent campaign (`docs/PARITY_HEURISTIC_CAMPAIGN.md`, complete at ITER70) removed the
+> The heuristic-agent campaign (`docs/HISTORY.md (formerly PARITY_HEURISTIC_CAMPAIGN.md)`, complete at ITER70) removed the
 > one-square-per-activation ceiling: the same 100-game measurement now shows 5,663 GFI rolls, 6
 > touchdowns and 4 throw-ins. The decision it was waiting on has been taken and delivered.
 >

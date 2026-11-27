@@ -5,7 +5,7 @@
 
 Why: the bb2020 rosters are LRB6 data wearing BB2020 clothes — 119 of 120 positions disagree with
 the rulebook, because BB2016 stores bare characteristics and BB2020 stores roll targets (see
-docs/PARITY_BB2020_CAMPAIGN.md ITER127). Parity cannot catch that: both engines read the same JSON,
+docs/HISTORY.md (formerly PARITY_BB2020_CAMPAIGN.md) ITER127). Parity cannot catch that: both engines read the same JSON,
 so a wrong stat is wrong identically on both sides and the hashes still match.
 
 **Position ids are preserved wherever a name matches an existing position**, because every

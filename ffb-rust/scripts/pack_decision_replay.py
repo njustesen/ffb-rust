@@ -14,7 +14,7 @@ import zipfile
 
 from PIL import Image
 
-JAVA = 'C:/Users/Admin/niels/ffb-rust/ffb-java/ffb-resources/src/main/resources/icons'
+JAVA = 'C:/Users/Admin/niels/ffb-rust/ffb-java/ffb/ffb-resources/src/main/resources/icons'
 SQ = 30
 
 

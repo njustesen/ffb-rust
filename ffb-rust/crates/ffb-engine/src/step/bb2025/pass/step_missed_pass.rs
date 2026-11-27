@@ -414,7 +414,7 @@ impl StepMissedPass {
         // StepCatchScatterThrowIn inert. Rust's early ThrowIn was already in flight, so that step
         // woke up with a stale mode and ran a whole throw-in/bounce/catch chain: ten dice Java
         // never rolls (lineman bb2025 seed 58 i=171, reachable only once an agent moves far enough
-        // to stand in a pass corridor -- see docs/PARITY_HEURISTIC_CAMPAIGN.md ITER8/ITER9).
+        // to stand in a pass corridor -- see docs/HISTORY.md (formerly PARITY_HEURISTIC_CAMPAIGN.md) ITER8/ITER9).
         match self.pending_deviate.take() {
             Some(ev) => StepOutcome::next().with_event(ev),
             None => StepOutcome::next(),

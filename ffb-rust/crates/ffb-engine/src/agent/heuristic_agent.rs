@@ -2001,7 +2001,7 @@ pub enum Mode {
 
 /// The prompt classes the heuristic agent can score, one bit each in a [`ClassMask`].
 ///
-/// This exists for the Java-parity ladder (`docs/PARITY_HEURISTIC_CAMPAIGN.md`). Porting 3,600
+/// This exists for the Java-parity ladder (`docs/HISTORY.md (formerly PARITY_HEURISTIC_CAMPAIGN.md)`). Porting 3,600
 /// lines of scorer and only then finding out whether the two engines agree would mean debugging
 /// every prompt class at once. Instead the mask lets exactly one class at a time be switched from
 /// "answered by the parity `RandomAgent` contract" to "scored by the heuristic", so the 100-seed
@@ -2749,7 +2749,7 @@ impl HeuristicAgent {
         // The kickoff-return window is ANSWERED, not played: letting the agent activate inside it
         // livelocks the driver (measured -- a bb2020 20-seed run never terminated). Java does
         // record one activation inside the window on some seeds, so this is not the whole truth
-        // yet; see docs/PARITY_AMAZON_CAMPAIGN.md ITER19.
+        // yet; see docs/HISTORY.md (formerly PARITY_AMAZON_CAMPAIGN.md) ITER19.
         // The window is PLAYED, not answered away: Java records one activation inside it (bb2020
         // seed 1 step 142, `Activate(Away6, MOVE)` in KICKOFF_RETURN mode). The phase-2 deselect
         // above plus its `just_deselected` latch is what ends it after that one pick.
@@ -3234,7 +3234,7 @@ impl HeuristicAgent {
                 // coord-sorted, ONE actionRng) the same way — dwarf bb2025 seed 2: the keg ran
                 // with target_id=null and no target draw, 4 draws short of Java by the re-roll
                 // offer. A None fold (no valid target) is a known gap: Java deselects; recorded
-                // in docs/PARITY_DWARF_CAMPAIGN.md.
+                // in docs/HISTORY.md (formerly PARITY_DWARF_CAMPAIGN.md).
                 let t = match pac {
                     PlayerActionChoice::ThrowKeg => self.parity.fold_keg_target(g, &pid),
                     PlayerActionChoice::HypnoticGaze => self.parity.fold_gaze_target(g, &pid),
@@ -3290,7 +3290,7 @@ impl HeuristicAgent {
         // The kickoff-return window is ANSWERED, not played: letting the agent activate inside it
         // livelocks the driver (measured -- a bb2020 20-seed run never terminated). Java does
         // record one activation inside the window on some seeds, so this is not the whole truth
-        // yet; see docs/PARITY_AMAZON_CAMPAIGN.md ITER19.
+        // yet; see docs/HISTORY.md (formerly PARITY_AMAZON_CAMPAIGN.md) ITER19.
         // The window is PLAYED, not answered away: Java records one activation inside it (bb2020
         // seed 1 step 142, `Activate(Away6, MOVE)` in KICKOFF_RETURN mode). The phase-2 deselect
         // above plus its `just_deselected` latch is what ends it after that one pick.
@@ -4089,7 +4089,7 @@ impl Agent for HeuristicAgent {
             None => return Action::Acknowledge,
         };
 
-        // The Java-port ladder (docs/PARITY_HEURISTIC_CAMPAIGN.md). Any class not switched on is
+        // The Java-port ladder (docs/HISTORY.md (formerly PARITY_HEURISTIC_CAMPAIGN.md)). Any class not switched on is
         // answered by the parity RandomAgent contract instead, so a partially-ported Java side can
         // still be gated at 100/100: rung 0 delegates everything and must reproduce the
         // random-agent gate exactly. `ClassMask::ALL` (the default) never takes this branch.

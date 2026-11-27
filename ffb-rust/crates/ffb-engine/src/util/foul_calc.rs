@@ -49,7 +49,7 @@ impl Default for FoulCalc {
     }
 }
 
-// Tests mirror ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/util/FoulCalcTest.java 1:1
+// Tests mirror ffb-java/ffb/ffb-server/src/test/java/com/fumbbl/ffb/server/util/FoulCalcTest.java 1:1
 #[cfg(test)]
 mod tests {
     use super::*;

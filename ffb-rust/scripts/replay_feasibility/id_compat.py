@@ -1,5 +1,5 @@
 import json, re, sys
-J = 'C:/Users/Admin/niels/ffb-rust/ffb-java/ffb-common/src/main/java/com/fumbbl/ffb/'
+J = 'C:/Users/Admin/niels/ffb-rust/ffb-java/ffb/ffb-common/src/main/java/com/fumbbl/ffb/'
 facts = json.load(open(sys.argv[1]))
 def ids(path):
     return set(re.findall(r'\b[A-Z0-9_]+\("([A-Za-z0-9]+)"', open(J + path, encoding='utf-8').read()))

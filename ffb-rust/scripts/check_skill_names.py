@@ -23,7 +23,7 @@ SKILL_DIR = JAVA / "ffb-common" / "src" / "main" / "java" / "com" / "fumbbl" / "
 # bb2020 was excluded here as "an unaudited legacy clone (not used by the parity matrix)". That
 # stopped being true: BB2020 is a full parity ruleset and its 30-roster matrix runs 100/100. The
 # exclusion meant the BB2020 rosters were never checked at all. Included since 2026-08-16, see
-# docs/PARITY_BB2020_CAMPAIGN.md ITER123.
+# docs/HISTORY.md (formerly PARITY_BB2020_CAMPAIGN.md) ITER123.
 EDITION_TO_RULES = {"bb2016": "BB2016", "bb2020": "BB2020", "bb2025": "BB2025"}
 
 

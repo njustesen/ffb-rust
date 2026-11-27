@@ -2,8 +2,7 @@
 
 This is the methodology for driving **per-step state-hash parity** between the Java
 (`ffb-server`, ground-truth) engine and the Rust engine. It captures the loop, the tracing
-toolkit, and the discipline. The per-campaign *logs* live in `docs/PARITY_TTM.md` (current /
-human + ogre tiers) and `docs/PARITY_TIER1.md` (lineman tier); the RNG *contract* the two
+toolkit, and the discipline. The campaign timeline is `docs/HISTORY.md` and the working log is `docs/BACKLOG.md`; the RNG *contract* the two
 agents obey is `AGENT_CONTRACT.md`; step-port invariants are `docs/step_port/INVARIANTS.md`.
 
 ## What parity means
@@ -56,7 +55,7 @@ state entering step N; `post_hash(step N)` is the state after it resolves (== `s
    **REVERT immediately if anything regresses.**
 7. **Commit** with an explicit path list (never `git add -A`, which would sweep regenerated
    `parity/*.jsonl` and worktrees), message `Parity(<tier>): …`, and append the diagnosis +
-   result to `docs/PARITY_TTM.md`. Delete any temp trace files first so the tree stays clean.
+   result to `docs/BACKLOG.md`. Delete any temp trace files first so the tree stays clean.
 8. **Chain** to the next frontier.
 
 ## Tracing toolkit (environment variables)
@@ -98,8 +97,8 @@ Both engines share one `GameRng` (game dice) seeded per game; the agent's two st
 ## Tiers
 
 The campaign runs progressively richer rosters so each tier exercises new mechanics:
-- **lineman v lineman** (`PARITY_TIER1.md`) — movement, dodge, GFI, blocks, pickup, kickoff.
-- **full human v full human** (`PARITY_TTM.md`) — adds Block, Dodge/Catch (catchers), Pass, and
+- **lineman v lineman** (`docs/HISTORY.md (formerly PARITY_TIER1.md)`) — movement, dodge, GFI, blocks, pickup, kickoff.
+- **full human v full human** (`docs/HISTORY.md (formerly PARITY_TTM.md)`) — adds Block, Dodge/Catch (catchers), Pass, and
   an **Ogre** (Big Guy: Bone Head, Throw Team-Mate) → negatrait rolls, pass/catch re-rolls,
   blitz/foul edge cases.
 - **ogre v ogre** — exercises Throw Team-Mate (no human roster has a Right-Stuff/throwable

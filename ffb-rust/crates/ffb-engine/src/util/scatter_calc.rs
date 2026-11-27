@@ -31,7 +31,7 @@ impl Default for ScatterCalc {
     }
 }
 
-// Tests mirror ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/util/ScatterCalcTest.java 1:1
+// Tests mirror ffb-java/ffb/ffb-server/src/test/java/com/fumbbl/ffb/server/util/ScatterCalcTest.java 1:1
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -20,7 +20,7 @@ import zipfile
 
 from PIL import Image, ImageDraw, ImageFont
 
-JAVA = os.environ.get('FFB_JAVA_ICONS', 'C:/Users/Admin/niels/ffb-rust/ffb-java/ffb-resources/src/main/resources/icons')
+JAVA = os.environ.get('FFB_JAVA_ICONS', 'C:/Users/Admin/niels/ffb-rust/ffb-java/ffb/ffb-resources/src/main/resources/icons')
 SQ = 30
 ICON = 28
 OX = OY = 1

@@ -54,7 +54,7 @@ fn player_state_description(state: PlayerState) -> Option<&'static str> {
 
 /// Java: `PlayerGender.getDative()` — not yet ported to the shared enum, translated
 /// locally here. Verified against
-/// `ffb-java/ffb-common/src/main/java/com/fumbbl/ffb/PlayerGender.java`: dative in enum
+/// `ffb-java/ffb/ffb-common/src/main/java/com/fumbbl/ffb/PlayerGender.java`: dative in enum
 /// order MALE, FEMALE, NONBINARY, NEUTRAL = him, her, them, it.
 ///
 /// Only consumer in `InjuryMessage.java` is the `thickSkullUsed` branch (`"'s Thick Skull

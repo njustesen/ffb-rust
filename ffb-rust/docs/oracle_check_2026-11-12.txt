@@ -1,8 +1,0 @@
-games 33000, reports 14034203, distinct reportIds 93 of 164 in the catalog
-modifier names seen: {'rollModifiers': 48, 'armorModifiers': 17, 'injuryModifiers': 5, 'casualtyModifiers': 1}
-skillUse reasons: 18  re-roll sources: 8
-java twins: 33000 same length: 23645
-
-!! JAVA REPORTS IT, RUST DOES NOT -- these are Rust bugs, not coverage gaps:
-     reportId modifiedDodgeResultSuccessful    java=8
-     reportId prayerWasted                     java=2

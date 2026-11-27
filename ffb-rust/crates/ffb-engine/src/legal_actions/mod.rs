@@ -1205,7 +1205,7 @@ pub fn legal_block_targets(game: &Game, player_id: &str, side: TeamSide) -> Vec<
             // the RANDOM contract: `--agent random` bb2025 amazon went 100 -> 93/100, because the
             // random agent's `idx % N` alignment is defined against ParityRunner's own picker, not
             // against `foes`. The tackle-zone rule is therefore applied in the heuristic's Block
-            // arm instead. See docs/PARITY_AMAZON_CAMPAIGN.md ITER17.
+            // arm instead. See docs/HISTORY.md (formerly PARITY_AMAZON_CAMPAIGN.md) ITER17.
             game.field_model.player_state(&p.id)
                 .map(|s| s.can_be_blocked())
                 .unwrap_or(false)

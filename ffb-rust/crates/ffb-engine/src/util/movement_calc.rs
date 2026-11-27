@@ -50,7 +50,7 @@ impl Default for MovementCalc {
     }
 }
 
-// Tests mirror ffb-java/ffb-server/src/test/java/com/fumbbl/ffb/server/util/MovementCalcTest.java 1:1
+// Tests mirror ffb-java/ffb/ffb-server/src/test/java/com/fumbbl/ffb/server/util/MovementCalcTest.java 1:1
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,7 +1,7 @@
 /// 1:1 translation of com.fumbbl.ffb.server.step.action.move.StepDivingTackle (COMMON rules)
 /// plus its three per-edition hooks: com.fumbbl.ffb.server.skillbehaviour.{bb2016,bb2020,bb2025}
 /// .DivingTackleBehaviour. Following the established "logic lives directly in the step" convention
-/// (Dauntless/Wrestle/Stab/DumpOff precedent — see docs/PHASE_AAF_SKILL_HOOK_AUDIT.md), all three
+/// (Dauntless/Wrestle/Stab/DumpOff precedent — see docs/HISTORY.md (formerly PHASE_AAF_SKILL_HOOK_AUDIT.md)), all three
 /// editions' hook bodies are ported directly here rather than through the disconnected
 /// `skill_behaviour/` registry mechanism.
 ///

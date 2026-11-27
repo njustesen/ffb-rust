@@ -1,5 +1,0 @@
-games 33000, reports 14020420, distinct reportIds 95 of 164 in the catalog
-modifier names seen: {'rollModifiers': 46, 'armorModifiers': 16, 'injuryModifiers': 5, 'casualtyModifiers': 1}
-skillUse reasons: 18  re-roll sources: 8
-java twins: 33000 same length: 33000
-oracle check: Rust names everything Java names.

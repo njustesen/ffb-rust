@@ -117,7 +117,7 @@ pub struct RandomAgent {
     /// never receives an AgentPrompt::Move), yet Java has already drawn that move-target actionRng.
     /// Pre-drawing here keeps the action_rng stream aligned in that case; when the Move prompt does
     /// arrive (negatrait passed / none), the square is reused without a second draw. Reset at each
-    /// activation. See docs/PARITY_TTM.md "FRONTIER (human)" — the Ogre Bone-head case.
+    /// activation. See docs/HISTORY.md (formerly PARITY_TTM.md) "FRONTIER (human)" — the Ogre Bone-head case.
     pending_move: Option<FieldCoordinate>,
     /// The gaze victim drawn when a GAZE was declared (`fold_gaze_target`). bb2020 asks for it
     /// later, at `AgentPrompt::GazeTarget`, where Java spends that same single actionRng pick.
@@ -2265,7 +2265,7 @@ mod tests {
 
     #[test]
     fn prone_move_predraw_is_reused_without_second_action_rng_draw() {
-        // Regression (docs/PARITY_TTM.md "FRONTIER (human)", the Ogre Bone-head case): a prone
+        // Regression (docs/HISTORY.md (formerly PARITY_TTM.md) "FRONTIER (human)", the Ogre Bone-head case): a prone
         // (standing-up) player activated for Move pre-draws its move target at activation — mirroring
         // Java ParityRunner.sendMoveAction, which draws the move-target actionRng at phase-2, BEFORE
         // the Select-sequence negatrait roll. A Bone-head failure ends the activation before
