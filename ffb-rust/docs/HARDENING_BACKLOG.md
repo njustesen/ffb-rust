@@ -8,9 +8,8 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q2.8 part 5** (the bb2025 Prayers step for bought prayers: roll table size + prayer effects,
-repro in Q2.8; move `prayers` to the front of COVERAGE_INDUCEMENTS in both harnesses to gate it), then
-**Q3.3** cards. Gate shape: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`.
+Next item: **Q3.3** cards (bb2016/bb2020 decks, buy + play), then Q2.8's stars / mercenaries / staff.
+Gate shape: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`.
 Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
 squads, Q1.2b punt stall (two repros).
 Q2.2/Q2.3 inducement parts wait for Q2.8. Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
@@ -170,15 +169,10 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   FREE_INDUCEMENT_CASH in both harnesses (the drafts sit within 50k, so petty cash alone never buys
   anything); under `--coverage-bias` both agents buy one of each COVERAGE_INDUCEMENTS type in list order
   while gold lasts. **Parts 2 (bb2020), 3 (bb2016) and 4 (state hash + prayers) done** (see Log).
-  **Part 5 in progress** (see Log): roll, handler dispatch, team names, Iron Man / Knuckle Dusters /
-  Blessed Statue dialogs, Intensive Training skill dialog and the Throw a Rock prayer's inducement now
-  match. With `prayers` FIRST in COVERAGE_INDUCEMENTS (both harnesses), FFB_INDUCEMENT_CASH=600000 and
-  the bias, bb2025 human-halfling / undead-nurgle / dark_elf-wood_elf / human-orc seeds 1-10 = 32/40.
-  Open: **seed 7 in all four** (+1 more each) — the Throw a Rock prayer's use: Java casts the wizard
-  first where Rust throws the rock (or the reverse), then Rust stops after ~92 reports. Check the
-  order the END_OF_OWN/OPPONENT_TURN windows offer `throwARock` vs `wizard` and the ThrowARock
-  sequence (bb2025 generator / StepThrowARock). The list keeps `prayers` LAST until then.
-  Then stars / mercenaries / staff (position choices) and cards (Q3.3).
+  **Part 5 done** (see Log): bought bb2025 prayers 1:1 — `prayers` is now FIRST in
+  COVERAGE_INDUCEMENTS (both harnesses); human-halfling / undead-nurgle / dark_elf-wood_elf / human-orc
+  seeds 1-10 = 40/40 states + reports, biased bb2020 orc-skaven + bb2016 goblin-dwarf 10/10.
+  Still open: stars / mercenaries / staff (position choices) and cards (Q3.3).
 - [~] **Q2.9 Remaining fixed answers:** part 1 (see Log): under `--coverage-bias` both agents take the
   other branch of PUNT_TO_CROWD (punt), PICK_UP_CHOICE (pick up) and KICK_SKILL (use Kick), zero draws.
   None of the three fired in 60 biased games (dark_elf vs wood_elf_sk, human vs orc bb2025) — needs a
@@ -270,6 +264,13 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q2.8 part 5c · (this commit) · bb2025 Throw a Rock use 1:1: StepThrowARock consumes the
+  throwARock use + the THROW_A_ROCK prayer, picks the target with Collections.shuffle and rolls the
+  animation x (die 26). InjuryResult gets Java object identity (`uid`): the driver writes a step's
+  result back into every stack step holding the same one, so the inducement window's DEFENDER
+  StepApothecary no longer re-reports the rock's injury (was 2 extra reports, seed 7 in all four).
+  `prayers` moved FIRST in COVERAGE_INDUCEMENTS. Prayer gate 40/40 + reports; smoke 60/60; tests green.
 
 - 2026-11-27 · Q2.8 part 5b · (this commit) · bb2025 Iron Man and Knuckle Dusters are select-player
   dialogs (were random picks; Iron Man keeps its armour < 11 selector for the dialog); Intensive

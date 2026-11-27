@@ -667,6 +667,22 @@ impl DriverStepStack {
             if consumed { return; }
         }
     }
+
+    /// Java object identity for `InjuryResult`: a published INJURY_RESULT is ONE object that
+    /// every receiving step holds by reference, so what one step does to it (passedRegeneration,
+    /// the report flags, the apothecary status) is what the next holder sees. Rust delivers a
+    /// clone to each step; this writes the running step's copy back into every stack step that
+    /// holds the same result (same `uid`). Thrown rock inside an inducement window: the rock's
+    /// own DEFENDER StepApothecary and the window's DEFENDER StepApothecary both receive it;
+    /// without this the second one saw a fresh pre-regeneration copy and reported the injury
+    /// twice more (§Q2.8).
+    pub fn sync_injury_result(&mut self, ir: &crate::injury::InjuryResult) {
+        for entry in self.steps.iter_mut() {
+            if let Some(held) = entry.step.shared_injury_result_mut() {
+                if held.uid == ir.uid { *held = ir.clone(); }
+            }
+        }
+    }
 }
 
 impl Default for DriverStepStack {
@@ -1326,6 +1342,9 @@ impl DriverGameState {
         // queue before the next report; anything left belongs to the step that just ran.
         self.game.report_list.flush_chomp_removals();
         self.events.append(&mut outcome.events);
+        if let Some(ir) = entry.step.shared_injury_result_mut().map(|ir| ir.clone()) {
+            self.stack.sync_injury_result(&ir);
+        }
         for seq in outcome.pushes.drain(..) { self.stack.push_sequence(seq); }
         // Java AbstractStep.publishParameter: `setParameter(pParameter)` on the publishing step
         // itself first, then `stepStack.publishStepParameter(pParameter)` to the stack
@@ -1648,6 +1667,34 @@ pub(crate) fn new_game(seed: u64) -> DriverGameState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Java holds one InjuryResult by reference in every step it was published to: once the
+    /// first DEFENDER StepApothecary has passed regeneration and reported, the second one (the
+    /// enclosing inducement window's) sees that, not a fresh copy. A different result (`new`)
+    /// is left alone.
+    #[test]
+    fn sync_injury_result_updates_holders_of_the_same_result_only() {
+        use crate::injury::InjuryResult;
+        use crate::step::bb2025::shared::step_apothecary::StepApothecary;
+        use ffb_model::enums::ApothecaryMode;
+        let shared = InjuryResult::new(ApothecaryMode::Defender);
+        let other = InjuryResult::new(ApothecaryMode::Defender);
+        let mut stack = DriverStepStack::new();
+        for ir in [&shared, &other] {
+            let mut s = StepApothecary::new();
+            s.set_parameter(&StepParameter::ApothecaryMode(ApothecaryMode::Defender));
+            s.set_parameter(&StepParameter::InjuryResult(Box::new(ir.clone())));
+            stack.push(DriverStepEntry::new(Box::new(s)));
+        }
+        let mut done = shared.clone();
+        done.passed_regeneration();
+        done.set_already_reported(true);
+        stack.sync_injury_result(&done);
+        let held: Vec<(bool, bool)> = stack.steps.iter_mut()
+            .map(|e| { let ir = e.step.shared_injury_result_mut().unwrap(); (ir.pre_regeneration, ir.already_reported) })
+            .collect();
+        assert_eq!(held, vec![(false, true), (true, false)]);
+    }
 
     /// The report -> event bridge (§H.52). Every variant below had NO live construction site, so
     /// the mechanic ran, wrote its report, and the census saw nothing across 33,000 games. Adding

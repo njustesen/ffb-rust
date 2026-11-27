@@ -386,6 +386,7 @@ mod tests {
         dpc.injury_result = Some(Box::new(InjuryResult {
             injury_context: ctx,
             knocked_out: false, rip: false, already_reported: false, pre_regeneration: true,
+            uid: InjuryResult::next_uid(),
         }));
         let mut step = StepHandleDropPlayerContext::new();
         step.set_parameter(&StepParameter::DropPlayerContext(dpc));
@@ -425,6 +426,7 @@ mod tests {
                 rip: false,
                 already_reported: false,
                 pre_regeneration: true,
+                uid: InjuryResult::next_uid(),
             })),
             player_id: Some(player_id.to_owned()),
             apothecary_mode: Some(ApothecaryMode::Defender),

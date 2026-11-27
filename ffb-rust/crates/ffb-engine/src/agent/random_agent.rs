@@ -1920,9 +1920,9 @@ fn coverage_spell_target(game: &Game, caster_home: bool) -> Option<FieldCoordina
 
 /// §Q2.8 coverage purchase order — ParityRunner.COVERAGE_INDUCEMENTS, same list and order.
 pub const COVERAGE_INDUCEMENTS: &[&str] = &[
-    "throwARock", "weatherMage", "wizard", "halflingMasterChef", "bribes", "bloodweiserBabes",
+    "prayers", "throwARock", "weatherMage", "wizard", "halflingMasterChef", "bribes", "bloodweiserBabes",
     "extraTeamTraining", "wanderingApothecaries", "partTimeCoach", "tempCheerleader", "teamMascot",
-    "biasedRef", "bugmansXXXXXX", "mortuaryAssistant", "plagueDoctor", "prayers",
+    "biasedRef", "bugmansXXXXXX", "mortuaryAssistant", "plagueDoctor",
 ];
 
 /// §Q2.8: one of each [`COVERAGE_INDUCEMENTS`] entry the buy dialog offers (`available` = the

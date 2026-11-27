@@ -101,6 +101,7 @@ pub fn handle_injury(
         rip,
         already_reported: false,
         pre_regeneration: true,
+        uid: InjuryResult::next_uid(),
     }
 }
 

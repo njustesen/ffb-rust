@@ -72,13 +72,29 @@ impl StepThrowARock {
             return StepOutcome::next();
         }
 
-        // Java: Collections.shuffle(players) — random selection
-        let idx = (rng.die(eligible.len() as u32) - 1) as usize;
-        let target_id = eligible[idx].clone();
+        // Java: the first THROW_ROCK type -> `UtilServerInducementUse.useInducement(type, 1, set)`
+        // and `inducementSet.removePrayer(Prayer.THROW_A_ROCK)` (§Q2.8: the use was never consumed,
+        // so the window kept offering the rock).
+        if let Some(rock) = ffb_model::factory::inducement_type_factory::all_types_in(game.rules)
+            .into_iter().find(|t| t.usages.contains(&ffb_model::inducement::usage::Usage::THROW_ROCK))
+        {
+            let set = if self.home_team { &mut game.turn_data_home.inducement_set } else { &mut game.turn_data_away.inducement_set };
+            set.use_one_of(&rock.id);
+            set.remove_prayer("THROW_A_ROCK");
+        }
+
+        // Java: `Collections.shuffle(players); players.get(0)` -- java.util.Collections' shared
+        // Random, not the game dice.
+        let mut shuffled = eligible.clone();
+        ffb_model::util::java_random::collections_shuffle(&mut shuffled, &mut game.collections_rng.lock());
+        let target_id = shuffled[0].clone();
 
         // Java: int roll = rollDice(6); boolean successful = roll >= 4
         let roll = rng.d6();
         let successful = roll >= 4;
+        // Java: the animation's start square -- `rollXCoordinate()` = rollDice(26) - 1, one die
+        // either half (the y is 0 or 14 by the target's half).
+        let _start_x = rng.die(26) - 1;
 
         let throw_event = GameEvent::ThrowAtPlayer { player_id: target_id.clone(), roll, successful };
 
@@ -202,9 +218,8 @@ mod tests {
     /// A successful hit (roll ≥ 4) publishes STEADY_FOOTING_CONTEXT.
     #[test]
     fn successful_hit_publishes_steady_footing_context() {
-        // Find a seed where both the player-selection roll AND the hit roll produce a hit.
-        // The step rolls: die(1) (always 1 with 1 eligible player) then d6.
-        // So we just need a seed where d6 >= 4.
+        // Java picks the target with Collections.shuffle (not the game dice), so the first game
+        // die is the hit roll: find a seed whose first d6 is >= 4.
         let mut game = make_game();
         let p = make_player("away1", 1);
         game.team_away.players.push(p);
@@ -213,7 +228,6 @@ mod tests {
 
         for seed in 0..200u64 {
             let mut rng = GameRng::new(seed);
-            rng.die(1); // player selection (always 1)
             let roll = rng.d6();
             if roll >= 4 {
                 let mut game2 = make_game();
@@ -246,7 +260,6 @@ mod tests {
 
         for seed in 0..200u64 {
             let mut rng = GameRng::new(seed);
-            rng.die(1); // player selection
             let roll = rng.d6();
             if roll < 4 {
                 let mut game2 = make_game();

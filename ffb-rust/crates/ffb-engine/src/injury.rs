@@ -265,6 +265,9 @@ pub struct InjuryResult {
     pub already_reported: bool,
     /// Java: fPreRegeneration — true until passed_regeneration() is called.
     pub pre_regeneration: bool,
+    /// Java object identity: a clone is the same Java reference, `new` is a new object.
+    /// Steps holding the same uid are kept in sync by `DriverStepStack::sync_injury_result`.
+    pub uid: u64,
 }
 
 impl InjuryResult {
@@ -275,7 +278,14 @@ impl InjuryResult {
             rip: false,
             already_reported: false,
             pre_regeneration: true,
+            uid: Self::next_uid(),
         }
+    }
+
+    /// A fresh identity for a newly created result (Java `new InjuryResult()`).
+    pub fn next_uid() -> u64 {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     }
 
     pub fn injury_context(&self) -> &InjuryContext { &self.injury_context }

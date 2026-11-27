@@ -5447,9 +5447,9 @@ public class ParityRunner {
      * shuffle the harnesses do not share yet.
      */
     static final String[] COVERAGE_INDUCEMENTS = {
-        "throwARock", "weatherMage", "wizard", "halflingMasterChef", "bribes", "bloodweiserBabes",
+        "prayers", "throwARock", "weatherMage", "wizard", "halflingMasterChef", "bribes", "bloodweiserBabes",
         "extraTeamTraining", "wanderingApothecaries", "partTimeCoach", "tempCheerleader", "teamMascot",
-        "biasedRef", "bugmansXXXXXX", "mortuaryAssistant", "plagueDoctor", "prayers",
+        "biasedRef", "bugmansXXXXXX", "mortuaryAssistant", "plagueDoctor",
     };
 
     /**

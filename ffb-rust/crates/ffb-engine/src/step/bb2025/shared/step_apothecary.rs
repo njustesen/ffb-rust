@@ -900,6 +900,10 @@ impl Step for StepApothecary {
         out
     }
 
+    fn shared_injury_result_mut(&mut self) -> Option<&mut crate::injury::InjuryResult> {
+        self.injury_result.as_mut()
+    }
+
     fn set_parameter(&mut self, param: &StepParameter) -> bool {
         match param {
             // Java: StepParameterKey.APOTHECARY_MODE (mandatory init param)

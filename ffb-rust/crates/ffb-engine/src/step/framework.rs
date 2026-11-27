@@ -543,6 +543,9 @@ pub trait Step: Send {
     /// End*/Roll steps consume specific keys. Implementations must mirror exactly the keys
     /// their Java counterpart's setParameter consumes.
     fn consumes_parameter(&self, _param: &StepParameter) -> bool { false }
+    /// The INJURY_RESULT this step holds, for steps whose Java twin mutates the shared object
+    /// another stack step also holds (see `DriverStepStack::sync_injury_result`).
+    fn shared_injury_result_mut(&mut self) -> Option<&mut crate::injury::InjuryResult> { None }
 }
 
 /// Test helper: create a minimal team for unit tests.
