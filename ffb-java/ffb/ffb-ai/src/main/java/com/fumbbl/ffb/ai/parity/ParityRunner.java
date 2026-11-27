@@ -2445,11 +2445,24 @@ public class ParityRunner {
             players.sort(java.util.Comparator.comparingInt(Player::getNr));
             for (int i = 0; i < players.size(); i++) {
                 if (pid.equals(players.get(i).getId())) {
-                    return String.format("%s%02d,%d", prefixes[t], i, currentMove);
+                    return String.format("%s%02d,%d", prefixes[t], i, currentMove) + actingDetail(actingPlayer);
                 }
             }
         }
-        return "?," + currentMove;
+        return "?," + currentMove + actingDetail(actingPlayer);
+    }
+
+    /** §Q1.3: `,<action>,<flags>` — the declared PlayerAction name (or `-`) and ten activation flags as
+     *  0/1: blocked, passed, fouled, moved, fed, goingForIt, standingUp, bloodLust, animosity, jumping.
+     *  Must stay byte-identical with ffb-rust `state_hash.rs::acting_detail`. */
+    private static String actingDetail(ActingPlayer ap) {
+        PlayerAction action = ap.getPlayerAction();
+        boolean[] f = { ap.hasBlocked(), ap.hasPassed(), ap.hasFouled(), ap.hasMoved(), ap.hasFed(),
+            ap.isGoingForIt(), ap.isStandingUp(), ap.isSufferingBloodLust(), ap.isSufferingAnimosity(),
+            ap.isJumping() };
+        StringBuilder sb = new StringBuilder(",").append(action != null ? action.getName() : "-").append(',');
+        for (boolean b : f) sb.append(b ? '1' : '0');
+        return sb.toString();
     }
 
     private static void addPlayersFromTeam(Team team, FieldModel fm, List<String> out, String prefix) {

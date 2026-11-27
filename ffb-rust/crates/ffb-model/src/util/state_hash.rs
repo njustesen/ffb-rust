@@ -178,12 +178,26 @@ fn acting_player_part(game: &Game) -> String {
         let mut players: Vec<_> = team.players.iter().collect();
         players.sort_by_key(|p| p.nr);
         if let Some(i) = players.iter().position(|p| p.id == pid) {
-            return format!("{prefix}{i:02},{}", game.acting_player.current_move);
+            return format!("{prefix}{i:02},{}{}", game.acting_player.current_move, acting_detail(game));
         }
     }
     // Activated but on neither roster — report the move alone rather than silently claiming
     // nobody is acting.
-    format!("?,{}", game.acting_player.current_move)
+    format!("?,{}{}", game.acting_player.current_move, acting_detail(game))
+}
+
+/// §Q1.3: `,<action>,<flags>` — the declared PlayerAction name (or `-`) and ten activation flags as
+/// 0/1: blocked, passed, fouled, moved, fed, goingForIt, standingUp, bloodLust, animosity, jumping.
+/// Must stay byte-identical with `ParityRunner.actingDetail`.
+fn acting_detail(game: &Game) -> String {
+    let ap = &game.acting_player;
+    let flags = [ap.has_blocked, ap.has_passed, ap.has_fouled, ap.has_moved, ap.has_fed,
+        ap.goes_for_it, ap.standing_up, ap.suffering_blood_lust, ap.suffering_animosity, ap.jumping];
+    let mut s = String::from(",");
+    s.push_str(ap.player_action.map(|a| a.name()).unwrap_or("-"));
+    s.push(',');
+    for f in flags { s.push(if f { '1' } else { '0' }); }
+    s
 }
 
 fn player_state_str(base: u32) -> &'static str {
