@@ -265,14 +265,14 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
-- 2026-11-27 · Q2.8 part 5c · (this commit) · bb2025 Throw a Rock use 1:1: StepThrowARock consumes the
+- 2026-11-27 · Q2.8 part 5c · 9094ec6a8 · bb2025 Throw a Rock use 1:1: StepThrowARock consumes the
   throwARock use + the THROW_A_ROCK prayer, picks the target with Collections.shuffle and rolls the
   animation x (die 26). InjuryResult gets Java object identity (`uid`): the driver writes a step's
   result back into every stack step holding the same one, so the inducement window's DEFENDER
   StepApothecary no longer re-reports the rock's injury (was 2 extra reports, seed 7 in all four).
   `prayers` moved FIRST in COVERAGE_INDUCEMENTS. Prayer gate 40/40 + reports; smoke 60/60; tests green.
 
-- 2026-11-27 · Q2.8 part 5b · (this commit) · bb2025 Iron Man and Knuckle Dusters are select-player
+- 2026-11-27 · Q2.8 part 5b · 7bbdf076e · bb2025 Iron Man and Knuckle Dusters are select-player
   dialogs (were random picks; Iron Man keeps its armour < 11 selector for the dialog); Intensive
   Training raises its skill dialog (the step stalled without one); the Throw a Rock prayer adds a
   throwARock use (was a no-op); parity team names match the Java XML (`<Roster> Parity25 Home`, the
