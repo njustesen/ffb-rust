@@ -8,7 +8,8 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q1.6** (Rust-vs-Rust determinism gate). Parked with notes: Q1.2b (punt → throw-in
+Next item: **Q2.1** (apothecary accept). Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
+that change games; run the Q1 night queue first (mirror 330 + view suites on a frozen exe). Parked with notes: Q1.2b (punt → throw-in
 stall), Q1.2c. Night queue: mirror 330 with the Q1.1–Q1.3 verdict + hash (freeze a q1 exe + jar first).
 Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q2.5). Last certified build: cert9 (`docs/cert_manifest.json`); last view build: view15.
 
@@ -99,7 +100,11 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
   only when it fired, not when offered (Q1.5b). Original: The coverage checklist runs for every gate (aggregate per suite, not per
   50-game gate); MISSING required items are reds at suite level; the skill ledger counts a skill only when
   it changed the outcome path (fired), not when offered. Done: suite-level coverage report in the cert.
-- [ ] **Q1.6 Determinism gate.** Run Rust twice on the same seeds (fresh process each) and diff the
+- [x] **Q1.6 Determinism gate.** (see Log) `scripts/determinism_check.py` (bench mode, no JVM, two
+  fresh processes, byte-compare every Rust log): bb2025 human, bb2020 snotling-skaven, bb2016
+  goblin-underworld, bb2025 nippon-ogre + stars, 100 seeds each → 4×200 files identical. Left (Q1.6b):
+  make the `player_at` arrival-counter tie and `util_server_cards.rs:245` deactivation order explicit
+  (`field_model.rs` is being edited by another session — do it when that lands). Original: Run Rust twice on the same seeds (fresh process each) and diff the
   JSONL; replace hash-ordered iteration on RNG/report paths with ordered maps (`player_at` tie,
   `util_server_cards.rs:245`). Done: 100 seeds × 3 editions identical across two runs.
 - [ ] **Q1.7 Re-certify (cert10).** Freeze one exe + jar; mirror 330, cross 4,012, star 4,012, skill
@@ -211,6 +216,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q1.6 · (next commit) · determinism_check.py; 4 matchups × 100 seeds byte-identical over
+  two processes.
 - 2026-11-27 · Q1.5 · (next commit) · suite-level coverage: per-gate JSON, --coverage-merge, coverage.txt
   required by cert_tally; merge unit test.
 - 2026-11-27 · Q1.4 · (next commit) · view_suite.py in the repo, post-game view dumps, cert_tally counts
