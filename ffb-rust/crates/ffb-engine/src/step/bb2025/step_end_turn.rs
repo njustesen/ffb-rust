@@ -434,7 +434,9 @@ impl StepEndTurn {
             // Java bb2016 StepEndTurn: `if (fNewHalf) { ... else stateMechanic.startHalf(this,
             // half + 1); }` (line 320, for the end of half 1; OVERTIME is off in parity games)
             // runs BEFORE `addReport(new ReportTurnEnd(...))` (line 352).
-            if self.new_half && game.half == 1 && !self.half_started_early {
+            // §Q3.1: bb2016 also starts half 3 here when a drawn half 2 goes to OVERTIME (line 313).
+            if self.new_half && !self.half_started_early
+                && (game.half == 1 || (game.half == 2 && draw_with_overtime(game))) {
                 use crate::mechanic::bb2025::state_mechanic::StateMechanic;
                 use crate::mechanic::state_mechanic::StateMechanic as StateMechanicTrait;
                 self.early_half_events = StateMechanic::new().start_half(game, game.half + 1);
@@ -1183,6 +1185,15 @@ impl StepEndTurn {
             game.field_model.clear_move_squares();
             game.field_model.clear_track_numbers();
             game.field_model.clear_dice_decorations();
+            // Java StepEndTurn (bb2016:325, bb2020:384, bb2025:387) `else if (fTouchdown) {
+            // setBallCoordinate(null); setBallInPlay(false); ... }` — a touchdown that is not also a
+            // new half takes the ball off the pitch. The next kickoff used to hide the gap; a
+            // sudden-death overtime touchdown ends the game with the ball still on the end zone
+            // (§Q3.1, bb2016 overtime seed 20: final hash `b25,0,true` vs Java `b-1,-1,false`).
+            if !self.new_half && self.touchdown == Some(true) {
+                game.field_model.ball_coordinate = None;
+                game.field_model.ball_in_play = false;
+            }
             // Java: reportSecretWeaponsUsed → below, once (`secret_weapons_reported`)
         }
         }
@@ -1395,8 +1406,10 @@ impl StepEndTurn {
             if self.new_half {
                 // Java: half > 2 → end_game; half > 1 → overtime check or end_game; else → H2 kickoff
                 let ended_half = if self.half_started_early { game.half - 1 } else { game.half };
-                if ended_half > 1 {
-                    // Half 2+ ended → end game (overtime check not yet ported)
+                // §Q3.1 Java: half > 2 -> endGame; half 2 -> OVERTIME && drawn ? startHalf(3) +
+                // Kickoff(withCoinChoice = true) : endGame; half 1 -> startHalf(2) + Kickoff(false).
+                let overtime = ended_half == 2 && draw_with_overtime(game);
+                if ended_half > 2 || (ended_half == 2 && !overtime) {
                     outcome = outcome.push_seq(end_game_sequence_for(game.rules, game.admin_mode));
                 } else {
                     // Java: if (game.getHalf() == 1 || (half == 2 && drawWithOvertime))
@@ -1418,12 +1431,28 @@ impl StepEndTurn {
                         // enters InitKickoff in TurnMode::Setup, so it must be emitted here.
                         outcome = outcome.with_event(GameEvent::StartHalf { half: game.half });
                     }
-                    // End of first half → push H2 kickoff sequence
-                    outcome = outcome.push_seq(kickoff_seq(game));
+                    // End of first half → push H2 kickoff sequence. Overtime: Java
+                    // Kickoff.SequenceParams(gameState, withCoinChoice = true) -- COIN_CHOICE and
+                    // RECEIVE_CHOICE first, then the same kickoff.
+                    if overtime {
+                        let seq = if game.rules == ffb_model::enums::Rules::Bb2016 {
+                            crate::step::generator::mixed::kickoff::Kickoff::build_sequence(
+                                &crate::step::generator::mixed::kickoff::KickoffParams { with_coin_choice: true })
+                        } else {
+                            let mut seq = kickoff_seq(game);
+                            seq.insert(0, crate::step::framework::SequenceStep::new(StepId::ReceiveChoice));
+                            seq.insert(0, crate::step::framework::SequenceStep::new(StepId::CoinChoice));
+                            seq
+                        };
+                        outcome = outcome.push_seq(seq);
+                    } else {
+                        outcome = outcome.push_seq(kickoff_seq(game));
+                    }
                 }
             } else if touchdown {
-                // Java: touchdownEndsGame check → end_game if last turn
-                let td_ends_game = game.turn_data_home.turn_nr >= 8 && game.turn_data_away.turn_nr >= 8;
+                // Java: mechanic.touchdownEndsGame(game) (bb2016: half == 3; bb2020/bb2025: half == 3
+                // && OVERTIME_GOLDEN_GOAL). The old "both teams at turn 8" stand-in was not Java's rule.
+                let td_ends_game = crate::mechanic::game_mechanic_for(game.rules).touchdown_ends_game(game);
                 if td_ends_game {
                     outcome = outcome.push_seq(end_game_sequence_for(game.rules, game.admin_mode));
                 } else {
@@ -1444,6 +1473,11 @@ impl StepEndTurn {
         // Kept for correctness if dialogs are later wired in.
         StepOutcome::cont()
     }
+}
+
+/// §Q3.1 Java StepEndTurn: `drawWithOvertime = isOptionEnabled(OVERTIME) && scoreHome == scoreAway`.
+fn draw_with_overtime(game: &Game) -> bool {
+    game.options.is_enabled("overtime") && game.game_result.home.score == game.game_result.away.score
 }
 
 impl Default for StepEndTurn {
@@ -2057,6 +2091,33 @@ mod tests {
             "Java credits the scorer's PlayerResult.touchdowns");
         assert_eq!(game.turn_mode, TurnMode::Setup);
         assert_eq!(step.touchdown_player_id.as_deref(), Some("scorer"));
+        // Java `else if (fTouchdown) { setBallCoordinate(null); setBallInPlay(false); }`.
+        assert_eq!(game.field_model.ball_coordinate, None);
+        assert!(!game.field_model.ball_in_play);
+    }
+
+    /// §Q3.1 Java bb2016 StepEndTurn:325-330: a sudden-death touchdown in half 3 takes the ball off
+    /// the pitch and pushes EndGame. Rust left it in the end zone (bb2016 overtime seed 20).
+    #[test]
+    fn a_sudden_death_touchdown_clears_the_ball_and_ends_the_game() {
+        let mut game = make_game();
+        game.rules = Rules::Bb2016;
+        game.half = 3;
+        game.team_home.players.push(make_player("scorer"));
+        let ball_coord = FieldCoordinate::new(FIELD_WIDTH - 1, 7);
+        game.field_model.set_player_coordinate("scorer", ball_coord);
+        game.field_model.set_player_state("scorer", PlayerState::new(PS_STANDING));
+        game.field_model.ball_coordinate = Some(ball_coord);
+        game.field_model.ball_in_play = true;
+        game.field_model.ball_moving = false;
+
+        let mut step = StepEndTurn::new();
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert_eq!(game.field_model.ball_coordinate, None);
+        assert!(!game.field_model.ball_in_play);
+        assert!(out.pushes.iter().flatten().any(|s| s.step_id == StepId::PenaltyShootout),
+            "a half-3 touchdown pushes the EndGame sequence");
     }
 
     /// Java StepEndTurn: a touchdown by an UNUSED Star of the Show scorer shows a SkillUse dialog

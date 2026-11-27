@@ -1260,6 +1260,14 @@ public class ParityRunner {
                 game.setDialogParameter(null);
                 break;
 
+            // §Q3.1: the penalty shootout after a drawn OVERTIME waits for CLIENT_CONFIRM from BOTH
+            // coaches (StepPenaltyShootout: homeConfirmed && awayConfirmed). The default arm confirmed
+            // for one side only, so the dialog looped and the game stuck. Rust's step needs no answer.
+            case PENALTY_SHOOTOUT:
+                MatchRunner.injectForTeam(gameState, new com.fumbbl.ffb.net.commands.ClientCommandConfirm(), true);
+                MatchRunner.injectForTeam(gameState, new com.fumbbl.ffb.net.commands.ClientCommandConfirm(), false);
+                break;
+
             // ── Blitz target selection dialog: same handling as the step ─────
             // (the server shows a dialog while StepSelectBlitzTarget waits; falling
             // to RandomStrategy here would be non-seeded nondeterminism)

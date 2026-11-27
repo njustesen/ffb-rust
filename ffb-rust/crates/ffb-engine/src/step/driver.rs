@@ -585,6 +585,12 @@ pub fn make_step_for(id: StepId, rules: Rules) -> Box<dyn Step> {
             // games (`winnings` showed 32,997 of 33,000 instead).
             StepId::Winnings =>
                 return Box::new(crate::step::bb2016::end::step_winnings::StepWinnings),
+            // §Q3.1: Java has a @RulesCollection(BB2016) StepPenaltyShootout (one d6 + re-rolls
+            // left per team, repeated until unequal, one ReportPenaltyShootout) next to the mixed
+            // one (five rolls each, both coaches confirm). The shared table handed bb2016 the mixed
+            // step; it only ran once overtime could end drawn (bb2016 overtime seed 14).
+            StepId::PenaltyShootout =>
+                return Box::new(crate::step::bb2016::end::step_penalty_shootout::StepPenaltyShootout::new()),
             // BB2016 Shadowing and Tentacles are ESCAPE rolls by the DODGER — 2d6 against
             // `8 + shadowerMA - dodgerMA` / `strength`-based thresholds, re-rolled by the acting
             // player under SHADOWING_ESCAPE / TENTACLES_ESCAPE (`skillbehaviour/bb2016/*`). The
@@ -1723,6 +1729,26 @@ mod tests {
             assert_eq!(make_step_for(id, Rules::Bb2016).id(), id, "bb2016 routing of {id:?}");
             assert_eq!(make_step_for(id, Rules::Bb2025).id(), id, "bb2025 passthrough of {id:?}");
         }
+    }
+
+    #[test]
+    fn make_step_for_routes_bb2016_penalty_shootout_to_the_bb2016_step() {
+        // Java bb2016/end/StepPenaltyShootout: d6 + re-rolls left per team until unequal, ONE report,
+        // NEXT_STEP at once. The mixed step (bb2020/bb2025) shows a dialog both coaches confirm.
+        use crate::step::framework::{test_team, StepAction};
+        use ffb_model::enums::Rules;
+        use ffb_model::report::report_id::ReportId;
+        let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2016);
+        game.half = 3;
+        game.game_result.home.score = 1;
+        game.game_result.away.score = 1;
+        let mut rng = GameRng::new(7);
+        let mut step = make_step_for(StepId::PenaltyShootout, Rules::Bb2016);
+        let outcome = step.start(&mut game, &mut rng);
+        assert!(matches!(outcome.action, StepAction::NextStep));
+        assert!(outcome.prompt.is_none());
+        assert_eq!(game.game_result.home.score + game.game_result.away.score, 3);
+        assert!(game.report_list.has_report(ReportId::PENALTY_SHOOTOUT));
     }
 
     #[test]

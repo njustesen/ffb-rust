@@ -77,6 +77,24 @@ public class HeadlessGameSetup {
             ruleSet.setValue(RulesCollection.Rules.valueOf(ruleset).name());
             gameState.getGame().getOptions().addOption(ruleSet);
         }
+        // §Q3.1: FFB_OVERTIME switches OVERTIME on (UtilServerStartGame's addOption line for it is
+        // commented out); the Rust parity runner reads the same variable.
+        if (System.getenv("FFB_OVERTIME") != null) {
+            GameOptionFactory otFactory = new GameOptionFactory();
+            com.fumbbl.ffb.option.GameOptionBoolean overtime =
+                (com.fumbbl.ffb.option.GameOptionBoolean) otFactory.createGameOption(GameOptionId.OVERTIME);
+            overtime.setValue(true);
+            gameState.getGame().getOptions().addOption(overtime);
+        }
+        // FFB_GOLDEN_GOAL: OVERTIME_GOLDEN_GOAL on (first half-3 touchdown ends the game); the Rust
+        // parity runner reads the same variable.
+        if (System.getenv("FFB_GOLDEN_GOAL") != null) {
+            GameOptionFactory ggFactory = new GameOptionFactory();
+            com.fumbbl.ffb.option.GameOptionBoolean goldenGoal =
+                (com.fumbbl.ffb.option.GameOptionBoolean) ggFactory.createGameOption(GameOptionId.OVERTIME_GOLDEN_GOAL);
+            goldenGoal.setValue(true);
+            gameState.getGame().getOptions().addOption(goldenGoal);
+        }
 
         // 2. Initialize rule-dependent members and rules
         Game game = gameState.getGame();

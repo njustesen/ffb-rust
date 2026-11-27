@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q3.1** (overtime). Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
+Next item: **Q3.2** (in-game inducement use). Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
 squads, Q1.2b punt stall (two repros).
 Q2.2/Q2.3 inducement parts wait for Q2.8. Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
 that change games; run the Q1 night queue first (mirror 330 + view suites on a frozen exe). Parked with notes: Q1.2b (punt → throw-in
@@ -177,10 +177,10 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Q3 — Port what is missing from the engine (1:1 from Java)
 
-- [ ] **Q3.1 Overtime / sudden death / golden goal** (`bb2025/step_end_turn.rs:1399` "overtime check not
-  yet ported"; `OVERTIME`, `OVERTIME_GOLDEN_GOAL`). Test with the overtime option on in both engines
-  (harness option, Java line `UtilServerStartGame.java:234`). Gate: drawn games enter half 3 in all 3
-  editions, steps + reports identical.
+- [x] **Q3.1 Overtime / sudden death / golden goal** (see Log). `FFB_OVERTIME=1` / `FFB_GOLDEN_GOAL=1`
+  switch the options on in both harnesses. Gate met: human bb2025/bb2020/bb2016 seeds 1-30, 30/30 steps +
+  reports with overtime, and again with golden goal (bb2025: 10 games reach half 3, 8 end on a
+  golden-goal touchdown); standing smoke gates 20/20.
 - [ ] **Q3.2 In-game inducement use:** route Wizard, Throw a Rock, Weather Mage, Master Chef, Fan Factor
   in `step_init_inducement.rs` (bb2025, bb2020, bb2016 card play). Gate: each inducement fires.
 - [ ] **Q3.3 Cards (bb2016/bb2020):** build decks, buy, draw, play, deactivate (`handle_card`,
@@ -247,6 +247,11 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q3.1 · (this commit) · overtime ported: StepEndTurn starts half 3 on a drawn half 2 with
+  OVERTIME (coin + receive choice first), `touchdownEndsGame` per edition; a touchdown now takes the ball
+  off the pitch (all editions, hidden by the next kickoff until a sudden-death TD); bb2016 routed to its
+  own StepPenaltyShootout (was the mixed one); harness confirms the mixed shootout for both coaches.
 
 - 2026-11-27 · Q2.9 part 1 · (next commit) · punt-to-crowd / pick-up / Kick flipped under coverage bias;
   not yet reached in 60 biased games; second Q1.2b repro recorded.

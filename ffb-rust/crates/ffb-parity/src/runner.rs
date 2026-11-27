@@ -595,7 +595,18 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     // Skill-touch telemetry (BACKLOG §M phase 0): count from a clean slate for this game.
     ffb_model::skill_touch::set_enabled(true);
     let _ = ffb_model::skill_touch::take();
-    let mut engine = GameState::new_full_pregame(home, away, rules, seed, BASELINE_SETUP_OPTIONS);
+    // §Q3.1: `FFB_OVERTIME=1` switches OVERTIME on in BOTH engines (HeadlessGameSetup reads the
+    // same variable), so drawn games play half 3. Off by default, as Java's commented-out addOption.
+    let mut options: Vec<(&str, &str)> = BASELINE_SETUP_OPTIONS.to_vec();
+    if std::env::var_os("FFB_OVERTIME").is_some() {
+        options.push(("overtime", "true"));
+    }
+    // `FFB_GOLDEN_GOAL=1` (with FFB_OVERTIME): the first half-3 touchdown ends the game (bb2020/bb2025
+    // `touchdownEndsGame`; bb2016 always ends on it). Java default false; HeadlessGameSetup mirrors.
+    if std::env::var_os("FFB_GOLDEN_GOAL").is_some() {
+        options.push(("overtimeGoldenGoal", "true"));
+    }
+    let mut engine = GameState::new_full_pregame(home, away, rules, seed, &options);
     // ONE shared agent for both teams, mirroring ParityRunner's single-object shape.
     // `new_parity` seeds both decision and action RNGs to match Java's decisionRng and actionRng
     // exactly; the heuristic agent seeds its own single stream and embeds a parity RandomAgent for
