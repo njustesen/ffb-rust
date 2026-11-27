@@ -1208,10 +1208,18 @@ impl Agent for RandomAgent {
             // Multiple Block die choice (attacker or defender dialog): ParityRunner's
             // RE_ROLL_BLOCK_FOR_TARGETS(_PROPERTIES) / OPPONENT_BLOCK_SELECTION(_PROPERTIES) arms pick
             // DIE 0 of the first still-unselected target, no Pro, no re-roll. 0 rng.
-            Some(AgentPrompt::BlockRollsForTargets { targets, .. }) => Action::BlockChoice {
-                die_index: 0,
-                target_id: targets.iter().find(|(_, open)| *open).map(|(t, _)| t.clone()),
-            },
+            // §Q2.6: under `--coverage-bias` both pick the LAST die of that target instead (read from
+            // the shown DialogReRollBlockForTargets/OpponentBlockSelection Properties parameter),
+            // zero draws, so other block results than die 0 get exercised.
+            Some(AgentPrompt::BlockRollsForTargets { targets, .. }) => {
+                let target_id = targets.iter().find(|(_, open)| *open).map(|(t, _)| t.clone());
+                let die_index = if crate::agent::heuristic_agent::coverage_bias() > 0.0 {
+                    target_id.as_deref().map_or(0, |t| last_block_die_index(&gs.game, t) as usize)
+                } else {
+                    0
+                };
+                Action::BlockChoice { die_index, target_id }
+            }
             // Pick-up choice (bb2025 Trickster): ParityRunner's PICK_UP_CHOICE arm declines, 0 rng.
             Some(AgentPrompt::PickUpChoice { .. }) => Action::PickUpChoice { pick_up: false },
             // Punt to crowd: ParityRunner's PUNT_TO_CROWD case always declines, 0 rng.
@@ -1830,6 +1838,23 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         | PlayerAction::ViciousVines | PlayerAction::Chomp
         | PlayerAction::Incorporeal | PlayerAction::Forgo => PlayerActionChoice::Move,
     }
+}
+
+/// §Q2.6: index of the LAST die rolled for `target` in the shown multi-block dialog (attacker's
+/// DialogReRollBlockForTargetsProperties or defender's DialogOpponentBlockSelectionProperties);
+/// 0 when no dialog/roll is found. ParityRunner's RE_ROLL_BLOCK_FOR_TARGETS / OPPONENT_BLOCK_SELECTION
+/// arms use the same `blockRoll.length - 1` under the coverage bias.
+fn last_block_die_index(game: &ffb_model::model::game::Game, target: &str) -> i32 {
+    use ffb_model::dialog::dialog_parameter_factory::DialogParameter;
+    let rolls = match &game.dialog_parameter {
+        Some(DialogParameter::ReRollBlockForTargetsProperties(p)) => &p.block_rolls,
+        Some(DialogParameter::OpponentBlockSelectionProperties(p)) => &p.block_rolls,
+        _ => return 0,
+    };
+    rolls.iter()
+        .find(|r| r.target_id.as_deref() == Some(target))
+        .and_then(|r| r.block_roll.as_ref())
+        .map_or(0, |dice| (dice.len() as i32 - 1).max(0))
 }
 
 #[cfg(test)]

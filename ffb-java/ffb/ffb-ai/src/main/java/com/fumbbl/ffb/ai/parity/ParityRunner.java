@@ -1543,6 +1543,7 @@ public class ParityRunner {
                 // supertype with BlockRoll, so each dialog class is walked in its own branch.
                 String obsTargetId = null;
                 String obsTeamId = null;
+                int obsDie = 0;
                 if (dialog instanceof com.fumbbl.ffb.dialog.DialogOpponentBlockSelectionParameter) {
                     com.fumbbl.ffb.dialog.DialogOpponentBlockSelectionParameter ob =
                         (com.fumbbl.ffb.dialog.DialogOpponentBlockSelectionParameter) dialog;
@@ -1555,13 +1556,17 @@ public class ParityRunner {
                         (com.fumbbl.ffb.dialog.DialogOpponentBlockSelectionPropertiesParameter) dialog;
                     obsTeamId = ob.getTeamId();
                     for (com.fumbbl.ffb.model.BlockRollProperties roll : ob.getBlockRolls()) {
-                        if (roll.needsSelection()) { obsTargetId = roll.getTargetId(); break; }
+                        if (roll.needsSelection()) {
+                            obsTargetId = roll.getTargetId();
+                            obsDie = lastDieUnderCoverageBias(roll.getBlockRoll());
+                            break;
+                        }
                     }
                 }
                 if (obsTargetId != null) {
                     com.fumbbl.ffb.net.commands.ClientCommandBlockOrReRollChoiceForTarget obsCmd =
                         new com.fumbbl.ffb.net.commands.ClientCommandBlockOrReRollChoiceForTarget(
-                            obsTargetId, 0, -1, null);
+                            obsTargetId, obsDie, -1, null);
                     if (obsTeamId != null) {
                         MatchRunner.injectForTeam(gameState, obsCmd,
                             obsTeamId.equals(game.getTeamHome().getId()));
@@ -1611,13 +1616,18 @@ public class ParityRunner {
                     com.fumbbl.ffb.dialog.DialogReRollBlockForTargetsPropertiesParameter bp =
                         (com.fumbbl.ffb.dialog.DialogReRollBlockForTargetsPropertiesParameter) dialog;
                     String pickTarget = null;
+                    int pickDie = 0;
                     for (com.fumbbl.ffb.model.BlockRollProperties roll : bp.getBlockRolls()) {
-                        if (roll.needsSelection()) { pickTarget = roll.getTargetId(); break; }
+                        if (roll.needsSelection()) {
+                            pickTarget = roll.getTargetId();
+                            pickDie = lastDieUnderCoverageBias(roll.getBlockRoll());
+                            break;
+                        }
                     }
                     if (pickTarget != null) {
                         MatchRunner.inject(gameState,
                             new com.fumbbl.ffb.net.commands.ClientCommandBlockOrReRollChoiceForTarget(
-                                pickTarget, 0, -1, null));
+                                pickTarget, pickDie, -1, null));
                     } else {
                         game.setDialogParameter(null);
                     }
@@ -2475,6 +2485,14 @@ public class ParityRunner {
             }
         }
         return "?," + currentMove + actingDetail(actingPlayer);
+    }
+
+    /** §Q2.6: under --coverage-bias the multi-block die is the LAST one rolled (bb2025 Properties
+     *  dialogs only -- Rust auto-selects die 0 where it shows no dialog); 0 otherwise.
+     *  Mirrors random_agent.rs::last_block_die_index. */
+    private static int lastDieUnderCoverageBias(int[] blockRoll) {
+        if (com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS <= 0.0f || blockRoll == null) return 0;
+        return Math.max(0, blockRoll.length - 1);
     }
 
     /** §Q1.3: `x,y,moving` of the bomb, `-` when there is none. Must match state_hash.rs::bomb_part. */
