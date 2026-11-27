@@ -142,6 +142,13 @@ impl Step for StepInitThrowTeamMate {
                 }
                 self.execute_step(game)
             }
+            // Java CLIENT_ACTING_PLAYER with no player id: fEndPlayerAction = true, EXECUTE_STEP
+            // (same mapping as the bb2025 StepInitThrowTeamMate). It was missing, so a deselect
+            // while the step waited for a target fell to `next()` and skipped the end-action goto.
+            Action::Acknowledge => {
+                self.end_player_action = true;
+                self.execute_step(game)
+            }
             _ => StepOutcome::next(),
         }
     }
@@ -198,6 +205,21 @@ mod tests {
         let outcome = step.start(&mut game, &mut rng);
         assert!(matches!(outcome.action, StepAction::GotoLabel));
         assert!(outcome.published.iter().any(|p| matches!(p, StepParameter::EndTurn(true))));
+    }
+
+    #[test]
+    fn a_deselect_while_waiting_for_the_target_ends_the_player_action() {
+        // Java CLIENT_ACTING_PLAYER(null) -> fEndPlayerAction -> END_PLAYER_ACTION + goto label.
+        let mut step = StepInitThrowTeamMate::new();
+        step.set_parameter(&StepParameter::GotoLabelOnEnd("end".into()));
+        step.set_parameter(&StepParameter::ThrownPlayerId(Some("p1".into())));
+        let mut game = make_game();
+        add_player(&mut game, "p1");
+        let mut rng = GameRng::new(0);
+        step.start(&mut game, &mut rng);
+        let outcome = step.handle_command(&Action::Acknowledge, &mut game, &mut rng);
+        assert!(matches!(outcome.action, StepAction::GotoLabel));
+        assert!(outcome.published.iter().any(|p| matches!(p, StepParameter::EndPlayerAction(true))));
     }
 
     #[test]

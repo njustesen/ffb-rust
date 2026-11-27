@@ -3474,6 +3474,17 @@ public class ParityRunner {
         FieldCoordinate target = new FieldCoordinate(tx, ty);
         FieldCoordinate cmd = isHome ? target : target.transform();
         if (DEBUG) System.err.println("JAVA_TTM_TARGET pid=" + playerId + " target=(" + tx + "," + ty + ")");
+        // §Q1.2a: a target with no legal TTM passing distance leaves StepInitThrowTeamMate waiting
+        // (createRangeRuler == null), and re-sending it spun to STUCK_STEP (ogre bb2016 seed 73).
+        // Deselect instead -- CLIENT_ACTING_PLAYER(null) ends the player action, zero draws.
+        // random_agent.rs's ThrowTeamMateTarget arm makes the same check.
+        com.fumbbl.ffb.mechanics.PassMechanic passMechanic = (com.fumbbl.ffb.mechanics.PassMechanic)
+            game.getRules().getFactory(com.fumbbl.ffb.FactoryType.Factory.MECHANIC)
+                .forName(com.fumbbl.ffb.mechanics.Mechanic.Type.PASS.name());
+        if (passMechanic.findPassingDistance(game, coord, target, true) == null) {
+            MatchRunner.inject(gameState, new ClientCommandActingPlayer(null, null, false));
+            return;
+        }
         MatchRunner.inject(gameState,
             new com.fumbbl.ffb.net.commands.ClientCommandThrowTeamMate(playerId, cmd));
     }

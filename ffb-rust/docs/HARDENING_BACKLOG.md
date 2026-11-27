@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q2.9a** (punt-to-crowd loop), then Q1.2a/b, Q1.3.
+Next item: **Q1.2b** (stuck CATCH_SCATTER_THROW_IN), then Q1.2c, Q1.3.
 Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q2.5). Last certified build: cert9 (`docs/cert_manifest.json`); last view build: view15.
 
 ## Ground rules (every item)
@@ -18,7 +18,9 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
 - Dice order is sacred: no change may add, drop or reorder an RNG call on the default path.
 - Gate every change: `cargo test --workspace` green, then the item's own gate (below), then the
   standing smoke gate (`ffb-parity --home human --away human --edition bb2025 --tier 3 --agent heuristic
-  --seeds 1-20` and the same for bb2020/bb2016 with a mixed squad) steps + reports identical.
+  --heur-classes all --seeds 1-20 --no-abort`, plus bb2020 orc-skaven and bb2016 dwarf-elf at
+  `--heur-scale 1.0`) steps + reports identical. **Always pass `--heur-classes all`**: it is what every
+  cert suite runs; without it the heuristic runs with no classes (a config no suite certifies).
 - Freeze the exe (`target/release/deps/ffb_parity.exe` → `D:/ffb_star/bin/ffb-parity-qN.exe`) and the jar
   for any suite run. Never two runs of the same edition+matchup at once.
 - Heavy suites (mirror 330 / cross 4,012 / star 4,012) only 21:00–07:00, pinned to ≤70 % of the cores
@@ -46,8 +48,16 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
   JAVA-CRASH, not as a pass). `DIALOG_LOOP_CLEARED` is a red. Fix `cert_tally.py` to count them.
   Done: the 7 known aborts and 8 loop-clears from cert9 are each classified (Java defect or Rust/harness
   bug fixed).
-- [ ] **Q1.2a Stuck step: bb2016 ogre mirror** (scale 0): Java `STUCK_STEP: INIT_THROW_TEAM_MATE`
-  (`mirror_cert9/scratch/sw_ogre_bb2016_0.log.err`). Find the seed, root-cause on both sides, fix 1:1.
+- [x] **Q1.2a Stuck step: bb2016 ogre mirror** (seed 73, scale 0): both agents' TTM target rule
+  (thrower ±3 squares, clamped) produced a square with no TTM passing distance; StepInitThrowTeamMate
+  waits for another command in both engines, the harness re-sent the same square → STUCK_STEP / no_prompt.
+  Fix: both agents deselect (CLIENT_ACTING_PLAYER null = Action::Acknowledge) when the target is out of
+  range; Rust bb2016 StepInitThrowTeamMate gained Java's missing deselect → END_PLAYER_ACTION branch (+test).
+  ogre bb2016/bb2020/bb2025 scale 0 100/100 each, goblin-underworld bb2016 30/30.
+- [ ] **Q1.2c classes=none divergences** (found while checking Q1.2a): ogre bb2016 scale 0 *without*
+  `--heur-classes` diverges on seeds 7, 18, 30, 82 (Java activates a FOUL whose step changes nothing,
+  Rust a Move; reports differ). Same with the frozen cert9 exe+jar, so it is old. Not a certified config,
+  but a real Java/Rust agent-contract difference: root-cause and fix.
 - [ ] **Q1.2b Stuck step: underworld_37844 vs dark_elf bb2025** (cross): Java
   `STUCK_STEP: CATCH_SCATTER_THROW_IN` (`cross_cert9/scratch/cw_underworld_37844_vs_dark_elf_bb2025.log.err:536`).
 - [ ] **Q1.3 Wider state hash.** Add to BOTH `ffb-model/src/util/state_hash.rs` and
@@ -90,7 +100,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 - [ ] **Q2.5b Swarming placement** (remove the engine's hard-coded "place nobody" in
   `bb2025/kickoff/step_swarming.rs`, ask the agent as Java asks the client; both harnesses place
   swarmers with seeded draws).
-- [ ] **Q2.9a PUNT_TO_CROWD loop** (dark_elf bb2025, 8 loop clears in cert9): the harness DOES answer
+- [x] **Q2.9a PUNT_TO_CROWD loop** — does not reproduce on head: dark_elf bb2025 scales 0 and 1.0
+  seeds 1-100 and 1e6 seed 14 all `loops_cleared 0`, 100/100 (fixed between cert9 and head). Original: (dark_elf bb2025, 8 loop clears in cert9): the harness DOES answer
   `sendPuntToCrowd(false)`, yet the dialog re-fires; find why in Java `StepInitPunt` and fix the harness
   answer (or Rust, if Rust differs). Seeds: `mirror_cert9/scratch/sw_dark_elf_bb2025_*.log.err`.
 - [ ] **Q2.6 Multiple Block / block dice:** choose by value, use Pro / Consummate / single-die re-rolls.
@@ -175,6 +186,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q1.2a · (next commit) · out-of-range TTM target → both agents deselect; bb2016
+  StepInitThrowTeamMate deselect branch ported; ogre ×3 editions 100/100. Q2.9a closed (no repro on head).
 - 2026-11-27 · Q2.5a · (next commit) · harness clears the Swarming dialog at once (was a 500× loop on
   an ignored CONFIRM); snotling bb2020 + bb2025 20/20, loops_cleared 0.
 - 2026-11-27 · Q1.2 · (next commit) · end_reason/loops_cleared in both logs; aborts fail; cert9 aborts

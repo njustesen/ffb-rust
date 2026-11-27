@@ -950,8 +950,30 @@ impl Agent for RandomAgent {
                 let target = gs.game.field_model.player_coordinate(thrower_id)
                     .map(|c| FieldCoordinate::new((c.x + dir * 3).clamp(0, 25), c.y.clamp(0, 14)))
                     .unwrap_or(FieldCoordinate::new(0, 0));
-                let cmd_coord = if is_home { target } else { target.transform() };
-                Action::ThrowTeamMate { player_id: thrown_player_id.clone(), coord: cmd_coord }
+                // §Q1.2a: a target with no legal TTM passing distance makes StepInitThrowTeamMate wait
+                // for another command (Java and Rust alike), and re-sending the same square spins
+                // forever (ogre bb2016 seed 73: STUCK_STEP). Deselect instead -- Java's
+                // ClientCommandActingPlayer(null) = Action::Acknowledge, zero draws; ParityRunner
+                // .sendThrowTeamMateTarget makes the same check with the edition's PassMechanic.
+                let thrower_coord = gs.game.field_model.player_coordinate(thrower_id);
+                let in_range = match gs.game.rules {
+                    ffb_model::enums::Rules::Bb2016 => {
+                        use ffb_mechanics::pass_mechanic::PassMechanic as _;
+                        ffb_mechanics::bb2016::pass_mechanic::PassMechanic::new()
+                            .find_passing_distance(&gs.game, thrower_coord, Some(target), true).is_some()
+                    }
+                    _ => {
+                        use ffb_mechanics::pass_mechanic::PassMechanic as _;
+                        ffb_mechanics::bb2025::pass_mechanic::PassMechanic::new()
+                            .find_passing_distance(&gs.game, thrower_coord, Some(target), true).is_some()
+                    }
+                };
+                if !in_range {
+                    Action::Acknowledge
+                } else {
+                    let cmd_coord = if is_home { target } else { target.transform() };
+                    Action::ThrowTeamMate { player_id: thrown_player_id.clone(), coord: cmd_coord }
+                }
             }
             // Swoop target (BB2016/BB2020): Java's mixed StepSwoop offers the (at most four)
             // orthogonally adjacent squares and WAITS for a CLIENT_SWOOP naming one — there is no
