@@ -647,10 +647,12 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     let mut stall: (String, u64, Option<std::mem::Discriminant<AgentPrompt>>) =
         (String::new(), 0, None);
     let mut stall_count = 0u32;
+    // Why the loop ended, written to the game_end line (§Q1.2): only "finished" is a played game.
+    let mut end_reason = "max_iterations";
 
     for _ in 0..max_iters {
-        if engine.is_finished() { break; }
-        if engine.current_prompt().is_none() { break; }
+        if engine.is_finished() { end_reason = "finished"; break; }
+        if engine.current_prompt().is_none() { end_reason = "no_prompt"; break; }
 
         // Mirror of `ParityRunner.resetCurrentTeam`'s non-settable branch (§H.30). Java's
         // `SetupMechanic.checkSetup` counts `playersOnField` purely by COORDINATE, so an injured
@@ -751,6 +753,7 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
                      50 iterations with unchanged hash={} rng_calls={} prompt={:?} — aborting game",
                     probe.0, probe.1, engine.current_prompt()
                 );
+                end_reason = "stalled";
                 break;
             }
         } else {
@@ -786,6 +789,7 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
             Ok(evs) => all_events.extend(evs),
             Err(e) => {
                 log::warn!("engine error at seed {seed}: {e}");
+                end_reason = "engine_error";
                 break;
             }
         }
@@ -862,11 +866,15 @@ pub fn run_rust_headless(seed: u64, home_roster: &str, away_roster: &str, editio
     if std::env::var_os("FFB_TRACE").is_some() {
         eprintln!("RUST_END state={}", state_string(&engine.game));
     }
+    // The loop can also exit on its first check after the engine finished during the last apply.
+    if engine.is_finished() { end_reason = "finished"; }
     lines.push(LogLine::GameEnd {
         i: step_index,
         home_score: score_home,
         away_score: score_away,
         state_hash: end_hash,
+        end_reason: Some(end_reason.to_string()),
+        loops_cleared: None,
     });
 
     // Write step log to disk
@@ -2719,6 +2727,8 @@ pub fn run_bench_game(
             home_score: engine.game.game_result.home.score,
             away_score: engine.game.game_result.away.score,
             state_hash: end_hash,
+            end_reason: None,
+            loops_cleared: None,
         });
         t.log_ns += log_t0.elapsed().as_nanos();
     }

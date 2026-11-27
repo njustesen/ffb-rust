@@ -8,7 +8,8 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q1.2** (Q1.1 code done, its mirror 330 run is queued for the night). Last certified build: cert9 (`docs/cert_manifest.json`); last view build: view15.
+Next item: **Q2.5** (Swarming; it turns ~160 cert gates red under Q1.2), then Q1.2a/b, Q1.3.
+Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q2.5). Last certified build: cert9 (`docs/cert_manifest.json`); last view build: view15.
 
 ## Ground rules (every item)
 - Java (`ffb-java/ffb/`) is the oracle. Fix Rust only. The harness (`ParityRunner.java`, `ffb-ai`) may be
@@ -35,11 +36,20 @@ Next item: **Q1.2** (Q1.1 code done, its mirror 330 run is queued for the night)
   `state_hash`/turn/half/active mismatch AND on a step-count mismatch, not only on the final hash.
   Keep the final-hash check. Done: unit tests for converge-after-diverge and extra-step cases; smoke gate
   green; mirror 330 re-run green (night).
-- [ ] **Q1.2 Abort = red.** Parse `END_REASON` on both sides; anything other than `finished` is a red
+- [x] **Q1.2 Abort = red.** (see Log) `game_end` now carries `end_reason` (+ Java `loops_cleared`);
+  any non-`finished` end or a cleared dialog loop fails the game; Java exceptions print as JAVA-CRASH.
+  cert9 classification (3 suites): SWARMING loop clears 3,106 (harness has no Swarming answer → Q2.5,
+  every snotling/swarming game is now red until then), PUNT_TO_CROWD loop clears 8 (harness gap →
+  Q2.9), java_crash 5 (JD-002 `armorRoll` null, stock Java), stuck_step 2 → Q1.2a, Q1.2b.
+  **Q2.5 and Q2.9 (punt) must land before Q1.7.** Original text: Parse `END_REASON` on both sides; anything other than `finished` is a red
   unless it is a known Java crash recorded in `docs/JAVA_DEFECTS.md` (then reported separately as
   JAVA-CRASH, not as a pass). `DIALOG_LOOP_CLEARED` is a red. Fix `cert_tally.py` to count them.
   Done: the 7 known aborts and 8 loop-clears from cert9 are each classified (Java defect or Rust/harness
   bug fixed).
+- [ ] **Q1.2a Stuck step: bb2016 ogre mirror** (scale 0): Java `STUCK_STEP: INIT_THROW_TEAM_MATE`
+  (`mirror_cert9/scratch/sw_ogre_bb2016_0.log.err`). Find the seed, root-cause on both sides, fix 1:1.
+- [ ] **Q1.2b Stuck step: underworld_37844 vs dark_elf bb2025** (cross): Java
+  `STUCK_STEP: CATCH_SCATTER_THROW_IN` (`cross_cert9/scratch/cw_underworld_37844_vs_dark_elf_bb2025.log.err:536`).
 - [ ] **Q1.3 Wider state hash.** Add to BOTH `ffb-model/src/util/state_hash.rs` and
   `ParityRunner.java` (same string format): PA; full player state incl. flags (rooted, confused,
   hypnotised, used-Pro, …) and the exact off-pitch state (banned, KO, BH, SI, RIP, missing, …);
@@ -158,5 +168,7 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q1.2 · (next commit) · end_reason/loops_cleared in both logs; aborts fail; cert9 aborts
+  classified; snotling bb2025 seeds 1-3 now fail (4 Swarming loop clears each); smoke 3×20 green.
 - 2026-11-27 · Q1.1 · (this commit) · verdict now fails on any per-step hash/post-hash/turn/half/active
   difference, a step-count difference or a different start state; 5 unit tests; smoke 3×20 green.

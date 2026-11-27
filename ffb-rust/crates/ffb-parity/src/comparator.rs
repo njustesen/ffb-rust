@@ -12,9 +12,17 @@ pub struct CompareResult {
     pub rust_event_count: usize,
     pub java_hash: String,
     pub rust_hash: String,
+    /// Set when either game did not end normally (§Q1.2): e.g. "java java_crash", "rust stalled",
+    /// "java cleared 2 dialog loop(s)". An aborted game never counts as a match.
+    pub abort: Option<String>,
 }
 
 impl CompareResult {
+    /// The abort was a Java engine exception (a stock-Java defect, `docs/JAVA_DEFECTS.md`).
+    pub fn is_java_crash(&self) -> bool {
+        self.abort.as_deref().map_or(false, |a| a.contains("java_crash"))
+    }
+
     /// A Rust panic is a parity divergence: Java played the game, Rust could not. `main` records the
     /// seed with this so the sweep keeps running and the summary counts it, instead of the process
     /// aborting and leaving a "PARITY FAIL"-counting caller to read zero failures as success.
@@ -28,6 +36,7 @@ impl CompareResult {
             rust_event_count: 0,
             java_hash: String::new(),
             rust_hash: format!("<rust panicked: {msg}>"),
+            abort: Some("rust panic".into()),
         }
     }
 }
@@ -85,12 +94,14 @@ pub fn compare_lines(java_lines: &[LogLine], rust_lines: &[LogLine]) -> CompareR
         _ => None,
     });
     let starts_agree = start_hash(java_lines) == start_hash(rust_lines);
+    let abort = abort_reason(java_lines, rust_lines);
 
     if first_step_diff.is_none()
         && java_steps.len() == rust_steps.len()
         && starts_agree
         && !java_hash.is_empty()
         && java_hash == rust_hash
+        && abort.is_none()
     {
         let n = java_lines.len();
         return CompareResult {
@@ -102,6 +113,7 @@ pub fn compare_lines(java_lines: &[LogLine], rust_lines: &[LogLine]) -> CompareR
             rust_event_count: rust_lines.len(),
             java_hash,
             rust_hash,
+            abort: None,
         };
     }
 
@@ -127,7 +139,26 @@ pub fn compare_lines(java_lines: &[LogLine], rust_lines: &[LogLine]) -> CompareR
         rust_event_count: rust_lines.len(),
         java_hash,
         rust_hash,
+        abort,
     }
+}
+
+/// Why a game is an abort rather than a played game, or None. A log without `end_reason`
+/// (written before §Q1.2) is not judged on it.
+fn abort_reason(java_lines: &[LogLine], rust_lines: &[LogLine]) -> Option<String> {
+    let end = |lines: &[LogLine]| lines.iter().rev().find_map(|l| match l {
+        LogLine::GameEnd { end_reason, loops_cleared, .. } => Some((end_reason.clone(), *loops_cleared)),
+        _ => None,
+    });
+    let mut why = Vec::new();
+    if let Some((reason, loops)) = end(java_lines) {
+        if let Some(r) = reason.filter(|r| r != "finished") { why.push(format!("java {r}")); }
+        if let Some(n) = loops.filter(|&n| n > 0) { why.push(format!("java cleared {n} dialog loop(s)")); }
+    }
+    if let Some((reason, _)) = end(rust_lines) {
+        if let Some(r) = reason.filter(|r| r != "finished") { why.push(format!("rust {r}")); }
+    }
+    if why.is_empty() { None } else { Some(why.join(", ")) }
 }
 
 fn steps_differ(a: &LogLine, b: &LogLine) -> bool {
@@ -153,6 +184,7 @@ fn failure(java_count: usize, rust_count: usize, java_hash: String, rust_hash: S
         rust_event_count: rust_count,
         java_hash,
         rust_hash,
+        abort: None,
     }
 }
 
@@ -170,7 +202,36 @@ mod tests {
         }
     }
     fn end(h: &str) -> LogLine {
-        LogLine::GameEnd { i: 9, home_score: 0, away_score: 0, state_hash: h.into() }
+        end_with(h, Some("finished"), None)
+    }
+    fn end_with(h: &str, reason: Option<&str>, loops: Option<u32>) -> LogLine {
+        LogLine::GameEnd { i: 9, home_score: 0, away_score: 0, state_hash: h.into(),
+            end_reason: reason.map(Into::into), loops_cleared: loops }
+    }
+
+    #[test]
+    fn an_aborted_game_fails_even_when_both_sides_agree() {
+        let java = vec![start("s"), step(1, "a", "b"), end_with("b", Some("stuck_step"), Some(0))];
+        let rust = vec![start("s"), step(1, "a", "b"), end_with("b", Some("stalled"), None)];
+        let r = compare_lines(&java, &rust);
+        assert!(!r.matches);
+        assert_eq!(r.abort.as_deref(), Some("java stuck_step, rust stalled"));
+    }
+
+    #[test]
+    fn a_cleared_dialog_loop_fails_and_a_java_crash_is_named() {
+        let log = vec![start("s"), step(1, "a", "b"), end_with("b", Some("finished"), Some(2))];
+        let r = compare_lines(&log, &vec![start("s"), step(1, "a", "b"), end("b")]);
+        assert!(!r.matches);
+        let java = vec![start("s"), step(1, "a", "b"), end_with("b", Some("java_crash"), Some(0))];
+        let rust = vec![start("s"), step(1, "a", "b"), end_with("b", Some("stalled"), None)];
+        assert!(compare_lines(&java, &rust).is_java_crash());
+    }
+
+    #[test]
+    fn old_logs_without_an_end_reason_are_not_judged_on_it() {
+        let log = vec![start("s"), step(1, "a", "b"), end_with("b", None, None)];
+        assert!(compare_lines(&log, &log.clone()).matches);
     }
 
     #[test]

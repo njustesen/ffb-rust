@@ -33,6 +33,14 @@ pub enum LogLine {
         home_score: i32,
         away_score: i32,
         state_hash: String,
+        /// Why the game loop ended (§Q1.2): "finished" for a played game; anything else
+        /// ("stuck_step", "java_crash", "stalled", "no_prompt", "max_iterations", ...) is an abort.
+        /// Absent in logs written before §Q1.2.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        end_reason: Option<String>,
+        /// Java only: how many times the harness cleared a dialog that repeated 500 times.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        loops_cleared: Option<u32>,
     },
 }
 
@@ -234,6 +242,8 @@ mod tests {
             home_score: 2,
             away_score: 1,
             state_hash: "0000000000000000".into(),
+            end_reason: Some("finished".into()),
+            loops_cleared: Some(0),
         };
         let json = serde_json::to_string(&line).unwrap();
         assert!(json.contains("\"type\":\"game_end\""));
@@ -244,7 +254,8 @@ mod tests {
     #[test]
     fn final_hash_returns_last_game_end_hash() {
         let lines = vec![
-            LogLine::GameEnd { i: 0, home_score: 1, away_score: 0, state_hash: "aabb".into() },
+            LogLine::GameEnd { i: 0, home_score: 1, away_score: 0, state_hash: "aabb".into(),
+                end_reason: None, loops_cleared: None },
         ];
         assert_eq!(GameLog::final_hash(&lines), Some("aabb"));
     }

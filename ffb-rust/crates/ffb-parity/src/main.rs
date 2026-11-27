@@ -672,6 +672,7 @@ fn main() {
     println!("TIMING java_total={:.3}s (batched JVM, {total} seeds)", java_total.as_secs_f64());
     let mut rust_total = std::time::Duration::ZERO;
     let mut rust_panics = 0usize;
+    let mut java_crashes = 0usize;
     // Report-level verdict (report_compare.rs): advisory, printed next to PARITY, never folded in.
     let mut reports_identical = 0usize;
     let mut reports_differ = 0usize;
@@ -747,6 +748,12 @@ fn main() {
             );
             eprintln!("  java_hash={}", result.java_hash);
             eprintln!("  rust_hash={}", result.rust_hash);
+            if let Some(abort) = &result.abort {
+                // §Q1.2: an aborted game is never a pass. A stock-Java exception is named
+                // JAVA-CRASH so it can be told apart from a Rust/harness defect.
+                if result.is_java_crash() { java_crashes += 1; }
+                eprintln!("  ABORT{}: {abort}", if result.is_java_crash() { " (JAVA-CRASH)" } else { "" });
+            }
             if !args.no_abort {
                 println!("TIMING java_total={:.3}s rust_total={:.3}s (aborted at seed {seed})",
                     java_total.as_secs_f64(), rust_total.as_secs_f64());
@@ -784,11 +791,14 @@ fn main() {
     // ALWAYS emit a verdict line naming how many games were actually COMPARED, and always name
     // panics separately. Counting the absence of "PARITY FAIL" lines cannot distinguish "all
     // passed" from "nothing ran"; this line can, because `passed + failed` is the games compared.
-    let panic_note = if rust_panics > 0 {
+    let mut panic_note = if rust_panics > 0 {
         format!(" [{rust_panics} RUST PANIC(S) — counted as failures]")
     } else {
         String::new()
     };
+    if java_crashes > 0 {
+        panic_note.push_str(&format!(" [{java_crashes} JAVA-CRASH(ES) — stock Java defects, counted as failures]"));
+    }
 
     // The verdict ALWAYS goes to stdout, whatever it says. It used to go to stdout when green and
     // stderr when red, so any harness reading a single stream saw a passing gate as "no verdict"

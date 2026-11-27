@@ -403,6 +403,8 @@ public class ParityRunner {
         StepId lastStepId = null;
         int sameStepNoDialogCount = 0;
         String endReason = "finished";
+        // §Q1.2: written to the game_end line; a cleared dialog loop makes the game an abort.
+        int loopsCleared = 0;
         while (game.getFinished() == null && ++iter < MAX_ITERATIONS) {
             IStep step = gameState.getCurrentStep();
             if (step == null) { endReason = "step_stack_empty"; break; }
@@ -423,6 +425,7 @@ public class ParityRunner {
                         System.err.println("DIALOG_LOOP_CLEARED: " + dialog.getId()
                             + " at step " + stepId + " half=" + game.getHalf());
                         game.setDialogParameter(null);
+                        loopsCleared++;
                         sameDialogCount = 0; lastDialogId = null; continue;
                     }
                 } else { lastDialogId = dialog.getId(); sameDialogCount = 1; }
@@ -493,8 +496,9 @@ public class ParityRunner {
         int scoreAway = game.getGameResult().getScoreAway();
         if (System.getenv("FFB_TRACE") != null) { System.err.println("JAVA_END state=" + stateString(game)); }
         out.println(String.format(
-            "{\"i\":%d,\"type\":\"game_end\",\"home_score\":%d,\"away_score\":%d,\"state_hash\":\"%s\"}",
-            stepIndex, scoreHome, scoreAway, endHash));
+            "{\"i\":%d,\"type\":\"game_end\",\"home_score\":%d,\"away_score\":%d,\"state_hash\":\"%s\","
+            + "\"end_reason\":\"%s\",\"loops_cleared\":%d}",
+            stepIndex, scoreHome, scoreAway, endHash, endReason, loopsCleared));
     }
 
     /**
