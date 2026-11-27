@@ -30,9 +30,11 @@ use ffb_mechanics::modifiers::dodge_context::DodgeContext;
 ///          USING_DIVING_TACKLE, RE_ROLL_USED published by preceding steps.
 ///
 /// standFirmNoDropOnFailedDodge game option → wired (NEXT_STEP + EndPlayerAction instead of failDodge).
-/// client-only: Break-Tackle dialog (canAddStrengthToDodge) — headless auto-skips strength bonus offer.
-/// client-only: Diving Tackle pre-roll dialog — headless auto-skips diving tackle activation.
-/// client-only: Arm-Bar choice dialog — headless skips arm-bar activation.
+/// Java bb2016 StepMoveDodge handles no command of its own (only AbstractStepWithReRoll's): Break
+/// Tackle is applied automatically by the strength dodge modifier (see `dodge`, no dialog), Diving
+/// Tackle is its own step (StepDivingTackle -> RETRY_DODGE), and Arm Bar does not exist in bb2016
+/// (`skill/mixed/ArmBar` is BB2020/BB2025 only). §Q3.5: the old "headless skips" notes here were
+/// stale, not gaps.
 pub struct StepMoveDodge {
     /// Java: fGotoLabelOnFailure
     pub goto_label_on_failure: String,
@@ -89,8 +91,7 @@ impl Step for StepMoveDodge {
                 self.re_roll_state.re_roll_source = None;
                 self.execute_step(game, rng)
             }
-            // client-only: canAddStrengthToDodge (BreakTackle) — skill use dialog skipped in headless
-            // client-only: CLIENT_PLAYER_CHOICE ARM_BAR mode — defender uses arm bar via dialog; headless skips
+            // Java bb2016: no Break Tackle dialog and no Arm Bar (not a bb2016 skill).
             _ => self.execute_step(game, rng),
         }
     }
@@ -361,7 +362,6 @@ impl StepMoveDodge {
         // bb2016 has no Steady Footing; its StepFallDown reads INJURY_TYPE only. Publishing a
         // SteadyFootingContext left StepFallDown on its default InjuryTypeDropGFI, so every failed
         // bb2016 dodge was reported as `dropGfi`.
-        // client-only: Arm-Bar dialog can override injuryType to InjuryTypeArmBar — headless uses default injury type
         let label = self.goto_label_on_failure.clone();
         StepOutcome::goto(&label)
             .publish(StepParameter::InjuryTypeName("InjuryTypeDropDodge".into()))

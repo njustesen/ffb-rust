@@ -38,9 +38,10 @@ use ffb_model::types::FieldCoordinate;
 /// BB2016's JumpModifierCollection is empty, but `super.findModifiers` still supplies the
 /// player's own registered modifiers -- `bb2016.VeryLongLegs` registers a REGULAR -1.
 /// BB2016 agility_with_modifiers() == agility (no stat-injury pipeline yet).
-/// no-op: DivingTackle executeStepHooks skipped in headless (SkillBehaviour registry not ported).
+/// The only bb2016 behaviour hooked into StepJump is `skillbehaviour/bb2016/LeapBehaviour`, which
+/// this step inlines; bb2016's DivingTackleBehaviour hooks StepDivingTackle only, so there is no
+/// Diving Tackle on a leap in bb2016 (§Q3.5: the old "skipped in headless" note was stale).
 /// canStillJump: wired via BB2016 JumpMechanic.
-/// client-only: checkDivingTackle dialog — headless auto-skips diving tackle activation.
 pub struct StepJump {
     /// Java: StepState.goToLabelOnFailure
     pub goto_label_on_failure: String,
@@ -75,7 +76,6 @@ impl Step for StepJump {
         if let Action::UseReRoll { use_reroll: false } = action {
             self.re_roll_state.re_roll_source = None;
         }
-        // client-only: CLIENT_PLAYER_CHOICE DIVING_TACKLE mode — headless never receives this
         self.execute_step(game, rng)
     }
 

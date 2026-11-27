@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q3.5** bb2016 dodge/leap hooks. Q3.3a (card play) waits for another session's
+Next item: **Q3.6** bb2020 `is_wisdom_available` + bb2025 grantable-skill check. Q3.3a (card play) waits for another session's
 uncommitted card-model work (see Q3.3a); Q3.3b (card draw) is [!] with a question for the user.
 Then Q3.6, Q2.8's stars / mercenaries / staff. Gate shape for purchases: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`.
 Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
@@ -239,8 +239,10 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   already ported (`handle_solid_defence_bb2025`, Java's DialogPlayerChoiceParameter + validSolidDefence);
   the "DEVIATION" comments sat in the bb2016/bb2020 path, where Java itself does a free re-setup. Stale
   comments corrected (see Log).
-- [ ] **Q3.5 bb2016 dodge/leap hooks:** Break Tackle and Arm Bar on dodge (`step_move_dodge.rs:91`),
-  Diving Tackle on Leap (`step_jump.rs:41`).
+- [x] **Q3.5 bb2016 dodge/leap hooks** — review false positive: Java bb2016 StepMoveDodge handles no
+  command of its own and applies Break Tackle automatically (already ported, no dialog); Arm Bar is
+  `skill/mixed/ArmBar` = BB2020/BB2025 only; the only bb2016 StepJump hook is LeapBehaviour (inlined),
+  bb2016 DivingTackleBehaviour hooks StepDivingTackle only. Stale comments corrected (see Log).
 - [ ] **Q3.6 bb2020 `is_wisdom_available`** (`ffb-mechanics/src/bb2020/game_mechanic.rs:152`) and the
   bb2025 grantable-skill check (`bb2025/game_mechanic.rs:167`).
 - [ ] **Q3.7 Approximations:** Riotous Rookies shuffle (`bb2025/game_mechanic.rs:80`), bb2016
@@ -297,6 +299,10 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q3.5 · (this commit) · review false positive: bb2016 has no Arm Bar, Break Tackle is
+  automatic and ported, Leap has no Diving Tackle hook in Java bb2016; stale "headless skips" comments
+  in bb2016 step_move_dodge.rs / step_jump.rs rewritten. No code change.
 
 - 2026-11-27 · Q2.8 part 5c · 9094ec6a8 · bb2025 Throw a Rock use 1:1: StepThrowARock consumes the
   throwARock use + the THROW_A_ROCK prayer, picks the target with Collections.shuffle and rolls the
