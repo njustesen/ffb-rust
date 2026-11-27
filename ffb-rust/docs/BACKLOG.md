@@ -12406,3 +12406,12 @@ Next units, in order:
 > `<coach>`) and the rosters from `rosters/`. Then join-with-team → `serverUserSettings` + `serverJoin`,
 > second coach → `serverGameState` from `Game::to_json_value()` (+ `transform` for away). Note: AiMain
 > with an empty team list spams `clientActingPlayer` (harness quirk, not a server bug).
+
+
+## §Q — 2026-11-27: HARDENING — close the port review's missing pieces and validation holes (ACTIVE)
+
+The port review of 2026-11-27 found validation holes (final-hash-only verdict, narrow state hash, aborts
+counted green, client view outside the cert, replay parity is model-level only) and missing pieces
+(overtime, in-game inducements, cards, 33 undecoded client commands, ...). The ordered queue, ground
+rules and done-criteria live in [HARDENING_BACKLOG.md](HARDENING_BACKLOG.md); work it from its
+RESUME HERE pointer.
