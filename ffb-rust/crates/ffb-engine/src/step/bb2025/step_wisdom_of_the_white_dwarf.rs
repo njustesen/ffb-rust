@@ -38,12 +38,7 @@ use crate::step::framework::{StepId, StepParameter};
 /// Java: `Constant.getGrantAbleSkills` — the fixed set of skills Wisdom of the White Dwarf may
 /// grant, with an optional configured value (Mighty Blow carries value "1").
 pub(crate) fn grant_able_skills() -> Vec<(SkillId, Option<&'static str>)> {
-    vec![
-        (SkillId::BreakTackle, None),
-        (SkillId::Dauntless, None),
-        (SkillId::MightyBlow, Some("1")),
-        (SkillId::SureFeet, None),
-    ]
+    ffb_model::constant::grant_able_skills()
 }
 
 pub struct StepWisdomOfTheWhiteDwarf {

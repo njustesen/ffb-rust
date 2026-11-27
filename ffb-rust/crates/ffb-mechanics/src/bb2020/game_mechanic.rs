@@ -148,9 +148,21 @@ impl GameMechanicTrait for GameMechanic {
 
     fn players_for_go_activations(&self, _game: &Game) -> bool { false }
 
-    fn is_wisdom_available(&self, _game: &Game, _player: &Player) -> bool {
-        // TODO: UtilCards + NamedProperties + UtilPlayer
-        false
+    /// Java bb2020 `isWisdomAvailable`: the player RECEIVES -- it lacks one of the grantable
+    /// skills, and an adjacent team-mate with tackle zones holds an unused
+    /// canGrantSkillsToTeamMates skill (§Q3.6; this was `false`).
+    fn is_wisdom_available(&self, game: &Game, player: &Player) -> bool {
+        use ffb_model::model::property::named_properties::NamedProperties;
+        let can_gain_skill = ffb_model::constant::grant_able_skills().iter()
+            .any(|(skill, _)| !player.all_skill_ids().any(|owned| owned == *skill));
+        let Some(coord) = game.field_model.player_coordinate(&player.id) else { return false };
+        let team = if game.team_home.has_player(&player.id) { &game.team_home } else { &game.team_away };
+        can_gain_skill && ffb_model::util::util_player::UtilPlayer::find_adjacent_players_with_tacklezones(
+                game, team, coord, false)
+            .into_iter()
+            .any(|mate_id| game.player(mate_id).map(|mate|
+                mate.has_unused_skill_with_property(NamedProperties::CAN_GRANT_SKILLS_TO_TEAM_MATES))
+                .unwrap_or(false))
     }
 }
 

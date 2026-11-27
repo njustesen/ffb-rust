@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q3.6** bb2020 `is_wisdom_available` + bb2025 grantable-skill check. Q3.3a (card play) waits for another session's
+Next item: **Q3.7** approximations. Q3.3a (card play) waits for another session's
 uncommitted card-model work (see Q3.3a); Q3.3b (card draw) is [!] with a question for the user.
 Then Q3.6, Q2.8's stars / mercenaries / staff. Gate shape for purchases: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`.
 Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
@@ -243,8 +243,11 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   command of its own and applies Break Tackle automatically (already ported, no dialog); Arm Bar is
   `skill/mixed/ArmBar` = BB2020/BB2025 only; the only bb2016 StepJump hook is LeapBehaviour (inlined),
   bb2016 DivingTackleBehaviour hooks StepDivingTackle only. Stale comments corrected (see Log).
-- [ ] **Q3.6 bb2020 `is_wisdom_available`** (`ffb-mechanics/src/bb2020/game_mechanic.rs:152`) and the
-  bb2025 grantable-skill check (`bb2025/game_mechanic.rs:167`).
+- [x] **Q3.6 bb2020 `is_wisdom_available`** (`ffb-mechanics/src/bb2020/game_mechanic.rs:152`) and the
+  bb2025 grantable-skill check (`bb2025/game_mechanic.rs:167`). Both ported 1:1 with a new
+  `ffb_model::constant::grant_able_skills` (Java `Constant.getGrantAbleSkills`). The engine's live
+  check was already 1:1 (`legal_actions::is_wisdom_available`); the mechanic copies are only read by
+  the dead ffb-client crate, and a test now pins mechanic == legal_actions for both editions.
 - [ ] **Q3.7 Approximations:** Riotous Rookies shuffle (`bb2025/game_mechanic.rs:80`), bb2016
   `armour_is_broken` modifier total (`bb2016/stats_mechanic.rs:25`), `isValidMove` path validation
   (`step_init_moving.rs:79`), stalling rock-hit branch (`stalling_extension.rs:32,105`), Swoop hooks and
@@ -299,6 +302,11 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q3.6 · (this commit) · `ffb_model::constant` (Java Constant.getGrantAbleSkills);
+  bb2020 GameMechanic.isWisdomAvailable ported (was `false`), bb2025's gains the grantable-skill
+  test; the engine's Wisdom step reads the shared list. Test: mechanic == legal_actions for both
+  editions. Smoke 60/60, tests green.
 
 - 2026-11-27 · Q3.5 · (this commit) · review false positive: bb2016 has no Arm Bar, Break Tackle is
   automatic and ported, Leap has no Diving Tackle hook in Java bb2016; stale "headless skips" comments

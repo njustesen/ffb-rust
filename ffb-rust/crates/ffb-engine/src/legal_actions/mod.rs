@@ -2189,6 +2189,36 @@ mod tests {
         assert!(!is_wisdom_available(&game, "grombrindal"));
     }
 
+    /// §Q3.6: the `GameMechanic.isWisdomAvailable` ports in ffb-mechanics (bb2020 was a stub
+    /// `false`, bb2025 ignored the grantable skills) agree with this module's 1:1 port, per edition.
+    #[test]
+    fn mechanic_is_wisdom_available_matches_the_legal_actions_port() {
+        for rules in [Rules::Bb2020, Rules::Bb2025] {
+            // (granter skills, mate skills, mate square)
+            let cases: Vec<(Vec<SkillId>, Vec<SkillId>, (i32, i32))> = vec![
+                (vec![SkillId::WisdomOfTheWhiteDwarf], vec![], (6, 5)),
+                (vec![SkillId::WisdomOfTheWhiteDwarf], vec![], (7, 5)),
+                (vec![SkillId::WisdomOfTheWhiteDwarf], vec![SkillId::BreakTackle, SkillId::Dauntless,
+                    SkillId::MightyBlow, SkillId::SureFeet], (6, 5)),
+                (vec![], vec![], (6, 5)),
+            ];
+            for (granter, mate_skills, (x, y)) in cases {
+                let mut game = make_game(rules);
+                add_player(&mut game, true, "grombrindal", c(5, 5), PS_STANDING, granter.clone());
+                activate(&mut game, "grombrindal");
+                add_player(&mut game, true, "mate", c(x, y), PS_STANDING, mate_skills.clone());
+                activate(&mut game, "mate");
+                for id in ["grombrindal", "mate"] {
+                    let player = game.player(id).unwrap().clone();
+                    assert_eq!(
+                        crate::mechanic::game_mechanic_for(rules).is_wisdom_available(&game, &player),
+                        is_wisdom_available(&game, id),
+                        "{rules:?} {id} granter={granter:?} mate={mate_skills:?} at ({x},{y})");
+                }
+            }
+        }
+    }
+
     /// A team-mate that already owns every grantable skill cannot be a target, so the offer
     /// disappears even though the team-mate is adjacent and active.
     #[test]

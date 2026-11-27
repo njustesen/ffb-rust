@@ -164,12 +164,14 @@ impl GameMechanicTrait for GameMechanic {
         let is_home = game.team_home.has_player(&player.id);
         let team = if is_home { &game.team_home } else { &game.team_away };
         let team_mates = UtilPlayer::find_standing_or_prone_players(game, team, coord, 2);
-        // TODO: Constant.getGrantAbleSkills via SkillFactory — check that teammate lacks a grantable skill
-        // For now: return true if any active team-mate is present within 2 squares.
+        // Java: an active team-mate that lacks one of Constant.getGrantAbleSkills (§Q3.6: the
+        // grantable-skill half was missing, so a mate owning all four still counted).
+        let grantable = ffb_model::constant::grant_able_skills();
         team_mates.iter().any(|tm| {
             game.field_model.player_state(&tm.id)
                 .map(|s| s.is_active())
                 .unwrap_or(false)
+                && grantable.iter().any(|(skill, _)| !tm.all_skill_ids().any(|owned| owned == *skill))
         })
     }
 }
