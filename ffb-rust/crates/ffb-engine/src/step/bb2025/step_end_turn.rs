@@ -1256,6 +1256,13 @@ impl StepEndTurn {
             if ask {
                 self.remove_used_secret_weapons(game);
             }
+            // Java bb2020/bb2025 StepEndTurn: `getGameState().restoreWeather(fNewHalf || fTouchdown)`
+            // before the fainting / KO-recovery block (a Weather Mage's weather lasts one turn, or
+            // until the end of the drive). bb2016's StepEndTurn has no such call.
+            if game.rules != ffb_model::enums::Rules::Bb2016 {
+                crate::step::bb2025::inducements::step_weather_mage::restore_weather(
+                    game, self.new_half || touchdown);
+            }
             // Java StepEndTurn:489-495: `getFaintingCount` (the KO-recovery / fainting dice) and
             // `ReportTurnEnd` come BEFORE `deactivateEffectsAndPrayers` and
             // `removeReRollsLastingForDrive`; Rust ran them after, so the lost-re-roll reports

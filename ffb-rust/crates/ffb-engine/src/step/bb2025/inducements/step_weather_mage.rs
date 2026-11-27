@@ -42,16 +42,14 @@ impl Step for StepWeatherMage {
     fn handle_command(&mut self, action: &Action, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
         match action {
             Action::SelectWeather { weather } => {
-                // Java: CLIENT_SELECT_WEATHER — always reports Effect.CHANGED before
-                // applying the new weather (StepWeatherMage.handleCommand, case CLIENT_SELECT_WEATHER).
-                let old_weather = game.field_model.weather;
-                game.report_list.add(ReportWeatherMageResult::new(
-                    0,
-                    Some(weather.name().to_string()),
-                    Some(WeatherMageEffect::CHANGED),
-                    Some(old_weather.name().to_string()),
-                ));
-                game.field_model.weather = *weather;
+                // Java: CLIENT_SELECT_WEATHER -> `replaceWeather(weather, command.getModifier(),
+                // CHANGED)`. The client sends the modifier the dialog listed for that weather.
+                let modifier = match &game.dialog_parameter {
+                    Some(ffb_model::dialog::dialog_parameter_factory::DialogParameter::SelectWeather(p)) =>
+                        p.options.get(java_weather_constant(*weather)).copied().unwrap_or(0),
+                    _ => 0,
+                };
+                replace_weather_with_report(game, *weather, modifier, WeatherMageEffect::CHANGED);
                 StepOutcome::next()
             }
             Action::Acknowledge => StepOutcome::next(),
@@ -106,13 +104,8 @@ impl StepWeatherMage {
             Some(new_weather) => {
                 let old_weather = game.field_model.weather;
                 if new_weather != old_weather {
-                    game.field_model.weather = new_weather;
-                    game.report_list.add(ReportWeatherMageResult::new(
-                        0,
-                        Some(new_weather.name().to_string()),
-                        Some(WeatherMageEffect::NO_CHOICE),
-                        Some(old_weather.name().to_string()),
-                    ));
+                    // Java: `replaceWeather(newWeather, options.get(name) /* 0 */, NO_CHOICE)`.
+                    replace_weather_with_report(game, new_weather, 0, WeatherMageEffect::NO_CHOICE);
                 } else {
                     game.report_list.add(ReportWeatherMageResult::new(
                         0,
@@ -166,8 +159,47 @@ impl StepWeatherMage {
 /// Java: `StepWeatherMage.DIALOG_TITLE`.
 pub const DIALOG_TITLE: &str = "Weather Mage";
 
+/// Java `StepWeatherMage.replaceWeather(weather, modifier, effect)`: `GameState.replaceWeather`
+/// plus the result report, whose old weather is the one `replaceWeather` returns (the weather
+/// before the FIRST mage of the drive).
+fn replace_weather_with_report(game: &mut Game, weather: Weather, modifier: i32, effect: WeatherMageEffect) {
+    let old = replace_weather(game, weather);
+    game.report_list.add(ReportWeatherMageResult::new(
+        modifier,
+        Some(weather.name().to_string()),
+        Some(effect),
+        Some(old.name().to_string()),
+    ));
+}
+
+/// Java `GameState.replaceWeather(Weather)`: remember the original weather once, skip the next
+/// restore, set the new weather; returns the remembered original.
+pub fn replace_weather(game: &mut Game, weather: Weather) -> Weather {
+    if game.old_weather.is_none() {
+        game.old_weather = Some(game.field_model.weather);
+    }
+    game.skip_restore_weather = true;
+    game.field_model.weather = weather;
+    game.old_weather.unwrap_or(weather)
+}
+
+/// Java `GameState.restoreWeather(boolean endOfDrive)` (StepEndTurn, bb2020/bb2025).
+pub fn restore_weather(game: &mut Game, end_of_drive: bool) {
+    if end_of_drive {
+        if let Some(old) = game.old_weather {
+            game.field_model.weather = old;
+        }
+        game.skip_restore_weather = false;
+        game.old_weather = None;
+    } else if game.skip_restore_weather {
+        game.skip_restore_weather = false;
+    } else if let Some(old) = game.old_weather.take() {
+        game.field_model.weather = old;
+    }
+}
+
 /// Java `Weather.name()` -- the enum constant name (the key of `DialogSelectWeatherParameter`).
-fn java_weather_constant(w: Weather) -> &'static str {
+pub fn java_weather_constant(w: Weather) -> &'static str {
     match w {
         Weather::SwelteringHeat => "SWELTERING_HEAT",
         Weather::VerySunny => "VERY_SUNNY",
@@ -315,6 +347,42 @@ mod tests {
         let ind = game.turn_data_home.inducement_set.get("weatherMage").unwrap();
         assert_eq!(ind.get_uses(), 1);
         assert_eq!(ind.get_uses_left(), 0);
+    }
+
+    /// Java GameState.replaceWeather / restoreWeather: the first replaced weather is remembered;
+    /// the turn end right after the mage skips the restore, the next one restores it; the end of a
+    /// drive always restores and forgets.
+    #[test]
+    fn replaced_weather_is_restored_one_turn_later_or_at_the_end_of_the_drive() {
+        let mut game = make_game();
+        game.field_model.weather = Weather::Nice;
+        assert_eq!(replace_weather(&mut game, Weather::Blizzard), Weather::Nice);
+        assert_eq!(replace_weather(&mut game, Weather::PouringRain), Weather::Nice);
+        restore_weather(&mut game, false);
+        assert_eq!(game.field_model.weather, Weather::PouringRain, "the turn of the mage keeps it");
+        restore_weather(&mut game, false);
+        assert_eq!(game.field_model.weather, Weather::Nice);
+        assert!(game.old_weather.is_none());
+
+        replace_weather(&mut game, Weather::Blizzard);
+        restore_weather(&mut game, true);
+        assert_eq!(game.field_model.weather, Weather::Nice);
+        assert!(game.old_weather.is_none() && !game.skip_restore_weather);
+    }
+
+    /// Java: the chosen weather's report carries the modifier the dialog listed for it.
+    #[test]
+    fn select_weather_reports_the_dialog_modifier() {
+        let mut game = make_game();
+        let mut options = std::collections::HashMap::new();
+        options.insert("BLIZZARD".to_string(), -2);
+        game.dialog_parameter = Some(ffb_model::dialog::dialog_parameter_factory::DialogParameter::SelectWeather(
+            ffb_model::dialog::dialog_select_weather_parameter::DialogSelectWeatherParameter { options }));
+        let mut step = StepWeatherMage::new();
+        step.handle_command(&Action::SelectWeather { weather: Weather::Blizzard }, &mut game, &mut GameRng::new(0));
+        let report = game.report_list.get_reports().last().unwrap().to_json().unwrap();
+        assert_eq!(report["modifier"], -2);
+        assert_eq!(game.field_model.weather, Weather::Blizzard);
     }
 
     #[test]

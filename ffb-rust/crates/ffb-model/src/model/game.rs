@@ -126,6 +126,11 @@ pub struct Game {
     /// Java: GameState.isStalling() / stallingDetected() / resetStalling().
     /// Set true when the acting player is detected to be stalling; cleared after consumption.
     pub stalling: bool,
+    /// Java: GameState.activeEffects `oldWeather` -- the weather a Weather Mage replaced
+    /// (`replaceWeather`), restored at the end of the drive (`restoreWeather`).
+    pub old_weather: Option<crate::enums::Weather>,
+    /// Java: GameState.activeEffects `skipRestoreWeather`.
+    pub skip_restore_weather: bool,
     /// Java: game.isAdminMode() / setAdminMode — admin-controlled game allows reconnection.
     pub admin_mode: bool,
     /// Java: GameState.getLastDefenderId / setLastDefenderId — stores defender ID for MaximumCarnage second-block.
@@ -247,6 +252,8 @@ impl Game {
             home_additional_assists: 0,
             away_additional_assists: 0,
             stalling: false,
+            old_weather: None,
+            skip_restore_weather: false,
             admin_mode: false,
             last_defender_id: None,
             blitz_turn_state: None,

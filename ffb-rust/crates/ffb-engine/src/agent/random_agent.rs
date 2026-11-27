@@ -1555,13 +1555,42 @@ impl Agent for RandomAgent {
             // ParityRunner is given a matching deterministic BLOODLUST_ACTION handler (change=false).
             Some(AgentPrompt::BloodlustAction { .. }) =>
                 Action::BloodlustAction { change: false },
-            // Select weather: pick uniformly from options — 1 decision_rng call.
+            // §Q3.2 Weather Mage choice: the option whose Java constant name (the dialog's key)
+            // sorts first, zero draws (ParityRunner SELECT_WEATHER arm, same rule).
             Some(AgentPrompt::SelectWeather { options }) => {
-                if options.is_empty() {
-                    return Action::Acknowledge;
+                use crate::step::bb2025::inducements::step_weather_mage::java_weather_constant;
+                match options.iter().min_by_key(|w| java_weather_constant(**w)) {
+                    Some(w) => Action::SelectWeather { weather: *w },
+                    None => Action::Acknowledge,
                 }
-                let idx = self.pick(options.len());
-                Action::SelectWeather { weather: options[idx] }
+            }
+            // §Q3.2 WIZARD_SPELL: under --coverage-bias a Fireball on the opposing player on the
+            // pitch with the smallest (x, y) (server coordinates), sent in the coach's frame (an away
+            // coach's coordinate is mirrored, as StepWizard un-mirrors it); otherwise cancel (a null
+            // spell). ParityRunner WIZARD_SPELL arm, same rule. Zero draws.
+            Some(AgentPrompt::WizardSpell { team_id, .. }) => {
+                let home = *team_id == gs.game.team_home.id;
+                let target = if crate::agent::heuristic_agent::coverage_bias() > 0.0 {
+                    coverage_spell_target(&gs.game, home)
+                } else {
+                    None
+                };
+                match target {
+                    Some(c) => Action::WizardSpell {
+                        spell: crate::action::WizardSpellChoice::Fireball,
+                        coord: if home { c } else { c.transform() },
+                    },
+                    None => Action::Acknowledge,
+                }
+            }
+            // §Q3.2 USE_INDUCEMENT (StepInitInducement): under --coverage-bias use the first type
+            // by name; otherwise decline (Java RandomStrategy's null type). Zero draws.
+            Some(AgentPrompt::UseInducement { inducement_types, .. }) => {
+                match inducement_types.first() {
+                    Some(t) if crate::agent::heuristic_agent::coverage_bias() > 0.0 =>
+                        Action::UseInducement { inducement_type: Some(t.clone()), card_id: None, player_ids: vec![] },
+                    _ => Action::Acknowledge,
+                }
             }
             // Hit And Run move window. Java's StepHitAndRun publishes the eligible squares as
             // MoveSquares and waits for a CLIENT_FIELD_COORDINATE naming one (CLIENT_END_TURN is
@@ -1786,8 +1815,6 @@ impl Agent for RandomAgent {
             | Some(AgentPrompt::StartGame)
             | Some(AgentPrompt::GameStatistics)
             | Some(AgentPrompt::DefenderAction { .. })
-            | Some(AgentPrompt::UseInducement { .. })
-            | Some(AgentPrompt::WizardSpell { .. })
             | Some(AgentPrompt::BriberyAndCorruption { .. })
             | Some(AgentPrompt::ConcedeGame { .. })
             | Some(AgentPrompt::Journeymen { .. }) =>
@@ -1868,6 +1895,16 @@ pub(crate) fn player_action_to_pac(pa: &PlayerAction) -> PlayerActionChoice {
         | PlayerAction::ViciousVines | PlayerAction::Chomp
         | PlayerAction::Incorporeal | PlayerAction::Forgo => PlayerActionChoice::Move,
     }
+}
+
+/// §Q3.2: the coverage spell target — the opposing team's player on the pitch with the smallest
+/// (x, y) in server coordinates (ParityRunner.coverageSpellTarget).
+fn coverage_spell_target(game: &Game, caster_home: bool) -> Option<FieldCoordinate> {
+    let opponents = if caster_home { &game.team_away } else { &game.team_home };
+    opponents.players.iter()
+        .filter_map(|p| game.field_model.player_coordinate(&p.id))
+        .filter(|c| c.is_on_pitch())
+        .min_by_key(|c| (c.x, c.y))
 }
 
 /// §Q2.8 coverage purchase order — ParityRunner.COVERAGE_INDUCEMENTS, same list and order.

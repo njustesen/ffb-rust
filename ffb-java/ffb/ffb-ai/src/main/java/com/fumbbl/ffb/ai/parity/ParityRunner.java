@@ -1244,6 +1244,16 @@ public class ParityRunner {
             // informational — the step has already NEXT_STEPped. Rust's agent
             // acknowledges it without an RNG draw; clearing mirrors that exactly.
             case INFORMATION_OKAY:
+                // §Q3.2: StepWeatherMage's no-choice notice is the one INFORMATION_OKAY whose step
+                // still WAITS -- for CLIENT_CONFIRM. Rust's agent acknowledges, which advances it.
+                if (gameState.getCurrentStep() != null
+                        && gameState.getCurrentStep().getId() == StepId.WEATHER_MAGE) {
+                    game.setDialogParameter(null);
+                    MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandConfirm());
+                    break;
+                }
+                game.setDialogParameter(null);
+                break;
             case KICKOFF_RETURN:
             case SETUP_ERROR:
             case SWARMING_ERROR:
@@ -1267,6 +1277,74 @@ public class ParityRunner {
                 MatchRunner.injectForTeam(gameState, new com.fumbbl.ffb.net.commands.ClientCommandConfirm(), true);
                 MatchRunner.injectForTeam(gameState, new com.fumbbl.ffb.net.commands.ClientCommandConfirm(), false);
                 break;
+
+            // §Q3.2: StepInitInducement's dialog. Under --coverage-bias use the type whose name sorts
+            // first (random_agent.rs, same rule); otherwise RandomStrategy's decline (null type).
+            case USE_INDUCEMENT: {
+                com.fumbbl.ffb.dialog.DialogUseInducementParameter ui =
+                    (com.fumbbl.ffb.dialog.DialogUseInducementParameter) dialog;
+                com.fumbbl.ffb.inducement.InducementType pick = null;
+                if (com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS > 0.0f
+                        && ui.getInducementTypes() != null) {
+                    for (com.fumbbl.ffb.inducement.InducementType t : ui.getInducementTypes()) {
+                        if (t != null && (pick == null || t.getName().compareTo(pick.getName()) < 0)) {
+                            pick = t;
+                        }
+                    }
+                }
+                comm.clearCaptured();
+                comm.sendUseInducement(pick);
+                injectCaptured(dialog, game, gameState);
+                break;
+            }
+
+            // §Q3.2 StepWizard. Under --coverage-bias: a Fireball on the opposing player on the pitch
+            // with the smallest (x, y) in server coordinates, sent in the coach's frame (StepWizard
+            // transforms an away coach's target). Otherwise cancel (null spell -> fEndInducement);
+            // RandomStrategy's sendConfirm was unhandled and looped. random_agent.rs, same rule.
+            case WIZARD_SPELL: {
+                com.fumbbl.ffb.dialog.DialogWizardSpellParameter ws =
+                    (com.fumbbl.ffb.dialog.DialogWizardSpellParameter) dialog;
+                boolean casterHome = ws.getTeamId().equals(game.getTeamHome().getId());
+                FieldCoordinate target = null;
+                if (com.fumbbl.ffb.ai.parity.heuristic.HeuristicDriver.COVERAGE_BIAS > 0.0f) {
+                    Team opponents = casterHome ? game.getTeamAway() : game.getTeamHome();
+                    for (Player<?> p : opponents.getPlayers()) {
+                        FieldCoordinate c = game.getFieldModel().getPlayerCoordinate(p);
+                        if (c == null || !com.fumbbl.ffb.FieldCoordinateBounds.FIELD.isInBounds(c)) continue;
+                        if (target == null || c.getX() < target.getX()
+                                || (c.getX() == target.getX() && c.getY() < target.getY())) {
+                            target = c;
+                        }
+                    }
+                }
+                com.fumbbl.ffb.net.commands.ClientCommandWizardSpell spell = (target == null)
+                    ? new com.fumbbl.ffb.net.commands.ClientCommandWizardSpell(null, null)
+                    : new com.fumbbl.ffb.net.commands.ClientCommandWizardSpell(com.fumbbl.ffb.SpecialEffect.FIREBALL,
+                        casterHome ? target : target.transform());
+                MatchRunner.injectForTeam(gameState, spell, casterHome);
+                break;
+            }
+
+            // §Q3.2 Weather Mage: the option whose Weather constant name sorts first, with the
+            // modifier the dialog lists for it (random_agent.rs, same rule). Zero draws.
+            case SELECT_WEATHER: {
+                com.fumbbl.ffb.dialog.DialogSelectWeatherParameter sw =
+                    (com.fumbbl.ffb.dialog.DialogSelectWeatherParameter) dialog;
+                String name = null;
+                for (String key : sw.getOptions().keySet()) {
+                    if (name == null || key.compareTo(name) < 0) {
+                        name = key;
+                    }
+                }
+                if (name == null) {
+                    game.setDialogParameter(null);
+                    break;
+                }
+                MatchRunner.inject(gameState, new com.fumbbl.ffb.net.commands.ClientCommandSelectWeather(
+                    sw.getOptions().get(name), name));
+                break;
+            }
 
             // §Q2.8: under --coverage-bias the coach buys one of each COVERAGE_INDUCEMENTS entry, in
             // list order, while its cost fits the remaining gold and availability > 0 (random_agent.rs

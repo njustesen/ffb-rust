@@ -330,9 +330,12 @@ pub enum AgentPrompt {
         team_id: String,
         amount: i32,
     },
+    /// Java `DialogUseInducementParameter(teamId, inducementTypes)` (StepInitInducement): the coach
+    /// answers CLIENT_USE_INDUCEMENT with one of the types (`Action::UseInducement`) or declines
+    /// (`Action::Acknowledge`, Java's null type).
     UseInducement {
         team_id: String,
-        inducement_id: String,
+        inducement_types: Vec<String>,
     },
     WizardSpell {
         team_id: String,

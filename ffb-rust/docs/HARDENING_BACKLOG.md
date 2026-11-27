@@ -8,9 +8,8 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q3.2** (in-game inducement use: StepInitInducement routing to Wizard / Weather Mage /
-Throw a Rock + both agents use under bias; bb2025 purchases now exist via Q2.8 part 1 —
-`FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`). Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
+Next item: **Q2.8 part 2** (bb2020 BUY_CARDS_AND_INDUCEMENTS purchases with the option-driven types,
+then Q3.2 for bb2020; same gate shape: `FFB_INDUCEMENT_CASH=600000 --coverage-bias 1`). Open parts: Q2.4 re-placement design, Q2.6 re-rolls, Q2.9 coverage
 squads, Q1.2b punt stall (two repros).
 Q2.2/Q2.3 inducement parts wait for Q2.8. Q1.7 (cert10) waits for the night and for Q2.x/Q3.x
 that change games; run the Q1 night queue first (mirror 330 + view suites on a frozen exe). Parked with notes: Q1.2b (punt → throw-in
@@ -188,8 +187,12 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   switch the options on in both harnesses. Gate met: human bb2025/bb2020/bb2016 seeds 1-30, 30/30 steps +
   reports with overtime, and again with golden goal (bb2025: 10 games reach half 3, 8 end on a
   golden-goal touchdown); standing smoke gates 20/20.
-- [ ] **Q3.2 In-game inducement use:** route Wizard, Throw a Rock, Weather Mage, Master Chef, Fan Factor
+- [~] **Q3.2 In-game inducement use:** route Wizard, Throw a Rock, Weather Mage, Master Chef, Fan Factor
   in `step_init_inducement.rs` (bb2025, bb2020, bb2016 card play). Gate: each inducement fires.
+  **bb2025 done** (see Log): StepInitInducement routes SPELL / CHANGE_WEATHER / THROW_ROCK, both agents
+  use under the bias (Fireball on the min-(x,y) opponent, weather by first constant name); Master Chef
+  in Q2.8 part 1. Throw a Rock is routed but not buyable in bb2025 (Java availability = INDUCEMENT_DUMMY
+  = 0; it comes from a prayer). Open: bb2020 / bb2016 (after their Q2.8 purchases), Fan Factor, cards.
 - [ ] **Q3.3 Cards (bb2016/bb2020):** build decks, buy, draw, play, deactivate (`handle_card`,
   `step_buy_cards_and_inducements.rs:249-343`, `PlayCard`). Gate: card play in both editions.
 - [x] **Q3.4 Solid Defence player selection** — review false positive: bb2025's player-choice flow is
@@ -255,7 +258,14 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
-- 2026-11-27 · Q2.8 part 1 · (this commit) · bb2025 purchases 1:1: InducementTypeEntry carries Java's
+- 2026-11-27 · Q3.2 part 1 · (this commit) · bb2025 in-game use: StepInitInducement 1:1 (dialog,
+  SPELL → Wizard, CHANGE_WEATHER → WeatherMage, THROW_ROCK → ThrowARock); StepWizard now prompts and
+  takes Java's fireball square order; Weather Mage replace/restoreWeather (activeEffects old weather,
+  restored by StepEndTurn bb2020/bb2025) and the dialog modifier in its report; harness arms
+  USE_INDUCEMENT / WIZARD_SPELL / SELECT_WEATHER and the mage's INFORMATION_OKAY confirm. Gate
+  (FFB_INDUCEMENT_CASH=600000, bias): 8 bb2025 matchups × 10 = 80/80 (5 human-halfling games: 10
+  fireballs, 10 weather mages); smoke 20/20 ×3; 11,604 tests.
+- 2026-11-27 · Q2.8 part 1 · b149ed8fc · bb2025 purchases 1:1: InducementTypeEntry carries Java's
   cost/max option ids + per-type overrides (reduced costs, availability rules); StepBuyInducements
   prices/applies like handleTeamInducements (no treasury write, set into the turn's InducementSet);
   missing ReportInducement for extra training / wandering apos; MASTER_CHEF added to the bb2025 kickoff

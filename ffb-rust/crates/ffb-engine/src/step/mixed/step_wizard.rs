@@ -110,8 +110,19 @@ impl StepWizard {
                 // `addToAffectedPlayers`, which skips prone or stunned players.
                 let affected: Vec<String> = {
                     let coords: Vec<FieldCoordinate> = if spell == SpecialEffect::FIREBALL {
-                        let mut v = vec![coord];
-                        v.extend(game.field_model.adjacent_on_pitch(coord));
+                        // Java: `findAdjacentCoordinates(target, FIELD, 1, true)` (y outer, x inner,
+                        // -1..=1, start square included) walked from the LAST index down -- the
+                        // order the special-effect sequences are pushed in (§Q3.2).
+                        let mut v: Vec<FieldCoordinate> = Vec::new();
+                        for dy in -1..=1 {
+                            for dx in -1..=1 {
+                                let c = FieldCoordinate::new(coord.x + dx, coord.y + dy);
+                                if c.is_on_pitch() {
+                                    v.push(c);
+                                }
+                            }
+                        }
+                        v.reverse();
                         v
                     } else {
                         vec![coord]
@@ -168,12 +179,13 @@ impl StepWizard {
             game,
             ffb_model::dialog::dialog_parameter_factory::DialogParameter::WizardSpell(
                 ffb_model::dialog::dialog_wizard_spell_parameter::DialogWizardSpellParameter {
-                    team_id: Some(team_id),
+                    team_id: Some(team_id.clone()),
                 },
             ),
             false,
         );
-        StepOutcome::cont()
+        // §Q3.2: the coach answers with CLIENT_WIZARD_SPELL (spell + target) or cancels.
+        StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::WizardSpell { team_id, target_coord: None })
     }
 }
 

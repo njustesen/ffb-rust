@@ -1,4 +1,5 @@
 use ffb_model::enums::InducementPhase;
+use ffb_model::inducement::usage::Usage;
 use ffb_model::model::game::Game;
 use ffb_model::util::rng::GameRng;
 use crate::action::Action;
@@ -6,8 +7,8 @@ use crate::step::framework::{Step, StepOutcome};
 use crate::step::framework::{StepId, StepParameter};
 
 /// Initializes the inducement sequence: checks which inducements can be used at the given
-/// phase, shows dialog, then routes to the appropriate sub-sequence generator.
-/// InducementType routing not ported (requires InducementTypeFactory); headless skips all inducement sequences.
+/// phase, shows the use-inducement dialog, then routes the chosen type to the Wizard sequence,
+/// the Weather Mage step or the Throw a Rock sequence (§Q3.2).
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2025.inducements.StepInitInducement`.
 pub struct StepInitInducement {
     /// Java: fInducementPhase (init param)
@@ -54,15 +55,16 @@ impl Step for StepInitInducement {
     }
 
     fn handle_command(&mut self, action: &Action, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java: CLIENT_USE_INDUCEMENT — store inducement type for routing in execute_step.
-        if let Action::UseInducement { inducement_type, card_id: _, player_ids: _ } = action {
-            if let Some(itype) = inducement_type {
-                self.inducement_type = Some(itype.clone());
-                self.end_inducement_phase = false;
-                return self.execute_step(game, rng);
-            }
+        // Java: CLIENT_USE_INDUCEMENT — `fInducementType = command.getInducementType();
+        // fEndInducementPhase = fInducementType == null`. The agents' decline (Acknowledge) is
+        // Java's null type.
+        if let Action::UseInducement { inducement_type: Some(itype), .. } = action {
+            self.inducement_type = Some(itype.clone());
+            self.end_inducement_phase = false;
+        } else {
+            self.inducement_type = None;
+            self.end_inducement_phase = true;
         }
-        self.end_inducement_phase = true;
         self.execute_step(game, rng)
     }
 
@@ -77,22 +79,86 @@ impl Step for StepInitInducement {
 
 impl StepInitInducement {
     fn execute_step(&mut self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
-        // no-op: InducementType routing, sequence generators (Wizard/ThrowARock/WeatherMage) — requires InducementTypeFactory; headless skips all inducement sequences
         let phase = match self.inducement_phase {
             Some(p) => p,
             None => return StepOutcome::next(),
         };
-        // Java: fTouchdownOrEndOfHalf = UtilServerSteps.checkTouchdown(getGameState())
-        self.touchdown_or_end_of_half = crate::step::util_server_steps::check_touchdown(game);
-        // Java findUseableInducements() side effects. The actual inducement collection is
-        // skipped headless (routing stub above), but these state mutations are load-bearing:
-        // the END_OF_OWN/OPPONENT_TURN windows set BETWEEN_TURNS, and the END_OF_OPPONENT_TURN
-        // window hands home_playing to the window's own team. Dropping them collapsed the
-        // three-flip turn-handover chain (InitInducement → EndInducement → StepEndTurn = net
-        // one flip) into a double flip that gave the same team every turn, forever.
+        if self.end_inducement_phase {
+            return self.leave_step(phase, true);
+        }
+        let Some(inducement_type) = self.inducement_type.clone() else {
+            // Java: fTouchdownOrEndOfHalf = UtilServerSteps.checkTouchdown(getGameState())
+            self.touchdown_or_end_of_half = crate::step::util_server_steps::check_touchdown(game);
+            let useable = self.find_useable_inducements(game, phase);
+            if useable.is_empty() {
+                return self.leave_step(phase, true);
+            }
+            // Java: game.setDialogParameter(new DialogUseInducementParameter(teamId, useable)).
+            let team_id = if self.home_team { game.team_home.id.clone() } else { game.team_away.id.clone() };
+            crate::util::util_server_dialog::UtilServerDialog::show_dialog(
+                game,
+                ffb_model::dialog::dialog_parameter_factory::DialogParameter::UseInducement(
+                    ffb_model::dialog::dialog_use_inducement_parameter::DialogUseInducementParameter {
+                        team_id: Some(team_id.clone()),
+                        inducement_types: useable.iter().cloned().map(Some).collect(),
+                        cards: Vec::new(),
+                        player_id: None,
+                    },
+                ),
+                false,
+            );
+            return StepOutcome::cont().with_prompt(ffb_model::prompts::AgentPrompt::UseInducement {
+                team_id,
+                inducement_types: useable,
+            });
+        };
+        let usages = ffb_model::factory::inducement_type_factory::for_name_in(game.rules, &inducement_type)
+            .map(|t| t.usages)
+            .unwrap_or_default();
+        if usages.contains(&Usage::SPELL) {
+            // Java: Wizard.pushSequence(...); leaveStep(false)
+            let seq = crate::step::generator::common::wizard::Wizard::build_sequence();
+            self.leave_step(phase, false).push_seq(seq)
+        } else if usages.contains(&Usage::CHANGE_WEATHER) {
+            // Java: getStepStack().push(new StepWeatherMage(gameState)); leaveStep(false)
+            let seq = vec![crate::step::framework::SequenceStep::new(StepId::WeatherMage)];
+            self.leave_step(phase, false).push_seq(seq)
+        } else if usages.contains(&Usage::THROW_ROCK) {
+            // Java: ThrowARock.pushSequence(new ThrowARock.SequenceParams(gameState, fHomeTeam)); leaveStep(false)
+            let seq = crate::step::generator::bb2025::throw_a_rock::ThrowARock::build_sequence(
+                &crate::step::generator::bb2025::throw_a_rock::ThrowARockParams { home_team: self.home_team });
+            self.leave_step(phase, false).push_seq(seq)
+        } else {
+            self.leave_step(phase, true)
+        }
+    }
+
+    /// Java `leaveStep(boolean pEndInducementPhase)`.
+    fn leave_step(&self, phase: InducementPhase, end_inducement_phase: bool) -> StepOutcome {
+        StepOutcome::next()
+            .publish(StepParameter::EndInducementPhase(end_inducement_phase))
+            .publish(StepParameter::HomeTeam(self.home_team))
+            .publish(StepParameter::InducementPhase(phase))
+    }
+
+    /// Java `findUseableInducements()`, sorted by name (Java collects into a HashSet). Its side
+    /// effects are load-bearing: the END_OF_OWN/OPPONENT_TURN windows set BETWEEN_TURNS, and the
+    /// END_OF_OPPONENT_TURN window hands home_playing to the window's own team (dropping them
+    /// collapsed the three-flip turn-handover chain into a double flip).
+    fn find_useable_inducements(&self, game: &mut Game, phase: InducementPhase) -> Vec<String> {
+        let mut useable: Vec<String> = Vec::new();
+        let turn_data = if self.home_team { &game.turn_data_home } else { &game.turn_data_away };
+        let set = &turn_data.inducement_set;
+        let of_usage = |usage_ok: &dyn Fn(&ffb_model::inducement::inducement::Inducement) -> bool| -> Vec<String> {
+            set.get_inducements().into_iter()
+                .filter(|i| usage_ok(i) && set.has_uses_left(&i.type_id))
+                .map(|i| i.type_id)
+                .collect()
+        };
         if matches!(phase, InducementPhase::EndOfOwnTurn | InducementPhase::EndOfOpponentTurn)
             && !self.touchdown_or_end_of_half
         {
+            useable = of_usage(&|i| i.has_usage(Usage::SPELL) || i.has_usage(Usage::THROW_ROCK));
             // bb2016's StepInitInducement has no turn-mode change (lastTurnMode stays KICKOFF for
             // the client); the home_playing handover below is Rust's shared turn chain and stays.
             if game.rules != ffb_model::enums::Rules::Bb2016 {
@@ -101,12 +167,17 @@ impl StepInitInducement {
             if phase == InducementPhase::EndOfOpponentTurn && self.home_team != game.home_playing {
                 game.home_playing = !game.home_playing;
             }
+        } else if phase == InducementPhase::StartOfOwnTurn {
+            useable = of_usage(&|i| i.has_usage(Usage::CHANGE_WEATHER));
         }
-        // Headless: no useable inducements → Java leaveStep(true).
-        StepOutcome::next()
-            .publish(StepParameter::EndInducementPhase(true))
-            .publish(StepParameter::HomeTeam(self.home_team))
-            .publish(StepParameter::InducementPhase(phase))
+        // This step serves all three editions; the use routing is ported for bb2025 (§Q3.2).
+        // bb2020 / bb2016 (their own StepInitInducement classes, cards: §Q3.3) keep the old
+        // no-dialog behaviour until their purchases exist (§Q2.8).
+        if game.rules != ffb_model::enums::Rules::Bb2025 {
+            useable.clear();
+        }
+        useable.sort();
+        useable
     }
 }
 
@@ -138,6 +209,45 @@ mod tests {
         let mut step = StepInitInducement::new(InducementPhase::StartOfOwnTurn, false);
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::HomeTeam(false))));
+    }
+
+    /// §Q3.2 Java findUseableInducements: START_OF_OWN_TURN offers CHANGE_WEATHER types with uses
+    /// left; choosing one pushes StepWeatherMage and leaves with END_INDUCEMENT_PHASE = false.
+    #[test]
+    fn a_weather_mage_is_offered_at_the_start_of_the_turn_and_routes_to_the_mage_step() {
+        use ffb_model::inducement::inducement::Inducement;
+        let mut game = make_game();
+        game.turn_data_home.inducement_set.add_inducement(
+            Inducement::new("weatherMage", 1, vec![Usage::CHANGE_WEATHER]));
+        let mut step = StepInitInducement::new(InducementPhase::StartOfOwnTurn, true);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::Continue);
+        match out.prompt {
+            Some(ffb_model::prompts::AgentPrompt::UseInducement { inducement_types, .. }) =>
+                assert_eq!(inducement_types, vec!["weatherMage".to_string()]),
+            other => panic!("expected the use-inducement prompt, got {other:?}"),
+        }
+        let out = step.handle_command(&Action::UseInducement {
+            inducement_type: Some("weatherMage".into()), card_id: None, player_ids: vec![] },
+            &mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.pushes.iter().flatten().any(|s| s.step_id == StepId::WeatherMage));
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndInducementPhase(false))));
+    }
+
+    /// Java: a spell is offered only at END_OF_OWN/OPPONENT_TURN, not at the start of the turn; a
+    /// used-up inducement is not offered at all.
+    #[test]
+    fn a_used_up_wizard_is_not_offered() {
+        use ffb_model::inducement::inducement::Inducement;
+        let mut game = make_game();
+        let mut wizard = Inducement::new("wizard", 1, vec![Usage::SPELL]);
+        wizard.set_uses(1);
+        game.turn_data_home.inducement_set.add_inducement(wizard);
+        let mut step = StepInitInducement::new(InducementPhase::EndOfOwnTurn, true);
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(out.published.iter().any(|p| matches!(p, StepParameter::EndInducementPhase(true))));
     }
 
     #[test]

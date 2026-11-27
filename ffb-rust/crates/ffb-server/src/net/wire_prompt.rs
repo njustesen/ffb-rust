@@ -389,8 +389,11 @@ pub fn prompt_to_wire(prompt: &AgentPrompt) -> Option<WireDialog> {
             }),
         AgentPrompt::PettyCash { team_id, amount } =>
             Some(WireDialog::PettyCash { team_id: team_id.clone(), amount: *amount }),
-        AgentPrompt::UseInducement { team_id, inducement_id } =>
-            Some(WireDialog::UseInducement { team_id: team_id.clone(), inducement_id: inducement_id.clone() }),
+        AgentPrompt::UseInducement { team_id, inducement_types } =>
+            Some(WireDialog::UseInducement {
+                team_id: team_id.clone(),
+                inducement_id: inducement_types.first().cloned().unwrap_or_default(),
+            }),
         AgentPrompt::WizardSpell { team_id, target_coord } =>
             Some(WireDialog::WizardSpell { team_id: team_id.clone(), target_coord: *target_coord }),
         AgentPrompt::Journeymen { team_id, count } =>
