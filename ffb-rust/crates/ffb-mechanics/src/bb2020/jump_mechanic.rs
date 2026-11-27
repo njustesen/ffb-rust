@@ -36,10 +36,15 @@ impl JumpMechanicTrait for JumpMechanic {
             None => return false,
         };
         let coord = game.field_model.player_coordinate(player_id);
-        let has_unused_leap = UtilCards::has_unused_skill_with_property(player, NamedProperties::CAN_LEAP);
-        // BB2020: also can jump if not yet jumped AND there's a prone/stunned adjacent player
+        // Java `UtilCards.hasUnusedSkillWithProperty(actingPlayer, canLeap)`: `ActingPlayer.isSkillUsed`
+        // = the activation's set OR the player's (StepJump marks Leap used on the acting player).
+        let has_unused_leap = UtilCards::has_unused_skill_with_property(player, NamedProperties::CAN_LEAP)
+            && player.all_skill_ids().any(|id| id.properties_for(game.rules).contains(&NamedProperties::CAN_LEAP)
+                && !acting_player.used_skills.contains(&id) && !player.used_skills.contains(&id));
+        // Java: hasUnusedSkillWithProperty(canLeap) || (!actingPlayer.hasJumped() && prone/stunned
+        // adjacent). Rust read `!jumping` here, which let a player jump again after a leap.
         let has_prone_adjacent = coord.map(|c| self.has_prone_or_stunned_players_adjacent(game, c)).unwrap_or(false);
-        let can_leap_this_turn = has_unused_leap || (!acting_player.jumping && has_prone_adjacent);
+        let can_leap_this_turn = has_unused_leap || (!acting_player.has_jumped && has_prone_adjacent);
         can_leap_this_turn && !player.has_skill_property(NamedProperties::MOVES_RANDOMLY)
     }
 

@@ -205,12 +205,7 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   `InducementSet.add(other)`: **waits** for the other session's uncommitted `inducement_set.rs`
   (as Q3.3a); no suite or GUI setup turns the option on. Dead-twin edition diffs **audited**
   (bb2016 Pass/Mvp/Intercept/Apothecary, bb2020 Pass/Mvp/Jump vs the shared steps): Pass and
-  Intercept match; Mvp fixed (see Log). **Open (bb2020 StepJump, port as one unit):** no
-  hasJumped / Leap markUsed (Java :188/:207; canStillJump allows one jump), Jumped published in
-  bb2020 cancels Shadowing (bb2025-only publish), the Diving Tackle what-if re-roll offer is
-  bb2025-only (bb2020 :337 goes straight to the DT choice), DT candidates (bb2020 :318
-  `findAdjacentOpposingPlayersWithProperty(..., true)`, no leaving-TZ-only filter), the repeated
-  ReportJumpRoll after the DT answer (:274). **Open (bb2016 Apothecary):** Igor offer after a failed
+  Intercept match; Mvp and bb2020 StepJump fixed (see Log). **Open (bb2016 Apothecary):** Igor offer after a failed
   Regeneration (Java :245, needs bought Igors, Q2.8), ReportInducement + curePoison on Igor use;
   Getting Even runs ungated in `finish_tail` (latent: no bb2016/bb2020 keywords).
 
@@ -345,7 +340,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   **Part 1 done** (see Log): enhancements (the player's temporary maps) travel as Java's
   add/remove-enhancement changes; the only fallback in recent GUI runs (Dodgy Snack) is gone.
   Open: Incorporeal / Baleful Hex `getEnhancements()` in the processor (`java_skill_enhancements`
-  still Err; that file carries the other session's uncommitted card work), cards, chomp,
+  still Err; that file carries the other session's uncommitted card work), `actingPlayerSetHasJumped`
+  (the Rust `has_jumped` is not in the JSON the diff reads), cards, chomp,
   acting-player flags, the listed dialogs. A coverage-bias GUI run needs Q4.5's scripted client.
 - [~] **Q4.5 gui_check hardening:** fail on ignored commands; all three editions; all teams (add setups);
   a scripted "human" client path that answers every dialog kind. **Part 1 done** (see Log): an
@@ -378,6 +374,16 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q2.10 part 3 · (this commit) · bb2020 StepJump ported into the shared step as one
+  unit: the game's own JumpMechanic; ActingPlayer `has_jumped` (reset on player change) and Leap
+  marked used after every bb2020 leap; bb2020 canStillJump reads hasJumped (was `!jumping`) and the
+  activation's used skills; no JUMPED publish in bb2020 (it ended Shadowing); no Diving Tackle
+  re-roll offer in bb2020; DT candidates = findAdjacentOpposingPlayersWithProperty(.., true) +
+  filterThrower (+ DUMP_OFF filter), no leaving-TZ-only option; ReportJumpRoll on every bb2020
+  leap(); no updateMoveSquares on a bb2020 roll-1 failure; Java's second useReRoll after the DT
+  answer ported as JD-004. Tests: 2 new; cargo test 12,815 green; slann_fumbbl mirror and wood_elf
+  v slann_fumbbl bb2020 20/20 each; smoke 3×20/20.
 
 - 2026-11-27 · Q2.10 part 2 · (this commit) · shared StepMvp per edition: bb2016 eligibility is
   Java's (killed / recovering injury / Nurgle's Rot only -- stars, mercenaries and MISSING stay

@@ -182,3 +182,21 @@ to HashMap tree-bin internals, to reproduce an order that is not part of the rul
 The buy step up to the draw: same dice in the same order, same costs, same card type, same
 `cardsBought` report. Which card was drawn is not compared. Card PLAY is gated on fixed hands handed
 to both teams by the harness before kick-off (§Q3.3a), so no random draw decides a play gate.
+
+---
+
+## JD-004 — a bb2020 re-rolled leap spends its team re-roll again after the Diving Tackle answer
+
+| | |
+|---|---|
+| **Where** | `ffb-server/.../step/bb2020/move/StepJump.java` `executeStep` (:165): `if (JUMP == getReRolledAction() && !TRUE.equals(useIgnoreModifierAfterRollSkill)) { if (getReRollSource() == null \|\| !useReRoll(...)) handleFailure }` -- no `usingDivingTackle == null` guard (bb2025's StepJump has one) |
+| **Surfaces as** | A failed leap, re-rolled with a team re-roll, succeeds; the opposing coach is asked about Diving Tackle; on the answer `executeStep` runs again and `useReRoll(TEAM_RE_ROLL)` decrements the bank a second time (second ReportReRoll; a Loner player rolls Loner again and can turn the made leap into a failure) |
+| **Effect** | One team re-roll paid twice for one re-roll. No rule supports it. |
+| **Found on** | §Q2.10 code audit, 2026-11-27 (bb2020 games run Rust's shared StepJump); not yet demonstrated with a probe |
+| **Rust flag** | none yet -- add `defect_fixes` flag with the probe |
+
+### What Rust does
+
+Ports it 1:1 (`step/bb2025/move_/step_jump.rs`, bb2020 branch of `execute_step`): after a Diving
+Tackle answer with a JUMP re-roll recorded, the source is spent again and a failed spend fails the
+leap; the leap then re-reads the same roll.

@@ -28,6 +28,10 @@ pub struct ActingPlayer {
     /// setting it true also sets `jumping`, clearing `jumping` also clears it.
     #[serde(default)]
     pub jumps_without_modifiers: bool,
+    /// Java: `hasJumped` -- set by the bb2020 StepJump after a leap (success or failure); read by
+    /// the bb2020 `JumpMechanic.canStillJump`. Not part of Java's `toJsonValue`.
+    #[serde(default)]
+    pub has_jumped: bool,
     pub has_acted: bool,
     pub has_fouled: bool,
     pub held_in_place: bool,
@@ -152,6 +156,7 @@ impl ActingPlayer {
             // change; change_player_action re-captures it (sticky) right after this.
             self.old_player_state = None;
             self.set_jumping(false);
+            self.has_jumped = false;
             self.suffering_blood_lust = false;
             self.blood_lust_discards_move_stack = false;
             self.suffering_animosity = false;

@@ -10,8 +10,6 @@ use crate::step::framework::{StepId, StepParameter};
 use crate::step::abstract_step_with_re_roll::ReRollState;
 use crate::step::abstract_step_with_re_roll::find_skill_reroll_source;
 use crate::step::util_server_re_roll::{ask_for_reroll_if_available_ignoring, use_reroll};
-use ffb_mechanics::bb2025::jump_mechanic::JumpMechanic;
-use ffb_mechanics::jump_mechanic::JumpMechanic as JumpMechanicTrait;
 use ffb_mechanics::modifiers::jump_modifier_factory::JumpModifierFactory;
 use ffb_mechanics::modifiers::jump_context::JumpContext;
 use crate::util::util_server_player_move::UtilServerPlayerMove;
@@ -145,8 +143,10 @@ enum LeapStatus {
 
 impl StepJump {
     fn execute_step(&mut self, game: &mut Game, rng: &mut GameRng) -> StepOutcome {
-        // Java: doLeap = actingPlayer.isJumping() && mechanic.canStillJump(game, actingPlayer)
-        let mechanic = JumpMechanic::new();
+        // Java: doLeap = actingPlayer.isJumping() && mechanic.canStillJump(game, actingPlayer), the
+        // game's own JumpMechanic (bb2020 games run this shared step).
+        let bb2020 = game.rules == ffb_model::enums::Rules::Bb2020;
+        let mechanic = crate::mechanic::jump_mechanic_for(game.rules);
         let do_leap = game.acting_player.jumping
             && mechanic.can_still_jump(game, &game.acting_player.clone());
 
@@ -166,6 +166,22 @@ impl StepJump {
         {
             if self.re_roll_state.re_roll_source.is_some() {
                 self.roll = 0;
+            }
+        } else if bb2020 && already_rerolled && self.use_ignore_modifier_after_roll_skill != Some(true)
+            && self.using_diving_tackle.is_some()
+        {
+            // Java bb2020 StepJump:165 has no `usingDivingTackle == null` guard: after a re-rolled
+            // successful leap and the Diving Tackle answer it calls useReRoll AGAIN (a team re-roll
+            // is spent twice, JD-004), and leap() then re-reads the same roll (status is
+            // WAITING_FOR_SKILL_USE, so no fresh die).
+            let pid = game.acting_player.player_id.as_deref().unwrap_or("").to_owned();
+            let source_opt = self.re_roll_state.re_roll_source.clone();
+            let consumed = source_opt
+                .as_ref()
+                .map(|s| use_reroll(game, s, &pid, rng))
+                .unwrap_or(false);
+            if !consumed {
+                return self.handle_failure(game);
             }
         } else if already_rerolled && self.use_ignore_modifier_after_roll_skill != Some(true)
             && self.using_diving_tackle.is_none()
@@ -219,9 +235,16 @@ impl StepJump {
         let out = match self.leap(game, rng, &mut events) {
             LeapStatus::Success => {
                 game.acting_player.set_jumping(false);
-                StepOutcome::next()
-                    .publish(StepParameter::Jumped(true))
-                    .with_events(events)
+                if bb2020 {
+                    // Java bb2020: setHasJumped(true); markSkillUsed(canLeap); no JUMPED publish
+                    // (that parameter, which ends Shadowing, is bb2025's).
+                    Self::mark_jumped(game);
+                    StepOutcome::next().with_events(events)
+                } else {
+                    StepOutcome::next()
+                        .publish(StepParameter::Jumped(true))
+                        .with_events(events)
+                }
             }
             LeapStatus::WaitingForReRoll(prompt) => {
                 StepOutcome::cont().with_prompt(prompt).with_events(events)
@@ -317,8 +340,9 @@ impl StepJump {
         }
         let successful = DiceInterpreter::is_skill_roll_successful(self.roll, minimum_roll);
 
-        // Java: if (doRoll) getResult().addReport(new ReportJumpRoll(playerId, successful, roll, minRoll, reRolled, modifiers))
-        if do_roll {
+        // Java bb2025: if (doRoll) getResult().addReport(new ReportJumpRoll(...)); bb2020 :274 adds
+        // it on every leap(), so the re-leap after the Diving Tackle answer reports again.
+        if do_roll || game.rules == ffb_model::enums::Rules::Bb2020 {
             use ffb_model::report::report_jump_roll::ReportJumpRoll;
             game.report_list.add(ReportJumpRoll::new(
                 player_id.clone(),
@@ -460,7 +484,24 @@ impl StepJump {
             return LeapStatus::Success;
         }
         let to = game.field_model.player_coordinate(&pid).unwrap_or(from);
-        let tacklers = ffb_model::util::util_player::UtilPlayer::find_eligible_jump_tacklers(game, from, to);
+        let bb2020 = game.rules == ffb_model::enums::Rules::Bb2020;
+        let tacklers: Vec<String> = if bb2020 {
+            // Java bb2020 checkDivingTackle: findAdjacentOpposingPlayersWithProperty(game, from,
+            // canAttemptToTackleJumpingPlayer, true) (able to move), filterThrower, and on DUMP_OFF
+            // filterAttackerAndDefender; no DIVING_TACKLE_LEAVING_TZ_ONLY filter.
+            use ffb_model::util::util_player::UtilPlayer;
+            let found = UtilPlayer::find_adjacent_opposing_players_with_property(
+                game, &pid, from, NamedProperties::CAN_ATTEMPT_TO_TACKLE_JUMPING_PLAYER, true);
+            let found = UtilPlayer::filter_thrower(game, found);
+            let found = if game.turn_mode == ffb_model::enums::TurnMode::DumpOff {
+                UtilPlayer::filter_attacker_and_defender(game, found)
+            } else {
+                found
+            };
+            found.into_iter().cloned().collect()
+        } else {
+            ffb_model::util::util_player::UtilPlayer::find_eligible_jump_tacklers(game, from, to)
+        };
         let Some(first) = tacklers.first() else { return LeapStatus::Success };
         let Some(skill) = game.player(first).and_then(|p|
             p.skill_id_with_property_in(game.rules, NamedProperties::CAN_ATTEMPT_TO_TACKLE_JUMPING_PLAYER))
@@ -476,7 +517,9 @@ impl StepJump {
             return LeapStatus::Success;
         }
         let already_rerolled = self.re_roll_state.re_rolled_action.as_ref().is_some_and(|a| a.name == "JUMP");
-        if !self.dt_reroll_asked && !already_rerolled {
+        // The "Diving Tackle can make this jump fail" re-roll offer is bb2025's; bb2020 goes
+        // straight to the opposing coach's DIVING_TACKLE choice.
+        if !bb2020 && !self.dt_reroll_asked && !already_rerolled {
             // Java: askForReRollIfAvailable(gameState, actingPlayer.getPlayer(), JUMP, minimumRoll,
             // false, null, null, null, null, ["Diving Tackle can make this jump fail. Reroll the jump now?"])
             if let Some(prompt) = crate::step::util_server_re_roll::ask_for_reroll_if_available_for(
@@ -508,9 +551,25 @@ impl StepJump {
         })
     }
 
+    /// Java bb2020 StepJump: `actingPlayer.setHasJumped(true); actingPlayer.markSkillUsed(canLeap)`
+    /// (the latter marks the first unused canLeap skill, if any).
+    fn mark_jumped(game: &mut Game) {
+        game.acting_player.has_jumped = true;
+        let Some(pid) = game.acting_player.player_id.clone() else { return };
+        if let Some(skill) = crate::step::util_server_steps::acting_unused_skill_with_property(
+            game, &pid, ffb_model::model::property::named_properties::NamedProperties::CAN_LEAP)
+        {
+            crate::step::util_server_steps::mark_skill_used(game, &pid, skill);
+        }
+    }
+
     fn handle_failure(&mut self, game: &mut Game) -> StepOutcome {
         // Java: actingPlayer.setJumping(false)
         game.acting_player.set_jumping(false);
+        let bb2020 = game.rules == ffb_model::enums::Rules::Bb2020;
+        if bb2020 {
+            Self::mark_jumped(game);
+        }
         // Java: publishParameter(STEADY_FOOTING_CONTEXT, new SteadyFootingContext(new InjuryTypeDropJump(defender)))
         // Java passes `game.getDefender()` as the DropJump diving tackler (fallback Arm Bar source).
         let injury_name = match game.defender_id.as_deref() {
@@ -537,8 +596,11 @@ impl StepJump {
                 }
                 game.field_model.set_player_coordinate(&pid, start);
             }
-            // Java: UtilServerPlayerMove.updateMoveSquares(getGameState(), actingPlayer.isJumping())
-            UtilServerPlayerMove::update_move_squares(game, false);
+            // Java bb2025: UtilServerPlayerMove.updateMoveSquares(getGameState(), actingPlayer.isJumping())
+            // (bb2020 handleFailure does not)
+            if !bb2020 {
+                UtilServerPlayerMove::update_move_squares(game, false);
+            }
             None
         };
         let mut out = StepOutcome::goto(&label)
@@ -618,6 +680,61 @@ mod tests {
         let out = step.start(&mut game, &mut GameRng::new(0));
         assert_eq!(out.action, StepAction::NextStep);
         assert!(out.published.iter().any(|p| matches!(p, StepParameter::Jumped(true))));
+    }
+
+    /// Java bb2020 StepJump success: setHasJumped(true), markSkillUsed(canLeap), no JUMPED
+    /// publish; the bb2020 canStillJump then refuses a second jump in the activation.
+    #[test]
+    fn bb2020_success_marks_the_jump_and_leap_and_publishes_no_jumped() {
+        use ffb_mechanics::jump_mechanic::JumpMechanic as _;
+        let mut game = make_game_with_leaper();
+        game.rules = Rules::Bb2020;
+        let mut step = StepJump::new("fail".into());
+        step.roll = 4;
+        let out = step.start(&mut game, &mut GameRng::new(0));
+        assert_eq!(out.action, StepAction::NextStep);
+        assert!(!out.published.iter().any(|p| matches!(p, StepParameter::Jumped(_))), "JUMPED is bb2025-only");
+        assert!(game.acting_player.has_jumped);
+        assert!(game.acting_player.used_skills.contains(&SkillId::Leap));
+        assert!(!crate::mechanic::jump_mechanic_for(Rules::Bb2020).can_still_jump(&game, &game.acting_player.clone()),
+            "Leap used and hasJumped: no second jump");
+    }
+
+    /// Java bb2020 checkDivingTackle has no re-roll offer: a leap Diving Tackle could flip goes
+    /// straight to the opposing coach's choice, even with team re-rolls left.
+    #[test]
+    fn bb2020_diving_tackle_skips_the_re_roll_offer() {
+        // Rolls that fail outright get the ordinary failure re-roll offer; once a roll passes
+        // (Diving Tackle or not), no higher roll may raise a re-roll offer.
+        let mut asked = false;
+        let mut passed = false;
+        for roll in 2..=6 {
+            let mut game = make_game_with_leaper();
+            game.rules = Rules::Bb2020;
+            game.home_playing = true;
+            game.set_turn_mode(TurnMode::Regular);
+            game.turn_data_home.rerolls = 3;
+            let mut tackler = Player::default();
+            tackler.id = "dt".into();
+            tackler.starting_skills.push(SkillWithValue::new(SkillId::DivingTackle));
+            game.team_away.players.push(tackler);
+            game.field_model.set_player_state("dt", ffb_model::enums::PlayerState::new(ffb_model::enums::PS_STANDING).change_active(true));
+            game.field_model.set_player_coordinate("dt", ffb_model::types::FieldCoordinate::new(4, 5));
+            game.field_model.set_player_coordinate("p1", ffb_model::types::FieldCoordinate::new(7, 5));
+            let mut step = StepJump::new("fail".into());
+            step.move_start = Some(ffb_model::types::FieldCoordinate::new(5, 5));
+            step.roll = roll;
+            let out = step.start(&mut game, &mut GameRng::new(0));
+            match &out.prompt {
+                Some(ffb_model::prompts::AgentPrompt::PlayerChoice { reason, .. }) if reason == "DIVING_TACKLE" => {
+                    asked = true;
+                    passed = true;
+                }
+                Some(other) => assert!(!passed, "roll {roll}: bb2020 asks no re-roll before Diving Tackle, got {other:?}"),
+                None => passed = true,
+            }
+        }
+        assert!(asked, "some roll succeeds only without Diving Tackle");
     }
 
     #[test]
