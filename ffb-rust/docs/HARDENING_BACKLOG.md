@@ -151,12 +151,13 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 - [x] **Q2.5a Swarming dialog loop** (see Log): the harness clears DialogSwarmingPlayers at once
   instead of looping 500× on a CONFIRM StepSwarming ignores; same state (zero swarmers), no abort.
   snotling bb2020/bb2025 20/20 each, loops_cleared 0.
-- [~] **Q2.5b Swarming placement** (remove the engine's hard-coded "place nobody" in
+- [x] **Q2.5b Swarming placement** (remove the engine's hard-coded "place nobody" in
   `bb2025/kickoff/step_swarming.rs`, ask the agent as Java asks the client; both harnesses place
-  swarmers with seeded draws). **bb2025 done** (see Log): StepSwarming waits like Java
-  (`AgentPrompt::SwarmingPlacement`); both harnesses place by one zero-draw rule; the bb2025
-  setup check splits LINEMAN swarmers. Open: bb2016/bb2020 (Java's SwarmingBehaviour hook, still
-  place-nobody in both harnesses); the snotling cells of mirror/cross must be re-run (night).
+  swarmers with seeded draws). **bb2025** (c9ec0d5c0) and **bb2016/bb2020** (see Log) done:
+  StepSwarming waits like Java in every edition; bb2020 caps the allowance at the swarmers on the
+  pitch and leaves at once when it is 0; both harnesses place by one zero-draw rule (bb2025
+  LINEMAN, else the Swarming skill). bb2016 has no Swarming roster: unit-tested + goblin gate only.
+  Night: re-run the snotling cells of mirror/cross.
   Finding: bb2025 StepSetup / ApplyKickoffResult / BlitzTurn call the MIXED SetupMechanic where
   Java uses the bb2025 one (same verdict without swarmers; check when swarmers can be on the pitch).
 - [x] **Q2.9a PUNT_TO_CROWD loop** — does not reproduce on head: dark_elf bb2025 scales 0 and 1.0
@@ -352,6 +353,13 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q2.5b (bb2016/bb2020) · (this commit) · StepSwarming waits for placements in every
+  edition (Java SwarmingBehaviour shows the dialog for all); bb2020 allowance = min(swarmers on the
+  pitch, d3), 0 → leave at once; no setup check outside bb2025; too many placed → error dialog.
+  Both harnesses pick swarmers by LINEMAN (bb2025) or the Swarming skill. Gates: snotling bb2025,
+  snotling bb2020, snotling-orc bb2020, goblin bb2016 20/20 each (steps + reports); 16 bb2020
+  placements in 3 traced games; smoke 3×20/20; cargo test green.
 
 - 2026-11-27 · Q2.5b (bb2025) · (this commit) · bb2025 StepSwarming waits for placements like Java
   (prompt `SwarmingPlacement`, PlacePlayer re-asks, ConfirmSetup = CLIENT_END_TURN) and checks with

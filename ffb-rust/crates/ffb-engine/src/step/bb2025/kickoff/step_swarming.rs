@@ -43,6 +43,9 @@ pub struct StepSwarming {
     pub handle_receiving_team: bool,
     /// Java: state.rolledAmount — D6 swarming roll result.
     pub rolled_amount: i32,
+    /// Java bb2016/bb2020 SwarmingBehaviour `state.allowedAmount` (bb2016: the roll; bb2020:
+    /// min(swarmers already on the pitch, roll)); bb2025 has none (the roll is the allowance).
+    pub allowed_amount: i32,
     /// Java: state.teamId — ID of the swarming team.
     pub team_id: Option<String>,
 }
@@ -54,6 +57,7 @@ impl StepSwarming {
             end_turn: false,
             handle_receiving_team: false,
             rolled_amount: 0,
+            allowed_amount: 0,
             team_id: None,
         }
     }
@@ -80,7 +84,7 @@ impl Step for StepSwarming {
                 // Java CLIENT_SETUP_PLAYER: place and keep waiting (no executeStep). §Q2.5b: the
                 // wait now re-asks, as the setup step does (a bare cont() reads as a stall).
                 UtilServerSetup::setup_player(game, player_id, *coord);
-                return StepOutcome::cont().with_prompt(self.placement_prompt());
+                return StepOutcome::cont().with_prompt(self.placement_prompt(game));
             }
             _ => {}
         }
@@ -116,33 +120,37 @@ impl StepSwarming {
                     0
                 };
 
-                if placed > self.rolled_amount {
-                    // Java: showDialog(new DialogSwarmingErrorParameter(state.rolledAmount, placedSwarmingPlayers), false)
+                let allowed = self.allowance(game);
+                if placed > allowed {
+                    // Java: showDialog(new DialogSwarmingErrorParameter(allowed, placedSwarmingPlayers), false)
+                    // -- `state.rolledAmount` (bb2025), `state.allowedAmount` (bb2016/bb2020).
                     crate::util::util_server_dialog::UtilServerDialog::show_dialog(
                         game,
                         ffb_model::dialog::dialog_parameter_factory::DialogParameter::SwarmingError(
                             ffb_model::dialog::dialog_swarming_error_parameter::DialogSwarmingErrorParameter {
-                                allowed: self.rolled_amount,
+                                allowed,
                                 actual: placed,
                             },
                         ),
                         false,
                     );
-                    return StepOutcome::cont().with_prompt(self.placement_prompt());
+                    return StepOutcome::cont().with_prompt(self.placement_prompt(game));
                 }
 
                 // Java bb2025: `mechanic.checkSetup(gameState, isHomePlaying, rolledAmount)` with the
                 // EDITION's SetupMechanic (§Q2.5b: this called the mixed one without the swarmers,
-                // which rejects a team over eleven).
-                let setup_valid = crate::mechanic::setup_mechanic_for(game.rules)
-                    .check_setup_with_swarmers(game, game.home_playing, self.rolled_amount);
+                // which rejects a team over eleven). bb2016/bb2020 SwarmingBehaviour run no setup
+                // check: within the allowance they leave.
+                let setup_valid = game.rules != ffb_model::enums::Rules::Bb2025
+                    || crate::mechanic::setup_mechanic_for(game.rules)
+                        .check_setup_with_swarmers(game, game.home_playing, self.rolled_amount);
                 if setup_valid {
                     // Java leave(): pop the step, NEXT_STEP.
                     self.leave(game, placed);
                     return StepOutcome::next();
                 }
             }
-            return StepOutcome::cont().with_prompt(self.placement_prompt());
+            return StepOutcome::cont().with_prompt(self.placement_prompt(game));
         }
 
         // First entry.
@@ -231,6 +239,12 @@ impl StepSwarming {
         // Java `DiceRoller.rollSwarmingPlayers()` is `rollDice(3)` -- a d3 in EVERY edition. This
         // read d6, so even where the step did fire it consumed the wrong die.
         self.rolled_amount = rng.d3();
+        // Java bb2016 `allowedAmount = roll`; bb2020 `allowedAmount = min(limitingAmount, roll)`.
+        self.allowed_amount = if game.rules == ffb_model::enums::Rules::Bb2020 {
+            swarmers_on_pitch.min(self.rolled_amount)
+        } else {
+            self.rolled_amount
+        };
 
         // The report differs per edition, and BB2016/BB2020 run this shared step:
         //   bb2025 StepSwarming:     new ReportSwarmingRoll(teamId, rolledAmount)
@@ -247,38 +261,45 @@ impl StepSwarming {
             _ => game.report_list.add(ReportSwarmingRoll::new(team_id.clone(), self.rolled_amount)),
         }
 
-        // Java (bb2025): showDialog(new DialogSwarmingPlayersParameter(state.rolledAmount, false), false).
-        // The immediate leave() below hides it again, exactly as Java's leave() does.
+        self.end_turn = false;
+        // Java bb2020 SwarmingBehaviour: `if (allowedAmount == 0) { leave(.., 0); NEXT_STEP }` --
+        // no dialog, no wait.
+        if game.rules == ffb_model::enums::Rules::Bb2020 && self.allowed_amount == 0 {
+            self.leave(game, 0);
+            return StepOutcome::next();
+        }
+
+        // Java bb2025: showDialog(new DialogSwarmingPlayersParameter(rolledAmount, false), false);
+        // bb2016/bb2020: showDialog(new DialogSwarmingPlayersParameter(allowedAmount), false) --
+        // the one-argument constructor restricts placement.
+        let bb2025 = game.rules == ffb_model::enums::Rules::Bb2025;
         crate::util::util_server_dialog::UtilServerDialog::show_dialog(
             game,
             ffb_model::dialog::dialog_parameter_factory::DialogParameter::SwarmingPlayers(
                 ffb_model::dialog::dialog_swarming_players_parameter::DialogSwarmingPlayersParameter {
-                    amount: self.rolled_amount,
-                    restrict_placement: false,
+                    amount: self.allowance(game),
+                    restrict_placement: !bb2025,
                 },
             ),
             false,
         );
 
-        // Java pushes itself back on the stack and shows DialogSwarmingPlayersParameter, then
-        // waits for the coach to place swarmers (CLIENT_SETUP_PLAYER) and end the turn
-        // (CLIENT_END_TURN). §Q2.5b: bb2025 now waits the same way, asking the agent
-        // (`AgentPrompt::SwarmingPlacement`); ParityRunner.placeSwarmers answers with the same rule.
-        // bb2016/bb2020 keep the old contract -- spend the d3, place nobody, leave -- because their
-        // Java twin is the SwarmingBehaviour hook (not ported as a wait here) and the harness
-        // places nobody there.
-        self.end_turn = false;
-        if game.rules == ffb_model::enums::Rules::Bb2025 {
-            return StepOutcome::cont().with_prompt(self.placement_prompt());
-        }
-        self.leave(game, 0);
-        StepOutcome::next()
+        // Java pushes itself back on the stack and waits for the coach to place swarmers
+        // (CLIENT_SETUP_PLAYER) and end the turn (CLIENT_END_TURN). §Q2.5b: every edition now
+        // waits the same way, asking the agent (`AgentPrompt::SwarmingPlacement`);
+        // ParityRunner.placeSwarmers answers with the same rule.
+        StepOutcome::cont().with_prompt(self.placement_prompt(game))
     }
 
-    fn placement_prompt(&self) -> ffb_model::prompts::AgentPrompt {
+    /// How many swarmers may be placed: Java bb2025 `rolledAmount`, bb2016/bb2020 `allowedAmount`.
+    fn allowance(&self, game: &Game) -> i32 {
+        if game.rules == ffb_model::enums::Rules::Bb2025 { self.rolled_amount } else { self.allowed_amount }
+    }
+
+    fn placement_prompt(&self, game: &Game) -> ffb_model::prompts::AgentPrompt {
         ffb_model::prompts::AgentPrompt::SwarmingPlacement {
             team_id: self.team_id.clone().unwrap_or_default(),
-            amount: self.rolled_amount,
+            amount: self.allowance(game),
         }
     }
 
@@ -419,43 +440,49 @@ mod tests {
         assert_eq!(game.kicking_swarmers, 1);
     }
 
-    /// bb2016/bb2020 keep the old contract (the SwarmingBehaviour hook is not a wait here and the
-    /// harness places nobody): spend the d3 and leave inside `start()`.
+    /// Java bb2020 SwarmingBehaviour: `allowedAmount = min(swarmers already on the pitch, d3)`.
+    /// With a swarmer on the pitch the step waits for placements (prompt amount = the allowance);
+    /// with none it spends the d3 and leaves inside `start()` (no dialog, no wait).
     #[test]
-    fn swarming_trigger_spends_a_d3_and_leaves_the_swarming_turn() {
+    fn bb2020_allowance_is_capped_by_swarmers_on_the_pitch() {
         use ffb_model::types::FieldCoordinate;
-        let mut game = make_swarming_game();
-        // Add a second, on-pitch player for the home team.
-        let on_pitch = Player {
-            id: "p2".into(), name: "p2".into(), nr: 2, position_id: "lineman".into(),
-            player_type: PlayerType::Regular, gender: PlayerGender::Male,
-            movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
-            is_lineman: true,
-            ..Default::default()
-        };
-        game.team_home.players.push(on_pitch);
-        game.field_model.set_player_coordinate("p2", FieldCoordinate::new(5, 5));
-        game.field_model.set_player_state("p2", PlayerState::new(ffb_model::enums::PS_STANDING));
-        // bb2020's twin is the skill-based SwarmingBehaviour: give the team the skill.
-        game.rules = ffb_model::enums::Rules::Bb2020;
-        for p in &mut game.team_home.players {
-            p.starting_skills.push(ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::Swarming, value: None });
+        for (swarmer_on_pitch, waits) in [(true, true), (false, false)] {
+            let mut game = make_swarming_game();
+            let on_pitch = Player {
+                id: "p2".into(), name: "p2".into(), nr: 2, position_id: "lineman".into(),
+                player_type: PlayerType::Regular, gender: PlayerGender::Male,
+                movement: 6, strength: 3, agility: 3, passing: 4, armour: 9,
+                is_lineman: true,
+                ..Default::default()
+            };
+            game.team_home.players.push(on_pitch);
+            game.field_model.set_player_coordinate("p2", FieldCoordinate::new(5, 5));
+            game.field_model.set_player_state("p2", PlayerState::new(ffb_model::enums::PS_STANDING));
+            // bb2020's twin is the skill-based SwarmingBehaviour: the reserve has the skill, the
+            // on-pitch player only in the first case.
+            game.rules = ffb_model::enums::Rules::Bb2020;
+            for p in &mut game.team_home.players {
+                if p.id == "p1" || swarmer_on_pitch {
+                    p.starting_skills.push(ffb_model::model::skill_def::SkillWithValue { skill_id: SkillId::Swarming, value: None });
+                }
+            }
+
+            let mut step = StepSwarming::new();
+            step.handle_receiving_team = false;
+            let out = step.start(&mut game, &mut GameRng::new(0));
+
+            assert!((1..=3).contains(&step.rolled_amount), "a d3 must be spent");
+            assert_eq!(step.allowed_amount, if swarmer_on_pitch { 1 } else { 0 });
+            if waits {
+                assert_eq!(game.turn_mode, TurnMode::Swarming);
+                assert!(matches!(out.prompt,
+                    Some(ffb_model::prompts::AgentPrompt::SwarmingPlacement { amount: 1, .. })));
+            } else {
+                assert_eq!(out.action, StepAction::NextStep);
+                assert_eq!(game.turn_mode, TurnMode::Kickoff);
+                assert_eq!(game.kicking_swarmers, 0);
+            }
         }
-
-        let mut step = StepSwarming::new();
-        step.handle_receiving_team = false;
-        step.start(&mut game, &mut GameRng::new(0));
-
-        // The d3 was spent (Java `DiceRoller.rollSwarmingPlayers()` = rollDice(3)).
-        assert!((1..=3).contains(&step.rolled_amount),
-            "a d3 must be spent, got {}", step.rolled_amount);
-        // `leave()` ran: the swarming turn is over and the mode is back to Kickoff. Returning
-        // `cont()` here instead left the driver with no prompt and no step -- snotling produced
-        // ZERO steps until this was fixed.
-        assert_eq!(game.turn_mode, TurnMode::Kickoff,
-            "the swarming turn must be left before the step returns");
-        // No swarmer was placed, mirroring the harness's immediate EndTurn.
-        assert_eq!(game.kicking_swarmers, 0);
     }
 
     #[test]

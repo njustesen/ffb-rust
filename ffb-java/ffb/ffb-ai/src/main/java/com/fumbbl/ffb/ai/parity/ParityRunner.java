@@ -1229,11 +1229,17 @@ public class ParityRunner {
             if (placed >= amount) {
                 return;
             }
+            // The swarmers: bb2025 the LINEMAN keyword (StepSwarming), bb2016/bb2020 the Swarming
+            // skill (SwarmingBehaviour).
+            boolean bb2025 = isBb2025(game);
             Player<?> next = null;
             for (Player<?> p : team.getPlayers()) {
                 PlayerState s = fm.getPlayerState(p);
-                if (s != null && s.getBase() == PlayerState.RESERVE
-                    && p.getPosition().getKeywords().contains(com.fumbbl.ffb.model.Keyword.LINEMAN)
+                boolean swarmer = bb2025
+                    ? p.getPosition().getKeywords().contains(com.fumbbl.ffb.model.Keyword.LINEMAN)
+                    : p.getSkillsIncludingTemporaryOnes().stream()
+                        .anyMatch(sk -> "Swarming".equals(sk.getName()));
+                if (s != null && s.getBase() == PlayerState.RESERVE && swarmer
                     && (next == null || p.getNr() < next.getNr())) {
                     next = p;
                 }
@@ -1321,13 +1327,12 @@ public class ParityRunner {
             // state: the next iteration sees SWARMING with no dialog and the UNHANDLED_STEP default
             // ends the turn with zero swarmers placed, exactly what Rust's step_swarming does.
             case SWARMING:
-                // §Q2.5b: bb2025 StepSwarming waits for CLIENT_SETUP_PLAYER(s) + CLIENT_END_TURN.
-                // Place swarmers by random_agent.rs's `swarming_placement_action` rule (no draws);
-                // the UNHANDLED_STEP default then ends the turn. bb2016/bb2020 place nobody (as Rust).
-                if (isBb2025(game)) {
-                    placeSwarmers(game, gameState,
-                        ((com.fumbbl.ffb.dialog.DialogSwarmingPlayersParameter) dialog).getAmount());
-                }
+                // §Q2.5b: StepSwarming (bb2025) / SwarmingBehaviour (bb2016, bb2020) waits for
+                // CLIENT_SETUP_PLAYER(s) + CLIENT_END_TURN. Place swarmers by random_agent.rs's
+                // `swarming_placement_action` rule (no draws); the UNHANDLED_STEP default then ends
+                // the turn. The dialog's amount is the allowance (bb2020: min(on pitch, roll)).
+                placeSwarmers(game, gameState,
+                    ((com.fumbbl.ffb.dialog.DialogSwarmingPlayersParameter) dialog).getAmount());
                 game.setDialogParameter(null);
                 break;
 

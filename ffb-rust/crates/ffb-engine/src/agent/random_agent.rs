@@ -1943,8 +1943,11 @@ pub fn swarming_placement_action(game: &Game, team_id: &str, amount: i32) -> Act
     if placed >= amount {
         return Action::ConfirmSetup;
     }
+    // The swarmers: bb2025 the LINEMAN keyword (StepSwarming), bb2016/bb2020 the Swarming skill
+    // (SwarmingBehaviour).
+    let bb2025 = game.rules == ffb_model::enums::Rules::Bb2025;
     let mut reserves: Vec<&ffb_model::model::player::Player> = team.players.iter()
-        .filter(|p| p.is_lineman
+        .filter(|p| (if bb2025 { p.is_lineman } else { p.has_skill(ffb_model::enums::SkillId::Swarming) })
             && game.field_model.player_state(&p.id).is_some_and(|s| s.base() == ffb_model::enums::PS_RESERVE))
         .collect();
     reserves.sort_by_key(|p| p.nr);
