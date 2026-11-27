@@ -326,12 +326,13 @@ impl StepApplyKickoffResult {
         // Java: getResult().addReport(new ReportWeather(weather, weatherRoll))
         game.report_list.add(ReportWeather::new(weather, weather_roll.to_vec()));
 
-        // Java: SWELTERING_HEAT → EXHAUSTED players move to RESERVE
+        // Java: SWELTERING_HEAT → `for (Player player : game.getPlayers())` EXHAUSTED → RESERVE.
+        // Every player of both teams: an exhausted player sits in the reserve box, so walking only
+        // the players on the pitch never reached one (amazon bb2016 @1.0 seed 20, mirror q1).
         if weather == Weather::SwelteringHeat {
-            let player_ids: Vec<String> = game
-                .field_model
-                .players_on_pitch()
-                .cloned()
+            let player_ids: Vec<String> = game.team_home.players.iter()
+                .chain(game.team_away.players.iter())
+                .map(|p| p.id.clone())
                 .collect();
             for id in player_ids {
                 if let Some(state) = game.field_model.player_state(&id) {
@@ -616,6 +617,29 @@ mod tests {
 
     fn make_game() -> Game {
         Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2016)
+    }
+
+    /// Java bb2016 Weather Change to Sweltering Heat: `for (Player player : game.getPlayers())`
+    /// EXHAUSTED → RESERVE -- including the exhausted players in the reserve box (Rust walked only
+    /// the players on the pitch: amazon bb2016 @1.0 seed 20, mirror q1).
+    #[test]
+    fn sweltering_heat_weather_change_resets_exhausted_players_in_the_box() {
+        use ffb_model::enums::{PlayerState, PS_EXHAUSTED, PS_RESERVE};
+        use ffb_model::model::player::Player;
+        let seed = (0..2000u64).find(|s| {
+            let w = GameRng::new(*s).roll_weather();
+            DiceInterpreter::interpret_roll_weather(&w) == Weather::SwelteringHeat
+        }).expect("a seed rolling Sweltering Heat");
+        let mut game = make_game();
+        game.team_home.players.push(Player { id: "x".into(), nr: 1, ..Default::default() });
+        game.field_model.set_player_state("x", PlayerState::new(PS_EXHAUSTED));
+        // x = -1: the home reserve box (`RSV_HOME_X`), i.e. off the pitch.
+        game.field_model.set_player_coordinate("x", ffb_model::types::FieldCoordinate::new(-1, 0));
+        let mut step = StepApplyKickoffResult::new("end".into(), "blitz".into());
+        step.kickoff_result = Some(KickoffResult::WeatherChange);
+        step.start(&mut game, &mut GameRng::new(seed));
+        assert_eq!(game.field_model.weather, Weather::SwelteringHeat);
+        assert_eq!(game.field_model.player_state("x").map(|s| s.base()), Some(PS_RESERVE));
     }
 
     /// Java `DiceRoller.rollExtraReRoll()` is `rollDice(3)` — a **d3** — and bb2016 uses it for

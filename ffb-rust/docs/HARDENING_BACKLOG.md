@@ -375,6 +375,14 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q1.1 mirror q1 (first reds) · (this commit) · the per-step verdict found its first
+  real bug: a Weather Change kick-off to Sweltering Heat resets EXHAUSTED → RESERVE for EVERY player
+  (Java `game.getPlayers()`); Rust (bb2016 and the shared bb2025 step) walked only the players on
+  the pitch, so heat-exhausted players in the box stayed EXHAUSTED and active until the next drive
+  end (final state equal, so the old final-hash verdict never saw it). amazon @1.0 s20, nurgle @1.0
+  s75, undead @1.0 s20, khemri_fumbbl @1e6 s40 (all bb2016) now match. Test added; cargo test
+  12,816 green; smoke 3×20/20. The running q1 mirror keeps the old exe: re-gate its reds after.
+
 - 2026-11-27 · Q2.10 part 3 · (this commit) · bb2020 StepJump ported into the shared step as one
   unit: the game's own JumpMechanic; ActingPlayer `has_jumped` (reset on player change) and Leap
   marked used after every bb2020 leap; bb2020 canStillJump reads hasJumped (was `!jumping`) and the

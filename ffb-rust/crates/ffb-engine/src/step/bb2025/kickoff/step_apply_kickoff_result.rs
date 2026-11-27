@@ -973,7 +973,12 @@ impl StepApplyKickoffResult {
         // client-only: setAnimation based on weather
 
         if weather == Weather::SwelteringHeat {
-            let player_ids: Vec<String> = game.field_model.players_on_pitch().cloned().collect();
+            // Java: `for (Player player : game.getPlayers())` -- every player of both teams; an
+            // exhausted player sits in the reserve box, off the pitch (mirror q1, amazon bb2016).
+            let player_ids: Vec<String> = game.team_home.players.iter()
+                .chain(game.team_away.players.iter())
+                .map(|p| p.id.clone())
+                .collect();
             for id in player_ids {
                 if let Some(state) = game.field_model.player_state(&id) {
                     if state.base() == PS_EXHAUSTED {
