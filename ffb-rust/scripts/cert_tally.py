@@ -56,6 +56,13 @@ def main():
                                     ("view-c", ("cross",), 4012), ("view-s", ("star",), 4012)):
         files = [os.path.join("D:/", "ffb_view_%s_%s" % (name, s), "summary.txt") for s in suffixes]
         ok &= tally(label, [f for f in files if os.path.exists(f)], " ", VIEW_GREEN, expect)
+        # §Q1.5: suite-level coverage (view_suite.py writes coverage.txt when a root is DONE).
+        for s in suffixes:
+            cov = os.path.join("D:/", "ffb_view_%s_%s" % (name, s), "coverage.txt")
+            text = open(cov, errors="replace").read() if os.path.exists(cov) else ""
+            cov_ok = "all required items present" in text
+            print("%-6s coverage %-10s %s" % (label, s, "OK" if cov_ok else ("MISSING items" if text else "not run")))
+            ok &= cov_ok
     print("ALL SUITES GREEN (incl. client view)" if ok else "NOT ALL GREEN")
 
 

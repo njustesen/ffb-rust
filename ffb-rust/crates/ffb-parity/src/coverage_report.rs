@@ -2,14 +2,15 @@
 /// Used by both ffb-parity (inline during parity runs) and can be used standalone.
 
 use std::collections::HashMap;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ffb_model::events::GameEvent;
 use ffb_model::enums::{PlayerAction, SeriousInjuryKind};
 use ffb_mechanics::skills::SKILL_TABLE;
 
 // ── Data structures ────────────────────────────────────────────────────────────
 
-#[derive(Default, Serialize)]
+#[derive(Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct RollStats {
     pub total: u32,
     pub success: u32,
@@ -25,7 +26,8 @@ impl RollStats {
     }
 }
 
-#[derive(Default, Serialize)]
+#[derive(Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct BlockStats {
     pub total: u32,
     pub rerolled: u32,
@@ -34,7 +36,8 @@ pub struct BlockStats {
     pub by_result: HashMap<String, u32>,
 }
 
-#[derive(Default, Serialize)]
+#[derive(Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct PassStats {
     pub total: u32,
     pub rerolled: u32,
@@ -43,7 +46,8 @@ pub struct PassStats {
     pub by_distance_and_result: HashMap<String, u32>,
 }
 
-#[derive(Default, Serialize)]
+#[derive(Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct InjuryStats {
     pub total: u32,
     pub armor_only: u32,
@@ -53,7 +57,8 @@ pub struct InjuryStats {
     pub by_serious_injury: HashMap<String, u32>,
 }
 
-#[derive(Default, Serialize)]
+#[derive(Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct CoverageReport {
     pub games: u32,
     pub home_wins: u32,
@@ -245,7 +250,8 @@ fn event_type_name(ev: &GameEvent) -> String {
         .unwrap_or_else(|| "<unserialisable>".to_string())
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Default)]
+#[serde(default)]
 pub struct MatchupSummary {
     pub home: String,
     pub away: String,
@@ -978,9 +984,82 @@ render();
 "#, json = json)
 }
 
+// ── §Q1.5 suite-wide coverage ───────────────────────────────────────────────────
+
+/// Sum two serialised coverage reports: numbers add, objects merge key by key, arrays append,
+/// any other value keeps the first. Works on the JSON so a new counter needs no merge code.
+pub fn merge_json(into: &mut serde_json::Value, from: &serde_json::Value) {
+    use serde_json::Value;
+    match (into, from) {
+        (Value::Number(a), Value::Number(b)) => {
+            let sum = a.as_i64().unwrap_or(0) + b.as_i64().unwrap_or(0);
+            *a = serde_json::Number::from(sum);
+        }
+        (Value::Object(a), Value::Object(b)) => {
+            for (k, v) in b {
+                match a.get_mut(k) {
+                    Some(slot) => merge_json(slot, v),
+                    None => { a.insert(k.clone(), v.clone()); }
+                }
+            }
+        }
+        (Value::Array(a), Value::Array(b)) => a.extend(b.iter().cloned()),
+        _ => {}
+    }
+}
+
+/// Merge every `*.coverage.json` / `*.json` coverage file under `dir` (recursively) and render the
+/// tier-3 checklist over the sum. Returns (markdown, all required items present, files merged).
+pub fn merge_dir_and_check(dir: &std::path::Path) -> (String, bool, usize) {
+    fn walk(d: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        if let Ok(rd) = std::fs::read_dir(d) {
+            for e in rd.flatten() {
+                let p = e.path();
+                if p.is_dir() { walk(&p, out); }
+                else if p.file_name().and_then(|n| n.to_str()).map_or(false, |n| n.ends_with(".coverage.json")) {
+                    out.push(p);
+                }
+            }
+        }
+    }
+    let mut files = Vec::new();
+    walk(dir, &mut files);
+    files.sort();
+    let mut total = serde_json::Value::Object(Default::default());
+    for f in &files {
+        if let Some(v) = std::fs::read_to_string(f).ok().and_then(|s| serde_json::from_str(&s).ok()) {
+            merge_json(&mut total, &v);
+        }
+    }
+    let mut cov: CoverageReport = serde_json::from_value(total).unwrap_or_default();
+    cov.skill_names = build_skill_names();
+    let (md, ok) = crate::t3_checklist::render_markdown(&cov, cov.games);
+    (md, ok, files.len())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn merged_reports_sum_counters_and_maps() {
+        let mut a = CoverageReport::default();
+        a.games = 2; a.touchdowns = 1;
+        a.kickoff_events.insert("Blitz".into(), 1);
+        a.block_rolls.by_dice.insert(2, 3);
+        let mut b = CoverageReport::default();
+        b.games = 3; b.touchdowns = 4;
+        b.kickoff_events.insert("Blitz".into(), 2);
+        b.kickoff_events.insert("Riot".into(), 1);
+        b.block_rolls.by_dice.insert(2, 1);
+        let mut total = serde_json::to_value(&a).unwrap();
+        merge_json(&mut total, &serde_json::to_value(&b).unwrap());
+        let m: CoverageReport = serde_json::from_value(total).unwrap();
+        assert_eq!((m.games, m.touchdowns), (5, 5));
+        assert_eq!(m.kickoff_events.get("Blitz"), Some(&3));
+        assert_eq!(m.kickoff_events.get("Riot"), Some(&1));
+        assert_eq!(m.block_rolls.by_dice.get(&2), Some(&4));
+    }
     use ffb_model::types::FieldCoordinate;
 
     #[test]

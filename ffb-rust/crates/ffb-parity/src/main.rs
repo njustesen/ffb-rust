@@ -235,6 +235,17 @@ impl ParityArgs {
 fn main() {
     env_logger::init();
 
+    // §Q1.5: `--coverage-merge <dir>` sums every gate's FFB_COVERAGE_JSON under <dir> and enforces
+    // the tier-3 checklist on the WHOLE suite (no small-run exemption). Exit 1 on a missing item.
+    let raw_args: Vec<String> = std::env::args().collect();
+    if let Some(pos) = raw_args.iter().position(|a| a == "--coverage-merge") {
+        let dir = raw_args.get(pos + 1).expect("--coverage-merge <dir>");
+        let (md, ok, files) = coverage_report::merge_dir_and_check(std::path::Path::new(dir));
+        println!("{md}");
+        println!("COVERAGE: {files} gate file(s) merged, {}", if ok { "all required items present" } else { "required items MISSING" });
+        std::process::exit(if ok { 0 } else { 1 });
+    }
+
     let args = ParityArgs::parse();
 
     // ml/setup_bc viewer input: the two drafted teams before their first setup, as one
@@ -783,6 +794,11 @@ fn main() {
         std::fs::write("T3_COVERAGE.md", &md).ok();
         if let Ok(json) = serde_json::to_string(&*cov) {
             std::fs::write("t3_coverage.html", coverage_report::generate_html(&json)).ok();
+            // §Q1.5: one coverage JSON per gate, summed suite-wide by `--coverage-merge`, where
+            // the checklist is enforced on the whole suite instead of per (small) gate.
+            if let Some(path) = std::env::var_os("FFB_COVERAGE_JSON") {
+                std::fs::write(path, &json).ok();
+            }
         }
         println!("\n{md}");
         println!("Coverage written to T3_COVERAGE.md and t3_coverage.html");

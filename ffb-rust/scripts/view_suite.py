@@ -76,7 +76,8 @@ def run(ed, home, away, hs, aws):
     shutil.rmtree(vd, ignore_errors=True)
     os.makedirs(vd, exist_ok=True)
     stars = ["--home-star", hs, "--away-star", aws] if hs else []
-    env = dict(os.environ, FFB_PARITY_ROOT=d, FFB_CLIENT_VIEW_DIR=vd, PARITY_JVM_CORES="2")
+    env = dict(os.environ, FFB_PARITY_ROOT=d, FFB_CLIENT_VIEW_DIR=vd, PARITY_JVM_CORES="2",
+               FFB_COVERAGE_JSON=os.path.join(root, name + ".coverage.json"))
     if jar:
         env["PARITY_CP"] = jar
     logp = os.path.join(root, name + ".log")
@@ -138,4 +139,12 @@ for t in ts:
 left = sum(1 for j in jobs if not os.path.exists(os.path.join(root, job_name(*j) + ".check.txt")))
 summary = os.path.join(root, "summary.txt")
 bad = sum(1 for l in open(summary) if l.startswith("BAD")) if os.path.exists(summary) else 0
+if left == 0:
+    # §Q1.5: enforce the tier-3 coverage checklist on the whole suite (every job's
+    # <name>.coverage.json summed); the verdict lands in <root>/coverage.txt for cert_tally.py.
+    cov = subprocess.run([exe, "--coverage-merge", root], cwd=REPO, capture_output=True, text=True,
+                         errors="replace").stdout
+    with open(os.path.join(root, "coverage.txt"), "w") as f:
+        f.write(cov)
+    print(cov.strip().splitlines()[-1] if cov.strip() else "COVERAGE: no output", flush=True)
 print(("DONE" if left == 0 else "CHUNK END") + f" left={left} bad={bad}", flush=True)

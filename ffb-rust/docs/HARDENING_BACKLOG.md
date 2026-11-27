@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q1.5** (enforce coverage). Parked with notes: Q1.2b (punt → throw-in
+Next item: **Q1.6** (Rust-vs-Rust determinism gate). Parked with notes: Q1.2b (punt → throw-in
 stall), Q1.2c. Night queue: mirror 330 with the Q1.1–Q1.3 verdict + hash (freeze a q1 exe + jar first).
 Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q2.5). Last certified build: cert9 (`docs/cert_manifest.json`); last view build: view15.
 
@@ -92,7 +92,11 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
   `scripts/` (job lists → `FFB_CLIENT_VIEW_DIR` dumps → `client_view_check.py`), add a dump after game end
   (SPP, MVP, winnings, fan factor), compare ordered lists in order where Java's order is meaningful, and
   make `cert_tally.py` require `CLIENT VIEW n steps, n identical`. Done: one suite cell end-to-end.
-- [ ] **Q1.5 Enforce coverage.** The coverage checklist runs for every gate (aggregate per suite, not per
+- [x] **Q1.5 Enforce coverage.** (see Log) Each gate writes `FFB_COVERAGE_JSON`; `ffb-parity
+  --coverage-merge <root>` sums them and applies the tier-3 checklist with no small-run exemption
+  (exit 1 on MISSING); view_suite.py writes `<root>/coverage.txt` at DONE and cert_tally.py requires it.
+  3-job test: merge works, flags `throw-ins` MISSING over 9 games. Left: skill ledger counting a skill
+  only when it fired, not when offered (Q1.5b). Original: The coverage checklist runs for every gate (aggregate per suite, not per
   50-game gate); MISSING required items are reds at suite level; the skill ledger counts a skill only when
   it changed the outcome path (fired), not when offered. Done: suite-level coverage report in the cert.
 - [ ] **Q1.6 Determinism gate.** Run Rust twice on the same seeds (fresh process each) and diff the
@@ -207,6 +211,8 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-27 · Q1.5 · (next commit) · suite-level coverage: per-gate JSON, --coverage-merge, coverage.txt
+  required by cert_tally; merge unit test.
 - 2026-11-27 · Q1.4 · (next commit) · view_suite.py in the repo, post-game view dumps, cert_tally counts
   the view suites; human-orc bb2025, dwarf-elf bb2020, skaven-undead bb2016 all identical incl. end view.
 - 2026-11-27 · Q1.3 part 5 · (next commit) · temporary-skill count per player in the hash; Grombrindal
