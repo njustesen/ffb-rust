@@ -8,7 +8,7 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item: **Q4.4** missing dialogs and ModelChange kinds (Q4.2 rest waits for the other session's
+Next item: **Q4.4** rest (part 1 done: enhancements), then **Q2.10** inline decisions (Q4.2 rest waits for the other session's
 declaration work; Q4.3 is [!]; Q3.10 needs suite runs: night). Q3.9 code is done; its
 bb2016 skill sweep joins the night queue. Q3.3a (card play) waits for another session's
 uncommitted card-model work (see Q3.3a); Q3.3b (card draw) is [!] with a question for the user.
@@ -318,10 +318,15 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   Rust server get a ruleset setting Java's standalone server lacks (e.g. `rulesVersion` in the
   server ini, or per game at creation), so the GUI can play BB2020/BB2016? If yes, UseIgors and
   SelectCardToBuy (Q4.2) and the bb2016 KICK_TEAM_MATE decode follow.
-- [ ] **Q4.4 Missing dialogs and ModelChange kinds** (31 never produced: cards, prayers/enhancements,
+- [~] **Q4.4 Missing dialogs and ModelChange kinds** (31 never produced: cards, prayers/enhancements,
   hatred, chomp, acting-player dodging/jumping/leaping/strength, blitz state, …; dialogs
   BlockRollPartialReRoll, BuyInducements, Journeymen, PilingOn, TeamSetup, UseIgors,
   UseMortuaryAssistant). Done: whole-game fallbacks 0 on a coverage-bias GUI run.
+  **Part 1 done** (see Log): enhancements (the player's temporary maps) travel as Java's
+  add/remove-enhancement changes; the only fallback in recent GUI runs (Dodgy Snack) is gone.
+  Open: Incorporeal / Baleful Hex `getEnhancements()` in the processor (`java_skill_enhancements`
+  still Err; that file carries the other session's uncommitted card work), cards, chomp,
+  acting-player flags, the listed dialogs. A coverage-bias GUI run needs Q4.5's scripted client.
 - [~] **Q4.5 gui_check hardening:** fail on ignored commands; all three editions; all teams (add setups);
   a scripted "human" client path that answers every dialog kind. **Part 1 done** (see Log): an
   ignored command now fails the game, except Java's own two (a re-sent CLIENT_START_GAME, anything
@@ -353,6 +358,14 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q4.4 part 1 · (this commit) · model-change diff: a player's changed enhancement
+  source becomes the Java change that reproduces it (removeSkillEnhancements; addSkillEnhancements,
+  addPrayer, addHatred, addEnhancements, addIntensiveTraining, addWisdom, in that order, each proven
+  by a processor replay; gainedHatred rides on addHatred); `Prayer::VALUES` (Java `values()`) for
+  bb2020/bb2025. The q42b games 07/08 had fallen back on Dodgy Snack; re-run 07/08 + 10 more GUI
+  games 12/12 pass, 0 fallbacks (no Dodgy Snack rolled; the unit test replays the engine's exact
+  writes). cargo test green; smoke 3×20/20.
 
 - 2026-11-27 · Q2.5b (bb2016/bb2020) · (this commit) · StepSwarming waits for placements in every
   edition (Java SwarmingBehaviour shows the dialog for all); bb2020 allowance = min(swarmers on the

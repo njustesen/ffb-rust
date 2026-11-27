@@ -23,6 +23,14 @@ pub enum Prayer {
 }
 
 impl Prayer {
+    /// Java: `Prayer.values()`, in declaration order.
+    pub const VALUES: [Prayer; 16] = [
+        Prayer::TREACHEROUS_TRAPDOOR, Prayer::FRIENDS_WITH_THE_REF, Prayer::STILETTO, Prayer::IRON_MAN,
+        Prayer::KNUCKLE_DUSTERS, Prayer::BAD_HABITS, Prayer::GREASY_CLEATS, Prayer::BLESSED_STATUE_OF_NUFFLE,
+        Prayer::MOLES_UNDER_THE_PITCH, Prayer::PERFECT_PASSING, Prayer::DAZZLING_CATCHING, Prayer::FAN_INTERACTION,
+        Prayer::FOULING_FRENZY, Prayer::THROW_A_ROCK, Prayer::UNDER_SCRUTINY, Prayer::INTENSIVE_TRAINING,
+    ];
+
     /// Java: getName()
     pub fn get_name(self) -> &'static str {
         match self {

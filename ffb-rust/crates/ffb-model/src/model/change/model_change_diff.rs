@@ -189,6 +189,131 @@ struct Differ {
     uncovered: Vec<String>,
     /// Java would have notified GAME_SET_DIALOG_PARAMETER (see `Game::dialog_set_count`).
     dialog_set: bool,
+    /// (player id, enhancement source) whose temporary-map entries changed.
+    enhancement_sources: Vec<(String, String)>,
+}
+
+/// A player's temporary maps (Java `Player.temporarySkills` / `temporaryModifiers` /
+/// `temporaryProperties`), all keyed by the enhancement source name.
+const TEMPORARY_MAPS: [&str; 3] = ["temporaryModifiersMap", "temporaryPropertiesMap", "temporarySkillsMap"];
+
+/// One source's entries in a player's three temporary maps, order-free (`None` = no entry).
+type SourceEntry = [Option<Vec<String>>; 3];
+
+fn source_entry(game: &Game, player_id: &str, source: &str) -> SourceEntry {
+    let Some(p) = game.player(player_id) else { return [None, None, None] };
+    let names = |m: &Vec<(String, Vec<String>)>| {
+        m.iter().find(|(s, _)| s == source).map(|(_, v)| {
+            let mut v = v.clone();
+            v.sort();
+            v
+        })
+    };
+    let skills = p.temporary_skills_map.iter().find(|(s, _)| s == source).map(|(_, v)| {
+        let mut v: Vec<String> = v.iter().map(|sw| format!("{:?}{:?}", sw.skill_id, sw.value)).collect();
+        v.sort();
+        v
+    });
+    [names(&p.temporary_modifiers_map), names(&p.temporary_properties_map), skills]
+}
+
+/// The model changes Java sends when a player's enhancement `source` appears, changes or goes
+/// (every Java write to the temporary maps is a `FieldModel` method that notifies one of these):
+/// `removeSkillEnhancements(name)` drops the source from all three maps; it is added by
+/// `addSkillEnhancements(skill)`, `addEnhancements(name)` (the registry), `addPrayerEnhancements`,
+/// `addHatred` ("Getting Even <keyword>"), `addIntensiveTrainingSkill` or `addWisdomSkill` (one
+/// change per gained skill). The first candidate whose replay through the processor yields the
+/// engine's entry is taken; none -> the source stays uncovered (the whole game is sent).
+fn enhancement_candidates(work: &Game, after: &Game, player_id: &str, source: &str) -> Vec<Vec<ModelChange>> {
+    use crate::factory::skill_factory::SkillFactory;
+    use crate::enums::Rules;
+    let key = Some(player_id);
+    let had = source_entry(work, player_id, source) != [None, None, None];
+    if source_entry(after, player_id, source) == [None, None, None] {
+        return vec![vec![change("fieldModelRemoveSkillEnhancements", key, Value::from(source))]];
+    }
+    let rules = after.rules;
+    let mut adds: Vec<Vec<ModelChange>> = vec![
+        vec![change("fieldModelAddSkillEnhancements", key, Value::from(source))],
+    ];
+    // Prayers before the registry: the registry also knows the prayer names, but Java's prayer
+    // handlers send fieldModelAddPrayer.
+    let prayers: Vec<&'static str> = match rules {
+        Rules::Bb2020 => crate::inducement::bb2020::prayer::Prayer::VALUES.iter().filter(|p| p.get_name() == source).map(|p| p.name()).collect(),
+        Rules::Bb2025 => crate::inducement::bb2025::prayer::Prayer::VALUES.iter().filter(|p| p.get_name() == source).map(|p| p.name()).collect(),
+        _ => Vec::new(),
+    };
+    for p in prayers {
+        adds.push(vec![change("fieldModelAddPrayer", key, Value::from(p))]);
+    }
+    if let Some(keyword) = source.strip_prefix("Getting Even ") {
+        adds.push(vec![change("fieldModelAddHatred", key, Value::from(keyword))]);
+    }
+    adds.push(vec![change("fieldModelAddEnhancements", key, Value::from(source))]);
+    // The skills the source gained (a multiset difference: Java's SkillWithValue sets keep
+    // duplicates, having no equals).
+    let skills = |g: &Game| -> Vec<crate::model::skill_def::SkillWithValue> {
+        g.player(player_id)
+            .and_then(|p| p.temporary_skills_map.iter().find(|(s, _)| s == source).map(|(_, v)| v.clone()))
+            .unwrap_or_default()
+    };
+    let mut rest = skills(work);
+    let mut gained: Vec<String> = Vec::new();
+    for sw in skills(after) {
+        match rest.iter().position(|x| x.skill_id == sw.skill_id && x.value == sw.value) {
+            Some(i) => {
+                rest.remove(i);
+            }
+            None => gained.push(SkillFactory::name_in(rules, sw.skill_id).unwrap_or_default().to_string()),
+        }
+    }
+    if !gained.is_empty() {
+        for id in ["fieldModelAddIntensiveTraining", "fieldModelAddWisdom"] {
+            adds.push(gained.iter().map(|s| change(id, key, Value::from(s.as_str()))).collect());
+        }
+    }
+    let mut out = adds.clone();
+    if had {
+        // Java removes a source before adding it again (`addEnhancement` is a no-op while active).
+        for a in adds {
+            let mut c = vec![change("fieldModelRemoveSkillEnhancements", key, Value::from(source))];
+            c.extend(a);
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// Resolves the changed enhancement sources against the games (see `enhancement_candidates`).
+fn enhancements(before: &Game, after: &Game, sources: &[(String, String)], list: &mut ModelChangeList, uncovered: &mut Vec<String>) {
+    if sources.is_empty() {
+        return;
+    }
+    let processor = ModelChangeProcessor::new();
+    let mut work = before.clone();
+    for (player_id, source) in sources {
+        let want = source_entry(after, player_id, source);
+        let mut found = None;
+        for candidate in enhancement_candidates(&work, after, player_id, source) {
+            let mut g = work.clone();
+            let ok = candidate.iter().all(|c| {
+                DecodedModelChange::decode(&g, c).and_then(|d| processor.apply(&mut g, &d)).is_ok()
+            });
+            if ok && source_entry(&g, player_id, source) == want {
+                found = Some((candidate, g));
+                break;
+            }
+        }
+        match found {
+            Some((candidate, g)) => {
+                for c in candidate {
+                    list.add(c);
+                }
+                work = g;
+            }
+            None => uncovered.push(format!("player[{player_id}].enhancement {source:?}")),
+        }
+    }
 }
 
 impl Differ {
@@ -327,9 +452,28 @@ impl Differ {
                 continue;
             }
             for k in ao.keys().chain(bo.keys()) {
-                if k != "usedSkills" && get(bo, k) != get(ao, k) {
+                if k != "usedSkills" && !TEMPORARY_MAPS.contains(&k.as_str()) && get(bo, k) != get(ao, k) {
                     self.uncovered.push(format!("{path}.player[{id}].{k}"));
                 }
+            }
+            // The temporary maps change per enhancement source (resolved in `enhancements`).
+            let mut sources: Vec<String> = Vec::new();
+            for m in TEMPORARY_MAPS {
+                let (bm, am) = (get(bo, m), get(ao, m));
+                if bm == am {
+                    continue;
+                }
+                let empty = Map::new();
+                let (bm, am) = (bm.as_object().unwrap_or(&empty), am.as_object().unwrap_or(&empty));
+                for s in bm.keys().chain(am.keys()) {
+                    let (bs, as_) = (bm.get(s).map(canonical), am.get(s).map(canonical));
+                    if bs != as_ && !sources.contains(s) {
+                        sources.push(s.clone());
+                    }
+                }
+            }
+            for s in sources {
+                self.enhancement_sources.push((id.clone(), s));
             }
             let set = |v: &Value| v.as_array().cloned().unwrap_or_default();
             let (bu, au) = (set(get(bo, "usedSkills")), set(get(ao, "usedSkills")));
@@ -483,7 +627,9 @@ impl Differ {
                     self.uncovered.push(format!("{k}.playerResults[{id}] (added)"));
                     continue;
                 }
-                self.scalars(&format!("{k}.playerResults[{id}]"), bo, ao, PLAYER_RESULT_KEYS, Some(id), &["playerId"]);
+                // gainedHatred has no change of its own: fieldModelAddHatred adds it on the client
+                // (resolved with the "Getting Even" enhancement source; self_check proves it).
+                self.scalars(&format!("{k}.playerResults[{id}]"), bo, ao, PLAYER_RESULT_KEYS, Some(id), &["playerId", "gainedHatred"]);
             }
         }
         Ok(())
@@ -497,8 +643,10 @@ pub fn diff(before: &Game, after: &Game) -> Result<ModelChangeList, Vec<String>>
     let a = after.to_json_value().map_err(|e| vec![format!("after: {e}")])?;
     let dialog_set = before.dialog_set_count != after.dialog_set_count
         && !(before.dialog_parameter.is_none() && after.dialog_parameter.is_none());
-    let mut d = Differ { list: ModelChangeList::default(), uncovered: Vec::new(), dialog_set };
+    let mut d = Differ { list: ModelChangeList::default(), uncovered: Vec::new(), dialog_set, enhancement_sources: Vec::new() };
     d.game(&b, &a).map_err(|e| vec![e])?;
+    let sources = std::mem::take(&mut d.enhancement_sources);
+    enhancements(before, after, &sources, &mut d.list, &mut d.uncovered);
     if d.uncovered.is_empty() {
         Ok(d.list)
     } else {
@@ -788,6 +936,65 @@ mod tests {
         let mut after = before.clone();
         after.team_home.name = "renamed".into();
         assert_eq!(diff(&before, &after).unwrap_err(), vec!["teamHome.teamName".to_string()]);
+    }
+
+    /// bb2025 Dodgy Snack: Java `addEnhancements(player, "Dodgy Snack")` -> fieldModelAddEnhancements,
+    /// and at the end of the drive `removeSkillEnhancements` -> fieldModelRemoveSkillEnhancements.
+    #[test]
+    fn dodgy_snack_travels_as_enhancement_changes() {
+        use crate::model::player::{STAT_AV, STAT_MA};
+        let before = game();
+        let mut after = before.clone();
+        {
+            let p = after.team_home.player_mut("h1").unwrap();
+            p.begin_enhancement("Dodgy Snack");
+            p.add_temporary_stat_mod_limited("Dodgy Snack", STAT_MA, -1, crate::model::player::stat_limit(Rules::Bb2025, STAT_MA));
+            p.add_temporary_stat_mod_limited("Dodgy Snack", STAT_AV, -1, crate::model::player::stat_limit(Rules::Bb2025, STAT_AV));
+        }
+        let list = diff(&before, &after).unwrap();
+        let ids: Vec<_> = list.iter().map(|c| (c.change_id, c.get_key().map(str::to_string), c.value.clone())).collect();
+        assert_eq!(ids, vec![(ModelChangeId::FieldModelAddEnhancements, Some("h1".into()), Value::from("Dodgy Snack"))]);
+        self_check(&before, &after, &list).unwrap();
+
+        let mut later = after.clone();
+        later.team_home.player_mut("h1").unwrap().remove_enhancements("Dodgy Snack");
+        let list = diff(&after, &later).unwrap();
+        assert_eq!(list.iter().map(|c| c.change_id).collect::<Vec<_>>(), vec![ModelChangeId::FieldModelRemoveSkillEnhancements]);
+        self_check(&after, &later, &list).unwrap();
+    }
+
+    /// A prayer source maps back to its enum constant; Wisdom grants one change per skill.
+    #[test]
+    fn prayer_and_wisdom_sources_round_trip() {
+        let before = game();
+        let mut after = before.clone();
+        after.team_home.player_mut("h1").unwrap().begin_enhancement("Knuckle Dusters");
+        after.team_home.player_mut("h1").unwrap().add_prayer_skill("Knuckle Dusters", crate::enums::SkillId::MightyBlow, None);
+        after.team_home.player_mut("h1").unwrap().add_prayer_skill("Granted by Wisdom of the White Dwarf", crate::enums::SkillId::Dauntless, None);
+        let list = diff(&before, &after).unwrap();
+        assert!(list.iter().any(|c| c.change_id == ModelChangeId::FieldModelAddPrayer && c.value == "KNUCKLE_DUSTERS"));
+        assert!(list.iter().any(|c| c.change_id == ModelChangeId::FieldModelAddWisdom && c.value == "Dauntless"));
+        self_check(&before, &after, &list).unwrap();
+    }
+
+    /// bb2025 Getting Even: Java `game.addHatred` -> fieldModelAddHatred (enhancement + gainedHatred).
+    #[test]
+    fn getting_even_travels_as_add_hatred() {
+        let before = game();
+        let mut after = before.clone();
+        crate::model::change::model_change_processor::add_hatred(&mut after, "h1", crate::model::keyword::Keyword::for_name("Elf")).unwrap();
+        let list = diff(&before, &after).unwrap();
+        assert_eq!(list.iter().map(|c| c.change_id).collect::<Vec<_>>(), vec![ModelChangeId::FieldModelAddHatred]);
+        self_check(&before, &after, &list).unwrap();
+    }
+
+    /// A source no Java change reproduces stays uncovered (the whole game is sent).
+    #[test]
+    fn unreproducible_enhancement_source_is_uncovered() {
+        let before = game();
+        let mut after = before.clone();
+        after.team_home.player_mut("h1").unwrap().add_temporary_stat_mod("NO SUCH SOURCE", crate::model::player::STAT_ST, 1);
+        assert_eq!(diff(&before, &after).unwrap_err(), vec!["player[h1].enhancement \"NO SUCH SOURCE\"".to_string()]);
     }
 
     /// Java RosterPlayer.markUsed -> playerMarkSkillUsed keyed by the player.
