@@ -9,8 +9,9 @@ A game passes when the server logs `GAME FINISHED` and none of these happened:
   - a server panic, an engine panic or an undecodable / undecoded client command,
   - an exception in either Java client,
   - the engine waiting for a decision with no Java dialog set (the client could not answer).
-Reported but allowed: whole-game fallbacks (a model change the diff does not express yet), commands
-the engine ignored (Java's UNHANDLED_COMMAND -- AiMain re-sends while it waits).
+  - a command the engine ignored mid-game (Java's UNHANDLED_COMMAND), except the two kinds Java
+    ignores too: a re-sent CLIENT_START_GAME and anything after GAME FINISHED (`java_ignored_commands`).
+Reported but allowed: whole-game fallbacks (a model change the diff does not express yet).
 
 Prints DONE when every game passes. Logs go to --out (outside git: they carry coach names).
 
@@ -58,6 +59,28 @@ def teams_of(coach):
         if c and i and n and c.group(1).strip() == coach and i.group(1) in with_setup:
             out.append((i.group(1), n.group(1).strip()))
     return out
+
+
+def ignored_commands(log):
+    """Commands the engine did not take (Java's UNHANDLED_COMMAND), split (BACKLOG §Q4.5) into the
+    two kinds Java ignores as well -- a CLIENT_START_GAME the client re-sends once StepInitStartGame
+    is gone, and any command after GAME FINISHED (the end-of-game CLIENT_CONFIRMs) -- and the rest,
+    which fail the game: a command the client sends mid-game that no step took is a lost decision."""
+    java_ignores = other = 0
+    finished = False
+    if not os.path.exists(log):
+        return {'ignored_commands': 0, 'java_ignored_commands': 0}
+    with open(log, encoding='utf-8', errors='replace') as f:
+        for line in f:
+            if 'GAME FINISHED' in line:
+                finished = True
+            if not re.search(r'unhandled while|engine rejected', line):
+                continue
+            if finished or re.search(r'StartGame \{[^}]*\} unhandled while', line):
+                java_ignores += 1
+            else:
+                other += 1
+    return {'ignored_commands': other, 'java_ignored_commands': java_ignores}
 
 
 def count(path, pattern):
@@ -111,7 +134,7 @@ def play(n, home, away, args):
         'undecoded': count(log, r'decode error|undecodable'),
         'missing_dialogs': count(log, r'P2 worklist'),
         'whole_game_fallbacks': count(log, r'sending the whole game'),
-        'ignored_commands': count(log, r'unhandled while|engine rejected'),
+        **ignored_commands(log),
     }
     score = None
     with open(log, encoding='utf-8', errors='replace') as f:
@@ -121,7 +144,8 @@ def play(n, home, away, args):
                 break
     result['score'] = score
     result['pass'] = (finished and result['panics'] == 0 and client_exceptions == 0
-                      and result['undecoded'] == 0 and result['missing_dialogs'] == 0)
+                      and result['undecoded'] == 0 and result['missing_dialogs'] == 0
+                      and result['ignored_commands'] == 0)
     return result
 
 

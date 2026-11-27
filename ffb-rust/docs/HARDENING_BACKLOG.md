@@ -316,8 +316,11 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
   hatred, chomp, acting-player dodging/jumping/leaping/strength, blitz state, …; dialogs
   BlockRollPartialReRoll, BuyInducements, Journeymen, PilingOn, TeamSetup, UseIgors,
   UseMortuaryAssistant). Done: whole-game fallbacks 0 on a coverage-bias GUI run.
-- [ ] **Q4.5 gui_check hardening:** fail on ignored commands; all three editions; all teams (add setups);
-  a scripted "human" client path that answers every dialog kind.
+- [~] **Q4.5 gui_check hardening:** fail on ignored commands; all three editions; all teams (add setups);
+  a scripted "human" client path that answers every dialog kind. **Part 1 done** (see Log): an
+  ignored command now fails the game, except Java's own two (a re-sent CLIENT_START_GAME, anything
+  after GAME FINISHED: `java_ignored_commands`); today's 12 gui_check games had 0 others. Open: all
+  three editions (blocked on Q4.3 [!]), all teams (setups), the scripted human path.
 - [ ] **Q4.6 Optional server features** (ask before starting): persistence/resume, turn timer, DB login,
   FUMBBL mode, spectators/replays check.
 
@@ -342,6 +345,10 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-27 · Q4.5 part 1 · (this commit) · `scripts/gui_check.py` fails a game on a mid-game command
+  the engine ignored; the two kinds Java ignores too (re-sent CLIENT_START_GAME, commands after GAME
+  FINISHED) are reported as `java_ignored_commands`. Re-scored today's 12 games: 0 failures.
 
 - 2026-11-27 · Q4.3 (1:1 part) · (this commit) · join_approved reads the ruleset from the
   `rulesVersion` option (Java `initializeRules`) instead of forcing BB2025; behaviour unchanged
