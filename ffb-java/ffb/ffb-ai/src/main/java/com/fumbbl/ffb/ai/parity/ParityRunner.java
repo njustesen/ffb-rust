@@ -2380,7 +2380,14 @@ public class ParityRunner {
                         } catch (RuntimeException e) {
                             // fall through to clearing the dialog below
                         }
-                        game.setDialogParameter(null);
+                        // §Q1.2d: clear only the ANSWERED dialog. The target injection can run the
+                        // sequence on synchronously into FOUL_APPEARANCE, whose failed roll shows a
+                        // NEW re-roll dialog; clearing unconditionally wiped it and the step waited
+                        // forever (wood_elf+Swiftvine vs nurgle bb2020 seed 12: STUCK_STEP
+                        // FOUL_APPEARANCE). Same same-object guard as the RE_ROLL arm.
+                        if (game.getDialogParameter() == dialog) {
+                            game.setDialogParameter(null);
+                        }
                         break;
                     } else if ((mode == PlayerChoiceMode.IRON_MAN
                             || mode == PlayerChoiceMode.KNUCKLE_DUSTERS

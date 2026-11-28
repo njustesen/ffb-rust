@@ -11,11 +11,13 @@ done-criterion; tick it only when that criterion is met and the change is commit
 **Q1.7 = cert11** (frozen pair from 50f268a26, `D:/ffb_star/bin/*cert11*`; weekend compute until Mon
 11-30 07:00, 2 workers, 0x7FF). **Game suites done** (`scripts/cert_tally.py cert11`): star 4,012/4,012,
 skill 121/121, mirror 329/330 + goblin bb2025 @1.0 (4 games JD-002 JAVA-CRASH), cross 4,011/4,012 +
-underworld_37844 v dark_elf bb2025 (1 game JD-001 JAVA-CRASH). **Client-view suites RUNNING** (the first
-full view cert ever): `scratchpad view11_chain.cmd` → `scripts/view_suite.py` roots
+underworld_37844 v dark_elf bb2025 (1 game JD-001 JAVA-CRASH). **Client-view suites RUNNING, sampled**
+(the first full view cert ever; at the cert's seed counts a view game costs ~7 s, ~50 h on 2 workers):
+`scratchpad view11b_chain.cmd` → `scripts/view_suite.py` roots
 `D:/ffb_view_cert11_{mirror1.0,mirror0,mirror1e6,cross,star}` (job files `D:/ffb_view_jobs/cert11/`,
-seeds as the cert: mirror 1-100, cross 1-3, star 1-2), log `../view11_chain.log`; resumable (re-run the
-same commands; finished jobs are skipped). When done: `cert_tally.py cert11` must print ALL SUITES GREEN
+seeds: mirror 1-10 per cell × 3 scales, cross 1-1, star 1-1 ≈ 11,300 games, ~11 h), log
+`../view11_chain.log`; resumable (re-run the same .cmd; finished jobs are skipped). The aborted
+100-seed mirror1.0 start (6 jobs, all OK) is kept in `D:/ffb_view_cert11_mirror1.0_100seeds`. When done: `cert_tally.py cert11` must print ALL SUITES GREEN
 (the two JAVA-CRASH cells aside), then write `docs/cert_manifest.json`, tick Q1.7, update the README.
 Q1.2c's harness change only touches the classes=none random path no cert suite runs. Day items meanwhile: **Q2.10** rest (Team inducement set for USE_PREDEFINED_INDUCEMENTS; dead-twin edition diffs), **Q4.4** rest (part 1 done: enhancements) (Q4.2 rest waits for the other session's
 declaration work; Q4.3 is [!]; Q3.10 needs suite runs: night). Q3.9 code is done; its
@@ -83,7 +85,10 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
   `--heur-classes` diverges on seeds 7, 18, 30, 82 (Java activates a FOUL whose step changes nothing,
   Rust a Move; reports differ). Same with the frozen cert9 exe+jar, so it is old. Not a certified config,
   but a real Java/Rust agent-contract difference: root-cause and fix.
-- [ ] **Q1.2d Java harness: FOUL_APPEARANCE on a Furious Outburst path** (found 2026-11-28 while
+- [x] **Q1.2d Java harness: FOUL_APPEARANCE on a Furious Outburst path** (see Log): the harness's
+  FURIOUS_OUTBURST arm cleared the dialog unconditionally after injecting the target, wiping the
+  team re-roll offer a failed Foul Appearance roll had just shown; now clears only the answered
+  dialog (the RE_ROLL arm's guard). All 49 Swiftvine star gates 20/20. Original: (found 2026-11-28 while
   gating the JD fix flags): wood_elf+Swiftvine vs nurgle+Glart bb2020 @1.0 seed 12 -- Swiftvine's
   Furious Outburst targets a Foul Appearance player; ParityRunner prints `UNHANDLED_STEP:
   FOUL_APPEARANCE` until `stuck_step` (step 30), Rust plays on. Same on the frozen cert11 pair, so
@@ -403,6 +408,12 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-28 · Q1.2d · (this commit) · bb2020 wood_elf+Swiftvine v nurgle+Glart s12 STUCK_STEP
+  FOUL_APPEARANCE was the Java harness: its FURIOUS_OUTBURST arm cleared the dialog after the target
+  injection, wiping the re-roll offer the failed Foul Appearance roll (d6=1, rng 85) had shown.
+  Same-object guard as the RE_ROLL arm. All 49 Swiftvine star gates × 20 seeds green; smoke 3×20.
+  Q1.7 view suites re-seeded (sampled, see RESUME HERE).
 
 - 2026-11-28 · JAVA_DEFECTS flags · (this commit) · user request: every JD has a Rust fix flag + tests.
   New `defect_fixes` flags JD-004 `leap_reroll_spent_once`, JD-005 `arm_bar_choice_keeps_failed_dodge`,
