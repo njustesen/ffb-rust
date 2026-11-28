@@ -125,6 +125,15 @@ def matches(pat, keys):
     return any(re.fullmatch(k.replace(".", r"\.").replace("*", r"[^.]+"), pat) for k in keys)
 
 
+def matches_subtree(pat, keys):
+    """A SETUP key covers its whole subtree: `*.roster` is the roster object, so it must also cover
+    `teamAway.roster.positionArray.<n>.agility`. Plain `matches` only hit a path that ENDS at the
+    key, so the roster's positions were compared field by field and any difference in the order
+    the two harnesses list them (Java: team XML; Rust: data/teams) failed every step (cert11 view
+    trial, 2026-11-28: 252/252 steps, all `teamAway.roster.positionArray.*`)."""
+    return any(re.fullmatch(k.replace(".", r"\.").replace("*", r"[^.]+") + r"(\..+)?", pat) for k in keys)
+
+
 def ignored(pat):
     return matches(pat, IGNORED)
 
@@ -162,7 +171,7 @@ def main(argv):
                 walk(remap(java[idx], m), rust[idx], [], diffs)
                 game_diffs.append((idx, rust_ids, diffs))
                 for path, jv, rv in diffs:
-                    if matches(pattern(path, rust_ids), SETUP):
+                    if matches_subtree(pattern(path, rust_ids), SETUP):
                         jvals, rvals = setup_values[tuple(path)]
                         jvals.add(json.dumps(jv, sort_keys=True))
                         rvals.add(json.dumps(rv, sort_keys=True))
@@ -172,10 +181,10 @@ def main(argv):
                     pat = pattern(path, rust_ids)
                     if ignored(pat) or pat in seen:
                         continue
-                    if matches(pat, SETUP):
+                    if matches_subtree(pat, SETUP):
                         jvals, rvals = setup_values[tuple(path)]
                         if len(jvals) == 1 and len(rvals) == 1:
-                            setup_seen.add(next(k for k in SETUP if matches(pat, {k})))
+                            setup_seen.add(next(k for k in SETUP if matches_subtree(pat, {k})))
                             continue
                         pat = pat + "  (SETUP CHANGED MID-GAME)"
                         if pat in seen:
