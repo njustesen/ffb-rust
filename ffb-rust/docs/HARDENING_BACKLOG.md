@@ -384,6 +384,12 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 ## Log
 (newest first: date · item · commit · one line)
 
+- 2026-11-28 · Q1.7 cert10 cross · — · cross 4,012 on frozen cert10 (strict verdict): 4,011 green +
+  underworld_37844 v dark_elf bb2025 (s3 = JD-001, classified since 50f268a26). Since cert10 predates
+  that change, the certification restarts on ONE frozen pair: cert11 (exe+jar from 50f268a26), chain
+  star → skill → mirror → cross (scripts/cert_chain.ps1 -name cert11 -maxRun 2 -anytime, user's
+  weekend compute), log `../cert11_chain.log`.
+
 - 2026-11-28 · Q1.2b · (this commit) · cert10 cross red underworld_37844 v dark_elf bb2025 s3 is JD-001
   (stale punt outOfBounds → interior throw-in → swallowed IllegalStateException after the direction
   die). Rust spends the direction die before stopping (Java rng 105); the harness reports a STUCK_STEP
