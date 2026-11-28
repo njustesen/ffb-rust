@@ -872,6 +872,18 @@ public class ParityRunner {
                                 + " -- deselecting, no step logged");
                             continue;
                         }
+                        // §Q1.2c: a FOUL picked from the turn-start snapshot whose victims have all
+                        // stood up or moved away. sendFoulAction would deselect it in phase 2 -- but
+                        // only AFTER recordStep logged a phantom no-op step that Rust's agent (which
+                        // folds the foul target into the pick and re-picks in its own loop:
+                        // random_agent.rs RUST_FOUL_DESELECT) never produces, shifting every later
+                        // step index by one (ogre bb2016 scale 0 classes none, seed 7 i=52). Skip it
+                        // like an unhandled action: same target rule as sendFoulAction, no draw.
+                        if (action == PlayerAction.FOUL && !hasRandomFoulTarget(game, playerId)) {
+                            if (DEBUG_ACT) System.err.println("JAVA_FOUL_DESELECT pid=" + playerId
+                                + " -- no foul target, no step logged");
+                            continue;
+                        }
                         String chosen = "Activate(" + playerId + "," + action.toString() + ")";
                         recordStep(game, chosen, gameState.getDiceRoller().getCallCount());
                         blitzBlockSent = false;
@@ -3363,6 +3375,26 @@ public class ParityRunner {
      * Foul target: adjacent opponents whose state base is PRONE or STUNNED (mirrors
      * Rust PlayerState::can_be_fouled), coordinate-sorted, 1 actionRng pick.
      */
+    /** sendFoulAction's random-path target rule, without the draw: any adjacent prone/stunned opponent. */
+    private boolean hasRandomFoulTarget(Game game, String playerId) {
+        FieldModel fm = game.getFieldModel();
+        FieldCoordinate coord = playerCoordinate(game, playerId);
+        if (coord == null) {
+            return false;
+        }
+        Team opponent = game.isHomePlaying() ? game.getTeamAway() : game.getTeamHome();
+        for (Player<?> op : opponent.getPlayers()) {
+            FieldCoordinate oc = fm.getPlayerCoordinate(op);
+            PlayerState ops = fm.getPlayerState(op);
+            if (oc == null || ops == null) continue;
+            int base = ops.getBase();
+            if ((base == PlayerState.PRONE || base == PlayerState.STUNNED) && isAdjacentCoord(coord, oc)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void sendFoulAction(Game game, GameState gameState, String playerId) {
         // The heuristic already CHOSE the victim when it declared the foul -- exactly as for a
         // block, and `sendBlockAction` has honoured that since ITER45. This arm was missed, so it

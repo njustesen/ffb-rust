@@ -8,10 +8,13 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-Next item (weekend compute granted until Mon 11-30 07:00, shared with the user's training: 2 workers,
-0x7FF): **Q1.7 cert10** on one frozen pair -- mirror 330 is effectively done on q1b/q1c (329 + JD-002);
-run cross 4,012, star 4,012 and the skill sweep on a fresh frozen pair, fix every red 1:1, then one
-final mirror on that same pair. Day items after that: **Q2.10** rest (Team inducement set for USE_PREDEFINED_INDUCEMENTS; dead-twin edition diffs), **Q4.4** rest (part 1 done: enhancements) (Q4.2 rest waits for the other session's
+**Q1.7 is running as cert11** (frozen pair from 50f268a26, `D:/ffb_star/bin/*cert11*`; weekend compute
+until Mon 11-30 07:00, 2 workers, 0x7FF): star 4,012/4,012, skill 121/121, mirror 329/330 (+ JD-002
+goblin bb2025 1.0 as JAVA-CRASH) are done; cross is on its last workers (log `../cert11_chain.log`,
+results `../cross_cert11/scratch`). When it finishes: tally with `scripts/cert_tally.py cert11`, fix any
+red 1:1, write `docs/cert_manifest.json`, tick Q1.7, update the README Parity table. Q1.2c's harness
+change (11-28) only touches the classes=none random-pick path, which no cert suite runs, so cert11 stays
+valid. Day items meanwhile: **Q2.10** rest (Team inducement set for USE_PREDEFINED_INDUCEMENTS; dead-twin edition diffs), **Q4.4** rest (part 1 done: enhancements) (Q4.2 rest waits for the other session's
 declaration work; Q4.3 is [!]; Q3.10 needs suite runs: night). Q3.9 code is done; its
 bb2016 skill sweep joins the night queue. Q3.3a (card play) waits for another session's
 uncommitted card-model work (see Q3.3a); Q3.3b (card draw) is [!] with a question for the user.
@@ -69,7 +72,11 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
   Fix: both agents deselect (CLIENT_ACTING_PLAYER null = Action::Acknowledge) when the target is out of
   range; Rust bb2016 StepInitThrowTeamMate gained Java's missing deselect → END_PLAYER_ACTION branch (+test).
   ogre bb2016/bb2020/bb2025 scale 0 100/100 each, goblin-underworld bb2016 30/30.
-- [ ] **Q1.2c classes=none divergences** (found while checking Q1.2a): ogre bb2016 scale 0 *without*
+- [x] **Q1.2c classes=none divergences** (see Log): harness-only. A FOUL picked from the turn-start
+  snapshot with no victim left: Rust's agent re-picks inside its own loop (no step), Java declared it,
+  logged a no-op step and deselected in phase 2, shifting every later step index. ParityRunner now
+  skips that pick before `recordStep` (as it already did for unhandled actions). ogre bb2016 scale 0
+  classes none 100/100; random orc-human bb2016 40/40; smoke 3×20 green. Original: ogre bb2016 scale 0 *without*
   `--heur-classes` diverges on seeds 7, 18, 30, 82 (Java activates a FOUL whose step changes nothing,
   Rust a Move; reports differ). Same with the frozen cert9 exe+jar, so it is old. Not a certified config,
   but a real Java/Rust agent-contract difference: root-cause and fix.
@@ -383,6 +390,13 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-28 · Q1.2c · (this commit) · ogre bb2016 scale 0 classes none seeds 7/18/30/82: Java's random
+  pick declared a FOUL whose victims had all stood up/moved (turn-start snapshot), logged a no-op step,
+  then deselected in sendFoulAction; Rust folds the target into the pick and re-picks with no step
+  (RUST_FOUL_DESELECT). ParityRunner now checks the same target rule before recordStep and skips the
+  pick (no draw), as for unhandled actions. 100/100 steps + reports; random orc-human bb2016 40/40;
+  smoke 3×20 green. Harness-only (Rust unchanged, so no cargo test needed).
 
 - 2026-11-28 · Q1.7 cert10 cross · — · cross 4,012 on frozen cert10 (strict verdict): 4,011 green +
   underworld_37844 v dark_elf bb2025 (s3 = JD-001, classified since 50f268a26). Since cert10 predates
