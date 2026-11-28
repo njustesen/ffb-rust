@@ -29,7 +29,8 @@
 ///   - CLIENT_USE_APOTHECARY → find result by defender_id, mark UseApothecary or DoNotUseApothecary
 ///   - CLIENT_USE_IGORS → apo-multiple-igor not ported (blocked: InducementSet/Igor inducement infra)
 ///
-/// Igor inducement handling deferred — blocked by InducementSet/InducementTypeFactory not ported.
+/// DEAD TWIN: `driver.rs` dispatches the shared bb2025 `StepApothecaryMultiple` for every edition;
+/// this file is never reached. (Igors there need a bought Igor, HARDENING_BACKLOG §Q2.8.)
 use ffb_model::enums::{ApothecaryStatus, ApothecaryMode, PS_BADLY_HURT, PS_KNOCKED_OUT, PS_STUNNED, PS_RESERVE, PS_RIP, PS_SERIOUS_INJURY, PlayerState};
 use ffb_model::model::game::Game;
 use ffb_model::model::player_state::PlayerState as PlayerStateModel;

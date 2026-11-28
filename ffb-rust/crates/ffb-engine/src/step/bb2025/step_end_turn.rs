@@ -7,16 +7,10 @@
 /// - KICKOFF/REGULAR TurnMode transitions (home_playing flip, turn_nr++)
 /// - start_turn: resets both TurnData for the next turn
 ///
-/// Stubs (untranslated server-side systems):
-/// - ArgueTheCall, Bribes, StarOfTheShow dialogs → skip (choices set to Some(false) immediately)
-/// - Secret weapon ban/bribe handling → skip
-/// - new_half H2 push wired (h2_kickoff_sequence); end-game sequence not yet ported.
-/// - EndGame sequence push → TODO (end-game generator not yet ported)
-/// - Prayer/inducement deactivation → skip
-/// - Per-drive reroll removal → skip
-/// - Fainting (Sweltering Heat) → skip
-/// - Reports/sounds/timers → skip
-/// - FumbblGame update → skip
+/// Ported: argue the call / bribes / Star of the Show dialogs, secret-weapon bans, card and prayer
+/// deactivation, drive re-roll removal, KO recovery and Sweltering Heat fainting, and the
+/// Kickoff / Inducement / EndGame sequence pushes (see `execute_step`'s tail).
+/// Server-only, not part of the engine: sounds, turn timers, the FUMBBL game update.
 use std::collections::HashSet;
 use ffb_model::enums::{ApothecaryMode, Rules, TurnMode, Weather, PS_KNOCKED_OUT, PS_EXHAUSTED, PS_RESERVE, PS_SETUP_PREVENTED, PS_STANDING};
 use ffb_model::events::GameEvent;
@@ -1166,7 +1160,7 @@ impl StepEndTurn {
                     }
                     _ => {}
                 }
-                // Stub: sequence generator pushes (Kickoff, EndGame, Inducement) → skip
+                // The Kickoff / EndGame / Inducement sequence pushes follow below (Java's tail).
             }
 
             // Java StepEndTurn (all editions — bb2016:260, bb2025:358): UtilPlayer.

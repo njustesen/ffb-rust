@@ -93,7 +93,8 @@ impl StepBuyInducements {
         }
 
         // Java: if (USE_PREDEFINED_INDUCEMENTS) → apply predefined sets, skip dialog
-        // no-op: InducementTypeFactory not ported — headless auto-skips inducement dialog
+        // Not applied yet: the predefined sets need Java's Team.getInducementSet() on the Rust Team
+        // (HARDENING_BACKLOG §Q2.10, waits on inducement_set.rs). No suite turns the option on.
         if is_option_enabled(game, USE_PREDEFINED_INDUCEMENTS) {
             self.inducements_selected_home = true;
             self.inducements_selected_away = true;

@@ -61,8 +61,8 @@ fn roll_weeping_dagger(game: &mut Game, rng: &mut GameRng, source_id: &str, targ
 ///   - If `fell_from_rush` → injury type `InjuryTypeDropGFI`; else `InjuryTypeBlock`.
 ///   - If saboteur triggered attacker → publish `DROP_PLAYER_CONTEXT` directly.
 ///
-/// Saboteur paths: not yet ported (always `false`).
-/// `DeferredCommands` in attacker path: not yet ported (always empty).
+/// Saboteur paths: the flags come from the Saboteur hook (`skill_behaviour/bb2025/saboteur_behaviour.rs`).
+/// The attacker path carries its drop as a `DeferredCommand` in the SteadyFootingContext.
 pub struct StepDropFallingPlayers {
     /// Java: state.oldDefenderState
     pub old_defender_state: Option<PlayerState>,
@@ -250,7 +250,7 @@ impl StepDropFallingPlayers {
                 // BB2025 (non-PilingOn): `new InjuryTypeBlock(Mode.REGULAR, false)`, unconditionally.
                 _ => "InjuryTypeBlockNoAttackerChainsaw",
             };
-            // Saboteur overrides (not yet ported)
+            // Saboteur overrides (flags set by the Saboteur hook)
             let injury_type_name = if self.saboteur_triggered_defender { "InjuryTypeSaboteur" }
                 else if self.saboteur_triggered_attacker { "InjuryTypeSabotaged" }
                 else { injury_type_name };

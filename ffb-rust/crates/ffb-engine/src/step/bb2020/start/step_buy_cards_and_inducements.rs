@@ -20,9 +20,11 @@
 /// translation still resolves the dialogs sequentially rather than truly simultaneously; the
 /// `buy_inducement_commands` buffer is unused (a known, narrower-path simplification).
 ///
-/// USE_PREDEFINED_INDUCEMENTS: skips dialog (predefined set application requires InducementTypeFactory — not ported).
-/// CardTypeFactory / CardDeck / card-choice randomisation — card system not ported; card buying
-/// via `CLIENT_SELECT_CARD_TO_BUY` is out of scope for this pass (see `handle_card`).
+/// USE_PREDEFINED_INDUCEMENTS: skips the dialog; applying the predefined sets needs Java's
+/// Team.getInducementSet() on the Rust Team (HARDENING_BACKLOG §Q2.10).
+/// Cards: Java's bb2020 `Cards` (`inducement/bb2020/Cards.java`) is an EMPTY set, so `buildDecks`
+/// builds no deck and no card can be bought or handled in a bb2020 game (§Q3.3): the card paths
+/// below have nothing to do, by construction, not by omission.
 /// headless: BuyInducements action lacks star_player_position_ids / mercenary_position_ids —
 ///   add_star_players / add_mercenaries / add_staff are implemented but require extended action
 ///   fields not yet present in the Rust action model (star players / infamous staff purchasing
@@ -268,14 +270,14 @@ impl StepBuyCardsAndInducements {
         }
 
         // Java: if (USE_PREDEFINED_INDUCEMENTS) → apply predefined sets, skip dialog
-        // no-op: InducementTypeFactory not ported — headless auto-skips inducement dialog
+        // Not applied yet: needs Team.getInducementSet() on the Rust Team (§Q2.10).
         if is_option_enabled(game, USE_PREDEFINED_INDUCEMENTS) {
             self.phase = Phase::Done;
             self.available_inducement_gold_home = Some(0);
             self.available_inducement_gold_away = Some(0);
             return;
         }
-        // no-op: buildDecks() — CardTypeFactory/CardDeck not ported
+        // Java buildDecks(): bb2020 Cards is empty, so there is no deck to build.
 
         let free_cash = get_int_option(game, FREE_INDUCEMENT_CASH) + get_int_option(game, FREE_CARD_CASH);
 
@@ -314,9 +316,9 @@ impl StepBuyCardsAndInducements {
 
     /// Java: `handleCard()` — apply the selected card and refresh choices.
     fn handle_card(&mut self) {
-        // no-op: full card handling (CardDeck) not ported
-        // Java: deduct cardPrice from gold, add chosen card to inducement set,
-        //       call updateChoices() to draw next pair for the coach.
+        // Java: deduct cardPrice from gold, add chosen card to inducement set, call
+        // updateChoices() to draw the next pair. Unreachable: bb2020 Cards is empty in Java, so no
+        // card choice is ever offered (§Q3.3).
         self.current_selection = None;
     }
 

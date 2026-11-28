@@ -7,7 +7,8 @@ use crate::step::framework::{StepId, StepParameter};
 
 /// Initializes the inducement sequence: checks which inducements can be used at the given
 /// phase, shows dialog, then routes to the appropriate sub-sequence generator.
-/// InducementType routing not ported (requires InducementTypeFactory); headless skips all inducement sequences.
+/// DEAD TWIN: `driver.rs` dispatches the shared bb2025 `StepInitInducement` for every edition
+/// (it routes SPELL / CHANGE_WEATHER / THROW_ROCK, §Q3.2); this file is never reached.
 /// Mirrors Java `com.fumbbl.ffb.server.step.bb2020.inducements.StepInitInducement`.
 pub struct StepInitInducement {
     /// Java: fInducementPhase (init param)

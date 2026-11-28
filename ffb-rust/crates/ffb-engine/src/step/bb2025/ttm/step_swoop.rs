@@ -30,7 +30,7 @@ use crate::util::util_server_player_swoop::UtilServerPlayerSwoop;
 ///     // client-only: syncGameModel
 ///     setPlayerCoordinate(thrownPlayer, passCoordinate)
 ///     UtilActingPlayer.changeActingPlayer(thrownPlayerId, SWOOP) — ported (retires the thrower)
-///     // no-op: blitzTurnState.changeActingPlayer() — BlitzTurnState not ported
+///     if blitzTurnState != null: blitzTurnState.changeActingPlayer() — ported (§Q3.7)
 ///     if thrownPlayerHasBall: setBallCoordinate(passCoordinate)
 ///     setCurrentMove(thrownPlayer.movementWithModifiers - 3)
 ///     publish THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL
@@ -55,7 +55,7 @@ use crate::util::util_server_player_swoop::UtilServerPlayerSwoop;
 ///     `util_server_steps::change_acting_player` and called here, so the outgoing thrower is
 ///     retired (STANDING + INACTIVE once he has acted) exactly as Java retires him.
 ///   client-only: fieldModel animation, syncGameModel — client rendering/sync, no server-state effect.
-///   no-op: game.blitzTurnState.changeActingPlayer() — `BlitzTurnState` is not ported (headless no-op).
+///   (RESOLVED, §Q3.7) game.blitzTurnState.changeActingPlayer() is called when a blitz turn is running.
 ///   TODO(hook-infra): executeStepHooks (Swoop scatter/deflection hook) — this crate's `SkillBehaviour`
 ///     hook-dispatch registry is not wired into the step framework (see
 ///     `skill_behaviour::bb2016::ThrowTeamMateBehaviour` for the same, project-wide limitation); where a
@@ -329,7 +329,7 @@ impl StepSwoop {
         //   [syncGameModel — client-only]
         //   fieldModel.setPlayerCoordinate(thrownPlayer, passCoordinate)
         //   [UtilActingPlayer.changeActingPlayer — implemented: sets acting_player.player_id/action]
-        //   [blitzTurnState.changeActingPlayer — no-op: BlitzTurnState not ported]
+        //   if blitzTurnState != null: blitzTurnState.changeActingPlayer()
         //   if thrownPlayerHasBall: setBallCoordinate(passCoordinate)
         //   actingPlayer.setCurrentMove(thrownPlayer.movementWithModifiers - 3)
         //   publish THROWN_PLAYER_ID, THROWN_PLAYER_STATE, THROWN_PLAYER_HAS_BALL

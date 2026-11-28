@@ -12,7 +12,8 @@ use crate::injury::injuryType::modification_aware_injury_type_server::leak_injur
 
 pub struct InjuryTypeDropDodge {
     ctx: InjuryContext,
-    /// Java: pArmBarPlayer. Arm bar modifier source (TODO when ArmorModifierFactory is ported).
+    /// Java: pArmBarPlayer. The Arm Bar player whose armour/injury modifier applies (see the
+    /// `orElseGet` fallback below).
     arm_bar_player_id: Option<String>,
     use_arm_bar_modifiers: bool,
 }

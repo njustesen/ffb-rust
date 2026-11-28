@@ -379,8 +379,12 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 - [ ] **Q6.1** Regenerate `TRANSLATION_TRACKER.md` from the filesystem (77 ✓ rows name missing files;
   dead bb2020/bb2016 step files marked as such).
-- [ ] **Q6.2** Remove stale "not ported" comments found by the review (InducementTypeFactory, CardDeck,
-  BlitzTurnState, ArmorModifierFactory, Saboteur, EndGame generators, …).
+- [x] **Q6.2** (see Log) Remove stale "not ported" comments found by the review (InducementTypeFactory, CardDeck,
+  BlitzTurnState, ArmorModifierFactory, Saboteur, EndGame generators, …). All 15 sites naming these
+  were checked against the code: stale ones corrected, the truly open ones re-pointed at their item
+  (predefined inducements → Q2.10), dead twins marked DEAD TWIN, bb2020 cards documented as empty in
+  Java. ~150 other generic "not ported" mentions (mostly ffb-client, ffb-server, dialogs) were not
+  part of the review list and are left for Q6.1's tracker regeneration.
 - [ ] **Q6.3** Dead code: `ffb-client` (old protocol, wrong URL), `ffb-server/src/net/wire.rs` and
   `wire_prompt.rs`; either wire them to the real protocol or delete (ask first).
 - [ ] **Q6.4** Port the missing Java unit tests for steps/generators without tests (38/120 generators,
@@ -390,6 +394,13 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-28 · Q6.2 · (this commit) · 15 review-named stale comments checked and fixed in 9 engine files:
+  Throw a Rock handler (ported), Saboteur + attacker DeferredCommands (ported), bb2025 EndTurn header
+  (argue/bribes/SW bans/deactivation/re-roll removal/fainting/EndGame push all ported), Swoop
+  BlitzTurnState (ported §Q3.7), DropDodge Arm Bar, bb2020 cards (Java's bb2020 Cards is empty),
+  bb2020 InitInducement/ApothecaryMultiple = dead twins, predefined inducements → §Q2.10. Comments
+  only; engine builds.
 
 - 2026-11-28 · Q1.2c · (this commit) · ogre bb2016 scale 0 classes none seeds 7/18/30/82: Java's random
   pick declared a FOUL whose victims had all stood up/moved (turn-start snapshot), logged a no-op step,
