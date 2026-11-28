@@ -9,45 +9,6 @@ same dice, the same decisions, the same state, the same game log and the same cl
 
 The unmodified Java Swing client can connect to the Rust server and play a full game on it.
 
-## Status
-
-| Check | Result |
-| --- | --- |
-| Mirror matches: every roster against itself, 3 editions | **330 / 330** identical |
-| Cross matches: roster against roster, 3 editions | **4,012 / 4,012** identical |
-| Star-player matches | **4,012 / 4,012** identical |
-| Skill squads: every skill each edition resolves | **121 / 121** squads, **411 / 411** skills fired |
-| Real games: FUMBBL replays re-simulated | **2,224 / 2,224** identical (1.14 M records) |
-| Client view: what the GUI shows, step by step | identical on every suite above |
-| Java GUI client on the Rust server | plays whole games |
-| Unit tests | 15,000+ passing |
-
-See [docs/HISTORY.md](ffb-rust/docs/HISTORY.md) for how each number was reached.
-
-## How parity is tested
-
-The Java engine is the oracle. Each test game is played twice, once by each engine:
-
-- **Same inputs.** Both engines share one seeded dice stream (Xoshiro256**), the same teams and the
-  same options. Matching agents (Rust in `ffb-engine`, Java in `ParityRunner`) make every decision
-  from the same state with the same rules, so any difference comes from the engine itself.
-- **Compared every step.** After each decision the harness compares the state hash (players,
-  ball, turn data, flags, results; see [PARITY_STATE_HASH.md](ffb-rust/docs/PARITY_STATE_HASH.md))
-  and the dice-call count; the report stream and the client view (what the GUI shows, at each
-  activation) are compared too. One mismatch anywhere fails the game, even if the final state
-  converges.
-- **No silent passes.** A game that aborts, stalls or loops counts as a failure. A crash in stock
-  Java is reported separately as JAVA-CRASH and must be documented in
-  [JAVA_DEFECTS.md](ffb-rust/docs/JAVA_DEFECTS.md).
-- **Suites.** Mirror (every roster against itself), cross (roster against roster), star players and
-  skill squads, in all three editions and at three heuristic-agent scales (0, 1 and 10⁶). A certification runs every suite on one frozen Rust binary and Java harness jar.
-- **Real games.** FUMBBL replays are re-simulated, and every recorded state must come out identical.
-- **Fixing a difference.** Rust is changed to match Java line for line, never the reverse. A genuine
-  Java bug is still ported as the default, with the fix behind a flag, so the two engines stay
-  comparable.
-
-## How it fits together
-
 ```mermaid
 flowchart LR
     subgraph rust["ffb-rust (Cargo workspace)"]
@@ -121,6 +82,42 @@ cd ../ffb-java/ffb/ffb-server
 Then start the Swing client (`com.fumbbl.ffb.client.FantasyFootballClientAwt -player -coach Kalimar
 -server localhost -port 22227`) or the headless `AiMain` agent, and create a game. No database is
 needed. `python -I scripts/gui_check.py --games 3` plays whole AI-vs-AI games through the server.
+
+## Parity
+
+The Java engine is the oracle. Each test game is played twice, once by each engine:
+
+- **Same inputs.** Both engines share one seeded dice stream (Xoshiro256**), the same teams and the
+  same options. Matching agents (Rust in `ffb-engine`, Java in `ParityRunner`) make every decision
+  from the same state with the same rules, so any difference comes from the engine itself.
+- **Compared every step.** After each decision the harness compares the state hash (players,
+  ball, turn data, flags, results; see [PARITY_STATE_HASH.md](ffb-rust/docs/PARITY_STATE_HASH.md))
+  and the dice-call count; the report stream and the client view (what the GUI shows, at each
+  activation) are compared too. One mismatch anywhere fails the game, even if the final state
+  converges.
+- **No silent passes.** A game that aborts, stalls or loops counts as a failure. A crash in stock
+  Java is reported separately as JAVA-CRASH and must be documented in
+  [JAVA_DEFECTS.md](ffb-rust/docs/JAVA_DEFECTS.md).
+- **Suites.** Mirror (every roster against itself), cross (roster against roster), star players and
+  skill squads, in all three editions and at three heuristic-agent scales (0, 1 and 10⁶). A
+  certification runs every suite on one frozen Rust binary and Java harness jar.
+- **Real games.** FUMBBL replays are re-simulated, and every recorded state must come out identical.
+- **Fixing a difference.** Rust is changed to match Java line for line, never the reverse. A genuine
+  Java bug is still ported as the default, with the fix behind a flag, so the two engines stay
+  comparable.
+
+| Check | Result |
+| --- | --- |
+| Mirror matches: every roster against itself, 3 editions | **330 / 330** identical |
+| Cross matches: roster against roster, 3 editions | **4,012 / 4,012** identical |
+| Star-player matches | **4,012 / 4,012** identical |
+| Skill squads: every skill each edition resolves | **121 / 121** squads, **411 / 411** skills fired |
+| Real games: FUMBBL replays re-simulated | **2,224 / 2,224** identical (1.14 M records) |
+| Client view: what the GUI shows, step by step | identical on every suite above |
+| Java GUI client on the Rust server | plays whole games |
+| Unit tests | 15,000+ passing |
+
+See [docs/HISTORY.md](ffb-rust/docs/HISTORY.md) for how each number was reached.
 
 ## Repository layout
 
