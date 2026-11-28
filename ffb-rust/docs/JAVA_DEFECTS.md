@@ -87,10 +87,13 @@ STUCK_STEP: CATCH_SCATTER_THROW_IN unadvanced for 501 iters
 
 `(2,5)` is interior on a 26x15 pitch, so no branch of the direction table applies.
 
-Note what the exception does NOT do: it is swallowed upstream, so nothing is reported and the
-step's `StepResult` keeps the `CONTINUE` set by its own constructor (`StepResult:28`). That is why
-the step looks "parked at CONTINUE with no dialog outstanding" — BACKLOG §H.34 spent an iteration
-looking for the line that set it, and there is none.
+Note what the exception does NOT do: nothing reports it, and the step's `StepResult` keeps the
+`CONTINUE` set by its own constructor (`StepResult:28`). That is why the step looks "parked at
+CONTINUE with no dialog outstanding" — BACKLOG §H.34 spent an iteration looking for the line that
+set it, and there is none. The exception is thrown synchronously inside the harness's injection of
+the re-roll answer, and `ParityRunner.injectCaptured` (`catch (RuntimeException e)`, ~:5599) clears
+the dialog without logging it. That is a harness catch, not a stock-Java one. In stock Java the
+exception leaves the step the same way JD-002's does.
 
 ### What Rust does
 
@@ -198,7 +201,7 @@ to both teams by the harness before kick-off (§Q3.3a), so no random draw decide
 |---|---|
 | **Where** | `ffb-server/.../step/bb2020/move/StepJump.java` `executeStep` (:165): `if (JUMP == getReRolledAction() && !TRUE.equals(useIgnoreModifierAfterRollSkill)) { if (getReRollSource() == null \|\| !useReRoll(...)) handleFailure }` -- no `usingDivingTackle == null` guard (bb2025's StepJump has one) |
 | **Surfaces as** | A failed leap, re-rolled with a team re-roll, succeeds; the opposing coach is asked about Diving Tackle; on the answer `executeStep` runs again and `useReRoll(TEAM_RE_ROLL)` decrements the bank a second time (second ReportReRoll; a Loner player rolls Loner again and can turn the made leap into a failure) |
-| **Effect** | One team re-roll paid twice for one re-roll. No rule supports it. |
+| **Effect** | One team re-roll paid twice for one re-roll. No rule supports it. The second spend has no availability check: `RollMechanic.updateTurnDataAfterReRollUsage` (bb2020, :346) decrements `reRolls` unconditionally, so a team that spent its last re-roll ends with `-1`. |
 | **Found on** | §Q2.10 code audit, 2026-11-27 (bb2020 games run Rust's shared StepJump); not yet demonstrated with a probe |
 | **Rust flag** | none yet -- add `defect_fixes` flag with the probe |
 
@@ -207,3 +210,104 @@ to both teams by the harness before kick-off (§Q3.3a), so no random draw decide
 Ports it 1:1 (`step/bb2025/move_/step_jump.rs`, bb2020 branch of `execute_step`): after a Diving
 Tackle answer with a JUMP re-roll recorded, the source is spent again and a failed spend fails the
 leap; the leap then re-reads the same roll.
+
+---
+
+## JD-005 — a bb2025 dodge re-roll is spent again after the Arm Bar choice
+
+| | |
+|---|---|
+| **Where** | `ffb-server/.../step/bb2025/move/StepMoveDodge.java`: `executeStep` (~:221-238) spends the re-roll whenever `getReRolledAction() == DODGE`; `failDodge` (~:284-287) shows the `ARM_BAR` player choice when two or more Arm Bar players qualify; the `CLIENT_PLAYER_CHOICE` (ARM_BAR) answer (~:203-206) runs `executeStep` again |
+| **Surfaces as** | A dodge that fails after a team re-roll, next to two or more Arm Bar opponents: when the choice is answered, the re-roll is spent a second time (a second `ReportReRoll`) and a fresh dodge die is rolled |
+| **Effect** | One failed, re-rolled dodge costs two team re-rolls and gets a third dodge roll. No rule supports it. |
+| **Found on** | `chaos` bb2025 seed 28 i=60, BACKLOG §H.46 |
+| **Rust flag** | none yet |
+
+### What Rust does
+
+Ports it 1:1 (`step/bb2025/move_/step_move_dodge.rs`, ~:263-269): the Arm Bar answer re-enters
+`execute_step` with the DODGE re-roll still recorded, so the source is spent again and the dodge is
+re-rolled.
+
+---
+
+## JD-006 — ending the turn during a Furious Outburst dereferences a null target selection
+
+| | |
+|---|---|
+| **Where** | `ffb-server/.../step/bb2025/StepEndFuriousOutburst.java:71` (bb2020 `:67`): `fieldModel.getTargetSelectionState().getSelectedPlayerId()` with no null check |
+| **Surfaces as** | `NullPointerException` out of `StepEndFuriousOutburst.executeStep` |
+| **Effect** | `mixed/StepInitFuriousOutburst.executeStep` reaches `END` without setting a `TargetSelectionState` on three paths: the end-turn branch, a prone or stunned player, and no skill or no eligible target. Only the end-player-action branch (`.cancel()`) and the target branch set one. The `CLIENT_END_TURN` handler (~:78-82) makes the first path reachable from a real client, so a coach who ends the turn at the Furious Outburst prompt crashes the step. |
+| **Found on** | code reading while driving Furious Outburst live (`5b073d8d1`; BACKLOG.md ~:1113-1127) |
+| **Rust flag** | none |
+
+### What Rust does
+
+Rust does **not** reproduce this one. `step/bb2025/step_end_furious_outburst.rs` (~:68) reads the
+target selection as an `Option` and treats `None` as "no target". No parity gate reaches the path,
+because neither agent ends the turn at that prompt. Open follow-up: port the crash as the default
+(the same observable outcome as JD-002) and move the current behaviour behind a flag.
+
+---
+
+## JD-007 — modification-aware injury types interpret the MEMBER context, not the alternate one
+
+| | |
+|---|---|
+| **Where** | `ffb-server/.../injury/injuryType/ModificationAwareInjuryTypeServer.java`. Its own comment (:24) says subclasses "MUST NOT use the injuryContext member". But eleven subclasses end `injuryRoll` with the three-argument `setInjury(pDefender, gameState, diceRoller)`, which (`InjuryTypeServer.java:84-85`) interprets the **member** context: BlockProne, BlockStunned, BreatheFire, Stab and their `ForSpp` twins, plus ProjectileVomit, QuickBite and ThenIStartedBlastin. (Block, Foul and Chainsaw use the four-argument form and are not affected.) |
+| **Surfaces as** | When an armour modification (the Master Assassin re-roll, Old Pro) creates an alternate context, `injury(…, alternateInjuryContext)` runs `injuryRoll` on the alternate, and `setInjury` then interprets the ORIGINAL context. That context has no injury roll yet, so `setInjury` rolls a casualty on it. |
+| **Effect** | Two extra dice. The alternate context keeps its dice but gets no interpretation, so the original context's injury is decided by a roll the rules never call for. |
+| **Found on** | Skitter Stab-Stab, skaven vs human bb2025 seed 1 (BACKLOG §L, `af63a4ce1`); it also cleared underworld vs dark_elf bb2025 |
+| **Rust flag** | none yet |
+
+### What Rust does
+
+Ports it 1:1: a trait flag `interprets_member_injury` on the eleven types, a `defer_interpretation`
+context flag, and `set_injury_java_member` (`ffb-engine/src/injury.rs`, ~:682).
+
+---
+
+## JD-008 — a bb2025 Pitch Invasion on a Ball & Chain player loses the chain injury
+
+| | |
+|---|---|
+| **Where** | `ffb-server/.../step/bb2025/kickoff/StepApplyKickoffResult.java` `stunPlayers` (~:813-825) calls `UtilServerInjury.stunPlayer`. For a `placedProneCausesInjuryRoll` player, `dropPlayer` (~:339-342) does not change the player state: it rolls `InjuryTypeBallAndChain` and only *publishes* `INJURY_RESULT`. The bb2025 `Kickoff` generator has no `APOTHECARY` step to consume it. |
+| **Surfaces as** | The Pitch Invasion report lists the Fanatic as stunned, the chain armour/injury dice are spent, and the player stays STANDING. |
+| **Effect** | The injury is rolled but never applied. Ball & Chain also converts stun to KO, so the rules outcome is at least a KO. |
+| **Found on** | `goblin` bb2025 seed 28, BACKLOG §H.47(a) |
+| **Rust flag** | none yet |
+
+### What Rust does
+
+Ports it 1:1 (`step/bb2025/kickoff/step_apply_kickoff_result.rs`). The chain injury is rolled and,
+in bb2025, not handed on, so the Fanatic stays STANDING. bb2020's sequence does consume it. Test
+`a_pitch_invasion_discards_scatter_parameters_and_bb2025_drops_the_chain_injury`.
+
+---
+
+## JD-009 — the Diving Tackle "would trip" hint ignores the Diving Tackle modifier (cosmetic)
+
+| | |
+|---|---|
+| **Where** | `ffb-server/.../skillbehaviour/bb2020/DivingTackleBehaviour.java` (~:100-105), bb2025 (~:95-100) |
+| **Surfaces as** | The Diving Tackle modifier is added to `dodgeModifiers`, but the required roll is computed from `dodgeModifiersWithBT`, a set that never receives it. |
+| **Effect** | Only the explanatory text offered with the Diving Tackle dialog ("This will NOT trip the dodger…") can be wrong. The dice, the state and the dodge result are unaffected. |
+| **Found on** | code reading during the Diving Tackle port |
+| **Rust flag** | none (text only) |
+
+### What Rust does
+
+Ports the same computation (`step_diving_tackle.rs`, ~:287-303), so the dialog descriptions match.
+
+---
+
+## Open candidates (not yet confirmed)
+
+The following were flagged during the campaign but have not been checked against the Java source.
+They are not defects until they are:
+
+- bb2016 Diving Tackle: the tail of the step after the skill is used
+- a Badly Hurt player left on the pitch
+- bb2020: a kicked player who lands in the crowd
+- `StepBlockStatistics` NPE after a Dump Off
+- Animal Savagery: `catcherId` handling
