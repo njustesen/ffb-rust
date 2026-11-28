@@ -1,21 +1,33 @@
-"""Generate TRANSLATION_TRACKER.md from Java source file listing.
+"""Generate TRANSLATION_TRACKER.md from the Java sources AND the Rust tree (HARDENING_BACKLOG §Q6.1).
 
-Run from the ffb-rust/ directory:
-    python scripts/gen_translation_tracker.py
+Run from anywhere:
+    python -I scripts/gen_translation_tracker.py
 
-Updates TRANSLATION_TRACKER.md in place, preserving any manually-set status
-values (○/~/✓) by reading the existing file before overwriting.
+For every Java class in ffb-common / ffb-server / ffb-client-logic (ffb-java/ffb/<module>) it finds the
+Rust file ON DISK and derives the row from the filesystem, so the tracker can no longer claim a file
+that does not exist:
+
+* Rust target: the predicted path if it exists, else the file with the same snake_case name in the
+  same crate (preferring the same edition folder: bb2016 / bb2020 / bb2025 / mixed), else none.
+* Status: `—` for excluded layers; `○` when no Rust file exists (this OVERRIDES any older hand-set
+  status -- the old tracker had 77 `✓` rows naming files that did not exist); otherwise the previous
+  hand-set `✓`/`~` is kept, defaulting to `~`.
+* Driver (step files only, i.e. files with `impl Step for`): `live` when `step/driver.rs` dispatches
+  the module (named by path, or glob-imported folder + module name), else `dead twin` -- an edition
+  copy the engine never runs because the driver serves that edition from a shared step.
 """
 import os
 import re
+from collections import defaultdict
 from pathlib import Path
 
-# Paths — adjust if repo layout changes
-SCRIPT_DIR = Path(__file__).parent
-REPO_ROOT = SCRIPT_DIR.parent.parent  # ffb-rust repo root
-JAVA_BASE = REPO_ROOT / "ffb-java"
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent.parent  # repo root (holds ffb-java/ and ffb-rust/)
+JAVA_BASE = REPO_ROOT / "ffb-java" / "ffb"
 RUST_BASE = REPO_ROOT / "ffb-rust" / "crates"
 OUT_PATH = REPO_ROOT / "ffb-rust" / "TRANSLATION_TRACKER.md"
+DRIVER = RUST_BASE / "ffb-engine" / "src" / "step" / "driver.rs"
+EDITIONS = ("bb2016", "bb2020", "bb2025", "mixed")
 
 
 def java_to_snake(name: str) -> str:
@@ -42,14 +54,13 @@ EXCLUDED_PACKAGES_COMMON = {'json', 'xml', 'stats', 'report'}
 
 
 def get_rust_target(java_rel: str, module_name: str):
+    """The predicted (crate, path) -- the convention the port was written to."""
     for ex in EXCLUDED_PREFIXES:
         if ex in java_rel:
             return "—", "—"
-
     rel = get_ffb_rel(java_rel)
     if rel is None:
         return "—", "—"
-
     filename = rel[-1].replace('.java', '')
     snake = java_to_snake(filename)
     pkg = rel[0] if rel else 'root'
@@ -78,8 +89,6 @@ def get_rust_target(java_rel: str, module_name: str):
         }
         if pkg in mapping:
             return mapping[pkg]
-        if pkg in ('bb2016', 'bb2020', 'bb2025'):
-            return "ffb-model", f"src/{pkg}/{sub}"
         return "ffb-model", f"src/{pkg}/{sub}"
 
     if module_name == 'ffb-server':
@@ -89,17 +98,10 @@ def get_rust_target(java_rel: str, module_name: str):
         server_pkg = server_parts[0]
         subpath = '/'.join(server_parts[1:-1])
         sub = f"{subpath}/{snake}.rs" if subpath else f"{snake}.rs"
-
         if server_pkg == 'step':
-            step_dirs = '/'.join(server_parts[1:-1])
-            step_file = java_to_snake(server_parts[-1].replace('.java', '')) + '.rs'
-            full_step = f"{step_dirs}/{step_file}" if step_dirs else step_file
-            return "ffb-engine", f"src/step/{full_step}"
+            return "ffb-engine", f"src/step/{sub}"
         if server_pkg == 'skillbehaviour':
-            sb_dirs = '/'.join(server_parts[1:-1])
-            sb_file = java_to_snake(server_parts[-1].replace('.java', '')) + '.rs'
-            full_sb = f"{sb_dirs}/{sb_file}" if sb_dirs else sb_file
-            return "ffb-engine", f"src/skill_behaviour/{full_sb}"
+            return "ffb-engine", f"src/skill_behaviour/{sub}"
         mapping = {
             'mechanic': ("ffb-engine", f"src/mechanic/{sub}"),
             'util': ("ffb-engine", f"src/util/{sub}"),
@@ -116,43 +118,75 @@ def get_rust_target(java_rel: str, module_name: str):
         return "—", "—"
 
     if module_name == 'ffb-client-logic':
-        cl_rel = '/'.join(rel)
-        return "ffb-client", f"src/{cl_rel.replace('.java', '.rs')}"
+        return "ffb-client", "src/" + '/'.join(rel[:-1] + [snake + '.rs'])
 
     return "—", "—"
 
 
-def check_rust_exists(crate: str, rust_path: str) -> str:
+# ── the Rust tree, indexed by crate and by file name ──────────────────────────────────────────────
+by_name = defaultdict(list)  # (crate, "file.rs") -> ["src/...", ...]
+for crate_dir in RUST_BASE.iterdir():
+    if not crate_dir.is_dir():
+        continue
+    for f in crate_dir.rglob("*.rs"):
+        rel = f.relative_to(crate_dir).as_posix()
+        if rel.startswith("target/"):
+            continue
+        by_name[(crate_dir.name, f.name)].append(rel)
+
+
+def pick(cands, predicted):
+    """One candidate path: the only one, or the one in the predicted edition folder; else None."""
+    if len(cands) == 1:
+        return cands[0]
+    wanted = [p for p in Path(predicted).parts if p in EDITIONS]
+    hits = [c for c in cands if wanted and wanted[0] in Path(c[1]).parts]
+    if not wanted:
+        hits = [c for c in cands if not any(e in Path(c[1]).parts for e in EDITIONS)]
+    return hits[0] if len(hits) == 1 else None
+
+
+def locate(crate: str, predicted: str):
+    """(crate, path) of the Rust file actually on disk for a predicted target, or None. Falls back to
+    the same file name in the predicted crate, then in any crate (several ports moved, e.g. the
+    modifier factories live in ffb-mechanics)."""
     if crate == "—":
-        return "—"
-    full_path = RUST_BASE / crate / rust_path
-    return "~" if full_path.exists() else "○"
+        return None
+    if (RUST_BASE / crate / predicted).exists():
+        return crate, predicted
+    name = Path(predicted).name
+    same = [(crate, p) for p in by_name.get((crate, name), [])]
+    if same:
+        return pick(same, predicted)
+    anywhere = [(c, p) for (c, n), ps in by_name.items() if n == name for p in ps]
+    return pick(anywhere, predicted) if anywhere else None
 
 
-def get_group_key(display: str, module_name: str) -> str:
-    parts = display.split('/')
-    if module_name == 'ffb-server':
-        if len(parts) < 2 or parts[1].endswith('.java'):
-            return f"{parts[0]}/root"
-        if parts[1] in ('step', 'skillbehaviour') and len(parts) >= 3 and not parts[2].endswith('.java'):
-            return f"{parts[0]}/{parts[1]}/{parts[2]}"
-        return f"{parts[0]}/{parts[1]}"
-    elif module_name == 'ffb-client-logic':
-        if len(parts) < 2 or parts[1].endswith('.java'):
-            return f"{parts[0]}/root"
-        return f"{parts[0]}/{parts[1]}"
-    else:
-        return parts[0] if len(parts) > 1 else 'root'
+# ── driver.rs liveness for step files ─────────────────────────────────────────────────────────────
+driver = DRIVER.read_text(encoding="utf-8") if DRIVER.exists() else ""
+globbed = set(re.findall(r"use crate::(step(?:::\w+)+)::\*;", driver))
 
 
-# Load existing status overrides from the current tracker file
+def driver_verdict(crate: str, rust_path: str) -> str:
+    if crate != "ffb-engine" or not rust_path.startswith("src/step/"):
+        return ""
+    full = RUST_BASE / crate / rust_path
+    if "impl Step for" not in full.read_text(encoding="utf-8", errors="replace"):
+        return ""
+    module = rust_path[len("src/"):-len(".rs")].replace("/", "::")  # step::bb2025::block::step_x
+    parent, name = module.rsplit("::", 1)
+    if module in driver or (parent in globbed and re.search(rf"\b{name}::", driver)):
+        return "live"
+    return "dead twin"
+
+
+# ── previous hand-set statuses (kept only where the Rust file exists) ─────────────────────────────
 existing_status = {}
 if OUT_PATH.exists():
     for line in OUT_PATH.read_text(encoding='utf-8').splitlines():
         m = re.match(r'\|\s*`([^`]+\.java)`\s*\|[^|]*\|[^|]*\|\s*([○~✓—])\s*\|', line)
         if m:
-            java_file, status = m.group(1), m.group(2)
-            existing_status[java_file] = status
+            existing_status[m.group(1)] = m.group(2)
 
 modules = [
     ("ffb-common", JAVA_BASE / "ffb-common/src/main/java"),
@@ -161,82 +195,79 @@ modules = [
 ]
 
 sections = {}
+demoted = 0
 for module_name, java_src in modules:
     if not java_src.exists():
-        print(f"WARNING: {java_src} does not exist, skipping")
-        continue
-    files = sorted(java_src.rglob("*.java"))
+        raise SystemExit(f"missing Java sources: {java_src}")
     entries = []
-    for f in files:
-        rel = str(f.relative_to(java_src)).replace(os.sep, '/')
-        crate, rust_path = get_rust_target(rel, module_name)
+    for f in sorted(java_src.rglob("*.java")):
+        rel = f.relative_to(java_src).as_posix()
+        crate, predicted = get_rust_target(rel, module_name)
         display = rel.replace('com/fumbbl/ffb/', '')
-        # Preserve manually-set status, fall back to auto-detect
-        if display in existing_status:
-            status = existing_status[display]
-        else:
-            status = check_rust_exists(crate, rust_path)
-        entries.append((display, crate, rust_path, status))
+        if crate == "—":
+            entries.append((display, "—", "—", "—", ""))
+            continue
+        found = locate(crate, predicted)
+        if found is None:
+            if existing_status.get(display) in ("✓", "~"):
+                demoted += 1
+            entries.append((display, crate, predicted, "○", ""))
+            continue
+        status = existing_status.get(display) if existing_status.get(display) in ("✓", "~") else "~"
+        fcrate, fpath = found
+        entries.append((display, fcrate, fpath, status, driver_verdict(fcrate, fpath)))
     sections[module_name] = entries
     print(f"{module_name}: {len(entries)} files")
 
-lines = []
-lines.append("# FFB Java to Rust 1:1 Translation Tracker\n\n")
-lines.append("<!-- Auto-generated skeleton from Java source. Update status cells manually as files are translated. -->\n")
-lines.append("<!-- To regenerate: python scripts/gen_translation_tracker.py -->\n\n")
-lines.append("## How to Use\n\n")
-lines.append("This file tracks every Java class in ffb-common, ffb-server, and ffb-client-logic against its target Rust file.\n\n")
-lines.append("1. When you start translating a file: change its status to `~`\n")
-lines.append("2. When it matches the Java source 1:1 and parity is confirmed: change to `✓`\n")
-lines.append("3. When a race passes T3b 100/100, all files exercised by that race should be `✓`\n\n")
-lines.append("**Workflow per Java file:**\n")
-lines.append("- Read the Java source in `ffb-java/<module>/src/main/java/<path>.java`\n")
-lines.append("- Find or create the corresponding Rust file at the listed Rust Target path\n")
-lines.append("- Translate method by method, matching dice consumption order, conditions, and state transitions exactly\n")
-lines.append("- Run `cargo test` after each file\n")
-lines.append("- Run `python scripts/parity_run.py --home amazon --away amazon --seeds 1-10` to catch regressions\n\n")
-lines.append("## Status Legend\n\n")
-lines.append("- `○` Not started -- no Rust equivalent exists\n")
-lines.append("- `~` Partial -- Rust equivalent exists but not yet 1:1 with Java\n")
-lines.append("- `✓` Done -- Rust matches Java line-by-line, parity confirmed\n")
-lines.append("- `—` Not translating (GUI, DB, WebSocket layer, serialization utils)\n\n")
-lines.append("---\n\n")
-lines.append("## Progress Summary\n\n")
-
-total_o = total_tilde = total_done = total_skip = 0
+counts = defaultdict(int)
 for entries in sections.values():
-    for _, _, _, status in entries:
-        if status == "○": total_o += 1
-        elif status == "~": total_tilde += 1
-        elif status == "✓": total_done += 1
-        elif status == "—": total_skip += 1
+    for e in entries:
+        counts[e[3]] += 1
+        if e[4]:
+            counts[e[4]] += 1
 
-total = total_o + total_tilde + total_done
-lines.append("| Metric | Count |\n")
-lines.append("|--------|-------|\n")
-lines.append(f"| Total Java files in scope | {total} |\n")
-lines.append(f"| Not started (○) | {total_o} |\n")
-lines.append(f"| Partial (~) | {total_tilde} |\n")
-lines.append(f"| Done (✓) | {total_done} |\n")
-lines.append(f"| Not translating (—) | {total_skip} |\n\n")
-lines.append("---\n\n")
-
+lines = [
+    "# FFB Java to Rust 1:1 Translation Tracker\n\n",
+    "<!-- Generated from the Java sources and the Rust tree. Regenerate: python -I scripts/gen_translation_tracker.py -->\n\n",
+    "Every Java class in ffb-common, ffb-server and ffb-client-logic (`ffb-java/ffb/`) against the Rust file\n",
+    "that holds its port, located on disk. A row can only say `~`/`✓` when that file exists.\n\n",
+    "## Legend\n\n",
+    "- `○` no Rust file found\n",
+    "- `~` Rust file exists (not marked done by hand)\n",
+    "- `✓` Rust file exists and was marked 1:1 by hand (kept across regenerations)\n",
+    "- `—` not translated (DB, network handlers, JSON/XML, stats, reports: other layers)\n",
+    "- **Driver** (step files only): `live` = dispatched by `step/driver.rs`; `dead twin` = an edition copy\n",
+    "  the engine never runs (the driver serves that edition from a shared step)\n\n",
+    "## Summary\n\n",
+    "| Metric | Count |\n|--------|-------|\n",
+    f"| Rust file found, done (✓) | {counts['✓']} |\n",
+    f"| Rust file found (~) | {counts['~']} |\n",
+    f"| No Rust file (○) | {counts['○']} |\n",
+    f"| Not translated (—) | {counts['—']} |\n",
+    f"| Step files: live / dead twin | {counts['live']} / {counts['dead twin']} |\n\n",
+    "---\n\n",
+]
 for module_name, entries in sections.items():
     lines.append(f"## Module: {module_name}\n\n")
-    by_pkg = {}
-    for entry in entries:
-        display = entry[0]
-        key = get_group_key(display, module_name)
-        by_pkg.setdefault(key, []).append(entry)
-    for pkg in sorted(by_pkg.keys()):
-        pkg_entries = by_pkg[pkg]
-        lines.append(f"### {pkg}/ ({len(pkg_entries)} files)\n\n")
-        lines.append("| Java File | Rust Crate | Rust Target | Status |\n")
-        lines.append("|-----------|-----------|-------------|--------|\n")
-        for display, crate, rust_path, status in pkg_entries:
-            lines.append(f"| `{display}` | `{crate}` | `{rust_path}` | {status} |\n")
+    by_pkg = defaultdict(list)
+    for e in entries:
+        parts = e[0].split('/')
+        if module_name == 'ffb-server' and len(parts) > 3 and parts[1] in ('step', 'skillbehaviour'):
+            key = '/'.join(parts[:3])
+        elif len(parts) > 2:
+            key = '/'.join(parts[:2])
+        else:
+            key = parts[0] if len(parts) > 1 else 'root'
+        by_pkg[key].append(e)
+    for pkg in sorted(by_pkg):
+        pe = by_pkg[pkg]
+        lines.append(f"### {pkg}/ ({len(pe)} files)\n\n")
+        lines.append("| Java File | Rust Crate | Rust Target | Status | Driver |\n")
+        lines.append("|-----------|-----------|-------------|--------|--------|\n")
+        for display, crate, path, status, drv in pe:
+            lines.append(f"| `{display}` | `{crate}` | `{path}` | {status} | {drv} |\n")
         lines.append("\n")
 
-content = ''.join(lines)
-OUT_PATH.write_text(content, encoding='utf-8')
-print(f"Written {len(lines)} lines ({len(content)} chars) to {OUT_PATH}")
+OUT_PATH.write_text(''.join(lines), encoding='utf-8')
+names = {"✓": "done", "~": "found", "○": "missing", "—": "excluded"}
+print({names.get(k, k): v for k, v in counts.items()}, f"demoted {demoted} rows that claimed a missing Rust file")

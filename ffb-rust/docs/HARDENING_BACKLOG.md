@@ -391,8 +391,12 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Q6 — Hygiene
 
-- [ ] **Q6.1** Regenerate `TRANSLATION_TRACKER.md` from the filesystem (77 ✓ rows name missing files;
-  dead bb2020/bb2016 step files marked as such).
+- [x] **Q6.1** (see Log) Regenerate `TRANSLATION_TRACKER.md` from the filesystem (77 ✓ rows name missing files;
+  dead bb2020/bb2016 step files marked as such). `scripts/gen_translation_tracker.py` rewritten: reads
+  `ffb-java/ffb/<module>` (the old path had been empty since the repo cleanup), locates each Rust file
+  on disk (predicted path, else same name in the crate, else in any crate), `○` whenever no file exists
+  (overrides old hand marks: 79 rows demoted, 44 of them ✓ -- mostly skill behaviours inlined into
+  steps), and a Driver column: 228 live step files, 122 dead twins (per `step/driver.rs`).
 - [x] **Q6.2** (see Log) Remove stale "not ported" comments found by the review (InducementTypeFactory, CardDeck,
   BlitzTurnState, ArmorModifierFactory, Saboteur, EndGame generators, …). All 15 sites naming these
   were checked against the code: stale ones corrected, the truly open ones re-pointed at their item
@@ -408,6 +412,10 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-28 · Q6.1 · (this commit) · TRANSLATION_TRACKER regenerated from the Java sources + Rust tree:
+  2,100 ✓ / 12 ~ with a Rust file, 379 no Rust file, 458 excluded layers; step files 228 live / 122 dead
+  twins. 79 rows that claimed a missing file demoted to ○ (44 were ✓).
 
 - 2026-11-28 · Q1.2d · (this commit) · bb2020 wood_elf+Swiftvine v nurgle+Glart s12 STUCK_STEP
   FOUL_APPEARANCE was the Java harness: its FURIOUS_OUTBURST arm cleared the dialog after the target
