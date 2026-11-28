@@ -8,13 +8,16 @@ done-criterion; tick it only when that criterion is met and the change is commit
 `[!]` blocked (reason + what decision is needed).
 
 ## RESUME HERE
-**Q1.7 is running as cert11** (frozen pair from 50f268a26, `D:/ffb_star/bin/*cert11*`; weekend compute
-until Mon 11-30 07:00, 2 workers, 0x7FF): star 4,012/4,012, skill 121/121, mirror 329/330 (+ JD-002
-goblin bb2025 1.0 as JAVA-CRASH) are done; cross is on its last workers (log `../cert11_chain.log`,
-results `../cross_cert11/scratch`). When it finishes: tally with `scripts/cert_tally.py cert11`, fix any
-red 1:1, write `docs/cert_manifest.json`, tick Q1.7, update the README Parity table. Q1.2c's harness
-change (11-28) only touches the classes=none random-pick path, which no cert suite runs, so cert11 stays
-valid. Day items meanwhile: **Q2.10** rest (Team inducement set for USE_PREDEFINED_INDUCEMENTS; dead-twin edition diffs), **Q4.4** rest (part 1 done: enhancements) (Q4.2 rest waits for the other session's
+**Q1.7 = cert11** (frozen pair from 50f268a26, `D:/ffb_star/bin/*cert11*`; weekend compute until Mon
+11-30 07:00, 2 workers, 0x7FF). **Game suites done** (`scripts/cert_tally.py cert11`): star 4,012/4,012,
+skill 121/121, mirror 329/330 + goblin bb2025 @1.0 (4 games JD-002 JAVA-CRASH), cross 4,011/4,012 +
+underworld_37844 v dark_elf bb2025 (1 game JD-001 JAVA-CRASH). **Client-view suites RUNNING** (the first
+full view cert ever): `scratchpad view11_chain.cmd` → `scripts/view_suite.py` roots
+`D:/ffb_view_cert11_{mirror1.0,mirror0,mirror1e6,cross,star}` (job files `D:/ffb_view_jobs/cert11/`,
+seeds as the cert: mirror 1-100, cross 1-3, star 1-2), log `../view11_chain.log`; resumable (re-run the
+same commands; finished jobs are skipped). When done: `cert_tally.py cert11` must print ALL SUITES GREEN
+(the two JAVA-CRASH cells aside), then write `docs/cert_manifest.json`, tick Q1.7, update the README.
+Q1.2c's harness change only touches the classes=none random path no cert suite runs. Day items meanwhile: **Q2.10** rest (Team inducement set for USE_PREDEFINED_INDUCEMENTS; dead-twin edition diffs), **Q4.4** rest (part 1 done: enhancements) (Q4.2 rest waits for the other session's
 declaration work; Q4.3 is [!]; Q3.10 needs suite runs: night). Q3.9 code is done; its
 bb2016 skill sweep joins the night queue. Q3.3a (card play) waits for another session's
 uncommitted card-model work (see Q3.3a); Q3.3b (card draw) is [!] with a question for the user.
@@ -394,6 +397,12 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-28 · Q1.7 cert11 · 351d0c7bc · game suites done on one frozen pair: star 4,012/4,012, skill 121/121,
+  mirror 329/330 + 4 JD-002 JAVA-CRASH games, cross 4,011/4,012 + 1 JD-001 JAVA-CRASH game. A view trial
+  (human-orc bb2025) showed 0/252 identical: client_view_check's SETUP key `*.roster` only matched the
+  roster node, not its fields, so the order the harnesses list roster positions failed every step.
+  Fixed (subtree match, mid-game change still flagged): 252/252. Full view suites launched.
 
 - 2026-11-28 · Q6.2 · (this commit) · 15 review-named stale comments checked and fixed in 9 engine files:
   Throw a Rock handler (ported), Saboteur + attacker DeferredCommands (ported), bb2025 EndTurn header
