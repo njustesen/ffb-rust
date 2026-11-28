@@ -123,20 +123,22 @@ See [docs/HISTORY.md](ffb-rust/docs/HISTORY.md) for how each number was reached.
 
 Parity work turns up bugs in stock Java, where it does something no reading of the rules supports.
 Rust reproduces each one by default so the engines stay comparable, and where a fix exists it sits
-behind a flag on `Game::defect_fixes`. Details, evidence and the Rust side of each are in
-[JAVA_DEFECTS.md](ffb-rust/docs/JAVA_DEFECTS.md).
+behind a flag on `Game::defect_fixes`. Each one is confirmed by a unit test that drives stock Java
+into it (`ffb-ai/.../defects/JavaDefectsTest.java`). Details, evidence, the Rust side of each and the
+suspects that turned out not to be defects are in [JAVA_DEFECTS.md](ffb-rust/docs/JAVA_DEFECTS.md).
 
 | ID | Edition | Defect | Rust fix flag |
 | --- | --- | --- | --- |
 | JD-001 | 2025 | A re-rolled punt distance keeps a stale out-of-bounds flag, so the throw-in from an interior square crashes | yes |
 | JD-002 | all | A Sneaky Git foul on a Ball & Chain player reads a missing armour roll and crashes | yes |
-| JD-003 | 2016 | The card deck is in JVM hash order, so a card draw cannot be reproduced from the dice | n/a |
 | JD-004 | 2020 | A re-rolled leap spends its team re-roll again after the Diving Tackle answer | not yet |
-| JD-005 | 2025 | A re-rolled dodge spends its re-roll again after the Arm Bar choice | not yet |
+| JD-005 | 2025 | A re-rolled dodge spends its re-roll again after the Arm Bar choice, and rolls a third time | not yet |
 | JD-006 | 2020, 2025 | Ending the turn at the Furious Outburst prompt crashes (Rust does not reproduce this yet) | not yet |
-| JD-007 | all | After an armour re-roll, eleven injury types interpret the wrong injury context | not yet |
+| JD-007 | 2020, 2025 | After an armour re-roll (e.g. Master Assassin), eleven injury types interpret the wrong injury context, so the victim is not hurt | not yet |
 | JD-008 | 2025 | A Pitch Invasion on a Ball & Chain player rolls the injury but never applies it | not yet |
-| JD-009 | 2020, 2025 | The Diving Tackle dialog hint ignores the Diving Tackle modifier (text only) | n/a |
+
+Not every oddity is a defect. The bb2016 card deck is kept in JVM hash order (PQ-001, formerly JD-003),
+which is legal under the rules but means Java cannot replay its own card draws.
 
 ## Repository layout
 
