@@ -22,9 +22,29 @@ The unmodified Java Swing client can connect to the Rust server and play a full 
 | Java GUI client on the Rust server | plays whole games |
 | Unit tests | 15,000+ passing |
 
-"Identical" means per-step state hash, dice-call count, report stream and client-view JSON all
-match the Java engine for every step of every game. See [docs/HISTORY.md](ffb-rust/docs/HISTORY.md)
-for how each number was reached.
+See [docs/HISTORY.md](ffb-rust/docs/HISTORY.md) for how each number was reached.
+
+## How parity is tested
+
+The Java engine is the oracle. Each test game is played twice, once by each engine:
+
+- **Same inputs.** Both engines share one seeded dice stream (Xoshiro256**), the same teams and the
+  same options. Matching agents (Rust in `ffb-engine`, Java in `ParityRunner`) make every decision
+  from the same state with the same rules, so any difference comes from the engine itself.
+- **Compared every step.** After each decision the harness compares the state hash (players,
+  ball, turn data, flags, results; see [PARITY_STATE_HASH.md](ffb-rust/docs/PARITY_STATE_HASH.md))
+  and the dice-call count; the report stream and the client view (what the GUI shows, at each
+  activation) are compared too. One mismatch anywhere fails the game, even if the final state
+  converges.
+- **No silent passes.** A game that aborts, stalls or loops counts as a failure. A crash in stock
+  Java is reported separately as JAVA-CRASH and must be documented in
+  [JAVA_DEFECTS.md](ffb-rust/docs/JAVA_DEFECTS.md).
+- **Suites.** Mirror (every roster against itself), cross (roster against roster), star players and
+  skill squads, in all three editions and at three heuristic-agent scales (0, 1 and 10⁶). A certification runs every suite on one frozen Rust binary and Java harness jar.
+- **Real games.** FUMBBL replays are re-simulated, and every recorded state must come out identical.
+- **Fixing a difference.** Rust is changed to match Java line for line, never the reverse. A genuine
+  Java bug is still ported as the default, with the fix behind a flag, so the two engines stay
+  comparable.
 
 ## How it fits together
 
