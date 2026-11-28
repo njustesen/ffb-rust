@@ -169,6 +169,7 @@ impl StepJump {
             }
         } else if bb2020 && already_rerolled && self.use_ignore_modifier_after_roll_skill != Some(true)
             && self.using_diving_tackle.is_some()
+            && !game.defect_fixes.leap_reroll_spent_once
         {
             // Java bb2020 StepJump:165 has no `usingDivingTackle == null` guard: after a re-rolled
             // successful leap and the Diving Tackle answer it calls useReRoll AGAIN (a team re-roll
@@ -698,6 +699,33 @@ mod tests {
         assert!(game.acting_player.used_skills.contains(&SkillId::Leap));
         assert!(!crate::mechanic::jump_mechanic_for(Rules::Bb2020).can_still_jump(&game, &game.acting_player.clone()),
             "Leap used and hasJumped: no second jump");
+    }
+
+    /// JD-004: bb2020, after a team-re-rolled leap succeeded and the Diving Tackle question was
+    /// answered, the step runs again. Default (Java): the team re-roll is spent a SECOND time
+    /// (bank 0 -> -1). `defect_fixes.leap_reroll_spent_once`: nothing more is spent.
+    /// Mirrors JavaDefectsTest.jd004_bb2020LeapSpendsTheTeamReRollAgainAfterDivingTackleAnswer.
+    #[test]
+    fn jd004_bb2020_diving_tackle_answer_spends_the_re_roll_again_unless_fixed() {
+        for fix in [false, true] {
+            let mut game = make_game_with_leaper();
+            game.rules = Rules::Bb2020;
+            game.home_playing = true;
+            game.set_turn_mode(TurnMode::Regular);
+            game.turn_data_home.rerolls = 0; // the one re-roll is already spent on the re-roll
+            game.defect_fixes.leap_reroll_spent_once = fix;
+            let mut step = StepJump::new("fail".into());
+            step.move_start = Some(ffb_model::types::FieldCoordinate::new(5, 5));
+            step.re_roll_state.re_rolled_action =
+                Some(ffb_model::model::re_rolled_action::ReRolledAction::new("JUMP"));
+            step.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
+            step.using_diving_tackle = Some(false); // the away coach answered: no Diving Tackle
+            step.roll = 4; // the re-rolled leap that made it
+            step.start(&mut game, &mut GameRng::new(0));
+            let expected = if fix { 0 } else { -1 };
+            assert_eq!(game.turn_data_home.rerolls, expected,
+                "fix={fix}: Java spends the team re-roll again on the Diving Tackle answer");
+        }
     }
 
     /// Java bb2020 checkDivingTackle has no re-roll offer: a leap Diving Tackle could flip goes

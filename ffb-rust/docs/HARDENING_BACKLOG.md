@@ -83,6 +83,12 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
   `--heur-classes` diverges on seeds 7, 18, 30, 82 (Java activates a FOUL whose step changes nothing,
   Rust a Move; reports differ). Same with the frozen cert9 exe+jar, so it is old. Not a certified config,
   but a real Java/Rust agent-contract difference: root-cause and fix.
+- [ ] **Q1.2d Java harness: FOUL_APPEARANCE on a Furious Outburst path** (found 2026-11-28 while
+  gating the JD fix flags): wood_elf+Swiftvine vs nurgle+Glart bb2020 @1.0 seed 12 -- Swiftvine's
+  Furious Outburst targets a Foul Appearance player; ParityRunner prints `UNHANDLED_STEP:
+  FOUL_APPEARANCE` until `stuck_step` (step 30), Rust plays on. Same on the frozen cert11 pair, so
+  old; the cert star suite runs seeds 1-2 and never reached it. Add the FOUL_APPEARANCE answer to the
+  harness (mirrored), re-gate the Swiftvine star cells at 20 seeds.
 - [x] **Q1.2b Stuck step: underworld_37844 vs dark_elf bb2025** -- **resolved: it is JD-001** (see Log):
   the re-rolled punt distance leaves outOfBounds on, the throw-in square is interior, Java throws
   after rolling the direction (rng 105) and swallows the exception. Rust now spends that die; the
@@ -397,6 +403,14 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-28 · JAVA_DEFECTS flags · (this commit) · user request: every JD has a Rust fix flag + tests.
+  New `defect_fixes` flags JD-004 `leap_reroll_spent_once`, JD-005 `arm_bar_choice_keeps_failed_dodge`,
+  JD-006 `furious_outburst_survives_missing_target` (and JD-006's crash is now ported as the default,
+  as JD-002), JD-007 `modified_injury_interprets_alternate_context`, JD-008
+  `pitch_invasion_applies_chain_injury`; one `jd00N_*` Rust test each (flag off = Java, on = rules).
+  ffb-engine 7,690/0; smoke 3×20 green; Swiftvine star gates bb2025 ×2, bb2020 elf-undead 20/20; the
+  one red (bb2020 wood_elf-nurgle s12) is a pre-existing Java-harness gap, logged as Q1.2d.
 
 - 2026-11-28 · Q1.7 cert11 · 351d0c7bc · game suites done on one frozen pair: star 4,012/4,012, skill 121/121,
   mirror 329/330 + 4 JD-002 JAVA-CRASH games, cross 4,011/4,012 + 1 JD-001 JAVA-CRASH game. A view trial

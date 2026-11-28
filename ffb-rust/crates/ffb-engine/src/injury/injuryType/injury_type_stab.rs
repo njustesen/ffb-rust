@@ -199,6 +199,57 @@ mod tests {
         assert!(t.ctx.armor_broken); assert!(t.ctx.injury.is_some());
     }
 
+    /// JD-007: a bb2025 Stab whose failed armour roll is re-rolled by Master Assassin and breaks.
+    /// Default (Java): the injury is rolled on the alternate context but interpreted on the
+    /// ORIGINAL one, so the original (armour held) gets a casualty roll and the alternate no
+    /// injury. `defect_fixes.modified_injury_interprets_alternate_context`: the alternate is
+    /// interpreted, the original gets no casualty roll.
+    /// Mirrors JavaDefectsTest.jd007_rerolledStabArmourInterpretsTheOriginalContext.
+    #[test]
+    fn jd007_master_assassin_reroll_interprets_the_original_unless_fixed() {
+        use ffb_model::enums::SkillId;
+        use ffb_model::model::player::Player;
+        use ffb_model::model::skill_def::SkillWithValue;
+        let make = |fix: bool| {
+            let mut game = game_with_armor(9);
+            game.team_away.players.push(Player {
+                id: "a1".into(), name: "a1".into(), nr: 1, strength: 3, agility: 3, movement: 6,
+                armour: 8, starting_skills: vec![SkillWithValue::new(SkillId::MasterAssassin)],
+                ..Default::default() });
+            game.defect_fixes.modified_injury_interprets_alternate_context = fix;
+            game
+        };
+        // A seed whose first armour roll holds and whose Master Assassin re-roll breaks.
+        let mut found = None;
+        for seed in 0..5000u64 {
+            let mut t = InjuryTypeStab::new(true);
+            t.handle_injury(&make(false), &mut GameRng::new(seed), Some("a1"), "p1", coord(), None, None,
+                ApothecaryMode::Defender);
+            if !t.ctx.armor_broken
+                && t.ctx.modified_injury_context.as_ref().map(|a| a.armor_broken).unwrap_or(false)
+            {
+                found = Some(seed);
+                break;
+            }
+        }
+        let seed = found.expect("some seed: armour holds, the re-roll breaks it");
+
+        let mut java = InjuryTypeStab::new(true);
+        java.handle_injury(&make(false), &mut GameRng::new(seed), Some("a1"), "p1", coord(), None, None,
+            ApothecaryMode::Defender);
+        let alt = java.ctx.modified_injury_context.as_ref().unwrap();
+        assert!(alt.injury_roll.is_some(), "the injury is rolled on the alternate");
+        assert!(alt.injury.is_none(), "Java: the alternate's injury is never interpreted");
+        assert!(java.ctx.casualty_roll.is_some(), "Java: a casualty roll for the original, whose armour held");
+
+        let mut fixed = InjuryTypeStab::new(true);
+        fixed.handle_injury(&make(true), &mut GameRng::new(seed), Some("a1"), "p1", coord(), None, None,
+            ApothecaryMode::Defender);
+        let alt = fixed.ctx.modified_injury_context.as_ref().unwrap();
+        assert!(alt.injury.is_some(), "fixed: the alternate's injury is interpreted");
+        assert!(fixed.ctx.casualty_roll.is_none(), "fixed: no casualty roll for the unbroken original");
+    }
+
     #[test]
     fn initial_context_has_no_injury() {
         let t = InjuryTypeStab::new(true);

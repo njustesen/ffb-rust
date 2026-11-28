@@ -233,6 +233,13 @@ impl StepMoveDodge {
 
         let player_id = game.acting_player.player_id.clone();
 
+        // JD-005 (docs/JAVA_DEFECTS.md): Java re-runs the re-roll below on the ARM_BAR answer (a
+        // second team re-roll and a third dodge die). With the fix the answer only names the Arm
+        // Bar player and the already-failed dodge falls.
+        if self.arm_bar_choice && game.defect_fixes.arm_bar_choice_keeps_failed_dodge {
+            return self.fail_dodge(game);
+        }
+
         // Java: if (DODGE == reRolledAction && !usingModifierIgnoringSkill && !(dtRerollAsked && source==null))
         //         if (source == null || !useReRoll(...)) { failDodge(); return; } else fReRollUsed = true;
         let already_rerolled = self.re_roll_state.re_rolled_action
@@ -1437,6 +1444,40 @@ mod tests {
         assert!(rng.call_count > before, "the ARM_BAR re-entry must roll a fresh dodge die");
         assert_eq!(out.action, StepAction::NextStep,
             "a fresh 6 succeeds; the stale 2 must not be reused");
+    }
+
+    /// JD-005: the ARM_BAR answer after a team-re-rolled, twice-failed dodge. Default (Java): a
+    /// second team re-roll is spent and a third die is rolled. `defect_fixes.
+    /// arm_bar_choice_keeps_failed_dodge`: no re-roll, no die, the dodge fails to the failure label.
+    /// Mirrors JavaDefectsTest.jd005_bb2025ArmBarChoiceSpendsTheReRollAgainAndRollsAThirdDodge.
+    #[test]
+    fn jd005_arm_bar_answer_re_runs_the_re_roll_unless_fixed() {
+        for fix in [false, true] {
+            let mut game = make_game();
+            add_player(&mut game, "p1");
+            game.acting_player.player_id = Some("p1".into());
+            game.acting_player.dodging = true;
+            game.turn_data_mut().rerolls = 1; // one already spent on the first re-roll
+            game.defect_fixes.arm_bar_choice_keeps_failed_dodge = fix;
+            let mut step = StepMoveDodge::new("fail".into());
+            step.re_roll_state.re_rolled_action =
+                Some(ffb_model::model::re_rolled_action::ReRolledAction::new("DODGE"));
+            step.re_roll_state.re_roll_source = Some(ReRollSource::new("TRR"));
+            step.dodge_roll = 1; // the re-rolled dodge that failed
+            let mut rng = GameRng::new(0);
+            let before = rng.call_count;
+            let out = step.handle_command(
+                &Action::SelectPlayer { player_id: "armbar".into() }, &mut game, &mut rng);
+            if fix {
+                assert_eq!(game.turn_data().rerolls, 1, "fixed: no second team re-roll");
+                assert_eq!(rng.call_count, before, "fixed: no third dodge die");
+                assert_eq!(out.action, StepAction::GotoLabel);
+                assert_eq!(out.goto_label.as_deref(), Some("fail"));
+            } else {
+                assert_eq!(game.turn_data().rerolls, 0, "Java: the Arm Bar answer spends a second team re-roll");
+                assert!(rng.call_count > before, "Java: a third dodge die is rolled");
+            }
+        }
     }
 
     /// Regression (human seed 13): a Dodge-skill player's failed-dodge re-roll is CANCELLED by an

@@ -146,7 +146,11 @@ pub fn modification_aware_handle_injury<T: ModificationAwareInjuryType>(
             this.injury_context_mut().armor_broken = false;
             this.armour_roll(game, rng, attacker_id, defender_id, false);
             if this.injury_context().armor_broken {
-                if this.interprets_member_injury() {
+                // JD-007 (docs/JAVA_DEFECTS.md): with the fix the alternate's injury is
+                // interpreted on the alternate, as every other injury type does.
+                if this.interprets_member_injury()
+                    && !game.defect_fixes.modified_injury_interprets_alternate_context
+                {
                     // Java: `injuryRoll(..., alternateInjuryContext)` sets the alternate's dice and
                     // modifiers, then `setInjury(pDefender, gameState, diceRoller)` interprets the
                     // MEMBER — the original — context (star tier: Skitter Stab-Stab's Master

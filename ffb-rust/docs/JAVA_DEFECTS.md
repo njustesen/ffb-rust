@@ -13,7 +13,9 @@ configuration flag on `Game::defect_fixes` (`ffb-model/src/model/java_defect_fix
 `false`. Turning a flag on makes Rust deliberately diverge from Java, and any parity gate run with
 it on is not a parity measurement.
 
-**Every entry is confirmed by a unit test against stock Java.**
+**Every entry has a Rust flag and is confirmed by unit tests on both sides.** Each Rust test
+(`jd00N_*` in `ffb-engine`) runs the defect with the flag off (Java's behaviour) and on (the rules'),
+and `JavaDefectFixes::all_fixed()` turns every flag on. **On the Java side:**
 `ffb-java/ffb/ffb-ai/src/test/java/com/fumbbl/ffb/ai/defects/JavaDefectsTest.java` builds a headless
 game (`DefectFixture`: parity teams, scripted dice through the `Fortuna` delegate, the real step
 sequence driven with the client commands a coach sends) and asserts what the unmodified engine does.
@@ -195,14 +197,16 @@ a parity quirk.
 | **Surfaces as** | A failed leap, re-rolled with a team re-roll, succeeds; the opposing coach is asked about Diving Tackle; on the answer `executeStep` runs again and `useReRoll(TEAM_RE_ROLL)` decrements the bank a second time (second ReportReRoll; a Loner player rolls Loner again and can turn the made leap into a failure) |
 | **Effect** | One team re-roll paid twice for one re-roll. No rule supports it. The second spend has no availability check: `RollMechanic.updateTurnDataAfterReRollUsage` (bb2020, :346) decrements `reRolls` unconditionally, so a team that spent its last re-roll ends with `-1`. |
 | **Found on** | §Q2.10 code audit, 2026-11-27 (bb2020 games run Rust's shared StepJump) |
-| **Rust flag** | none yet |
+| **Rust flag** | `defect_fixes.leap_reroll_spent_once` (default `false` = defect) |
 | **Test** | `jd004_bb2020LeapSpendsTheTeamReRollAgainAfterDivingTackleAnswer`: leap 1, team re-roll (bank 1 → 0), re-rolled 4 makes it but not with Diving Tackle's -2; the away coach names the tackler and the bank goes to **-1** |
 
 ### What Rust does
 
 Ports it 1:1 (`step/bb2025/move_/step_jump.rs`, bb2020 branch of `execute_step`): after a Diving
 Tackle answer with a JUMP re-roll recorded, the source is spent again and a failed spend fails the
-leap; the leap then re-reads the same roll.
+leap; the leap then re-reads the same roll. Flag `true`: the answer spends nothing (bb2025's guard).
+Rust test `jd004_bb2020_diving_tackle_answer_spends_the_re_roll_again_unless_fixed` (bank 0 → -1
+by default, stays 0 with the flag).
 
 ---
 
@@ -214,14 +218,15 @@ leap; the leap then re-reads the same roll.
 | **Surfaces as** | A dodge that fails after a team re-roll, next to two or more Arm Bar opponents: when the choice is answered, the re-roll is spent a second time (a second `ReportReRoll`) and a fresh dodge die is rolled |
 | **Effect** | One failed, re-rolled dodge costs two team re-rolls and gets a third dodge roll, and that third roll counts: if it passes, a dodge that failed twice ends with the dodger standing. No rule supports it. |
 | **Found on** | `chaos` bb2025 seed 28 i=60, BACKLOG §H.46 |
-| **Rust flag** | none yet |
+| **Rust flag** | `defect_fixes.arm_bar_choice_keeps_failed_dodge` (default `false` = defect) |
 | **Test** | `jd005_bb2025ArmBarChoiceSpendsTheReRollAgainAndRollsAThirdDodge`: dodge 1, team re-roll 1 (bank 2 → 1), two Arm Bar players so the away coach chooses; the answer spends a second re-roll (bank 0), rolls a third die (6), and the dodger stays up |
 
 ### What Rust does
 
-Ports it 1:1 (`step/bb2025/move_/step_move_dodge.rs`, ~:263-269): the Arm Bar answer re-enters
-`execute_step` with the DODGE re-roll still recorded, so the source is spent again and the dodge is
-re-rolled.
+Ports it 1:1 (`step/bb2025/move_/step_move_dodge.rs`): the Arm Bar answer re-enters `execute_step`
+with the DODGE re-roll still recorded, so the source is spent again and the dodge is re-rolled.
+Flag `true`: the answer only names the Arm Bar player and the failed dodge falls (no re-roll, no
+die). Rust test `jd005_arm_bar_answer_re_runs_the_re_roll_unless_fixed`.
 
 ---
 
@@ -233,15 +238,18 @@ re-rolled.
 | **Surfaces as** | `NullPointerException` out of `StepEndFuriousOutburst.executeStep` |
 | **Effect** | `mixed/StepInitFuriousOutburst.executeStep` reaches `END` without setting a `TargetSelectionState` on three paths: the end-turn branch, a prone or stunned player, and no skill or no eligible target. Only the end-player-action branch (`.cancel()`) and the target branch set one. The `CLIENT_END_TURN` handler (~:78-82) makes the first path reachable from a real client, so a coach who ends the turn at the Furious Outburst prompt crashes the step. |
 | **Found on** | code reading while driving Furious Outburst live (`5b073d8d1`; BACKLOG.md ~:1113-1127) |
-| **Rust flag** | none |
+| **Rust flag** | `defect_fixes.furious_outburst_survives_missing_target` (default `false` = defect) |
 | **Test** | `jd006_endTurnAtFuriousOutburstPromptThrowsNpe`: the bb2025 Furious Outburst sequence shows the target prompt; `CLIENT_END_TURN` from the acting coach throws the NPE out of `StepEndFuriousOutburst` |
 
 ### What Rust does
 
-Rust does **not** reproduce this one. `step/bb2025/step_end_furious_outburst.rs` (~:68) reads the
-target selection as an `Option` and treats `None` as "no target". No parity gate reaches the path,
-because neither agent ends the turn at that prompt. Open follow-up: port the crash as the default
-(the same observable outcome as JD-002) and move the current behaviour behind a flag.
+Since 2026-11-28 Rust reproduces it as JD-002 does: `step/bb2025/step_end_furious_outburst.rs` (the
+live step for bb2020 and bb2025) returns `Continue` having touched nothing when there is no target
+selection, so the driver's no-progress guard stops the game where Java's exception does. Flag
+`true`: no selection reads as no target and the activation ends normally (the previous Rust
+behaviour). Rust test `jd006_missing_target_selection_stops_by_default_and_ends_the_activation_when_fixed`.
+No certified gate reaches the path (both agents deselect a stale Furious Outburst before declaring
+it); four Swiftvine star gates × 20 seeds were unchanged by the switch.
 
 ---
 
@@ -253,7 +261,7 @@ because neither agent ends the turn at that prompt. Open follow-up: port the cra
 | **Surfaces as** | When an armour modification creates an alternate context (bb2025 Master Assassin re-rolls a Stab's armour; Old Pro), `injury(…, alternateInjuryContext)` runs `injuryRoll` on the alternate, and `setInjury` then interprets the ORIGINAL context. The original's armour held and it has no injury roll, so `interpretInjury` returns nothing and `setInjury` makes a casualty roll (d16 + d6) on it. |
 | **Effect** | The armour re-roll breaks the armour and the injury is rolled, but that roll is never interpreted: the alternate context ends with no injury, the original with a casualty roll it should never have had and no injury either. Whichever context is applied, **the victim is not hurt**, and two dice the rules never call for are spent. |
 | **Found on** | Skitter Stab-Stab, skaven vs human bb2025 seed 1 (BACKLOG §L, `af63a4ce1`); it also cleared underworld vs dark_elf bb2025 |
-| **Rust flag** | none yet |
+| **Rust flag** | `defect_fixes.modified_injury_interprets_alternate_context` (default `false` = defect) |
 | **Test** | `jd007_rerolledStabArmourInterpretsTheOriginalContext`: armour 1+1 holds, Master Assassin re-roll 6+6 breaks, injury 4+4 (a KO) is rolled on the alternate; then d16=3, d6=3 are rolled on the original; the alternate's state is `null`, and after the coach takes the re-roll and the result is applied the victim is still STANDING |
 
 ### In plain terms
@@ -277,7 +285,10 @@ and are not affected.
 ### What Rust does
 
 Ports it 1:1: a trait flag `interprets_member_injury` on the eleven types, a `defer_interpretation`
-context flag, and `set_injury_java_member` (`ffb-engine/src/injury.rs`, ~:682).
+context flag, and `set_injury_java_member` (`ffb-engine/src/injury.rs`, ~:682). Flag `true`
+(`modification_aware_injury_type_server.rs`): those types interpret the injury on the alternate
+context like every other type, and the original gets no casualty roll. Rust test
+`jd007_master_assassin_reroll_interprets_the_original_unless_fixed` (`injury_type_stab.rs`).
 
 ---
 
@@ -289,14 +300,16 @@ context flag, and `set_injury_java_member` (`ffb-engine/src/injury.rs`, ~:682).
 | **Surfaces as** | The Pitch Invasion report lists the Fanatic as stunned, the chain armour/injury dice are spent, and the player stays STANDING. |
 | **Effect** | The injury is rolled but never applied. Ball & Chain also converts stun to KO, so the rules outcome is at least a KO. |
 | **Found on** | `goblin` bb2025 seed 28, BACKLOG §H.47(a) |
-| **Rust flag** | none yet |
+| **Rust flag** | `defect_fixes.pitch_invasion_applies_chain_injury` (default `false` = defect) |
 | **Test** | `jd008_pitchInvasionRollsTheChainInjuryButLeavesTheFanaticStanding`: the bb2025 Kickoff sequence has no APOTHECARY step; `stunPlayers` picks the Fanatic (d1), rolls its injury (6+6, then a casualty roll), lists it as affected, and leaves it STANDING |
 
 ### What Rust does
 
 Ports it 1:1 (`step/bb2025/kickoff/step_apply_kickoff_result.rs`). The chain injury is rolled and,
 in bb2025, not handed on, so the Fanatic stays STANDING. bb2020's sequence does consume it. Test
-`a_pitch_invasion_discards_scatter_parameters_and_bb2025_drops_the_chain_injury`.
+`a_pitch_invasion_discards_scatter_parameters_and_bb2025_drops_the_chain_injury`. Flag `true`: bb2025
+hands the INJURY_RESULT on too, and the kick-off sequence's apothecary step applies it as in bb2020
+(same dice). Rust test `jd008_bb2025_pitch_invasion_hands_on_the_chain_injury_only_when_fixed`.
 
 ---
 

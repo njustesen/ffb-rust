@@ -1293,7 +1293,11 @@ impl StepApplyKickoffResult {
             // never consumed and the Fanatic stays STANDING. Rust runs the mixed sequence for both,
             // so bb2025 must not hand the result to those steps (goblin bb2025 @1.0 seed 28 i=0:
             // Java Fanatic `12,8,Standing`, Rust `-1,-1,Ko`).
-            if game.rules != ffb_model::enums::Rules::Bb2025 {
+            // JD-008 (docs/JAVA_DEFECTS.md): with the fix, bb2025 hands the result on too, and
+            // the sequence's apothecary step applies it as in bb2020.
+            if game.rules != ffb_model::enums::Rules::Bb2025
+                || game.defect_fixes.pitch_invasion_applies_chain_injury
+            {
                 params.extend(returned.into_iter().filter(|p| matches!(p, StepParameter::InjuryResult(_))));
             }
             events.push(GameEvent::KickoffPitchInvasionStun { player_id: id });
@@ -1457,6 +1461,40 @@ mod tests {
             let published = params.iter().any(|p| matches!(p, StepParameter::InjuryResult(_)));
             assert_eq!(published, rules == Rules::Bb2020, "{rules:?}: chain injury handed to the apothecary steps only where Java's sequence has them");
             assert_eq!(game.field_model.player_state("h1").map(|s| s.base()), Some(PS_STANDING));
+        }
+    }
+
+    /// JD-008: bb2025, a Pitch Invasion picks the Ball & Chain player. Default (Java): the chain
+    /// injury is rolled and dropped, the Fanatic stays STANDING. `defect_fixes.
+    /// pitch_invasion_applies_chain_injury`: the INJURY_RESULT is handed on, as in bb2020, for the
+    /// sequence's apothecary step to apply. Same dice either way.
+    /// Mirrors JavaDefectsTest.jd008_pitchInvasionRollsTheChainInjuryButLeavesTheFanaticStanding.
+    #[test]
+    fn jd008_bb2025_pitch_invasion_hands_on_the_chain_injury_only_when_fixed() {
+        use ffb_model::enums::{PlayerState, PS_STANDING, SkillId};
+        use ffb_model::model::skill_def::SkillWithValue;
+        use ffb_model::types::FieldCoordinate;
+
+        for fix in [false, true] {
+            let mut game = Game::new(test_team("home", 0), test_team("away", 0), Rules::Bb2025);
+            game.defect_fixes.pitch_invasion_applies_chain_injury = fix;
+            let mut fanatic = ffb_model::model::player::Player {
+                id: "h1".into(), name: "Fanatic".into(), nr: 1, position_id: "pos".into(),
+                movement: 3, strength: 7, agility: 3, passing: 6, armour: 8,
+                ..Default::default()
+            };
+            fanatic.starting_skills = vec![SkillWithValue { skill_id: SkillId::BallAndChain, value: None }];
+            game.team_home.players.push(fanatic);
+            game.field_model.set_player_coordinate("h1", FieldCoordinate::new(13, 7));
+            game.field_model.set_player_state("h1", PlayerState::new(PS_STANDING));
+
+            let step = make_step();
+            let mut rng = GameRng::new(7);
+            let before = rng.call_count;
+            let (_, params) = step.stun_random_standing_players(&mut game, &mut rng, true, 1);
+            assert_eq!(rng.call_count - before, 3, "fix={fix}: same dice (d1 pick + chain injury 2d6)");
+            let handed_on = params.iter().any(|p| matches!(p, StepParameter::InjuryResult(_)));
+            assert_eq!(handed_on, fix, "fix={fix}: Java drops the chain injury in bb2025");
         }
     }
 

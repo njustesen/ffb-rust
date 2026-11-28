@@ -59,6 +59,17 @@ impl Step for StepEndFuriousOutburst {
 
 impl StepEndFuriousOutburst {
     fn execute_step(&self, game: &mut Game, _rng: &mut GameRng) -> StepOutcome {
+        // JD-006 (docs/JAVA_DEFECTS.md): Java dereferences `getTargetSelectionState()` with no null
+        // check, and StepInitFuriousOutburst reaches here without one when the coach ends the turn
+        // at the target prompt (also: prone/stunned player, no eligible target) -- a
+        // NullPointerException that stops the game. Default: stop the same way (touch nothing,
+        // `Continue`; the driver's no-progress guard ends the game, as JD-002). With
+        // `defect_fixes.furious_outburst_survives_missing_target`: no selection = no target.
+        if game.field_model.target_selection_state.is_none()
+            && !game.defect_fixes.furious_outburst_survives_missing_target
+        {
+            return StepOutcome::cont();
+        }
         // Java: selectedPlayerId = fieldModel.getTargetSelectionState().getSelectedPlayerId()
         // Java: if (StringTool.isProvided(selectedPlayerId)) {
         //         target = game.getPlayerById(selectedPlayerId)
@@ -119,10 +130,36 @@ mod tests {
     use crate::step::framework::{StepAction, StepId};
     use ffb_model::enums::Rules;
 
+    /// Every path that reaches the end step in Java WITHOUT crashing carries a target selection
+    /// (the target branch's `new TargetSelectionState(id)` or the end-action branch's `.cancel()`).
     fn make_game() -> Game {
         let home = test_team("home", 0);
         let away = test_team("away", 0);
-        Game::new(home, away, Rules::Bb2025)
+        let mut game = Game::new(home, away, Rules::Bb2025);
+        game.field_model.target_selection_state = Some(ffb_model::model::TargetSelectionState::default());
+        game
+    }
+
+    /// JD-006: no target selection (the coach ended the turn at the Furious Outburst prompt).
+    /// Default (Java NullPointerException): the step stops, touching nothing. With
+    /// `defect_fixes.furious_outburst_survives_missing_target` the activation ends normally.
+    /// Mirrors JavaDefectsTest.jd006_endTurnAtFuriousOutburstPromptThrowsNpe.
+    #[test]
+    fn jd006_missing_target_selection_stops_by_default_and_ends_the_activation_when_fixed() {
+        for fix in [false, true] {
+            let mut game = make_game();
+            game.field_model.target_selection_state = None;
+            game.defect_fixes.furious_outburst_survives_missing_target = fix;
+            let mut step = StepEndFuriousOutburst::new();
+            let out = step.start(&mut game, &mut GameRng::new(0));
+            if fix {
+                assert_eq!(out.action, StepAction::NextStep);
+                assert_eq!(out.pushes.len(), 1, "the EndPlayerAction sequence follows");
+            } else {
+                assert_eq!(out.action, StepAction::Continue, "Java crashes here: nothing advances");
+                assert!(out.pushes.is_empty() && out.published.is_empty());
+            }
+        }
     }
 
     #[test]

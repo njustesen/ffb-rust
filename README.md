@@ -124,18 +124,18 @@ See [docs/HISTORY.md](ffb-rust/docs/HISTORY.md) for how each number was reached.
 Parity work turns up bugs in stock Java, where it does something no reading of the rules supports.
 Rust reproduces each one by default so the engines stay comparable, and where a fix exists it sits
 behind a flag on `Game::defect_fixes`. Each one is confirmed by a unit test that drives stock Java
-into it (`ffb-ai/.../defects/JavaDefectsTest.java`). Details, evidence, the Rust side of each and the
+into it (`ffb-ai/.../defects/JavaDefectsTest.java`) and by a Rust test of the flag off and on. Details, evidence, the Rust side of each and the
 suspects that turned out not to be defects are in [JAVA_DEFECTS.md](ffb-rust/docs/JAVA_DEFECTS.md).
 
 | ID | Edition | Defect | Rust fix flag |
 | --- | --- | --- | --- |
 | JD-001 | 2025 | A punt goes into the crowd, the kicker re-rolls the distance and the ball now lands on the pitch, yet the game still treats the ball as out of bounds and throws it in from that square on the pitch, which has no throw-in direction, so the game stops. (`StepPuntDistance` never clears `outOfBounds`.) | yes |
 | JD-002 | all | Fouling a prone Ball & Chain player: its armour counts as broken without an armour roll, but the referee then checks those (missing) armour dice for doubles, so the game stops. (`SneakyGitBehaviour`'s `StepReferee` hook reads a null `armorRoll`.) | yes |
-| JD-004 | 2020 | A failed leap is saved with a team re-roll and succeeds; when the opposing coach then answers whether to use Diving Tackle, the team pays for the same re-roll again, and a team with no re-rolls left goes to -1. (bb2020 `StepJump` lacks bb2025's Diving Tackle guard.) | not yet |
-| JD-005 | 2025 | A dodge fails, is team-re-rolled and fails again next to two or more Arm Bar players; when the opposing coach picks which Arm Bar applies, the team pays a second re-roll and the dodge is rolled a third time, so a dodge that failed twice can end with the player standing. (bb2025 `StepMoveDodge` re-runs the re-roll after the Arm Bar choice.) | not yet |
-| JD-006 | 2020, 2025 | A coach who ends the turn while choosing a Furious Outburst target stops the game. (`StepEndFuriousOutburst` reads a target selection that was never made; Rust does not reproduce the crash yet.) | not yet |
-| JD-007 | 2020, 2025 | A skill re-rolls a failed armour roll (e.g. Master Assassin on a Stab) and the re-roll breaks the armour, yet the victim is never hurt: the injury dice are rolled but never applied, and an extra casualty roll is made for the original roll, whose armour held. (Eleven injury types finish with the context-less `setInjury`, which works on the original injury context.) | not yet |
-| JD-008 | 2025 | When a Pitch Invasion picks a Ball & Chain player, the player is reported stunned and its injury is rolled, but the result is never applied and the player stays standing. (`UtilServerInjury.dropPlayer` only publishes the injury, and the bb2025 kick-off sequence has no step that applies it.) | not yet |
+| JD-004 | 2020 | A failed leap is saved with a team re-roll and succeeds; when the opposing coach then answers whether to use Diving Tackle, the team pays for the same re-roll again, and a team with no re-rolls left goes to -1. (bb2020 `StepJump` lacks bb2025's Diving Tackle guard.) | yes |
+| JD-005 | 2025 | A dodge fails, is team-re-rolled and fails again next to two or more Arm Bar players; when the opposing coach picks which Arm Bar applies, the team pays a second re-roll and the dodge is rolled a third time, so a dodge that failed twice can end with the player standing. (bb2025 `StepMoveDodge` re-runs the re-roll after the Arm Bar choice.) | yes |
+| JD-006 | 2020, 2025 | A coach who ends the turn while choosing a Furious Outburst target stops the game. (`StepEndFuriousOutburst` reads a target selection that was never made.) | yes |
+| JD-007 | 2020, 2025 | A skill re-rolls a failed armour roll (e.g. Master Assassin on a Stab) and the re-roll breaks the armour, yet the victim is never hurt: the injury dice are rolled but never applied, and an extra casualty roll is made for the original roll, whose armour held. (Eleven injury types finish with the context-less `setInjury`, which works on the original injury context.) | yes |
+| JD-008 | 2025 | When a Pitch Invasion picks a Ball & Chain player, the player is reported stunned and its injury is rolled, but the result is never applied and the player stays standing. (`UtilServerInjury.dropPlayer` only publishes the injury, and the bb2025 kick-off sequence has no step that applies it.) | yes |
 
 Not every oddity is a defect. The bb2016 card deck is kept in JVM hash order (PQ-001, formerly JD-003),
 which is legal under the rules but means Java cannot replay its own card draws.
