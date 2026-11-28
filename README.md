@@ -129,13 +129,13 @@ suspects that turned out not to be defects are in [JAVA_DEFECTS.md](ffb-rust/doc
 
 | ID | Edition | Defect | Rust fix flag |
 | --- | --- | --- | --- |
-| JD-001 | 2025 | A re-rolled punt distance keeps a stale out-of-bounds flag, so the throw-in from an interior square crashes | yes |
-| JD-002 | all | A Sneaky Git foul on a Ball & Chain player reads a missing armour roll and crashes | yes |
-| JD-004 | 2020 | A re-rolled leap spends its team re-roll again after the Diving Tackle answer | not yet |
-| JD-005 | 2025 | A re-rolled dodge spends its re-roll again after the Arm Bar choice, and rolls a third time | not yet |
-| JD-006 | 2020, 2025 | Ending the turn at the Furious Outburst prompt crashes (Rust does not reproduce this yet) | not yet |
-| JD-007 | 2020, 2025 | After an armour re-roll (e.g. Master Assassin), eleven injury types interpret the wrong injury context, so the victim is not hurt | not yet |
-| JD-008 | 2025 | A Pitch Invasion on a Ball & Chain player rolls the injury but never applies it | not yet |
+| JD-001 | 2025 | `StepPuntDistance` sets `outOfBounds` when the punt leaves the pitch but never clears it, so when a re-rolled distance lands the ball on the pitch it still publishes a throw-in from that interior square, and `ThrowInMechanic` throws `IllegalStateException` because an interior square has no throw-in direction. | yes |
+| JD-002 | all | The referee's armour-doubles check (the `StepReferee` hook in `SneakyGitBehaviour`, run for every foul) reads `armorRoll[0]` without a null check, but a fouled Ball & Chain player's armour is broken with no armour roll, so the step throws `NullPointerException`. | yes |
+| JD-004 | 2020 | bb2020 `StepJump` has no `usingDivingTackle` guard (bb2025's has one), so when the opposing coach answers the Diving Tackle question after a team-re-rolled leap has succeeded, `executeStep` runs again and spends the team re-roll a second time, taking the bank below zero. | not yet |
+| JD-005 | 2025 | bb2025 `StepMoveDodge` still has DODGE as its re-rolled action when the opposing coach answers the Arm Bar choice (two or more Arm Bar players), so `executeStep` spends the team re-roll a second time and rolls a third dodge die, which can turn the twice-failed dodge into a success. | not yet |
+| JD-006 | 2020, 2025 | `StepInitFuriousOutburst` jumps to the end of the sequence without setting a target selection when the coach ends the turn at the target prompt, and `StepEndFuriousOutburst` dereferences that missing target selection, throwing `NullPointerException` (Rust does not reproduce the crash yet). | not yet |
+| JD-007 | 2020, 2025 | When a skill re-rolls a failed armour roll (e.g. bb2025 Master Assassin on a Stab), eleven injury types finish with the context-less `setInjury`, which works on the original injury context instead of the re-rolled one, so Java rolls a needless casualty for the original (whose armour held) and never turns the re-rolled injury into a result, leaving the victim unhurt. | not yet |
+| JD-008 | 2025 | When a Pitch Invasion picks a Ball & Chain player, `UtilServerInjury.dropPlayer` rolls the chain injury and only publishes it as `INJURY_RESULT` instead of changing the player's state, and the bb2025 kick-off sequence has no apothecary step to apply it, so the Fanatic is reported stunned but stays standing. | not yet |
 
 Not every oddity is a defect. The bb2016 card deck is kept in JVM hash order (PQ-001, formerly JD-003),
 which is legal under the rules but means Java cannot replay its own card draws.
