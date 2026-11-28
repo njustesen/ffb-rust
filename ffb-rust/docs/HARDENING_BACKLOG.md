@@ -73,7 +73,10 @@ Q1.1's mirror 330 run is queued for the night (expect snotling cells red until Q
   `--heur-classes` diverges on seeds 7, 18, 30, 82 (Java activates a FOUL whose step changes nothing,
   Rust a Move; reports differ). Same with the frozen cert9 exe+jar, so it is old. Not a certified config,
   but a real Java/Rust agent-contract difference: root-cause and fix.
-- [~] **Q1.2b Stuck step: underworld_37844 vs dark_elf bb2025** (cross, seed 3, scale 1.0, classes all;
+- [x] **Q1.2b Stuck step: underworld_37844 vs dark_elf bb2025** -- **resolved: it is JD-001** (see Log):
+  the re-rolled punt distance leaves outOfBounds on, the throw-in square is interior, Java throws
+  after rolling the direction (rng 105) and swallows the exception. Rust now spends that die; the
+  harness names the stuck step JAVA_CRASH JD-001. Original: (cross, seed 3, scale 1.0, classes all;
   reproduces on head). Dark elf Away2 PUNTs: PuntDirection d6 (rng 102) + re-roll offer declined,
   PuntDistance 6 (103) → TRR accepted → 3 (104), ball out of bounds → THROW_IN. **Java** then rolls one
   more `rollThrowInDirection` (105) and sits in CATCH_SCATTER_THROW_IN with no dialog (only path:
@@ -380,6 +383,12 @@ coverage suite (`--coverage-bias`, mirror 330) at night.
 
 ## Log
 (newest first: date · item · commit · one line)
+
+- 2026-11-28 · Q1.2b · (this commit) · cert10 cross red underworld_37844 v dark_elf bb2025 s3 is JD-001
+  (stale punt outOfBounds → interior throw-in → swallowed IllegalStateException after the direction
+  die). Rust spends the direction die before stopping (Java rng 105); the harness reports a STUCK_STEP
+  CATCH_SCATTER_THROW_IN with the JD-001 signature as JAVA_CRASH, so the verdict classifies it.
+  Seed 3 now `ABORT (JAVA-CRASH)`; cargo test engine+parity green; smoke 3×20/20.
 
 - 2026-11-28 · Q1.1 + Q1.3 · (this commit) · mirror 330 on frozen q1b (strict per-step verdict, wider
   hash, aborts red): 325 green; 4 reds fixed this night (heat-exhausted reset 9397c84a4, bb2016

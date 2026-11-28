@@ -321,6 +321,12 @@ impl StepCatchScatterThrowIn {
                 // is on, which is the point of that flag.
                 if let Some(c) = self.throw_in_coordinate {
                     if !is_throw_in_edge(c) {
+                        // Java `throwInBall` rolls the direction (`rollThrowInDirection`, or the
+                        // corner d3) BEFORE `interpretThrowInDirectionRoll` throws, so the die is
+                        // spent (underworld_37844 v dark_elf bb2025 @1.0 s3: Java rng 105, Rust
+                        // stopped at 104).
+                        let mechanic = crate::mechanic::throw_in_mechanic_for(game.rules);
+                        let _ = if mechanic.is_corner_throw_in(c) { rng.d3() } else { rng.d6() };
                         return StepOutcome::cont();
                     }
                 }

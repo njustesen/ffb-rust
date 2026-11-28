@@ -103,6 +103,13 @@ Flag `true`: `StepPuntDistance` clears `out_of_bounds` on an in-bounds landing, 
 a normal catch, and the game continues. This is the behaviour the rules describe, and it is NOT
 parity-comparable against stock Java.
 
+Rust also spends the throw-in direction die before stopping (Java's `throwInBall` rolls it before
+`interpretThrowInDirectionRoll` throws). The harness names the swallowed exception: a STUCK_STEP at
+CATCH_SCATTER_THROW_IN with `isOutOfBounds()` and an interior ball square prints
+`JAVA_CRASH ... JD-001` and ends the game as `java_crash`, so the §Q1.2 verdict reports it as a
+JAVA-CRASH instead of an unexplained stuck game (2026-11-28; underworld_37844 v dark_elf bb2025 @1.0
+seed 3, the BACKLOG §Q1.2b repro).
+
 ---
 
 ## JD-002 — a Sneaky Git foul on a Ball & Chain player dereferences a null armour roll

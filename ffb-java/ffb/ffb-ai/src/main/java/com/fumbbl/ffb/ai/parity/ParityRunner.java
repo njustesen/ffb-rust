@@ -442,6 +442,20 @@ public class ParityRunner {
                     // wrong cause. The STUCK_STEP line above was always printed, but `grep
                     // END_REASON` alone gave the opposite answer.
                     endReason = "stuck_step";
+                    // JAVA_DEFECTS.md JD-001: a re-rolled punt distance leaves the stale
+                    // outOfBounds flag on, StepCatchScatterThrowIn throws an IllegalStateException
+                    // for the interior throw-in square, and the engine swallows it -- so the crash
+                    // only ever surfaces here, as a stuck CATCH_SCATTER_THROW_IN. Name it like any
+                    // other stock-Java crash (§Q1.2: reported separately, not a pass).
+                    com.fumbbl.ffb.FieldCoordinate ballAt = game.getFieldModel().getBallCoordinate();
+                    if (stepId == StepId.CATCH_SCATTER_THROW_IN && game.getFieldModel().isOutOfBounds()
+                            && ballAt != null && ballAt.getX() >= 1 && ballAt.getX() <= 24
+                            && ballAt.getY() >= 1 && ballAt.getY() <= 13) {
+                        System.err.println("JAVA_CRASH seed=" + Long.toUnsignedString(currentSeed)
+                            + " step=" + stepId + " JD-001 (swallowed IllegalStateException: Unable to"
+                            + " determine throwInDirection, interior throw-in at " + ballAt + ")");
+                        endReason = "java_crash";
+                    }
                     break;
                 }
             } else {
